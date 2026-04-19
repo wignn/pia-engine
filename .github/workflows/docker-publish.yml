@@ -21,7 +21,9 @@ jobs:
             dockerfile: infrastructure/Dockerfile.core
           - image: atlsd-control-plane
             dockerfile: infrastructure/Dockerfile.control-plane
-
+          - image: atlsd-portal
+            dockerfile: infrastructure/Dockerfile.portal
+            
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

@@ -82,6 +82,15 @@ services:
     networks:
       - private
 
+  portal:
+    container_name: portal
+    image: wign/atlsd-portal
+    build:
+      context: .
+      dockerfile: ./Dockerfile.portal
+    env_file:
+      - ./env/
+
   rsshub:
     image: diygod/rsshub:latest
     container_name: rsshub
