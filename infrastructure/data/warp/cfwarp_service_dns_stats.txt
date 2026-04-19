@@ -100,3 +100,24 @@ Per origin:
 2026-04-19T10:25:16.467Z warp-dns-stats: Queries: 368, Success: 47.3%, TimedOut: 0.0%, NoRecordsFound: 52.7%, Other Error: 0.0%, Avg Duration: 0.81ms
 Per origin:
   [primary]    Queries: 368, Success: 47.3%, TimedOut: 0.0%, NoRecordsFound: 52.7%, Other Error: 0.0%, Avg Duration: 0.81ms
+2026-04-19T10:27:16.466Z warp-dns-stats: Queries: 310, Success: 47.1%, TimedOut: 0.0%, NoRecordsFound: 52.9%, Other Error: 0.0%, Avg Duration: 1.30ms
+Per origin:
+  [primary]    Queries: 310, Success: 47.1%, TimedOut: 0.0%, NoRecordsFound: 52.9%, Other Error: 0.0%, Avg Duration: 1.30ms
+2026-04-19T10:29:16.466Z warp-dns-stats: Queries: 390, Success: 47.4%, TimedOut: 0.0%, NoRecordsFound: 52.6%, Other Error: 0.0%, Avg Duration: 1.08ms
+Per origin:
+  [primary]    Queries: 390, Success: 47.4%, TimedOut: 0.0%, NoRecordsFound: 52.6%, Other Error: 0.0%, Avg Duration: 1.08ms
+2026-04-19T10:31:16.466Z warp-dns-stats: Queries: 352, Success: 47.7%, TimedOut: 0.0%, NoRecordsFound: 52.3%, Other Error: 0.0%, Avg Duration: 3.09ms
+Per origin:
+  [primary]    Queries: 352, Success: 47.7%, TimedOut: 0.0%, NoRecordsFound: 52.3%, Other Error: 0.0%, Avg Duration: 3.09ms
+2026-04-19T10:33:16.467Z warp-dns-stats: Queries: 388, Success: 47.4%, TimedOut: 0.0%, NoRecordsFound: 52.6%, Other Error: 0.0%, Avg Duration: 0.85ms
+Per origin:
+  [primary]    Queries: 388, Success: 47.4%, TimedOut: 0.0%, NoRecordsFound: 52.6%, Other Error: 0.0%, Avg Duration: 0.85ms
+2026-04-19T10:35:16.467Z warp-dns-stats: Queries: 350, Success: 47.1%, TimedOut: 0.0%, NoRecordsFound: 52.9%, Other Error: 0.0%, Avg Duration: 1.13ms
+Per origin:
+  [primary]    Queries: 350, Success: 47.1%, TimedOut: 0.0%, NoRecordsFound: 52.9%, Other Error: 0.0%, Avg Duration: 1.13ms
+2026-04-19T10:37:16.466Z warp-dns-stats: Queries: 310, Success: 47.1%, TimedOut: 0.0%, NoRecordsFound: 52.9%, Other Error: 0.0%, Avg Duration: 1.07ms
+Per origin:
+  [primary]    Queries: 310, Success: 47.1%, TimedOut: 0.0%, NoRecordsFound: 52.9%, Other Error: 0.0%, Avg Duration: 1.07ms
+2026-04-19T10:39:16.466Z warp-dns-stats: Queries: 352, Success: 47.7%, TimedOut: 0.0%, NoRecordsFound: 52.3%, Other Error: 0.0%, Avg Duration: 0.99ms
+Per origin:
+  [primary]    Queries: 352, Success: 47.7%, TimedOut: 0.0%, NoRecordsFound: 52.3%, Other Error: 0.0%, Avg Duration: 0.99ms

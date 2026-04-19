@@ -17,9 +17,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - image: atlds-core
+          - image: atlsd-core
             dockerfile: infrastructure/Dockerfile.core
-          - image: atlds-control-plane
+          - image: atlsd-control-plane
             dockerfile: infrastructure/Dockerfile.control-plane
 
     steps:

@@ -64,6 +64,7 @@ services:
 
   control-plane:
     container_name: world-control-plane
+    image: wign/
     build:
       context: ..
       dockerfile: infrastructure/Dockerfile.control-plane
