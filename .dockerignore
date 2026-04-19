@@ -1,0 +1,13 @@
+.git
+.gitignore
+target
+**/target
+.cargo
+.env
+.env.*
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+portal/node_modules
+portal/dist

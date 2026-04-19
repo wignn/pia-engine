@@ -1,0 +1,10 @@
+.git
+.gitignore
+target
+.cargo
+.env
+.env.*
+.vscode
+.idea
+.DS_Store
+Thumbs.db

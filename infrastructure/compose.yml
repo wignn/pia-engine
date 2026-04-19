@@ -1,0 +1,113 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: atlsd
+    restart: unless-stopped
+    env_file:
+      - ./env/.env.db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      private:
+        ipv4_address: 172.29.0.10
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d forex" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  warp:
+    image: caomingjun/warp
+    container_name: warp
+    restart: always
+    device_cgroup_rules:
+      - 'c 10:200 rwm'
+    environment:
+      - WARP_SLEEP=2
+    cap_add:
+      - MKNOD
+      - AUDIT_WRITE
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - ./data/warp:/var/lib/cloudflare-warp
+    ports:
+      - "8090:8090"
+    networks:
+      - private
+
+  core:
+    container_name: world-core
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.core
+      args:
+        - DOCKER_BUILD_TYPE=release
+    env_file:
+      - ./env/.env.core
+    network_mode: "service:warp"
+    depends_on:
+      warp:
+        condition: service_started
+        restart: true
+      rsshub:
+        condition: service_started
+        restart: true
+      postgres:
+        condition: service_healthy
+        restart: true
+    restart: always
+
+  control-plane:
+    container_name: world-control-plane
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.control-plane
+      args:
+        - DOCKER_BUILD_TYPE=release
+    env_file:
+      - ./env/.env.control-plane
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    networks:
+      - private
+
+  rsshub:
+    image: diygod/rsshub:latest
+    container_name: rsshub
+    restart: unless-stopped
+    env_file:
+      - ./env/.env.rsshub
+    ports:
+      - "1200:1200"
+    networks:
+      - private
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:1200/',res=>process.exit(res.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+networks:
+  private:
+    external: false
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
+
+volumes:
+  postgres_data:
