@@ -4,75 +4,109 @@ use axum::{
     middleware::Next,
     response::Response,
 };
+use std::time::Instant;
 
 use crate::api::state::AppState;
+use crate::api::usage_tracker::UsageEvent;
 use crate::tenant::context::TenantContext;
 
-/// API key authentication middleware.
-/// Validates keys against DB-backed tenant registry (cached in memory).
-/// Falls back to env-based API_KEYS for admin/backward compatibility.
-/// Injects TenantContext into request extensions on success.
-pub async fn api_key_auth(
+pub async fn optional_api_key_auth(
     axum::extract::State(state): axum::extract::State<AppState>,
     mut request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    let path = request.uri().path();
+    let _ = attach_tenant_context_if_valid(&state, &mut request).await;
+
+    if let Some(ctx) = request.extensions().get::<TenantContext>() {
+        if !state.usage_tracker.try_consume_daily_quota(ctx).await {
+            return Err(StatusCode::TOO_MANY_REQUESTS);
+        }
+    }
+
+    Ok(next.run(request).await)
+}
+
+pub async fn strict_api_key_auth(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    if !attach_tenant_context_if_valid(&state, &mut request).await {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    if let Some(ctx) = request.extensions().get::<TenantContext>() {
+        if !state.usage_tracker.try_consume_daily_quota(ctx).await {
+            return Err(StatusCode::TOO_MANY_REQUESTS);
+        }
+    }
+
+    Ok(next.run(request).await)
+}
+
+pub async fn usage_logger(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let path = request.uri().path().to_string();
     let method = request.method().clone();
+    let usage_ctx = request.extensions().get::<TenantContext>().cloned();
+    let started = Instant::now();
+    let response = next.run(request).await;
 
-    // Skip auth for public endpoints
-    if path == "/health" || path == "/" {
-        return Ok(next.run(request).await);
-    }
-    // WebSocket auth is handled at upgrade time (via query param)
-    if path.starts_with("/api/v1/ws/") {
-        return Ok(next.run(request).await);
-    }
-    // Public GET endpoints
-    if method == axum::http::Method::GET
-        && (path.starts_with("/api/v1/forex/news")
-            || path.starts_with("/api/v1/equity/news"))
-    {
-        return Ok(next.run(request).await);
+    if let Some(ctx) = usage_ctx {
+        if !ctx.is_admin {
+            let elapsed_ms = started.elapsed().as_millis().min(i32::MAX as u128) as i32;
+            state
+                .usage_tracker
+                .enqueue(UsageEvent {
+                    user_id: ctx.user_id,
+                    api_key_id: ctx.api_key_id,
+                    endpoint: path,
+                    method: method.as_str().to_string(),
+                    status_code: i32::from(response.status().as_u16()),
+                    response_ms: elapsed_ms,
+                })
+                .await;
+        }
     }
 
-    // Extract API key from header, bearer, or query param
+    Ok(response)
+}
+
+async fn attach_tenant_context_if_valid(state: &AppState, request: &mut Request) -> bool {
     let raw_key = extract_key(&request);
 
-    let Some(raw) = raw_key else {
-        // No API keys configured at all = allow (backward compat)
-        if state.config.api_keys.is_empty() {
-            tracing::warn!("no API keys configured, all requests allowed");
-            return Ok(next.run(request).await);
+    match raw_key {
+        Some(raw) => {
+            if state.config.api_keys.contains(&raw) {
+                request.extensions_mut().insert(TenantContext::admin());
+                return true;
+            } else if let Some(registry) = &state.tenant_registry {
+                if let Some(ctx) = registry.validate_key(&raw).await {
+                    request.extensions_mut().insert(ctx);
+                    return true;
+                }
+                tracing::warn!(
+                    path = %request.uri().path(),
+                    key_prefix = %if raw.len() > 16 { &raw[..16] } else { &raw },
+                    "API key auth failed — key not found in env or tenant registry"
+                );
+            }
         }
-        return Err(StatusCode::UNAUTHORIZED);
-    };
-
-    // 1. Check env-based admin keys (backward compatibility for "olin" etc.)
-    if state.config.api_keys.contains(&raw) {
-        request.extensions_mut().insert(TenantContext::admin());
-        return Ok(next.run(request).await);
+        None => {
+            if state.config.api_keys.is_empty() {
+                tracing::warn!("no API keys configured, all requests allowed");
+                return true;
+            }
+        }
     }
 
-    // 2. Check DB-backed tenant registry
-    if let Some(registry) = &state.tenant_registry {
-        if let Some(ctx) = registry.validate_key(&raw).await {
-            request.extensions_mut().insert(ctx);
-            return Ok(next.run(request).await);
-        }
-    }
-
-    tracing::warn!(
-        path = %request.uri().path(),
-        key_prefix = %if raw.len() > 16 { &raw[..16] } else { &raw },
-        "API key auth failed — key not found in env or tenant registry"
-    );
-
-    Err(StatusCode::UNAUTHORIZED)
+    false
 }
 
 fn extract_key(request: &Request) -> Option<String> {
-    // X-API-Key header
     if let Some(val) = request.headers().get("X-API-Key") {
         if let Ok(s) = val.to_str() {
             if !s.is_empty() {
@@ -81,7 +115,6 @@ fn extract_key(request: &Request) -> Option<String> {
         }
     }
 
-    // Authorization: Bearer <token>
     if let Some(val) = request.headers().get(header::AUTHORIZATION) {
         if let Ok(s) = val.to_str() {
             if let Some(token) = s.strip_prefix("Bearer ") {
@@ -92,7 +125,6 @@ fn extract_key(request: &Request) -> Option<String> {
         }
     }
 
-    // Query param: ?api_key= or ?token=
     let uri = request.uri();
     uri.query().and_then(|q| {
         url::form_urlencoded::parse(q.as_bytes())

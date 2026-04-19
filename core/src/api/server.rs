@@ -12,7 +12,7 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::info;
 
 use crate::api::handlers;
-use crate::api::middleware::api_key_auth;
+use crate::api::middleware::{optional_api_key_auth, strict_api_key_auth, usage_logger};
 use crate::api::state::AppState;
 use crate::ws;
 
@@ -45,7 +45,7 @@ pub fn build_router(state: AppState) -> Router {
         ])
         .allow_credentials(true);
 
-    Router::new()
+    let public_api = Router::new()
         .route("/health", get(handlers::health::health))
         .route("/", get(handlers::health::root))
         .route("/api/v1/ws/forex", get(ws_handler))
@@ -56,8 +56,17 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/forex/news/latest", get(handlers::news::latest_news))
         .route("/api/v1/forex/news/{id}", get(handlers::news::get_news))
         .route("/api/v1/equity/news/latest", get(handlers::stock::latest_stock_news))
+        .layer(middleware::from_fn_with_state(state.clone(), usage_logger))
+        .layer(middleware::from_fn_with_state(state.clone(), optional_api_key_auth));
+
+    let private_api = Router::new()
         .route("/api/v1/content/scrape", post(handlers::scraping::scrape_article))
-        .layer(middleware::from_fn_with_state(state.clone(), api_key_auth))
+        .layer(middleware::from_fn_with_state(state.clone(), usage_logger))
+        .layer(middleware::from_fn_with_state(state.clone(), strict_api_key_auth));
+
+    Router::new()
+        .merge(public_api)
+        .merge(private_api)
         .layer(cors)
         .with_state(state)
 }

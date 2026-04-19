@@ -19,6 +19,7 @@ use tracing::{error, info, warn};
 use tracing_subscriber::{fmt, EnvFilter};
 
 use api::state::AppState;
+use api::usage_tracker::UsageTracker;
 use collector::calendar::CalendarCollector;
 use collector::price::{DataCollector, DataCollectorConfig};
 use collector::rss::RSSCollector;
@@ -90,6 +91,7 @@ async fn main() {
 
     let stats_hub = stats::StatsHub::new();
     let stats_interval = Duration::from_secs(cfg.stats_interval_sec);
+    let usage_tracker = Arc::new(UsageTracker::new(pool.clone(), redis_client.clone()));
 
     // Initialize tenant registry (SaaS layer)
     let tenant_registry = TenantRegistry::new(pool.clone());
@@ -102,6 +104,7 @@ async fn main() {
         db: pool.clone(),
         config: cfg.clone(),
         tenant_registry: Some(tenant_registry.clone()),
+        usage_tracker,
     };
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);

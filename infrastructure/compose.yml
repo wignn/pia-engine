@@ -42,6 +42,7 @@ services:
 
   core:
     container_name: world-core
+    image: wign/atlsd-core
     build:
       context: ..
       dockerfile: infrastructure/Dockerfile.core
@@ -64,7 +65,7 @@ services:
 
   control-plane:
     container_name: world-control-plane
-    image: wign/
+    image: wign/atlsd-control-plane
     build:
       context: ..
       dockerfile: infrastructure/Dockerfile.control-plane
