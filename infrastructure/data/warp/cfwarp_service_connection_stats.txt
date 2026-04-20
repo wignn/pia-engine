@@ -1902,3 +1902,4 @@
 {"timestamp":"2026-04-20T09:53:12.376Z","fields":{"message":"H2 tunnel TCP stats","stats_type":"tcp","rtt_us":21166,"latency_ms":21,"bytes_sent":9654407,"bytes_rexmit":22965,"loss_rate":"Some(\"0.2379%\")"},"target":"warp-connection-stats"}
 {"timestamp":"2026-04-20T09:53:27.377Z","fields":{"message":"H2 tunnel TCP stats","stats_type":"tcp","rtt_us":23691,"latency_ms":23,"bytes_sent":9678093,"bytes_rexmit":22965,"loss_rate":"Some(\"0.2373%\")"},"target":"warp-connection-stats"}
 {"timestamp":"2026-04-20T09:53:42.377Z","fields":{"message":"H2 tunnel TCP stats","stats_type":"tcp","rtt_us":22438,"latency_ms":22,"bytes_sent":9702063,"bytes_rexmit":22965,"loss_rate":"Some(\"0.2367%\")"},"target":"warp-connection-stats"}
+{"timestamp":"2026-04-20T09:53:57.377Z","fields":{"message":"H2 tunnel TCP stats","stats_type":"tcp","rtt_us":24259,"latency_ms":24,"bytes_sent":9731686,"bytes_rexmit":22965,"loss_rate":"Some(\"0.2360%\")"},"target":"warp-connection-stats"}
