@@ -3,6 +3,7 @@ use std::future::Future;
 
 use chrono::Utc;
 use serde::Serialize;
+use serde_json::Value as JsonValue;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 use tradingview::live::{
@@ -136,7 +137,11 @@ impl DataCollector {
                     }
                 }
                 TradingViewResponse::Error(e, context) => {
-                    warn!(error = %e, ctx = ?context, "price stream received error event");
+                    if is_benign_tv_protocol_error(&e.to_string(), &context) {
+                        debug!(error = %e, ctx = ?context, "price stream benign protocol event");
+                    } else {
+                        warn!(error = %e, ctx = ?context, "price stream received error event");
+                    }
                 }
                 _ => {}
             }
@@ -171,4 +176,15 @@ fn format_data_server(server: DataServer) -> &'static str {
         DataServer::WidgetData => "widgetdata",
         DataServer::MobileData => "mobile-data",
     }
+}
+
+fn is_benign_tv_protocol_error(error: &str, context: &[JsonValue]) -> bool {
+    let e = error.to_ascii_lowercase();
+    if !e.contains("invalid_method") {
+        return false;
+    }
+
+    context
+        .iter()
+        .any(|entry| matches!(entry, JsonValue::String(s) if s.eq_ignore_ascii_case("qsd")))
 }

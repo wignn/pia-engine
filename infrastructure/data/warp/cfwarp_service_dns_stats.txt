@@ -379,3 +379,202 @@ Per origin:
 2026-04-19T13:31:16.491Z warp-dns-stats: Queries: 636, Success: 48.9%, TimedOut: 0.2%, NoRecordsFound: 50.9%, Other Error: 0.0%, Avg Duration: 9.17ms
 Per origin:
   [primary]    Queries: 636, Success: 48.9%, TimedOut: 0.2%, NoRecordsFound: 50.9%, Other Error: 0.0%, Avg Duration: 9.17ms
+2026-04-20T07:42:28.315Z warp-dns-stats: Queries: 0, Success: 0.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+2026-04-20T07:44:28.316Z warp-dns-stats: Queries: 1012, Success: 51.0%, TimedOut: 0.0%, NoRecordsFound: 49.0%, Other Error: 0.0%, Avg Duration: 2.32ms
+Per origin:
+  [primary]    Queries: 1010, Success: 50.9%, TimedOut: 0.0%, NoRecordsFound: 49.1%, Other Error: 0.0%, Avg Duration: 2.32ms
+  [fixed]      Queries: 2, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+2026-04-20T07:46:28.315Z warp-dns-stats: Queries: 512, Success: 48.4%, TimedOut: 0.2%, NoRecordsFound: 51.4%, Other Error: 0.0%, Avg Duration: 9.89ms
+Per origin:
+  [primary]    Queries: 512, Success: 48.4%, TimedOut: 0.2%, NoRecordsFound: 51.4%, Other Error: 0.0%, Avg Duration: 9.89ms
+2026-04-20T07:48:28.315Z warp-dns-stats: Queries: 480, Success: 47.7%, TimedOut: 0.2%, NoRecordsFound: 52.1%, Other Error: 0.0%, Avg Duration: 10.53ms
+Per origin:
+  [primary]    Queries: 480, Success: 47.7%, TimedOut: 0.2%, NoRecordsFound: 52.1%, Other Error: 0.0%, Avg Duration: 10.53ms
+2026-04-20T07:50:28.316Z warp-dns-stats: Queries: 480, Success: 47.9%, TimedOut: 0.2%, NoRecordsFound: 51.9%, Other Error: 0.0%, Avg Duration: 10.37ms
+Per origin:
+  [primary]    Queries: 480, Success: 47.9%, TimedOut: 0.2%, NoRecordsFound: 51.9%, Other Error: 0.0%, Avg Duration: 10.37ms
+2026-04-20T07:52:28.316Z warp-dns-stats: Queries: 360, Success: 47.5%, TimedOut: 0.3%, NoRecordsFound: 52.2%, Other Error: 0.0%, Avg Duration: 14.44ms
+Per origin:
+  [primary]    Queries: 360, Success: 47.5%, TimedOut: 0.3%, NoRecordsFound: 52.2%, Other Error: 0.0%, Avg Duration: 14.44ms
+2026-04-20T07:54:28.316Z warp-dns-stats: Queries: 400, Success: 47.8%, TimedOut: 0.0%, NoRecordsFound: 52.2%, Other Error: 0.0%, Avg Duration: 2.62ms
+Per origin:
+  [primary]    Queries: 400, Success: 47.8%, TimedOut: 0.0%, NoRecordsFound: 52.2%, Other Error: 0.0%, Avg Duration: 2.62ms
+2026-04-20T07:56:28.316Z warp-dns-stats: Queries: 408, Success: 48.5%, TimedOut: 0.0%, NoRecordsFound: 51.5%, Other Error: 0.0%, Avg Duration: 3.76ms
+Per origin:
+  [primary]    Queries: 408, Success: 48.5%, TimedOut: 0.0%, NoRecordsFound: 51.5%, Other Error: 0.0%, Avg Duration: 3.76ms
+2026-04-20T07:58:28.316Z warp-dns-stats: Queries: 362, Success: 47.2%, TimedOut: 0.3%, NoRecordsFound: 52.5%, Other Error: 0.0%, Avg Duration: 13.88ms
+Per origin:
+  [primary]    Queries: 362, Success: 47.2%, TimedOut: 0.3%, NoRecordsFound: 52.5%, Other Error: 0.0%, Avg Duration: 13.88ms
+2026-04-20T08:00:28.316Z warp-dns-stats: Queries: 354, Success: 49.4%, TimedOut: 0.6%, NoRecordsFound: 50.0%, Other Error: 0.0%, Avg Duration: 25.82ms
+Per origin:
+  [primary]    Queries: 354, Success: 49.4%, TimedOut: 0.6%, NoRecordsFound: 50.0%, Other Error: 0.0%, Avg Duration: 25.82ms
+2026-04-20T08:02:28.315Z warp-dns-stats: Queries: 318, Success: 46.9%, TimedOut: 0.3%, NoRecordsFound: 52.8%, Other Error: 0.0%, Avg Duration: 14.64ms
+Per origin:
+  [primary]    Queries: 318, Success: 46.9%, TimedOut: 0.3%, NoRecordsFound: 52.8%, Other Error: 0.0%, Avg Duration: 14.64ms
+2026-04-20T08:04:28.316Z warp-dns-stats: Queries: 316, Success: 47.2%, TimedOut: 0.3%, NoRecordsFound: 52.5%, Other Error: 0.0%, Avg Duration: 13.72ms
+Per origin:
+  [primary]    Queries: 316, Success: 47.2%, TimedOut: 0.3%, NoRecordsFound: 52.5%, Other Error: 0.0%, Avg Duration: 13.72ms
+2026-04-20T08:06:28.316Z warp-dns-stats: Queries: 352, Success: 47.2%, TimedOut: 0.0%, NoRecordsFound: 52.8%, Other Error: 0.0%, Avg Duration: 1.32ms
+Per origin:
+  [primary]    Queries: 352, Success: 47.2%, TimedOut: 0.0%, NoRecordsFound: 52.8%, Other Error: 0.0%, Avg Duration: 1.32ms
+2026-04-20T08:08:28.316Z warp-dns-stats: Queries: 384, Success: 47.4%, TimedOut: 0.0%, NoRecordsFound: 52.6%, Other Error: 0.0%, Avg Duration: 1.12ms
+Per origin:
+  [primary]    Queries: 384, Success: 47.4%, TimedOut: 0.0%, NoRecordsFound: 52.6%, Other Error: 0.0%, Avg Duration: 1.12ms
+2026-04-20T08:08:42.379Z warp-dns-stats: Queries: 0, Success: 0.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+2026-04-20T08:10:42.379Z warp-dns-stats: Queries: 1388, Success: 10.6%, TimedOut: 0.1%, NoRecordsFound: 89.3%, Other Error: 0.0%, Avg Duration: 5.21ms
+Per origin:
+  [primary]    Queries: 1386, Success: 10.5%, TimedOut: 0.1%, NoRecordsFound: 89.5%, Other Error: 0.0%, Avg Duration: 5.22ms
+  [fixed]      Queries: 2, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+2026-04-20T08:12:42.379Z warp-dns-stats: Queries: 908, Success: 0.9%, TimedOut: 0.0%, NoRecordsFound: 99.1%, Other Error: 0.0%, Avg Duration: 2.79ms
+Per origin:
+  [primary]    Queries: 908, Success: 0.9%, TimedOut: 0.0%, NoRecordsFound: 99.1%, Other Error: 0.0%, Avg Duration: 2.79ms
+2026-04-20T08:14:42.379Z warp-dns-stats: Queries: 898, Success: 0.7%, TimedOut: 0.1%, NoRecordsFound: 99.2%, Other Error: 0.0%, Avg Duration: 7.02ms
+Per origin:
+  [primary]    Queries: 898, Success: 0.7%, TimedOut: 0.1%, NoRecordsFound: 99.2%, Other Error: 0.0%, Avg Duration: 7.02ms
+2026-04-20T08:16:42.379Z warp-dns-stats: Queries: 918, Success: 0.5%, TimedOut: 0.0%, NoRecordsFound: 99.5%, Other Error: 0.0%, Avg Duration: 3.21ms
+Per origin:
+  [primary]    Queries: 918, Success: 0.5%, TimedOut: 0.0%, NoRecordsFound: 99.5%, Other Error: 0.0%, Avg Duration: 3.21ms
+2026-04-20T08:18:42.379Z warp-dns-stats: Queries: 992, Success: 0.8%, TimedOut: 0.0%, NoRecordsFound: 99.2%, Other Error: 0.0%, Avg Duration: 4.40ms
+Per origin:
+  [primary]    Queries: 992, Success: 0.8%, TimedOut: 0.0%, NoRecordsFound: 99.2%, Other Error: 0.0%, Avg Duration: 4.40ms
+2026-04-20T08:20:42.378Z warp-dns-stats: Queries: 822, Success: 0.7%, TimedOut: 0.1%, NoRecordsFound: 99.1%, Other Error: 0.0%, Avg Duration: 7.15ms
+Per origin:
+  [primary]    Queries: 822, Success: 0.7%, TimedOut: 0.1%, NoRecordsFound: 99.1%, Other Error: 0.0%, Avg Duration: 7.15ms
+2026-04-20T08:22:42.378Z warp-dns-stats: Queries: 388, Success: 9.0%, TimedOut: 0.0%, NoRecordsFound: 91.0%, Other Error: 0.0%, Avg Duration: 6.00ms
+Per origin:
+  [primary]    Queries: 388, Success: 9.0%, TimedOut: 0.0%, NoRecordsFound: 91.0%, Other Error: 0.0%, Avg Duration: 6.00ms
+2026-04-20T08:24:42.379Z warp-dns-stats: Queries: 10, Success: 90.0%, TimedOut: 0.0%, NoRecordsFound: 10.0%, Other Error: 0.0%, Avg Duration: 62.50ms
+Per origin:
+  [primary]    Queries: 10, Success: 90.0%, TimedOut: 0.0%, NoRecordsFound: 10.0%, Other Error: 0.0%, Avg Duration: 62.50ms
+2026-04-20T08:26:42.379Z warp-dns-stats: Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+Per origin:
+  [primary]    Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+2026-04-20T08:28:42.379Z warp-dns-stats: Queries: 8, Success: 75.0%, TimedOut: 25.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 1828.62ms
+Per origin:
+  [primary]    Queries: 8, Success: 75.0%, TimedOut: 25.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 1828.62ms
+2026-04-20T08:30:42.379Z warp-dns-stats: Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 803.62ms
+Per origin:
+  [primary]    Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 803.62ms
+2026-04-20T08:32:42.378Z warp-dns-stats: Queries: 26, Success: 76.9%, TimedOut: 7.7%, NoRecordsFound: 15.4%, Other Error: 0.0%, Avg Duration: 1524.15ms
+Per origin:
+  [primary]    Queries: 26, Success: 76.9%, TimedOut: 7.7%, NoRecordsFound: 15.4%, Other Error: 0.0%, Avg Duration: 1524.15ms
+2026-04-20T08:34:42.379Z warp-dns-stats: Queries: 8, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 833.75ms
+Per origin:
+  [primary]    Queries: 8, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 833.75ms
+2026-04-20T08:36:42.379Z warp-dns-stats: Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+Per origin:
+  [primary]    Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+2026-04-20T08:38:42.379Z warp-dns-stats: Queries: 6, Success: 83.3%, TimedOut: 0.0%, NoRecordsFound: 16.7%, Other Error: 0.0%, Avg Duration: 20.00ms
+Per origin:
+  [primary]    Queries: 6, Success: 83.3%, TimedOut: 0.0%, NoRecordsFound: 16.7%, Other Error: 0.0%, Avg Duration: 20.00ms
+2026-04-20T08:40:42.379Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 27.67ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 27.67ms
+2026-04-20T08:42:42.379Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 3.83ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 3.83ms
+2026-04-20T08:44:42.379Z warp-dns-stats: Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 20.50ms
+Per origin:
+  [primary]    Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 20.50ms
+2026-04-20T08:46:42.379Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 10.83ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 10.83ms
+2026-04-20T08:48:42.379Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 13.00ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 13.00ms
+2026-04-20T08:50:42.379Z warp-dns-stats: Queries: 6, Success: 83.3%, TimedOut: 0.0%, NoRecordsFound: 16.7%, Other Error: 0.0%, Avg Duration: 39.67ms
+Per origin:
+  [primary]    Queries: 6, Success: 83.3%, TimedOut: 0.0%, NoRecordsFound: 16.7%, Other Error: 0.0%, Avg Duration: 39.67ms
+2026-04-20T08:52:42.379Z warp-dns-stats: Queries: 10, Success: 90.0%, TimedOut: 0.0%, NoRecordsFound: 10.0%, Other Error: 0.0%, Avg Duration: 15.80ms
+Per origin:
+  [primary]    Queries: 10, Success: 90.0%, TimedOut: 0.0%, NoRecordsFound: 10.0%, Other Error: 0.0%, Avg Duration: 15.80ms
+2026-04-20T08:54:42.378Z warp-dns-stats: Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 4.75ms
+Per origin:
+  [primary]    Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 4.75ms
+2026-04-20T08:56:42.379Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 3.33ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 3.33ms
+2026-04-20T08:58:42.378Z warp-dns-stats: Queries: 6, Success: 83.3%, TimedOut: 0.0%, NoRecordsFound: 16.7%, Other Error: 0.0%, Avg Duration: 10.67ms
+Per origin:
+  [primary]    Queries: 6, Success: 83.3%, TimedOut: 0.0%, NoRecordsFound: 16.7%, Other Error: 0.0%, Avg Duration: 10.67ms
+2026-04-20T09:00:42.378Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 12.33ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 12.33ms
+2026-04-20T09:02:42.379Z warp-dns-stats: Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 6.50ms
+Per origin:
+  [primary]    Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 6.50ms
+2026-04-20T09:04:42.379Z warp-dns-stats: Queries: 14, Success: 92.9%, TimedOut: 0.0%, NoRecordsFound: 7.1%, Other Error: 0.0%, Avg Duration: 44.00ms
+Per origin:
+  [primary]    Queries: 14, Success: 92.9%, TimedOut: 0.0%, NoRecordsFound: 7.1%, Other Error: 0.0%, Avg Duration: 44.00ms
+2026-04-20T09:06:42.379Z warp-dns-stats: Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 33.12ms
+Per origin:
+  [primary]    Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 33.12ms
+2026-04-20T09:08:42.378Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+2026-04-20T09:10:42.379Z warp-dns-stats: Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 23.38ms
+Per origin:
+  [primary]    Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 23.38ms
+2026-04-20T09:12:42.379Z warp-dns-stats: Queries: 6, Success: 83.3%, TimedOut: 0.0%, NoRecordsFound: 16.7%, Other Error: 0.0%, Avg Duration: 13.17ms
+Per origin:
+  [primary]    Queries: 6, Success: 83.3%, TimedOut: 0.0%, NoRecordsFound: 16.7%, Other Error: 0.0%, Avg Duration: 13.17ms
+2026-04-20T09:14:42.379Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 11.00ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 11.00ms
+2026-04-20T09:16:42.379Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 6.83ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 6.83ms
+2026-04-20T09:18:42.379Z warp-dns-stats: Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 13.62ms
+Per origin:
+  [primary]    Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 13.62ms
+2026-04-20T09:20:42.379Z warp-dns-stats: Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 7.38ms
+Per origin:
+  [primary]    Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 7.38ms
+2026-04-20T09:22:42.379Z warp-dns-stats: Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 5.00ms
+Per origin:
+  [primary]    Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 5.00ms
+2026-04-20T09:24:42.378Z warp-dns-stats: Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+Per origin:
+  [primary]    Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+2026-04-20T09:26:42.379Z warp-dns-stats: Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 38.88ms
+Per origin:
+  [primary]    Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 38.88ms
+2026-04-20T09:28:42.379Z warp-dns-stats: Queries: 6, Success: 83.3%, TimedOut: 0.0%, NoRecordsFound: 16.7%, Other Error: 0.0%, Avg Duration: 11.67ms
+Per origin:
+  [primary]    Queries: 6, Success: 83.3%, TimedOut: 0.0%, NoRecordsFound: 16.7%, Other Error: 0.0%, Avg Duration: 11.67ms
+2026-04-20T09:30:42.379Z warp-dns-stats: Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+Per origin:
+  [primary]    Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+2026-04-20T09:32:42.379Z warp-dns-stats: Queries: 10, Success: 90.0%, TimedOut: 0.0%, NoRecordsFound: 10.0%, Other Error: 0.0%, Avg Duration: 20.50ms
+Per origin:
+  [primary]    Queries: 10, Success: 90.0%, TimedOut: 0.0%, NoRecordsFound: 10.0%, Other Error: 0.0%, Avg Duration: 20.50ms
+2026-04-20T09:34:42.378Z warp-dns-stats: Queries: 14, Success: 85.7%, TimedOut: 7.1%, NoRecordsFound: 7.1%, Other Error: 0.0%, Avg Duration: 310.29ms
+Per origin:
+  [primary]    Queries: 14, Success: 85.7%, TimedOut: 7.1%, NoRecordsFound: 7.1%, Other Error: 0.0%, Avg Duration: 310.29ms
+2026-04-20T09:36:42.379Z warp-dns-stats: Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 5.75ms
+Per origin:
+  [primary]    Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 5.75ms
+2026-04-20T09:38:42.378Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 11.17ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 11.17ms
+2026-04-20T09:40:42.378Z warp-dns-stats: Queries: 8, Success: 75.0%, TimedOut: 0.0%, NoRecordsFound: 25.0%, Other Error: 0.0%, Avg Duration: 16.38ms
+Per origin:
+  [primary]    Queries: 8, Success: 75.0%, TimedOut: 0.0%, NoRecordsFound: 25.0%, Other Error: 0.0%, Avg Duration: 16.38ms
+2026-04-20T09:42:42.379Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 8.33ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 8.33ms
+2026-04-20T09:44:42.379Z warp-dns-stats: Queries: 8, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 10.62ms
+Per origin:
+  [primary]    Queries: 8, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 10.62ms
+2026-04-20T09:46:42.379Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 7.50ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 7.50ms
+2026-04-20T09:48:42.378Z warp-dns-stats: Queries: 12, Success: 83.3%, TimedOut: 0.0%, NoRecordsFound: 16.7%, Other Error: 0.0%, Avg Duration: 32.00ms
+Per origin:
+  [primary]    Queries: 12, Success: 83.3%, TimedOut: 0.0%, NoRecordsFound: 16.7%, Other Error: 0.0%, Avg Duration: 32.00ms
+2026-04-20T09:50:42.379Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 4.50ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 4.50ms
+2026-04-20T09:52:42.379Z warp-dns-stats: Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 21.50ms
+Per origin:
+  [primary]    Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 21.50ms

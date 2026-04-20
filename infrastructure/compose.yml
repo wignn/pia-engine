@@ -18,6 +18,31 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - yes
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      private:
+        ipv4_address: 172.29.0.11
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   warp:
     image: caomingjun/warp
     container_name: warp
@@ -61,6 +86,9 @@ services:
       postgres:
         condition: service_healthy
         restart: true
+      redis:
+        condition: service_healthy
+        restart: true
     restart: always
 
   control-plane:
@@ -78,6 +106,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: always
     networks:
       - private
@@ -89,7 +119,7 @@ services:
       context: .
       dockerfile: ./Dockerfile.portal
     env_file:
-      - ./env/
+      - ./env/.env.portal
 
   rsshub:
     image: diygod/rsshub:latest
@@ -100,7 +130,8 @@ services:
     ports:
       - "1200:1200"
     networks:
-      - private
+      private:
+        ipv4_address: 172.29.0.12
     healthcheck:
       test:
         [
@@ -122,3 +153,4 @@ networks:
 
 volumes:
   postgres_data:
+  redis_data:
