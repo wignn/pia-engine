@@ -56,12 +56,39 @@ pub struct PriceTick {
 
 impl PriceTick {
     fn from_quote(default_symbol: &str, quote: &tradingview::QuoteValue) -> Option<Self> {
+        Self::from_quote_with_map(default_symbol, &std::collections::HashMap::new(), quote)
+    }
+
+    fn from_quote_with_map(
+        default_symbol: &str,
+        symbol_map: &std::collections::HashMap<String, String>,
+        quote: &tradingview::QuoteValue,
+    ) -> Option<Self> {
         let price = quote.price?;
-        let symbol = quote
+
+        // quote.symbol maps to TradingView's `short_name` (e.g. "BTCUSDT", "XAUUSD")
+        // which strips the exchange prefix. We try to recover the full symbol
+        // (e.g. "BINANCE:BTCUSDT") so that hub filters using "EXCHANGE:SYMBOL" match correctly.
+        let short_name = quote
             .symbol
             .map(|s| s.to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| default_symbol.to_string());
+            .filter(|s| !s.is_empty());
+
+        let symbol = match short_name {
+            // Already has exchange prefix — use as-is.
+            Some(ref s) if s.contains(':') => s.clone(),
+            // Look up in pre-built map: "XAUUSD" -> "OANDA:XAUUSD"
+            Some(ref s) if symbol_map.contains_key(s.as_str()) => {
+                symbol_map[s.as_str()].clone()
+            }
+            // Fallback: check if default_symbol ends with this short_name
+            Some(ref s) if default_symbol.ends_with(s.as_str()) => {
+                default_symbol.to_string()
+            }
+            // Last resort: use short_name as-is
+            Some(s) => s,
+            None => default_symbol.to_string(),
+        };
 
         Some(Self {
             symbol,
@@ -105,6 +132,18 @@ impl DataCollector {
             .cloned()
             .unwrap_or_else(|| "UNKNOWN".to_string());
 
+        // Build a lookup: short_name (after ':') → full symbol
+        // e.g. "XAUUSD" -> "OANDA:XAUUSD", "BTCUSDT" -> "BINANCE:BTCUSDT"
+        let symbol_map: std::collections::HashMap<String, String> = self
+            .config
+            .symbols
+            .iter()
+            .map(|full| {
+                let short = full.split(':').last().unwrap_or(full.as_str()).to_string();
+                (short, full.clone())
+            })
+            .collect();
+
         info!(
             server = %format_data_server(self.config.server),
             symbols = ?self.config.symbols,
@@ -131,7 +170,7 @@ impl DataCollector {
         while let Some(msg) = data_rx.recv().await {
             match msg {
                 TradingViewResponse::QuoteData(quote) => {
-                    if let Some(tick) = PriceTick::from_quote(&default_symbol, &quote) {
+                    if let Some(tick) = PriceTick::from_quote_with_map(&default_symbol, &symbol_map, &quote) {
                         quote_count += 1;
                         on_tick(tick).await;
                     }

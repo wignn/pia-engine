@@ -12,7 +12,6 @@ use crate::models::plan::Plan;
 use crate::models::tenant_config::{SetConfigRequest, TenantConfig};
 use crate::sync;
 
-/// GET /api/v1/config
 pub async fn list_config(
     State(state): State<AppState>,
     request: axum::extract::Request,
@@ -49,7 +48,7 @@ pub async fn set_config(
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     // Validate config key
-    let allowed_keys = ["x_usernames", "tv_symbols", "custom_rss_feeds"];
+    let allowed_keys = ["tv_symbols", "custom_rss_feeds"];
     if !allowed_keys.contains(&config_key.as_str()) {
         return Ok(Json(json!({ "error": format!("Unknown config key: {}. Allowed: {:?}", config_key, allowed_keys) })));
     }
@@ -115,22 +114,6 @@ pub async fn delete_config(
 
 fn validate_config(key: &str, value: &Value, plan: &Plan) -> Result<(), String> {
     match key {
-        "x_usernames" => {
-            let arr = value.as_array().ok_or("x_usernames must be an array of strings")?;
-            if arr.len() > plan.x_usernames_max as usize {
-                return Err(format!(
-                    "Your plan allows max {} X usernames, got {}. Upgrade your plan for more.",
-                    plan.x_usernames_max,
-                    arr.len()
-                ));
-            }
-            for item in arr {
-                if item.as_str().is_none() {
-                    return Err("Each username must be a string".into());
-                }
-            }
-            Ok(())
-        }
         "tv_symbols" => {
             let arr = value.as_array().ok_or("tv_symbols must be an array of strings")?;
             if arr.len() > plan.tv_symbols_max as usize {

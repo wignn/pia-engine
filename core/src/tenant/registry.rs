@@ -25,7 +25,6 @@ struct CachedKey {
 /// Cached per-user config.
 #[derive(Debug, Clone, Default)]
 struct UserConfig {
-    x_usernames: HashSet<String>,
     tv_symbols: HashSet<String>,
 }
 
@@ -91,15 +90,6 @@ impl TenantRegistry {
                 for (uid, key, val) in rows {
                     let entry = map.entry(uid).or_default();
                     match key.as_str() {
-                        "x_usernames" => {
-                            if let Some(arr) = val.as_array() {
-                                for item in arr {
-                                    if let Some(s) = item.as_str() {
-                                        entry.x_usernames.insert(s.trim().to_lowercase());
-                                    }
-                                }
-                            }
-                        }
                         "tv_symbols" => {
                             if let Some(arr) = val.as_array() {
                                 for item in arr {
@@ -142,35 +132,8 @@ impl TenantRegistry {
             ws_connections: cached.ws_connections,
             rate_limit_per_min: cached.rate_limit_per_min,
             can_scrape: cached.can_scrape,
-            x_usernames: user_cfg.x_usernames,
             tv_symbols: user_cfg.tv_symbols,
         })
-    }
-
-    /// Get all unique X usernames across all tenants + env config.
-    pub async fn all_x_usernames(&self, env_usernames: &str) -> HashSet<String> {
-        let mut all = HashSet::new();
-
-        // Add env usernames
-        for u in env_usernames.split(',').map(|s| s.trim().to_lowercase()) {
-            if !u.is_empty() { all.insert(u); }
-        }
-
-        // Add tenant usernames
-        let configs = self.configs.read().await;
-        for cfg in configs.values() {
-            all.extend(cfg.x_usernames.iter().cloned());
-        }
-
-        all
-    }
-
-    /// Get X usernames for a specific user.
-    pub async fn user_x_usernames(&self, user_id: &Uuid) -> HashSet<String> {
-        let configs = self.configs.read().await;
-        configs.get(user_id)
-            .map(|c| c.x_usernames.clone())
-            .unwrap_or_default()
     }
 
     /// Background task: periodically reload registry.

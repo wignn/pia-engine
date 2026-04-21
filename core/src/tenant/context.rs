@@ -14,7 +14,6 @@ pub struct TenantContext {
     pub rate_limit_per_min: i32,
     pub can_scrape: bool,
     /// Per-tenant config
-    pub x_usernames: HashSet<String>,
     pub tv_symbols: HashSet<String>,
 }
 
@@ -30,7 +29,6 @@ impl TenantContext {
             ws_connections: i32::MAX,
             rate_limit_per_min: i32::MAX,
             can_scrape: true,
-            x_usernames: HashSet::new(),
             tv_symbols: HashSet::new(),
         }
     }

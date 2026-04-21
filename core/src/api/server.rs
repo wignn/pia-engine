@@ -88,7 +88,6 @@ async fn ws_handler(
 
     // Try to resolve tenant context from token
     let mut user_id = None;
-    let mut x_usernames = HashSet::new();
     let mut tv_symbols = HashSet::new();
 
     if let Some(raw_key) = &token {
@@ -106,14 +105,13 @@ async fn ws_handler(
                         .unwrap();
                 }
                 user_id = Some(ctx.user_id);
-                x_usernames = ctx.x_usernames;
                 tv_symbols = ctx.tv_symbols;
             }
         }
     }
 
     let hub = state.hub.clone();
-    ws.on_upgrade(move |socket| ws::client::handle_socket(socket, hub, bot_id, user_id, x_usernames, tv_symbols))
+    ws.on_upgrade(move |socket| ws::client::handle_socket(socket, hub, bot_id, user_id, HashSet::new(), tv_symbols))
 }
 
 async fn stats_ws_handler(

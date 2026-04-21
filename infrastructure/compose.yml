@@ -120,6 +120,8 @@ services:
       dockerfile: ./Dockerfile.portal
     env_file:
       - ./env/.env.portal
+    ports:
+      - "5173:5173"
 
   rsshub:
     image: diygod/rsshub:latest
