@@ -904,3 +904,5 @@ NewNeighbour; Destination: 172.29.0.12;
 NewNeighbour; Destination: 172.29.0.12; 
 2026-04-21T02:05:47.011Z DEBUG route-change: Routes changed:
 NewNeighbour; Destination: 172.29.0.12; 
+2026-04-21T02:05:49.315Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
