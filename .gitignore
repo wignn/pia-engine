@@ -7,5 +7,5 @@
 .DS_Store
 Thumbs.db
 .vscode/
-infrastructure/data/**
+/infrastructure/data/**
 /exemple
