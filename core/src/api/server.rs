@@ -16,7 +16,6 @@ use crate::api::middleware::{optional_api_key_auth, strict_api_key_auth, usage_l
 use crate::api::state::AppState;
 use crate::ws;
 
-/// Build the Axum router with all routes and middleware.
 pub fn build_router(state: AppState) -> Router {
     let allowed_origins: Vec<axum::http::HeaderValue> = [
         "http://localhost:3000",
@@ -51,7 +50,6 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/ws/forex", get(ws_handler))
         .route("/api/v1/ws/equity", get(ws_handler))
         .route("/api/v1/ws/x", get(ws_handler))
-        .route("/api/v1/ws/stats", get(stats_ws_handler))
         .route("/api/v1/forex/news", get(handlers::news::list_news))
         .route("/api/v1/forex/news/latest", get(handlers::news::latest_news))
         .route("/api/v1/forex/news/{id}", get(handlers::news::get_news))
@@ -114,17 +112,7 @@ async fn ws_handler(
     ws.on_upgrade(move |socket| ws::client::handle_socket(socket, hub, bot_id, user_id, HashSet::new(), tv_symbols))
 }
 
-async fn stats_ws_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> Response {
-    let stats_hub = state.stats_hub.clone();
-    ws.on_upgrade(move |socket| async move {
-        stats_hub.handle_socket(socket).await;
-    })
-}
 
-/// Start the HTTP server with graceful shutdown.
 pub async fn start(state: AppState) -> Result<(), Box<dyn std::error::Error>> {
     let port = state.config.server_port;
     let app = build_router(state);

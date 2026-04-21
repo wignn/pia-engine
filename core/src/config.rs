@@ -12,7 +12,6 @@ pub struct Config {
     pub rss_fetch_sec: u64,
     pub stock_fetch_sec: u64,
     pub calendar_check_sec: u64,
-    pub stats_interval_sec: u64,
     pub log_level: String,
     pub rsshub_url: String,
     pub x_usernames: String,
@@ -62,7 +61,6 @@ impl Config {
             rss_fetch_sec: get_env_u64("RSS_FETCH_SEC", 20),
             stock_fetch_sec: get_env_u64("STOCK_FETCH_SEC", 20),
             calendar_check_sec: get_env_u64("CALENDAR_CHECK_SEC", 60),
-            stats_interval_sec: get_env_u64("STATS_INTERVAL_SEC", 5),
             log_level: get_env("LOG_LEVEL", "INFO"),
 
             rsshub_url: get_env("RSSHUB_URL", "http://rsshub:1200"),

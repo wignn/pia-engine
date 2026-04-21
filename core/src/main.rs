@@ -6,7 +6,6 @@ mod error;
 mod html;
 mod pipeline;
 mod scraper;
-mod stats;
 mod tenant;
 mod ws;
 
@@ -14,7 +13,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use chrono::Utc;
 use serde_json::json;
-use std::collections::HashSet;
 use tracing::{error, info, warn};
 use tracing_subscriber::{fmt, EnvFilter};
 
@@ -58,7 +56,6 @@ async fn main() {
         rss_interval = cfg.rss_fetch_sec,
         equity_interval = cfg.stock_fetch_sec,
         calendar_interval = cfg.calendar_check_sec,
-        stats_interval = cfg.stats_interval_sec,
         x_enabled = cfg.has_twitter(),
         redis_enabled = cfg.has_redis(),
         "core starting"
@@ -89,18 +86,14 @@ async fn main() {
 
     let hub = ws::Hub::new(redis_client.clone(), cfg.redis_channel_prefix.clone());
 
-    let stats_hub = stats::StatsHub::new();
-    let stats_interval = Duration::from_secs(cfg.stats_interval_sec);
     let usage_tracker = Arc::new(UsageTracker::new(pool.clone(), redis_client.clone()));
 
-    // Initialize tenant registry (SaaS layer)
     let tenant_registry = TenantRegistry::new(pool.clone());
     tenant_registry.reload().await;
     info!("tenant registry initialized");
 
     let state = AppState {
         hub: hub.clone(),
-        stats_hub: stats_hub.clone(),
         db: pool.clone(),
         config: cfg.clone(),
         tenant_registry: Some(tenant_registry.clone()),
@@ -110,13 +103,7 @@ async fn main() {
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
 
     // Stats hub background task
-    {
-        let stats_hub = stats_hub.clone();
-        tokio::spawn(async move {
-            stats_hub.run(stats_interval, shutdown_rx).await;
-        });
-        info!(interval = ?stats_interval, "stats ws endpoint enabled");
-    }
+    
 
     // Tenant registry background sync
     {
