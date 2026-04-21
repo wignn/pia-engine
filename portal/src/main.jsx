@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -10,12 +10,21 @@ import DashboardPage from './pages/DashboardPage'
 import KeysPage from './pages/KeysPage'
 import ConfigPage from './pages/ConfigPage'
 import PlansPage from './pages/PlansPage'
+import AdminPage from './pages/AdminPage'
 import './index.css'
 
 function ProtectedRoute({ children }) {
   const jwt = localStorage.getItem('wi_jwt')
   const apiKey = localStorage.getItem('wi_api_key')
   if (!jwt && !apiKey) return <Navigate to="/login" replace />
+  return children
+}
+
+function AdminRoute({ children }) {
+  const { user } = useAuth()
+  // Allow if plan is enterprise (admin) or if using admin api key (no user object)
+  const plan = user?.user?.plan
+  if (plan && plan !== 'enterprise') return <Navigate to="/" replace />
   return children
 }
 
@@ -32,6 +41,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="keys" element={<KeysPage />} />
             <Route path="config" element={<ConfigPage />} />
             <Route path="plans" element={<PlansPage />} />
+            <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
           </Route>
         </Routes>
       </AuthProvider>

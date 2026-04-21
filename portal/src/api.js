@@ -1,8 +1,9 @@
 const BASE = (import.meta.env.VITE_API_BASE || '/api/v1').replace(/\/$/, '')
+export const CORE_WS_BASE = (import.meta.env.VITE_CORE_WS_BASE || 'ws://localhost:8090').replace(/\/$/, '')
+export const CORE_API_BASE = (import.meta.env.VITE_CORE_API_BASE || 'http://localhost:8090').replace(/\/$/, '')
 
 function headers() {
   const h = { 'Content-Type': 'application/json' }
-  // Prefer JWT over API key
   const jwt = localStorage.getItem('wi_jwt')
   if (jwt) {
     h['Authorization'] = `Bearer ${jwt}`
@@ -20,7 +21,6 @@ async function request(method, path, body) {
     body: body ? JSON.stringify(body) : undefined,
   })
   if (res.status === 401) {
-    // Clear invalid tokens
     localStorage.removeItem('wi_jwt')
     localStorage.removeItem('wi_api_key')
     if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
@@ -28,6 +28,14 @@ async function request(method, path, body) {
     }
     return { error: 'Session expired' }
   }
+  return res.json()
+}
+
+async function coreRequest(path) {
+  const apiKey = localStorage.getItem('wi_api_key') || import.meta.env.VITE_ADMIN_API_KEY || ''
+  const res = await fetch(`${CORE_API_BASE}${path}`, {
+    headers: { 'X-API-Key': apiKey }
+  })
   return res.json()
 }
 
@@ -59,4 +67,14 @@ export const api = {
   // Plans
   plans: () => request('GET', '/plans'),
   upgrade: (planId) => request('POST', '/plans/upgrade', { plan_id: planId }),
+
+  // Admin
+  adminStats: () => request('GET', '/admin/stats'),
+  adminUsers: () => request('GET', '/admin/users'),
+  adminSetPlan: (userId, plan) => request('POST', `/admin/users/${userId}/plan`, { plan }),
+  adminToggleUser: (userId) => request('POST', `/admin/users/${userId}/toggle`),
+
+  // Core data (news, feeds)
+  coreForexNews: (limit = 20) => coreRequest(`/api/v1/forex/news/latest?limit=${limit}`),
+  coreEquityNews: (limit = 20) => coreRequest(`/api/v1/equity/news/latest?limit=${limit}`),
 }

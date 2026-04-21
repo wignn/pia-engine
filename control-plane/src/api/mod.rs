@@ -1,5 +1,6 @@
 pub mod server;
 pub mod auth;
+pub mod admin;
 pub mod keys;
 pub mod tenant_config;
 pub mod plans;
