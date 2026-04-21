@@ -1846,3 +1846,23 @@ kex=X25519
 2026-04-21T02:05:52.545Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.
 2026-04-21T02:05:56.547Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.
 2026-04-21T02:05:56.547Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.
+2026-04-21T02:06:00.549Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.dns.podman.
+2026-04-21T02:06:00.549Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.dns.podman.
+2026-04-21T02:06:02.768Z DEBUG actor_connectivity::connectivity: Routes changed: 2 in the last 30 seconds
+2026-04-21T02:06:04.551Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.dns.podman.
+2026-04-21T02:06:04.551Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.dns.podman.
+2026-04-21T02:06:05.823Z DEBUG dns_proxy::proxy: DNS proxy health status: Healthy
+2026-04-21T02:06:07.977Z DEBUG dns_proxy::errors: DnsProxy timeout target=finance.detik.com.
+2026-04-21T02:06:07.977Z DEBUG dns_proxy::errors: DnsProxy timeout target=finance.detik.com.
+2026-04-21T02:06:08.553Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.dns.podman.
+2026-04-21T02:06:08.553Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.dns.podman.
+2026-04-21T02:06:11.979Z DEBUG dns_proxy::errors: DnsProxy timeout target=finance.detik.com.
+2026-04-21T02:06:11.980Z DEBUG dns_proxy::errors: DnsProxy timeout target=finance.detik.com.
+2026-04-21T02:06:12.554Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.dns.podman.
+2026-04-21T02:06:12.554Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.dns.podman.
+2026-04-21T02:06:13.762Z DEBUG dns_proxy::errors: DnsProxy timeout target=id.investing.com.
+2026-04-21T02:06:13.763Z DEBUG dns_proxy::errors: DnsProxy timeout target=id.investing.com.
+2026-04-21T02:06:15.045Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.
+2026-04-21T02:06:15.045Z DEBUG dns_proxy::errors: DnsProxy timeout target=www.ecb.europa.eu.
+2026-04-21T02:06:15.982Z DEBUG dns_proxy::errors: DnsProxy timeout target=finance.detik.com.
+2026-04-21T02:06:15.982Z DEBUG dns_proxy::errors: DnsProxy timeout target=finance.detik.com.
