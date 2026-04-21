@@ -85,3 +85,21 @@ Per origin:
 2026-04-21T00:56:24.431Z warp-dns-stats: Queries: 20, Success: 75.0%, TimedOut: 10.0%, NoRecordsFound: 15.0%, Other Error: 0.0%, Avg Duration: 636.75ms
 Per origin:
   [primary]    Queries: 20, Success: 75.0%, TimedOut: 10.0%, NoRecordsFound: 15.0%, Other Error: 0.0%, Avg Duration: 636.75ms
+2026-04-21T00:58:24.431Z warp-dns-stats: Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+Per origin:
+  [primary]    Queries: 4, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 0.00ms
+2026-04-21T01:00:24.431Z warp-dns-stats: Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 576.17ms
+Per origin:
+  [primary]    Queries: 6, Success: 100.0%, TimedOut: 0.0%, NoRecordsFound: 0.0%, Other Error: 0.0%, Avg Duration: 576.17ms
+2026-04-21T01:02:24.431Z warp-dns-stats: Queries: 10, Success: 80.0%, TimedOut: 0.0%, NoRecordsFound: 20.0%, Other Error: 0.0%, Avg Duration: 698.90ms
+Per origin:
+  [primary]    Queries: 10, Success: 80.0%, TimedOut: 0.0%, NoRecordsFound: 20.0%, Other Error: 0.0%, Avg Duration: 698.90ms
+2026-04-21T01:04:24.431Z warp-dns-stats: Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 7.00ms
+Per origin:
+  [primary]    Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 7.00ms
+2026-04-21T01:06:24.432Z warp-dns-stats: Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 7.25ms
+Per origin:
+  [primary]    Queries: 8, Success: 87.5%, TimedOut: 0.0%, NoRecordsFound: 12.5%, Other Error: 0.0%, Avg Duration: 7.25ms
+2026-04-21T01:08:24.432Z warp-dns-stats: Queries: 10, Success: 90.0%, TimedOut: 0.0%, NoRecordsFound: 10.0%, Other Error: 0.0%, Avg Duration: 511.60ms
+Per origin:
+  [primary]    Queries: 10, Success: 90.0%, TimedOut: 0.0%, NoRecordsFound: 10.0%, Other Error: 0.0%, Avg Duration: 511.60ms
