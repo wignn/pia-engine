@@ -48,8 +48,11 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health", get(handlers::health::health))
         .route("/", get(handlers::health::root))
         .route("/api/v1/ws/forex", get(ws_handler))
+        .route("/api/v1/ws/forex/:symbol", get(ws_handler_single_symbol))
         .route("/api/v1/ws/equity", get(ws_handler))
+        .route("/api/v1/ws/equity/:symbol", get(ws_handler_single_symbol))
         .route("/api/v1/ws/x", get(ws_handler))
+        .route("/api/v1/ws/x/:symbol", get(ws_handler_single_symbol))
         .route("/api/v1/forex/news", get(handlers::news::list_news))
         .route("/api/v1/forex/news/latest", get(handlers::news::latest_news))
         .route("/api/v1/forex/news/{id}", get(handlers::news::get_news))
@@ -118,6 +121,18 @@ async fn ws_handler(
 
     let hub = state.hub.clone();
     ws.on_upgrade(move |socket| ws::client::handle_socket(socket, hub, bot_id, user_id, HashSet::new(), tv_symbols, channels_query))
+}
+
+/// Wrapper handler for single-symbol path routing (e.g. /ws/forex/BINANCE:DOGEUSDT).
+/// Extracts the symbol from the URL path and injects it as a query parameter for ws_handler.
+async fn ws_handler_single_symbol(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    axum::extract::Path(symbol): axum::extract::Path<String>,
+    axum::extract::Query(mut params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    params.insert("symbols".to_string(), symbol);
+    ws_handler(ws, State(state), axum::extract::Query(params)).await
 }
 
 
