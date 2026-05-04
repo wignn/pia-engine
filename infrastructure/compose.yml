@@ -8,7 +8,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     networks:
       private:
         ipv4_address: 172.29.0.10
@@ -102,7 +102,7 @@ services:
     env_file:
       - ./env/.env.control-plane
     ports:
-      - "8080:8080"
+      - "${CONTROL_PLANE_PORT:-8081}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -142,12 +142,12 @@ services:
 
   rsshub:
     image: diygod/rsshub:latest
-    container_name: rsshub
+    container_name: rsshubs
     restart: unless-stopped
     env_file:
       - ./env/.env.rsshub
     ports:
-      - "1200:1200"
+      - "1201:1200"
     networks:
       private:
         ipv4_address: 172.29.0.12

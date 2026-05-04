@@ -86,7 +86,11 @@ async fn subscribe_loop(redis_url: &str, hub: &Arc<ws::Hub>) -> anyhow::Result<(
 fn normalize_symbol(source: &str, raw: &str) -> String {
     match source {
         "finnhub" => {
-            raw.to_string()
+            if let Some((venue, pair)) = raw.split_once(':') {
+                format!("{}:{}", venue, pair.replace('_', ""))
+            } else {
+                raw.to_string()
+            }
         }
         "tiingo" => {
             format!("OANDA:{}", raw.to_uppercase())

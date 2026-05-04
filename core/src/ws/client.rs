@@ -3,7 +3,6 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-/// Handle stored per connected client for sending messages.
 pub struct ClientHandle {
     pub id: super::hub::ClientId,
     pub bot_id: String,
@@ -14,7 +13,6 @@ pub struct ClientHandle {
     pub sender: mpsc::Sender<Vec<u8>>,
 }
 
-/// Default channels a new WebSocket client subscribes to.
 pub fn default_channels() -> HashSet<String> {
     [
         "all",
@@ -40,13 +38,14 @@ pub async fn handle_socket(
     user_id: Option<Uuid>,
     x_usernames: HashSet<String>,
     tv_symbols: HashSet<String>,
+    custom_channels: Option<HashSet<String>>,
 ) {
     use axum::extract::ws::Message;
     use futures_util::{SinkExt, StreamExt};
     use std::time::Duration;
     use tracing::{debug, warn};
 
-    let channels = default_channels();
+    let channels = custom_channels.unwrap_or_else(default_channels);
     let (client_id, mut rx) = hub.register(bot_id.clone(), channels, user_id, x_usernames, tv_symbols).await;
 
     let (mut ws_tx, mut ws_rx) = socket.split();

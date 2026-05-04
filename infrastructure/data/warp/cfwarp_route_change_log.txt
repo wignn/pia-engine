@@ -1523,3 +1523,653 @@ NewNeighbour; Destination: 172.29.0.12;
 2026-04-21T03:44:16.771Z DEBUG route-change: Routes changed:
 NewNeighbour; Destination: 172.29.0.12; 
 NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:40:08.266Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:40:11.303Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:40:14.380Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:40:14.930Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:40:28.492Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.11; 
+2026-05-04T10:40:31.977Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:40:32.992Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:40:53.708Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:40:53.758Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.11; 
+2026-05-04T10:41:00.162Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:41:02.209Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.11; 
+NewNeighbour; Destination: 172.29.0.11; 
+2026-05-04T10:41:31.084Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:41:33.591Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.11; 
+2026-05-04T10:41:38.371Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:42:15.658Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:42:43.560Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:43:33.951Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:43:35.349Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.11; 
+2026-05-04T10:43:39.392Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:43:55.523Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:43:57.548Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:44:06.762Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:44:18.024Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:44:26.733Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:44:44.648Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:44:57.960Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:45:00.776Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:45:06.926Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:45:44.551Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:45:44.555Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:45:58.128Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:46:00.685Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:46:07.599Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:46:44.456Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:46:58.025Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:47:00.590Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:47:06.983Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:47:44.617Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:47:57.930Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:48:00.754Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:48:06.893Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:48:44.520Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:48:57.831Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:49:06.803Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:49:27.783Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:49:44.428Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:50:29.229Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:50:44.589Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:51:28.616Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:51:44.494Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:51:44.502Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:52:28.008Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:52:44.653Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:53:29.453Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:53:44.569Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:54:28.840Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:54:44.480Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:55:00.839Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:55:03.662Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:55:06.984Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:55:20.811Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:55:27.227Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:55:44.623Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:56:00.751Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:56:05.099Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:56:07.147Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:56:20.967Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:56:27.139Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:56:44.521Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:57:00.912Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:57:04.490Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:57:07.048Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:57:44.425Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:58:00.779Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:58:03.879Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:58:07.729Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:58:07.741Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:58:44.583Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:59:00.842Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:59:03.280Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T10:59:07.116Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T10:59:44.497Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:00:17.008Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:00:44.647Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:01:16.391Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:01:44.552Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:02:15.786Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:02:44.505Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:03:17.274Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:03:44.619Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:04:16.625Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:04:44.547Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:05:16.024Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:05:44.432Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:06:15.404Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:06:44.590Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:07:16.840Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:07:44.488Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:08:16.258Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:08:44.648Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:09:15.627Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:09:44.563Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:10:17.072Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:10:44.464Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:11:16.455Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:11:44.624Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:12:15.851Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:12:44.528Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:13:17.288Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:13:44.423Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:14:17.864Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:14:44.584Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:15:18.120Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:15:44.492Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:16:19.566Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:16:44.647Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:17:18.958Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:17:44.554Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:18:18.343Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:18:44.456Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:19:19.784Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:19:44.615Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:20:15.083Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:20:44.519Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:20:44.522Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:21:14.476Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:21:44.423Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:22:15.912Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:22:44.584Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:23:15.303Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:23:44.487Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:24:14.696Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:24:44.675Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:24:58.475Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:25:01.800Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:25:06.922Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:25:44.560Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:25:59.403Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:26:03.240Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:26:06.824Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:26:44.457Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:26:58.536Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:27:02.634Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:27:06.986Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:27:19.048Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:27:26.951Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:27:26.955Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:27:44.619Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:27:44.623Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:27:58.696Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:28:02.023Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:28:07.656Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:28:44.522Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:28:58.599Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:29:01.416Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:29:07.047Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:29:44.423Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:29:59.975Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:30:02.871Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:30:06.952Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:30:20.028Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:30:26.919Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:30:26.923Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:30:44.583Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:30:59.944Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:31:04.300Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:31:06.877Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:31:44.487Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:31:59.743Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:32:03.691Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:32:07.015Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:32:44.651Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:32:59.783Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:33:03.080Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:33:06.919Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:33:44.551Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:33:59.754Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:34:04.520Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:34:06.828Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.10; 
+NewNeighbour; Destination: 172.29.0.10; 
+2026-05-04T11:34:44.455Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:35:08.007Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:35:44.616Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:36:09.447Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:36:44.523Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:37:08.845Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:37:44.435Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:38:08.234Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:38:44.583Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:39:07.651Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:39:44.494Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:39:44.502Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:40:29.553Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:40:44.647Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:41:28.942Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:41:44.563Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:42:30.376Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:42:44.459Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:43:29.767Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:43:44.615Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:44:29.164Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:44:44.520Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:44:44.529Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:45:16.268Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:45:44.423Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:45:44.426Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:46:15.662Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:46:44.587Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:46:44.597Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:47:17.095Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:47:44.489Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:48:16.492Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:48:44.649Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:49:15.891Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:49:44.573Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:50:11.175Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:50:44.460Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:51:12.623Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:51:44.619Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:51:44.633Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:52:12.008Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:52:44.524Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:53:11.400Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:53:44.424Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:54:10.791Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:54:44.584Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:55:18.376Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:55:44.487Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:56:19.821Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:56:44.648Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:57:19.207Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:57:44.556Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:58:18.607Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:58:44.458Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:59:20.042Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T11:59:44.618Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:00:11.245Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:00:44.523Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:01:10.635Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:01:44.428Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:02:12.076Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:02:44.586Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:03:11.480Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:03:44.495Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:04:10.856Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:04:44.663Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:05:12.300Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:05:44.565Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:06:13.742Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:06:44.460Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:07:13.132Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:07:23.379Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:07:52.039Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:08:23.271Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:08:51.433Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:09:23.432Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:09:52.873Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:10:23.335Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:10:23.338Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:10:50.215Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:11:23.242Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:11:49.608Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:12:23.420Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:12:49.005Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:13:23.303Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:13:50.444Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:14:23.464Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:14:49.831Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:15:23.368Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:15:23.371Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:15:47.175Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:16:23.287Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:16:46.569Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:17:23.439Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 
+NewNeighbour; Destination: 172.29.0.12; 
+2026-05-04T12:17:48.056Z DEBUG route-change: Routes changed:
+NewNeighbour; Destination: 172.29.0.12; 

@@ -84,14 +84,17 @@ async fn ws_handler(
 
     let token = params.get("token").or_else(|| params.get("api_key")).cloned();
 
-    // Try to resolve tenant context from token
     let mut user_id = None;
     let mut tv_symbols = HashSet::new();
+
+    let channels_query = params.get("channels").map(|c| c.split(',').map(|s| s.trim().to_string()).collect::<HashSet<_>>());
+    let symbols_query = params.get("symbols").map(|s| s.split(',').map(|s| s.trim().to_string()).collect::<HashSet<_>>()).unwrap_or_default();
 
     if let Some(raw_key) = &token {
         // Check env admin keys first
         if state.config.api_keys.contains(raw_key) {
-            // Admin: no filtering, get all
+            // Admin: no filtering by default, but allow them to use symbols query
+            tv_symbols = symbols_query;
         } else if let Some(registry) = &state.tenant_registry {
             if let Some(ctx) = registry.validate_key(raw_key).await {
                 // Enforce WS connection limit
@@ -103,13 +106,18 @@ async fn ws_handler(
                         .unwrap();
                 }
                 user_id = Some(ctx.user_id);
-                tv_symbols = ctx.tv_symbols;
+                // Intersect tenant's allowed symbols with requested symbols, or use all tenant's if requested is empty
+                if !symbols_query.is_empty() {
+                    tv_symbols = ctx.tv_symbols.intersection(&symbols_query).cloned().collect();
+                } else {
+                    tv_symbols = ctx.tv_symbols;
+                }
             }
         }
     }
 
     let hub = state.hub.clone();
-    ws.on_upgrade(move |socket| ws::client::handle_socket(socket, hub, bot_id, user_id, HashSet::new(), tv_symbols))
+    ws.on_upgrade(move |socket| ws::client::handle_socket(socket, hub, bot_id, user_id, HashSet::new(), tv_symbols, channels_query))
 }
 
 

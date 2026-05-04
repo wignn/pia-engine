@@ -47,7 +47,8 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
             continue;
         }
 
-        let url = format!("wss://ws.finnhub.io?token={}", cfg.finnhub_api_key);
+
+        let url = format!("wss://ws.finnhub.io/?token={}", cfg.finnhub_api_key.trim());
 
         info!(worker = "finnhub", symbol = SYMBOL, "connecting to finnhub websocket");
 
