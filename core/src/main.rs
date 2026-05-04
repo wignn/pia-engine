@@ -19,7 +19,6 @@ use tracing_subscriber::{fmt, EnvFilter};
 use api::state::AppState;
 use api::usage_tracker::UsageTracker;
 use collector::calendar::CalendarCollector;
-use collector::price::{DataCollector, DataCollectorConfig};
 use collector::rss::RSSCollector;
 use collector::stock::StockCollector;
 use collector::twitter::TwitterCollector;
@@ -206,105 +205,6 @@ async fn main() {
         });
     }
 
-    if cfg.has_price_stream() {
-        let hub = hub.clone();
-        let price_cfg = DataCollectorConfig::from_app_config(&cfg);
-        let reconnect_sec = cfg.tv_reconnect_sec;
-        let spike_threshold_pct = cfg.tv_volatility_spike_pct;
-        let spike_cooldown_sec = cfg.tv_volatility_cooldown_sec;
-
-        info!(
-            server = %cfg.tv_server,
-            symbols = ?cfg.tv_symbols,
-            reconnect_sec,
-            spike_threshold_pct,
-            spike_cooldown_sec,
-            "tradingview market stream enabled"
-        );
-
-        tokio::spawn(async move {
-            use std::collections::HashMap;
-            use tokio::sync::Mutex;
-
-            let last_prices = Arc::new(Mutex::new(HashMap::<String, f64>::new()));
-            let last_spike_at = Arc::new(Mutex::new(HashMap::<String, i64>::new()));
-
-            loop {
-                let collector = DataCollector::new(price_cfg.clone());
-                let stream_res = collector
-                    .stream_forever(|tick| {
-                        let hub = hub.clone();
-                        let last_prices = last_prices.clone();
-                        let last_spike_at = last_spike_at.clone();
-
-                        async move {
-                            let symbol = tick.symbol.clone();
-                            let now_ts = Utc::now().timestamp();
-
-                            let market_payload = json!({
-                                "tick": tick,
-                                "asset_type": "market",
-                            });
-                            let _ = hub
-                                .broadcast(ws::EVENT_MARKET_TRADE, market_payload, "market_data")
-                                .await;
-
-                            let prev = {
-                                let mut prices = last_prices.lock().await;
-                                prices.insert(symbol.clone(), tick.price)
-                            };
-
-                            if let Some(prev_price) = prev {
-                                if prev_price > 0.0 {
-                                    let delta_pct = ((tick.price - prev_price).abs() / prev_price) * 100.0;
-                                    let can_alert = {
-                                        let spikes = last_spike_at.lock().await;
-                                        spikes
-                                            .get(&symbol)
-                                            .map(|last| now_ts - *last >= spike_cooldown_sec as i64)
-                                            .unwrap_or(true)
-                                    };
-
-                                    if delta_pct >= spike_threshold_pct && can_alert {
-                                        let mut spikes = last_spike_at.lock().await;
-                                        spikes.insert(symbol.clone(), now_ts);
-
-                                        let vol_payload = json!({
-                                            "symbol": symbol,
-                                            "price": tick.price,
-                                            "prev_price": prev_price,
-                                            "delta_percent": delta_pct,
-                                            "threshold_percent": spike_threshold_pct,
-                                            "detected_at": Utc::now().to_rfc3339(),
-                                        });
-
-                                        let _ = hub
-                                            .broadcast(
-                                                ws::EVENT_GOLD_VOLATILITY_SPIKE,
-                                                vol_payload,
-                                                "volatility",
-                                            )
-                                            .await;
-                                    }
-                                }
-                            }
-                        }
-                    })
-                    .await;
-
-                match stream_res {
-                    Ok(()) => info!("price stream ended, reconnecting"),
-                    Err(e) => error!(error = %e, "price stream failed, reconnecting"),
-                }
-
-                tokio::time::sleep(Duration::from_secs(reconnect_sec.max(1))).await;
-            }
-        });
-    }
-
-    // Ingestion gateway listener — subscribes to Redis channels published
-    // by the external ingestion-gateway service and relays tick data into
-    // the WebSocket hub so connected clients receive real-time prices.
     if cfg.has_redis() {
         let hub = hub.clone();
         let redis_url = cfg.redis_url.clone();

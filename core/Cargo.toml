@@ -10,7 +10,6 @@ name = "core"
 path = "src/main.rs"
 
 [dependencies]
-tradingview-rs = { git = "https://github.com/bitbytelabio/tradingview-rs.git", branch = "main" }
 tokio = { workspace = true }
 axum = { workspace = true }
 tower = { workspace = true }

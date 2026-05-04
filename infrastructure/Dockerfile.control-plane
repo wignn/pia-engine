@@ -1,17 +1,17 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1.94-bookworm AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1.85-bookworm AS chef
 
 WORKDIR /app
 
 FROM chef AS planner
 
-# Copy workspace manifests
 COPY Cargo.toml Cargo.lock ./
 COPY core/Cargo.toml core/Cargo.toml
 COPY control-plane/Cargo.toml control-plane/Cargo.toml
+COPY ingestion-gateway/Cargo.toml ingestion-gateway/Cargo.toml
 
-# Dummy sources for chef
 RUN mkdir -p core/src && echo "fn main(){}" > core/src/main.rs && \
-    mkdir -p control-plane/src && echo "fn main(){}" > control-plane/src/main.rs
+    mkdir -p control-plane/src && echo "fn main(){}" > control-plane/src/main.rs && \
+    mkdir -p ingestion-gateway/src && echo "fn main(){}" > ingestion-gateway/src/main.rs
 
 RUN cargo chef prepare --recipe-path recipe.json
 
@@ -30,11 +30,12 @@ RUN <<EOF
   fi
 EOF
 
-# Copy real source
 COPY Cargo.toml Cargo.lock ./
 COPY control-plane/ control-plane/
 COPY core/Cargo.toml core/Cargo.toml
-RUN mkdir -p core/src && echo "fn main(){}" > core/src/main.rs
+COPY ingestion-gateway/Cargo.toml ingestion-gateway/Cargo.toml
+RUN mkdir -p core/src && echo "fn main(){}" > core/src/main.rs && \
+    mkdir -p ingestion-gateway/src && echo "fn main(){}" > ingestion-gateway/src/main.rs
 
 RUN <<EOF
   if [ "$DOCKER_BUILD_TYPE" = "release" ]; then

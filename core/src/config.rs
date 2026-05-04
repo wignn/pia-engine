@@ -16,12 +16,6 @@ pub struct Config {
     pub rsshub_url: String,
     pub x_usernames: String,
     pub x_poll_sec: u64,
-    pub tv_auth_token: String,
-    pub tv_server: String,
-    pub tv_symbols: Vec<String>,
-    pub tv_reconnect_sec: u64,
-    pub tv_volatility_spike_pct: f64,
-    pub tv_volatility_cooldown_sec: u64,
     pub redis_url: String,
     pub redis_channel_prefix: String,
 }
@@ -36,13 +30,6 @@ impl Config {
 
         let api_keys_raw = get_env("API_KEYS", "");
         let api_keys: Vec<String> = api_keys_raw
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-
-        let tv_symbols_raw = get_env("TV_SYMBOLS", "OANDA:XAUUSD");
-        let tv_symbols: Vec<String> = tv_symbols_raw
             .split(',')
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
@@ -66,12 +53,6 @@ impl Config {
             rsshub_url: get_env("RSSHUB_URL", "http://rsshub:1200"),
             x_usernames: get_env_any(&["X_USERNAMES", "X_USERNAME"], ""),
             x_poll_sec: get_env_u64("X_POLL_SEC", 60),
-            tv_auth_token: get_env("TV_AUTH_TOKEN", ""),
-            tv_server: get_env("TV_SERVER", "data"),
-            tv_symbols,
-            tv_reconnect_sec: get_env_u64("TV_RECONNECT_SEC", 5),
-            tv_volatility_spike_pct: get_env_f64("TV_VOLATILITY_SPIKE_PCT", 0.30),
-            tv_volatility_cooldown_sec: get_env_u64("TV_VOLATILITY_COOLDOWN_SEC", 30),
             redis_url: get_env("REDIS_URL", ""),
             redis_channel_prefix: get_env("REDIS_CHANNEL_PREFIX", "world-info"),
         }
@@ -79,10 +60,6 @@ impl Config {
 
     pub fn has_twitter(&self) -> bool {
         !self.x_usernames.is_empty()
-    }
-
-    pub fn has_price_stream(&self) -> bool {
-        !self.tv_auth_token.trim().is_empty() && !self.tv_symbols.is_empty()
     }
 
     pub fn has_redis(&self) -> bool {
