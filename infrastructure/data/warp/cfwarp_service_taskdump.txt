@@ -1,0 +1,6020 @@
+2026-04-21T03:37:02.463Z DEBUG task-dump: Dumping task state source="main-loop-watchdog" missed_ticks=5
+2026-04-21T03:37:02.465Z DEBUG task-dump: Runtime metrics: Some(
+    RuntimeMetrics {
+        workers_count: 4,
+        live_tasks_count: 72,
+        total_park_count: 2135773,
+        max_park_count: 542414,
+        min_park_count: 521865,
+        total_busy_duration: 118.767846242s,
+        max_busy_duration: 31.171138105s,
+        min_busy_duration: 27.765575489s,
+        global_queue_depth: 0,
+        elapsed: 31530.32583762s,
+    },
+)
+2026-04-21T03:37:02.465Z DEBUG task-dump: ╼ warp::warp_service::periodic::structured_log_loop::{{closure}} at warp/src/warp_service/periodic.rs:17:1
+╼ warp::warp_service::WarpService::main_loop<firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}}>::{{closure}}::{{closure}}::{{closure}} at warp/src/warp_service.rs:521:13
+  └╼ firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}} at firewall/src/engine.rs:361:5
+╼ actor_registration_verifier::actor::RegistrationVerifierLoop::run::{{closure}} at actors/actor-registration-verifier/src/actor.rs:67:5
+╼ warp::notification::notifications_loop::{{closure}} at warp/src/notification/mod.rs:114:1
+  └╼ warp::notification::connect::{{closure}} at warp/src/notification/mod.rs:141:1
+╼ actor_alternate_network::actor::AlternateNetworksLoop::run::{{closure}} at actors/actor-alternate-network/src/actor.rs:105:5
+╼ warp::warp_service::WarpService::main_loop<firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}}>::{{closure}}::{{closure}}::{{closure}} at warp/src/warp_service.rs:529:13
+╼ actor_main_loop_compat::handler::MainLoopCompatHandler::run::{{closure}} at actors/actor-main-loop-compat/src/handler.rs:34:5
+╼ warp::warp_service::notify_ipc_clients_on_registration_change::{{closure}} at warp/src/warp_service.rs:1835:1
+╼ warp_settings::manager::WarpSettingsManager::new::{{closure}} at warp-settings/src/manager.rs:92:22
+  └╼ warp_settings::manager::LayerManager::run::{{closure}} at warp-settings/src/manager.rs:1136:5
+╼ actor_configuration::handler::ConfigurationActorLoop::run::{{closure}} at actors/actor-configuration/src/handler.rs:152:5
+╼ <actor_connectivity::ConnectivityActor as actor_framework::actor::ActorInitWithArgs>::init_with_args<'_>::{{closure}} at actors/actor-connectivity/src/lib.rs:48:34
+  └╼ actor_connectivity::connectivity::ConnectivityHandler::run<network_info::linux::power_notifier::PowerNotifier, network_info::linux::route_monitor::RouteMonitor, network_info::linux::change_notifier::ChangeNotifier, <actor_connectivity::ConnectivityActor as actor_framework::actor::ActorInitWithArgs>::init_with_args<'_>::{{closure}}::{{closure}}::{{closure}}>::{{closure}} at actors/actor-connectivity/src/connectivity.rs:43:5
+╼ actor_emergency_disconnect::handler::EmergencyDisconnectActorLoop::run<actor_emergency_disconnect::checks::HttpsExternalEmergencySignalChecker>::{{closure}} at actors/actor-emergency-disconnect/src/handler.rs:118:5
+╼ actor_root_ca::handler::RootCaActorLoop::run::{{closure}} at actors/actor-root-ca/src/handler.rs:37:5
+╼ warp::warp_service::WarpService::start::{{closure}} at warp/src/warp_service.rs:343:5
+  └╼ warp::warp_service::WarpService::main_loop<firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}}>::{{closure}} at warp/src/warp_service.rs:499:5
+╼ warp::warp_service::actor_compat::send_updates::{{closure}} at warp/src/warp_service/actor_compat.rs:353:1
+╼ warp::warp_service::ipc_loop::launch_ipc_loop::{{closure}} at warp/src/warp_service/ipc_loop.rs:37:1
+
+2026-04-21T03:37:02.472Z DEBUG task-dump: Statistics snapshot:
+StatisticsSnapshot(
+    [
+        Counter(
+            CounterStat {
+                name: "requests_recv",
+                value: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "doh_err_other",
+                value: 9332,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "primary",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 23,
+                labels: [
+                    Label(
+                        "component",
+                        "statistics",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_skipped_mid_handshake_flush_count",
+                value: 0,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 22,
+                labels: [
+                    Label(
+                        "component",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "alternate_network",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "requests_recv",
+                value: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 2093,
+                labels: [
+                    Label(
+                        "component",
+                        "network_monitor",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 281,
+                labels: [
+                    Label(
+                        "component",
+                        "device_state",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "doh_err_timeout",
+                value: 405,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "primary",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "httx_hyper_body_sends",
+                value: 264,
+                labels: [
+                    Label(
+                        "component",
+                        "httx",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                    Label(
+                        "result",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "emergency_disconnect",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_udp_drop_count",
+                value: 0,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 194,
+                labels: [
+                    Label(
+                        "component",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_accepted_initial_packet_count",
+                value: 6,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 14,
+                labels: [
+                    Label(
+                        "component",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 164,
+                labels: [
+                    Label(
+                        "component",
+                        "dex_tests",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "requests_recv",
+                value: 315088,
+                labels: [
+                    Label(
+                        "component",
+                        "watchdog",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 262,
+                labels: [
+                    Label(
+                        "component",
+                        "network_monitor",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "masque_tunnel_stats_updated",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "min_since_ntp_sync",
+                value: FloatOrd(
+                    61.83192197,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "ntp-clock",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "get_warp_connection_info",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "network_monitor_command",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "with_config_actor",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "status_changed",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "tunnel_mtu_changes_per_conn",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "pmtu",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "quic_connections_in_memory",
+                value: FloatOrd(
+                    1.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "stats",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "conn_attempts_current",
+                value: FloatOrd(
+                    5.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "happy_eyeballs",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "connection_in_progress",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_health_changed",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_info_changed",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "quic_utilized_bandwidth",
+                value: FloatOrd(
+                    3581.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.013823736999999997,
+                ),
+                count: 164,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "status_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.001730128,
+                ),
+                count: 14,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "configuration",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "conn_attempts_all",
+                sum: FloatOrd(
+                    30.0,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "happy_eyeballs",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "fw_avg_ms",
+                sum: FloatOrd(
+                    4865.0,
+                ),
+                count: 119,
+                labels: [
+                    Label(
+                        "component",
+                        "firewall",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.074285687,
+                ),
+                count: 23,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "stats",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "doh_avg_ms",
+                sum: FloatOrd(
+                    2328108.0,
+                ),
+                count: 15271,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "primary",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    0.026539351,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "with_config_actor",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    3.0034615050000006,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                    Label(
+                        "verdict",
+                        "timeout",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.0014395239999999998,
+                ),
+                count: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_info_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.0006438020000000001,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "connection_in_progress",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "conn_duration_s",
+                sum: FloatOrd(
+                    27238.430305968996,
+                ),
+                count: 10,
+                labels: [
+                    Label(
+                        "component",
+                        "connection_lifetime",
+                    ),
+                    Label(
+                        "inner_reconnect",
+                        "0",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    18.79391916799963,
+                ),
+                count: 315088,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.009438019,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "with_config_actor",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "tunnel_mtu_changes_per_conn_hist",
+                sum: FloatOrd(
+                    0.0,
+                ),
+                count: 15,
+                labels: [
+                    Label(
+                        "component",
+                        "pmtu",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    3.9374285110000016,
+                ),
+                count: 2093,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "network_monitor_command",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.031480697,
+                ),
+                count: 262,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "masque_tunnel_stats_updated",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.00898508,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "main_loop_compat",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.000544378,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_health_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.0006079880000000001,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_health_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.000261025,
+                ),
+                count: 14,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "configuration",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.0006272679999999999,
+                ),
+                count: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_info_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "conn_duration_s",
+                sum: FloatOrd(
+                    4155.376193203,
+                ),
+                count: 5,
+                labels: [
+                    Label(
+                        "component",
+                        "connection_lifetime",
+                    ),
+                    Label(
+                        "inner_reconnect",
+                        "1",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.006466656,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "get_warp_connection_info",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.011983837000000013,
+                ),
+                count: 262,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "masque_tunnel_stats_updated",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.017635510999999996,
+                ),
+                count: 164,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "status_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.03350524499999996,
+                ),
+                count: 2093,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "network_monitor_command",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "doh_avg_ms",
+                sum: FloatOrd(
+                    0.0,
+                ),
+                count: 24,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "fixed",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.00019485000000000002,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "stats",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    15.777870031000319,
+                ),
+                count: 315086,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.000264341,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "connection_in_progress",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "api_req_avg_ms",
+                sum: FloatOrd(
+                    76.0,
+                ),
+                count: 1,
+                labels: [
+                    Label(
+                        "component",
+                        "api_actor",
+                    ),
+                    Label(
+                        "request",
+                        "default_network_settings",
+                    ),
+                    Label(
+                        "status",
+                        "success",
+                    ),
+                    Label(
+                        "compliance_env",
+                        "normal",
+                    ),
+                    Label(
+                        "wake_state",
+                        "awake",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.010423008000000001,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "main_loop_compat",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    0.010524140000000001,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "get_warp_connection_info",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+    ],
+)
+2026-04-21T03:37:07.489Z DEBUG task-dump: Dumping task state source="main-loop-watchdog" missed_ticks=10
+2026-04-21T03:37:07.489Z DEBUG task-dump: Runtime metrics: Some(
+    RuntimeMetrics {
+        workers_count: 4,
+        live_tasks_count: 73,
+        total_park_count: 210,
+        max_park_count: 80,
+        min_park_count: 18,
+        total_busy_duration: 100.87408ms,
+        max_busy_duration: 41.625672ms,
+        min_busy_duration: 8.280797ms,
+        global_queue_depth: 0,
+        elapsed: 5.026114859s,
+    },
+)
+2026-04-21T03:37:07.490Z DEBUG task-dump: ╼ warp::warp_service::periodic::structured_log_loop::{{closure}} at warp/src/warp_service/periodic.rs:17:1
+╼ warp::warp_service::WarpService::main_loop<firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}}>::{{closure}}::{{closure}}::{{closure}} at warp/src/warp_service.rs:521:13
+  └╼ firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}} at firewall/src/engine.rs:361:5
+╼ actor_registration_verifier::actor::RegistrationVerifierLoop::run::{{closure}} at actors/actor-registration-verifier/src/actor.rs:67:5
+╼ warp::notification::notifications_loop::{{closure}} at warp/src/notification/mod.rs:114:1
+  └╼ warp::notification::connect::{{closure}} at warp/src/notification/mod.rs:141:1
+╼ actor_alternate_network::actor::AlternateNetworksLoop::run::{{closure}} at actors/actor-alternate-network/src/actor.rs:105:5
+╼ warp::warp_service::WarpService::main_loop<firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}}>::{{closure}}::{{closure}}::{{closure}} at warp/src/warp_service.rs:529:13
+╼ actor_main_loop_compat::handler::MainLoopCompatHandler::run::{{closure}} at actors/actor-main-loop-compat/src/handler.rs:34:5
+╼ warp::warp_service::notify_ipc_clients_on_registration_change::{{closure}} at warp/src/warp_service.rs:1835:1
+╼ warp_settings::manager::WarpSettingsManager::new::{{closure}} at warp-settings/src/manager.rs:92:22
+  └╼ warp_settings::manager::LayerManager::run::{{closure}} at warp-settings/src/manager.rs:1136:5
+╼ actor_configuration::handler::ConfigurationActorLoop::run::{{closure}} at actors/actor-configuration/src/handler.rs:152:5
+╼ <actor_connectivity::ConnectivityActor as actor_framework::actor::ActorInitWithArgs>::init_with_args<'_>::{{closure}} at actors/actor-connectivity/src/lib.rs:48:34
+  └╼ actor_connectivity::connectivity::ConnectivityHandler::run<network_info::linux::power_notifier::PowerNotifier, network_info::linux::route_monitor::RouteMonitor, network_info::linux::change_notifier::ChangeNotifier, <actor_connectivity::ConnectivityActor as actor_framework::actor::ActorInitWithArgs>::init_with_args<'_>::{{closure}}::{{closure}}::{{closure}}>::{{closure}} at actors/actor-connectivity/src/connectivity.rs:43:5
+╼ actor_emergency_disconnect::handler::EmergencyDisconnectActorLoop::run<actor_emergency_disconnect::checks::HttpsExternalEmergencySignalChecker>::{{closure}} at actors/actor-emergency-disconnect/src/handler.rs:118:5
+╼ actor_root_ca::handler::RootCaActorLoop::run::{{closure}} at actors/actor-root-ca/src/handler.rs:37:5
+╼ warp::warp_service::WarpService::start::{{closure}} at warp/src/warp_service.rs:343:5
+  └╼ warp::warp_service::WarpService::main_loop<firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}}>::{{closure}} at warp/src/warp_service.rs:499:5
+╼ warp::warp_service::actor_compat::send_updates::{{closure}} at warp/src/warp_service/actor_compat.rs:353:1
+╼ warp::warp_service::ipc_loop::launch_ipc_loop::{{closure}} at warp/src/warp_service/ipc_loop.rs:37:1
+
+2026-04-21T03:37:07.496Z DEBUG task-dump: Statistics snapshot:
+StatisticsSnapshot(
+    [
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 262,
+                labels: [
+                    Label(
+                        "component",
+                        "network_monitor",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "alternate_network",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_accepted_initial_packet_count",
+                value: 6,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "doh_err_timeout",
+                value: 405,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "primary",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "doh_err_other",
+                value: 9332,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "primary",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "httx_hyper_body_sends",
+                value: 264,
+                labels: [
+                    Label(
+                        "component",
+                        "httx",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                    Label(
+                        "result",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "emergency_disconnect",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 281,
+                labels: [
+                    Label(
+                        "component",
+                        "device_state",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 164,
+                labels: [
+                    Label(
+                        "component",
+                        "dex_tests",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 14,
+                labels: [
+                    Label(
+                        "component",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 194,
+                labels: [
+                    Label(
+                        "component",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "requests_recv",
+                value: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 2093,
+                labels: [
+                    Label(
+                        "component",
+                        "network_monitor",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_skipped_mid_handshake_flush_count",
+                value: 0,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_udp_drop_count",
+                value: 0,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 23,
+                labels: [
+                    Label(
+                        "component",
+                        "statistics",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "requests_recv",
+                value: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 22,
+                labels: [
+                    Label(
+                        "component",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "requests_recv",
+                value: 315138,
+                labels: [
+                    Label(
+                        "component",
+                        "watchdog",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "quic_connections_in_memory",
+                value: FloatOrd(
+                    1.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "get_warp_connection_info",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "conn_attempts_current",
+                value: FloatOrd(
+                    5.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "happy_eyeballs",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "min_since_ntp_sync",
+                value: FloatOrd(
+                    61.83192197,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "ntp-clock",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "tunnel_mtu_changes_per_conn",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "pmtu",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "status_changed",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "stats",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "masque_tunnel_stats_updated",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "quic_utilized_bandwidth",
+                value: FloatOrd(
+                    3581.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "with_config_actor",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "network_monitor_command",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_health_changed",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "connection_in_progress",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_info_changed",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "doh_avg_ms",
+                sum: FloatOrd(
+                    2328108.0,
+                ),
+                count: 15271,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "primary",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.0014395239999999998,
+                ),
+                count: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_info_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.031480697,
+                ),
+                count: 262,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "masque_tunnel_stats_updated",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    3.9374285110000016,
+                ),
+                count: 2093,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "network_monitor_command",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.000261025,
+                ),
+                count: 14,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "configuration",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.0006272679999999999,
+                ),
+                count: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_info_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.011983837000000013,
+                ),
+                count: 262,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "masque_tunnel_stats_updated",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "api_req_avg_ms",
+                sum: FloatOrd(
+                    76.0,
+                ),
+                count: 1,
+                labels: [
+                    Label(
+                        "component",
+                        "api_actor",
+                    ),
+                    Label(
+                        "request",
+                        "default_network_settings",
+                    ),
+                    Label(
+                        "status",
+                        "success",
+                    ),
+                    Label(
+                        "compliance_env",
+                        "normal",
+                    ),
+                    Label(
+                        "wake_state",
+                        "awake",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    15.78013149500032,
+                ),
+                count: 315137,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    0.026539351,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "with_config_actor",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    0.010524140000000001,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "get_warp_connection_info",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.00898508,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "main_loop_compat",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    18.79538065899963,
+                ),
+                count: 315139,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "tunnel_mtu_changes_per_conn_hist",
+                sum: FloatOrd(
+                    0.0,
+                ),
+                count: 15,
+                labels: [
+                    Label(
+                        "component",
+                        "pmtu",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.074285687,
+                ),
+                count: 23,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "stats",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.017635510999999996,
+                ),
+                count: 164,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "status_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "doh_avg_ms",
+                sum: FloatOrd(
+                    0.0,
+                ),
+                count: 24,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "fixed",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.010423008000000001,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "main_loop_compat",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.03350524499999996,
+                ),
+                count: 2093,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "network_monitor_command",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.013823736999999997,
+                ),
+                count: 164,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "status_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.000264341,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "connection_in_progress",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.0006079880000000001,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_health_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "conn_attempts_all",
+                sum: FloatOrd(
+                    30.0,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "happy_eyeballs",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.0006438020000000001,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "connection_in_progress",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.00019485000000000002,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "stats",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "conn_duration_s",
+                sum: FloatOrd(
+                    27238.430305968996,
+                ),
+                count: 10,
+                labels: [
+                    Label(
+                        "component",
+                        "connection_lifetime",
+                    ),
+                    Label(
+                        "inner_reconnect",
+                        "0",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "conn_duration_s",
+                sum: FloatOrd(
+                    4155.376193203,
+                ),
+                count: 5,
+                labels: [
+                    Label(
+                        "component",
+                        "connection_lifetime",
+                    ),
+                    Label(
+                        "inner_reconnect",
+                        "1",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "fw_avg_ms",
+                sum: FloatOrd(
+                    4865.0,
+                ),
+                count: 119,
+                labels: [
+                    Label(
+                        "component",
+                        "firewall",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.001730128,
+                ),
+                count: 14,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "configuration",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.000544378,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_health_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.009438019,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "with_config_actor",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    3.0034615050000006,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                    Label(
+                        "verdict",
+                        "timeout",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.006466656,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "get_warp_connection_info",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+    ],
+)
+2026-04-21T03:37:17.498Z DEBUG task-dump: Dumping task state source="main-loop-watchdog" missed_ticks=5
+2026-04-21T03:37:17.498Z DEBUG task-dump: Runtime metrics: Some(
+    RuntimeMetrics {
+        workers_count: 4,
+        live_tasks_count: 72,
+        total_park_count: 331,
+        max_park_count: 159,
+        min_park_count: 7,
+        total_busy_duration: 11.044186ms,
+        max_busy_duration: 4.787918ms,
+        min_busy_duration: 877.395µs,
+        global_queue_depth: 0,
+        elapsed: 10.008940687s,
+    },
+)
+2026-04-21T03:37:17.498Z DEBUG task-dump: ╼ warp::warp_service::periodic::structured_log_loop::{{closure}} at warp/src/warp_service/periodic.rs:17:1
+╼ warp::warp_service::WarpService::main_loop<firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}}>::{{closure}}::{{closure}}::{{closure}} at warp/src/warp_service.rs:521:13
+  └╼ firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}} at firewall/src/engine.rs:361:5
+╼ actor_registration_verifier::actor::RegistrationVerifierLoop::run::{{closure}} at actors/actor-registration-verifier/src/actor.rs:67:5
+╼ warp::notification::notifications_loop::{{closure}} at warp/src/notification/mod.rs:114:1
+  └╼ warp::notification::connect::{{closure}} at warp/src/notification/mod.rs:141:1
+╼ actor_alternate_network::actor::AlternateNetworksLoop::run::{{closure}} at actors/actor-alternate-network/src/actor.rs:105:5
+╼ warp::warp_service::WarpService::main_loop<firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}}>::{{closure}}::{{closure}}::{{closure}} at warp/src/warp_service.rs:529:13
+╼ actor_main_loop_compat::handler::MainLoopCompatHandler::run::{{closure}} at actors/actor-main-loop-compat/src/handler.rs:34:5
+╼ warp::warp_service::notify_ipc_clients_on_registration_change::{{closure}} at warp/src/warp_service.rs:1835:1
+╼ warp_settings::manager::WarpSettingsManager::new::{{closure}} at warp-settings/src/manager.rs:92:22
+  └╼ warp_settings::manager::LayerManager::run::{{closure}} at warp-settings/src/manager.rs:1136:5
+╼ actor_configuration::handler::ConfigurationActorLoop::run::{{closure}} at actors/actor-configuration/src/handler.rs:152:5
+╼ <actor_connectivity::ConnectivityActor as actor_framework::actor::ActorInitWithArgs>::init_with_args<'_>::{{closure}} at actors/actor-connectivity/src/lib.rs:48:34
+  └╼ actor_connectivity::connectivity::ConnectivityHandler::run<network_info::linux::power_notifier::PowerNotifier, network_info::linux::route_monitor::RouteMonitor, network_info::linux::change_notifier::ChangeNotifier, <actor_connectivity::ConnectivityActor as actor_framework::actor::ActorInitWithArgs>::init_with_args<'_>::{{closure}}::{{closure}}::{{closure}}>::{{closure}} at actors/actor-connectivity/src/connectivity.rs:43:5
+╼ actor_emergency_disconnect::handler::EmergencyDisconnectActorLoop::run<actor_emergency_disconnect::checks::HttpsExternalEmergencySignalChecker>::{{closure}} at actors/actor-emergency-disconnect/src/handler.rs:118:5
+╼ actor_root_ca::handler::RootCaActorLoop::run::{{closure}} at actors/actor-root-ca/src/handler.rs:37:5
+╼ warp::warp_service::WarpService::start::{{closure}} at warp/src/warp_service.rs:343:5
+  └╼ warp::warp_service::WarpService::main_loop<firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}}>::{{closure}} at warp/src/warp_service.rs:499:5
+╼ warp::warp_service::actor_compat::send_updates::{{closure}} at warp/src/warp_service/actor_compat.rs:353:1
+╼ warp::warp_service::ipc_loop::launch_ipc_loop::{{closure}} at warp/src/warp_service/ipc_loop.rs:37:1
+
+2026-04-21T03:37:17.505Z DEBUG task-dump: Statistics snapshot:
+StatisticsSnapshot(
+    [
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 164,
+                labels: [
+                    Label(
+                        "component",
+                        "dex_tests",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "doh_err_other",
+                value: 9332,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "primary",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 262,
+                labels: [
+                    Label(
+                        "component",
+                        "network_monitor",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_udp_drop_count",
+                value: 0,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 23,
+                labels: [
+                    Label(
+                        "component",
+                        "statistics",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 22,
+                labels: [
+                    Label(
+                        "component",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "requests_recv",
+                value: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_skipped_mid_handshake_flush_count",
+                value: 0,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "doh_err_timeout",
+                value: 405,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "primary",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 14,
+                labels: [
+                    Label(
+                        "component",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "requests_recv",
+                value: 315239,
+                labels: [
+                    Label(
+                        "component",
+                        "watchdog",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "httx_hyper_body_sends",
+                value: 264,
+                labels: [
+                    Label(
+                        "component",
+                        "httx",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                    Label(
+                        "result",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "requests_recv",
+                value: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_accepted_initial_packet_count",
+                value: 6,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 2093,
+                labels: [
+                    Label(
+                        "component",
+                        "network_monitor",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 194,
+                labels: [
+                    Label(
+                        "component",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "emergency_disconnect",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "alternate_network",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 281,
+                labels: [
+                    Label(
+                        "component",
+                        "device_state",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_write_errors",
+                value: 1,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "reason",
+                        "err",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "min_since_ntp_sync",
+                value: FloatOrd(
+                    61.83192197,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "ntp-clock",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "tunnel_mtu_changes_per_conn",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "pmtu",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "masque_tunnel_stats_updated",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_health_changed",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "quic_connections_in_memory",
+                value: FloatOrd(
+                    1.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "conn_attempts_current",
+                value: FloatOrd(
+                    5.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "happy_eyeballs",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "quic_utilized_bandwidth",
+                value: FloatOrd(
+                    3581.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "with_config_actor",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "network_monitor_command",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "connection_in_progress",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "status_changed",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "stats",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_info_changed",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "get_warp_connection_info",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    0.010524140000000001,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "get_warp_connection_info",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    18.79859936599963,
+                ),
+                count: 315239,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "fw_avg_ms",
+                sum: FloatOrd(
+                    4923.0,
+                ),
+                count: 121,
+                labels: [
+                    Label(
+                        "component",
+                        "firewall",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "conn_attempts_all",
+                sum: FloatOrd(
+                    30.0,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "happy_eyeballs",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.000261025,
+                ),
+                count: 14,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "configuration",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "doh_avg_ms",
+                sum: FloatOrd(
+                    0.0,
+                ),
+                count: 24,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "fixed",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.011983837000000013,
+                ),
+                count: 262,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "masque_tunnel_stats_updated",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.006466656,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "get_warp_connection_info",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "conn_duration_s",
+                sum: FloatOrd(
+                    27238.430305968996,
+                ),
+                count: 10,
+                labels: [
+                    Label(
+                        "component",
+                        "connection_lifetime",
+                    ),
+                    Label(
+                        "inner_reconnect",
+                        "0",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.000544378,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_health_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    3.0034615050000006,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                    Label(
+                        "verdict",
+                        "timeout",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.0006079880000000001,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_health_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.017635510999999996,
+                ),
+                count: 164,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "status_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.03350524499999996,
+                ),
+                count: 2093,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "network_monitor_command",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.000264341,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "connection_in_progress",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "conn_duration_s",
+                sum: FloatOrd(
+                    4155.376193203,
+                ),
+                count: 5,
+                labels: [
+                    Label(
+                        "component",
+                        "connection_lifetime",
+                    ),
+                    Label(
+                        "inner_reconnect",
+                        "1",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.00019485000000000002,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "stats",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    0.026539351,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "with_config_actor",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.010423008000000001,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "main_loop_compat",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "tunnel_mtu_changes_per_conn_hist",
+                sum: FloatOrd(
+                    0.0,
+                ),
+                count: 15,
+                labels: [
+                    Label(
+                        "component",
+                        "pmtu",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "doh_avg_ms",
+                sum: FloatOrd(
+                    2328108.0,
+                ),
+                count: 15271,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "primary",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.031480697,
+                ),
+                count: 262,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "masque_tunnel_stats_updated",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.074285687,
+                ),
+                count: 23,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "stats",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.001730128,
+                ),
+                count: 14,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "configuration",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.013823736999999997,
+                ),
+                count: 164,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "status_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.0014395239999999998,
+                ),
+                count: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_info_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    15.785104273000334,
+                ),
+                count: 315237,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.0006438020000000001,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "connection_in_progress",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.0006272679999999999,
+                ),
+                count: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_info_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "api_req_avg_ms",
+                sum: FloatOrd(
+                    76.0,
+                ),
+                count: 1,
+                labels: [
+                    Label(
+                        "component",
+                        "api_actor",
+                    ),
+                    Label(
+                        "request",
+                        "default_network_settings",
+                    ),
+                    Label(
+                        "status",
+                        "success",
+                    ),
+                    Label(
+                        "compliance_env",
+                        "normal",
+                    ),
+                    Label(
+                        "wake_state",
+                        "awake",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    3.9374285110000016,
+                ),
+                count: 2093,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "network_monitor_command",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.009438019,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "with_config_actor",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.00898508,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "main_loop_compat",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+    ],
+)
+2026-04-21T03:37:22.508Z DEBUG task-dump: Dumping task state source="main-loop-watchdog" missed_ticks=10
+2026-04-21T03:37:22.508Z DEBUG task-dump: Runtime metrics: Some(
+    RuntimeMetrics {
+        workers_count: 4,
+        live_tasks_count: 76,
+        total_park_count: 226,
+        max_park_count: 86,
+        min_park_count: 8,
+        total_busy_duration: 15.037998ms,
+        max_busy_duration: 4.910459ms,
+        min_busy_duration: 1.900967ms,
+        global_queue_depth: 0,
+        elapsed: 5.009344768s,
+    },
+)
+2026-04-21T03:37:22.508Z DEBUG task-dump: ╼ warp::warp_service::periodic::structured_log_loop::{{closure}} at warp/src/warp_service/periodic.rs:17:1
+╼ warp::warp_service::WarpService::main_loop<firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}}>::{{closure}}::{{closure}}::{{closure}} at warp/src/warp_service.rs:521:13
+  └╼ firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}} at firewall/src/engine.rs:361:5
+╼ actor_registration_verifier::actor::RegistrationVerifierLoop::run::{{closure}} at actors/actor-registration-verifier/src/actor.rs:67:5
+╼ warp::notification::notifications_loop::{{closure}} at warp/src/notification/mod.rs:114:1
+  └╼ warp::notification::connect::{{closure}} at warp/src/notification/mod.rs:141:1
+╼ actor_alternate_network::actor::AlternateNetworksLoop::run::{{closure}} at actors/actor-alternate-network/src/actor.rs:105:5
+╼ warp::warp_service::WarpService::main_loop<firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}}>::{{closure}}::{{closure}}::{{closure}} at warp/src/warp_service.rs:529:13
+╼ actor_main_loop_compat::handler::MainLoopCompatHandler::run::{{closure}} at actors/actor-main-loop-compat/src/handler.rs:34:5
+╼ warp::warp_service::notify_ipc_clients_on_registration_change::{{closure}} at warp/src/warp_service.rs:1835:1
+╼ warp_settings::manager::WarpSettingsManager::new::{{closure}} at warp-settings/src/manager.rs:92:22
+  └╼ warp_settings::manager::LayerManager::run::{{closure}} at warp-settings/src/manager.rs:1136:5
+╼ actor_configuration::handler::ConfigurationActorLoop::run::{{closure}} at actors/actor-configuration/src/handler.rs:152:5
+╼ <actor_connectivity::ConnectivityActor as actor_framework::actor::ActorInitWithArgs>::init_with_args<'_>::{{closure}} at actors/actor-connectivity/src/lib.rs:48:34
+  └╼ actor_connectivity::connectivity::ConnectivityHandler::run<network_info::linux::power_notifier::PowerNotifier, network_info::linux::route_monitor::RouteMonitor, network_info::linux::change_notifier::ChangeNotifier, <actor_connectivity::ConnectivityActor as actor_framework::actor::ActorInitWithArgs>::init_with_args<'_>::{{closure}}::{{closure}}::{{closure}}>::{{closure}} at actors/actor-connectivity/src/connectivity.rs:43:5
+╼ actor_emergency_disconnect::handler::EmergencyDisconnectActorLoop::run<actor_emergency_disconnect::checks::HttpsExternalEmergencySignalChecker>::{{closure}} at actors/actor-emergency-disconnect/src/handler.rs:118:5
+╼ actor_root_ca::handler::RootCaActorLoop::run::{{closure}} at actors/actor-root-ca/src/handler.rs:37:5
+╼ warp::warp_service::WarpService::start::{{closure}} at warp/src/warp_service.rs:343:5
+  └╼ warp::warp_service::WarpService::main_loop<firewall::engine::FirewallEngine::engine<firewall::linux::Firewall>::{{closure}}>::{{closure}} at warp/src/warp_service.rs:499:5
+╼ warp::warp_service::actor_compat::send_updates::{{closure}} at warp/src/warp_service/actor_compat.rs:353:1
+╼ warp::warp_service::ipc_loop::launch_ipc_loop::{{closure}} at warp/src/warp_service/ipc_loop.rs:37:1
+
+2026-04-21T03:37:22.511Z DEBUG task-dump: Statistics snapshot:
+StatisticsSnapshot(
+    [
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 22,
+                labels: [
+                    Label(
+                        "component",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_skipped_mid_handshake_flush_count",
+                value: 0,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 281,
+                labels: [
+                    Label(
+                        "component",
+                        "device_state",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 2093,
+                labels: [
+                    Label(
+                        "component",
+                        "network_monitor",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 194,
+                labels: [
+                    Label(
+                        "component",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "requests_recv",
+                value: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "requests_recv",
+                value: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "doh_err_timeout",
+                value: 405,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "primary",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_udp_drop_count",
+                value: 0,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "requests_recv",
+                value: 315289,
+                labels: [
+                    Label(
+                        "component",
+                        "watchdog",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "httx_hyper_body_sends",
+                value: 264,
+                labels: [
+                    Label(
+                        "component",
+                        "httx",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                    Label(
+                        "result",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 164,
+                labels: [
+                    Label(
+                        "component",
+                        "dex_tests",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "emergency_disconnect",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_write_errors",
+                value: 1,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "reason",
+                        "err",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 262,
+                labels: [
+                    Label(
+                        "component",
+                        "network_monitor",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 23,
+                labels: [
+                    Label(
+                        "component",
+                        "statistics",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "commands_recv",
+                value: 14,
+                labels: [
+                    Label(
+                        "component",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "updates_recv",
+                value: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "alternate_network",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "quic_accepted_initial_packet_count",
+                value: 6,
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Counter(
+            CounterStat {
+                name: "doh_err_other",
+                value: 9332,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "primary",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "min_since_ntp_sync",
+                value: FloatOrd(
+                    61.83192197,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "ntp-clock",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "conn_attempts_current",
+                value: FloatOrd(
+                    5.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "happy_eyeballs",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "tunnel_mtu_changes_per_conn",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "pmtu",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "masque_tunnel_stats_updated",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "main_loop_compat",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_info_changed",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "quic_utilized_bandwidth",
+                value: FloatOrd(
+                    3581.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "status_changed",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "connection_in_progress",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "network_monitor_command",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "quic_connections_in_memory",
+                value: FloatOrd(
+                    1.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "quic",
+                    ),
+                    Label(
+                        "foundations-compat",
+                        "logger",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "stats",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "with_config_actor",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_health_changed",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "get_warp_connection_info",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "configuration",
+                    ),
+                ],
+            },
+        ),
+        Gauge(
+            GaugeStat {
+                name: "queue_depth",
+                value: FloatOrd(
+                    0.0,
+                ),
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.011983837000000013,
+                ),
+                count: 262,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "masque_tunnel_stats_updated",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.009438019,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "with_config_actor",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    0.026539351,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "with_config_actor",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.017635510999999996,
+                ),
+                count: 164,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "status_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "fw_avg_ms",
+                sum: FloatOrd(
+                    4923.0,
+                ),
+                count: 121,
+                labels: [
+                    Label(
+                        "component",
+                        "firewall",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.000544378,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_health_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "doh_avg_ms",
+                sum: FloatOrd(
+                    0.0,
+                ),
+                count: 24,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "fixed",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    3.0034615050000006,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                    Label(
+                        "verdict",
+                        "timeout",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.00898508,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "main_loop_compat",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.00019485000000000002,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "stats",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "conn_duration_s",
+                sum: FloatOrd(
+                    27238.430305968996,
+                ),
+                count: 10,
+                labels: [
+                    Label(
+                        "component",
+                        "connection_lifetime",
+                    ),
+                    Label(
+                        "inner_reconnect",
+                        "0",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    18.79997949299963,
+                ),
+                count: 315289,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.000264341,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "connection_in_progress",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.010423008000000001,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "main_loop_compat",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.006466656,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "get_warp_connection_info",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.0006438020000000001,
+                ),
+                count: 11,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "connection_in_progress",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "tunnel_mtu_changes_per_conn_hist",
+                sum: FloatOrd(
+                    0.0,
+                ),
+                count: 15,
+                labels: [
+                    Label(
+                        "component",
+                        "pmtu",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    15.787279813000328,
+                ),
+                count: 315287,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "watchdog_tick",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.0006079880000000001,
+                ),
+                count: 3,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_health_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.03350524499999996,
+                ),
+                count: 2093,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "network_monitor_command",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "conn_attempts_all",
+                sum: FloatOrd(
+                    30.0,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "happy_eyeballs",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.001730128,
+                ),
+                count: 14,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "configuration",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "doh_avg_ms",
+                sum: FloatOrd(
+                    2328108.0,
+                ),
+                count: 15271,
+                labels: [
+                    Label(
+                        "component",
+                        "dns_proxy",
+                    ),
+                    Label(
+                        "origin",
+                        "primary",
+                    ),
+                    Label(
+                        "mode",
+                        "dns-over-warp",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.074285687,
+                ),
+                count: 23,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "stats",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.013823736999999997,
+                ),
+                count: 164,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "status_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.0014395239999999998,
+                ),
+                count: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_info_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "conn_duration_s",
+                sum: FloatOrd(
+                    4155.376193203,
+                ),
+                count: 5,
+                labels: [
+                    Label(
+                        "component",
+                        "connection_lifetime",
+                    ),
+                    Label(
+                        "inner_reconnect",
+                        "1",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "api_req_avg_ms",
+                sum: FloatOrd(
+                    76.0,
+                ),
+                count: 1,
+                labels: [
+                    Label(
+                        "component",
+                        "api_actor",
+                    ),
+                    Label(
+                        "request",
+                        "default_network_settings",
+                    ),
+                    Label(
+                        "status",
+                        "success",
+                    ),
+                    Label(
+                        "compliance_env",
+                        "normal",
+                    ),
+                    Label(
+                        "wake_state",
+                        "awake",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    3.9374285110000016,
+                ),
+                count: 2093,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "network_monitor_command",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "rtt",
+                sum: FloatOrd(
+                    0.010524140000000001,
+                ),
+                count: 8,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "request",
+                    ),
+                    Label(
+                        "name",
+                        "get_warp_connection_info",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "duration_in_bus",
+                sum: FloatOrd(
+                    0.031480697,
+                ),
+                count: 262,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "masque_tunnel_stats_updated",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.000261025,
+                ),
+                count: 14,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "command",
+                    ),
+                    Label(
+                        "name",
+                        "configuration",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+        Histogram(
+            HistogramStat {
+                name: "send_duration",
+                sum: FloatOrd(
+                    0.0006272679999999999,
+                ),
+                count: 19,
+                labels: [
+                    Label(
+                        "component",
+                        "message_bus",
+                    ),
+                    Label(
+                        "type",
+                        "update",
+                    ),
+                    Label(
+                        "name",
+                        "network_info_changed",
+                    ),
+                    Label(
+                        "verdict",
+                        "success",
+                    ),
+                ],
+            },
+        ),
+    ],
+)

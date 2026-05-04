@@ -65,27 +65,20 @@ impl PriceTick {
         quote: &tradingview::QuoteValue,
     ) -> Option<Self> {
         let price = quote.price?;
-
-        // quote.symbol maps to TradingView's `short_name` (e.g. "BTCUSDT", "XAUUSD")
-        // which strips the exchange prefix. We try to recover the full symbol
-        // (e.g. "BINANCE:BTCUSDT") so that hub filters using "EXCHANGE:SYMBOL" match correctly.
-        let short_name = quote
+    
+    let short_name = quote
             .symbol
             .map(|s| s.to_string())
             .filter(|s| !s.is_empty());
 
         let symbol = match short_name {
-            // Already has exchange prefix — use as-is.
             Some(ref s) if s.contains(':') => s.clone(),
-            // Look up in pre-built map: "XAUUSD" -> "OANDA:XAUUSD"
             Some(ref s) if symbol_map.contains_key(s.as_str()) => {
                 symbol_map[s.as_str()].clone()
             }
-            // Fallback: check if default_symbol ends with this short_name
             Some(ref s) if default_symbol.ends_with(s.as_str()) => {
                 default_symbol.to_string()
             }
-            // Last resort: use short_name as-is
             Some(s) => s,
             None => default_symbol.to_string(),
         };

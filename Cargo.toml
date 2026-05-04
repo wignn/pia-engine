@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "control-plane"]
+members = ["core", "control-plane", "testss", "ingestion-gateway"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -24,6 +24,9 @@ url = "2"
 jsonwebtoken = "9"
 argon2 = "0.5"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
+async-trait = "0.1"
 
 [profile.release]
 opt-level = 3

@@ -1,0 +1,25 @@
+[package]
+name = "ingestion-gateway"
+version = "0.1.0"
+edition = "2021"
+description = "Real-time tick-level data ingestion gateway via Finnhub & Tiingo WebSocket"
+license = "MIT"
+
+[[bin]]
+name = "ingestion-gateway"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+futures-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+redis = { workspace = true }
+anyhow = { workspace = true }
+dotenvy = { workspace = true }
+url = { workspace = true }
+async-trait = { workspace = true }

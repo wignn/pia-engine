@@ -23,7 +23,8 @@ jobs:
             dockerfile: infrastructure/Dockerfile.control-plane
           - image: atlsd-portal
             dockerfile: infrastructure/Dockerfile.portal
-            
+          - image: atlsd-ingestion
+            dockerfile: infrastructure/Dockerfile.ingestion
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

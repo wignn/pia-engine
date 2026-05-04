@@ -4,6 +4,7 @@ mod config;
 mod db;
 mod error;
 mod html;
+mod ingestion_subscriber;
 mod pipeline;
 mod scraper;
 mod tenant;
@@ -15,7 +16,6 @@ use chrono::Utc;
 use serde_json::json;
 use tracing::{error, info, warn};
 use tracing_subscriber::{fmt, EnvFilter};
-
 use api::state::AppState;
 use api::usage_tracker::UsageTracker;
 use collector::calendar::CalendarCollector;
@@ -300,6 +300,18 @@ async fn main() {
                 tokio::time::sleep(Duration::from_secs(reconnect_sec.max(1))).await;
             }
         });
+    }
+
+    // Ingestion gateway listener — subscribes to Redis channels published
+    // by the external ingestion-gateway service and relays tick data into
+    // the WebSocket hub so connected clients receive real-time prices.
+    if cfg.has_redis() {
+        let hub = hub.clone();
+        let redis_url = cfg.redis_url.clone();
+        tokio::spawn(async move {
+            ingestion_subscriber::run(redis_url, hub).await;
+        });
+        info!("ingestion subscriber started (listening on ingestion:*)");
     }
 
     info!(port = cfg.server_port, "core running");

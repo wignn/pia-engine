@@ -197,8 +197,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/plans/upgrade", post(super::plans::upgrade))
         // Admin routes
         .route("/api/v1/admin/users", get(super::admin::list_users))
-        .route("/api/v1/admin/users/:id/plan", post(super::admin::set_user_plan))
-        .route("/api/v1/admin/users/:id/toggle", post(super::admin::toggle_user))
+        .route("/api/v1/admin/users/{id}/plan", post(super::admin::set_user_plan))
+        .route("/api/v1/admin/users/{id}/toggle", post(super::admin::toggle_user))
         .route("/api/v1/admin/stats", get(super::admin::platform_stats))
         // Middleware
         .layer(axum::middleware::from_fn_with_state(

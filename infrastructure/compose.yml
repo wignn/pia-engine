@@ -123,6 +123,23 @@ services:
     ports:
       - "5173:5173"
 
+  ingestion-gateway:
+    container_name: ingestion-gateway
+    image: wign/atlsd-ingestion
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.ingestion
+      args:
+        - DOCKER_BUILD_TYPE=release
+    env_file:
+      - ./env/.env.ingestion
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    networks:
+      - private
+
   rsshub:
     image: diygod/rsshub:latest
     container_name: rsshub
