@@ -25,6 +25,8 @@ jobs:
             dockerfile: infrastructure/Dockerfile.portal
           - image: atlsd-ingestion
             dockerfile: infrastructure/Dockerfile.ingestion
+          - image: atlsd-bot
+            dockerfile: infrastructure/Dockerfile.bot
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

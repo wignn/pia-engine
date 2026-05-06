@@ -1,0 +1,74 @@
+FROM lukemathwalker/cargo-chef:latest-rust-1.95-bookworm AS chef
+
+WORKDIR /app
+
+FROM chef AS planner
+COPY Cargo.toml Cargo.lock ./
+COPY bot/Cargo.toml bot/Cargo.toml
+COPY core/Cargo.toml core/Cargo.toml
+COPY control-plane/Cargo.toml control-plane/Cargo.toml
+COPY ingestion-gateway/Cargo.toml ingestion-gateway/Cargo.toml
+
+RUN mkdir -p bot/src && echo "fn main(){}" > bot/src/main.rs && \
+  mkdir -p core/src && echo "fn main(){}" > core/src/main.rs && \
+    mkdir -p control-plane/src && echo "fn main(){}" > control-plane/src/main.rs && \
+    mkdir -p ingestion-gateway/src && echo "fn main(){}" > ingestion-gateway/src/main.rs
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+
+ARG DOCKER_BUILD_TYPE=release
+
+ENV SQLX_OFFLINE=true
+COPY --from=planner /app/recipe.json recipe.json
+
+RUN <<EOF
+  if [ "$DOCKER_BUILD_TYPE" = "release" ]; then
+    cargo chef cook --release --recipe-path recipe.json;
+  else
+    cargo chef cook --recipe-path recipe.json;
+  fi
+EOF
+
+# Copy real source
+COPY Cargo.toml Cargo.lock ./
+COPY bot/ bot/
+COPY core/Cargo.toml core/Cargo.toml
+COPY control-plane/Cargo.toml control-plane/Cargo.toml
+COPY ingestion-gateway/Cargo.toml ingestion-gateway/Cargo.toml
+RUN mkdir -p core/src && echo "fn main(){}" > core/src/main.rs && \
+  mkdir -p control-plane/src && echo "fn main(){}" > control-plane/src/main.rs && \
+    mkdir -p ingestion-gateway/src && echo "fn main(){}" > ingestion-gateway/src/main.rs
+
+RUN <<EOF
+  if [ "$DOCKER_BUILD_TYPE" = "release" ]; then
+    cargo build --release -p bot;
+  else
+    cargo build -p bot;
+  fi
+EOF
+RUN <<EOF
+  if [ "$DOCKER_BUILD_TYPE" = "release" ]; then
+    cp /app/target/release/bot /app/target/bot;
+  else
+    cp /app/target/debug/bot /app/target/bot;
+  fi
+EOF
+
+FROM debian:bookworm-slim AS runtime
+
+WORKDIR /app
+
+RUN <<EOF
+  apt-get update
+  apt-get install -y ca-certificates
+  rm -rf /var/lib/apt/lists/*
+EOF
+
+COPY --from=builder /app/target/bot /usr/local/bin/bot
+COPY --from=builder /app/bot/migrations /app/migrations
+
+EXPOSE 8000
+
+ENTRYPOINT ["/usr/local/bin/bot"]

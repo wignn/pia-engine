@@ -6,7 +6,6 @@ use crate::tenant::registry::TenantRegistry;
 use crate::ws::Hub;
 use super::usage_tracker::UsageTracker;
 
-/// Shared application state accessible by all handlers.
 #[derive(Clone)]
 pub struct AppState {
     pub hub: Arc<Hub>,

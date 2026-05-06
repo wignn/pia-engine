@@ -47,16 +47,24 @@ pub fn build_router(state: AppState) -> Router {
     let public_api = Router::new()
         .route("/health", get(handlers::health::health))
         .route("/", get(handlers::health::root))
-        .route("/api/v1/ws/forex", get(ws_handler))
-        .route("/api/v1/ws/forex/{symbol}", get(ws_handler_single_symbol))
-        .route("/api/v1/ws/equity", get(ws_handler))
-        .route("/api/v1/ws/equity/{symbol}", get(ws_handler_single_symbol))
-        .route("/api/v1/ws/x", get(ws_handler))
+        // --- WebSocket streams — each route auto-subscribes to its channel ---
+        .route("/api/v1/ws/market", get(ws_market_handler))
+        .route("/api/v1/ws/market/{symbol}", get(ws_handler_single_symbol))
+        .route("/api/v1/ws/news", get(ws_news_handler))
+        .route("/api/v1/ws/equity", get(ws_equity_handler))
+        .route("/api/v1/ws/calendar", get(ws_calendar_handler))
+        .route("/api/v1/ws/x", get(ws_x_handler))
         .route("/api/v1/ws/x/{symbol}", get(ws_handler_single_symbol))
+        // --- Market prices (REST) ---
+        .route("/api/v1/market/prices", get(handlers::market::list_prices))
+        .route("/api/v1/market/prices/{symbol}", get(handlers::market::get_price))
+        // --- Forex ---
         .route("/api/v1/forex/news", get(handlers::news::list_news))
         .route("/api/v1/forex/news/latest", get(handlers::news::latest_news))
         .route("/api/v1/forex/news/{id}", get(handlers::news::get_news))
-        .route("/api/v1/equity/news/latest", get(handlers::stock::latest_stock_news))
+        .route("/api/v1/forex/calendar", get(handlers::calendar::list_calendar))
+        // --- Equity / Stock ---
+        .route("/api/v1/equity/news", get(handlers::stock::latest_stock_news))
         .layer(middleware::from_fn_with_state(state.clone(), usage_logger))
         .layer(middleware::from_fn_with_state(state.clone(), optional_api_key_auth));
 
@@ -72,12 +80,12 @@ pub fn build_router(state: AppState) -> Router {
         .with_state(state)
 }
 
-/// Tenant-aware WebSocket handler.
-/// Validates API key from query param, loads tenant config, enforces WS connection limit.
-async fn ws_handler(
+
+async fn ws_handler_inner(
     ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+    state: AppState,
+    params: std::collections::HashMap<String, String>,
+    channel_override: Option<&str>,
 ) -> Response {
     let bot_id = params
         .get("bot_id")
@@ -90,17 +98,24 @@ async fn ws_handler(
     let mut user_id = None;
     let mut tv_symbols = HashSet::new();
 
-    let channels_query = params.get("channels").map(|c| c.split(',').map(|s| s.trim().to_string()).collect::<HashSet<_>>());
-    let symbols_query = params.get("symbols").map(|s| s.split(',').map(|s| s.trim().to_string()).collect::<HashSet<_>>()).unwrap_or_default();
+    let channels_query: Option<HashSet<String>> = channel_override
+        .map(|ch| std::iter::once(ch.to_string()).collect())
+        .or_else(|| {
+            params
+                .get("channels")
+                .map(|c| c.split(',').map(|s| s.trim().to_string()).collect())
+        });
+
+    let symbols_query = params
+        .get("symbols")
+        .map(|s| s.split(',').map(|s| s.trim().to_string()).collect::<HashSet<_>>())
+        .unwrap_or_default();
 
     if let Some(raw_key) = &token {
-        // Check env admin keys first
         if state.config.api_keys.contains(raw_key) {
-            // Admin: no filtering by default, but allow them to use symbols query
             tv_symbols = symbols_query;
         } else if let Some(registry) = &state.tenant_registry {
             if let Some(ctx) = registry.validate_key(raw_key).await {
-                // Enforce WS connection limit
                 let current = state.hub.user_connection_count(&ctx.user_id).await;
                 if current >= ctx.ws_connections as usize {
                     return axum::response::Response::builder()
@@ -109,7 +124,6 @@ async fn ws_handler(
                         .unwrap();
                 }
                 user_id = Some(ctx.user_id);
-                // Intersect tenant's allowed symbols with requested symbols, or use all tenant's if requested is empty
                 if !symbols_query.is_empty() {
                     tv_symbols = ctx.tv_symbols.intersection(&symbols_query).cloned().collect();
                 } else {
@@ -120,11 +134,52 @@ async fn ws_handler(
     }
 
     let hub = state.hub.clone();
-    ws.on_upgrade(move |socket| ws::client::handle_socket(socket, hub, bot_id, user_id, HashSet::new(), tv_symbols, channels_query))
+    ws.on_upgrade(move |socket| {
+        ws::client::handle_socket(socket, hub, bot_id, user_id, HashSet::new(), tv_symbols, channels_query)
+    })
 }
 
-/// Wrapper handler for single-symbol path routing (e.g. /ws/forex/BINANCE:DOGEUSDT).
-/// Extracts the symbol from the URL path and injects it as a query parameter for ws_handler.
+
+async fn ws_market_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    ws_handler_inner(ws, state, params, Some("market_data")).await
+}
+
+async fn ws_news_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    ws_handler_inner(ws, state, params, Some("news")).await
+}
+
+async fn ws_equity_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    ws_handler_inner(ws, state, params, Some("equity_news")).await
+}
+
+async fn ws_calendar_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    ws_handler_inner(ws, state, params, Some("calendar")).await
+}
+
+async fn ws_x_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    ws_handler_inner(ws, state, params, Some("x")).await
+}
+
 async fn ws_handler_single_symbol(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
@@ -132,7 +187,7 @@ async fn ws_handler_single_symbol(
     axum::extract::Query(mut params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Response {
     params.insert("symbols".to_string(), symbol);
-    ws_handler(ws, State(state), axum::extract::Query(params)).await
+    ws_handler_inner(ws, state, params, Some("market_data")).await
 }
 
 

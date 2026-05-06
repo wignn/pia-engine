@@ -1,11 +1,40 @@
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 
 use futures_util::StreamExt;
+use once_cell::sync::Lazy;
+use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error, info, warn};
 
 use crate::ws;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CachedPrice {
+    pub symbol: String,
+    pub price: f64,
+    pub bid: Option<f64>,
+    pub ask: Option<f64>,
+    pub volume: Option<f64>,
+    pub source: String,
+    pub asset_type: String,
+    pub received_at: Option<String>,
+    #[serde(skip)]
+    pub updated_at: Option<Instant>,
+}
+
+pub static PRICE_CACHE: Lazy<Arc<RwLock<HashMap<String, CachedPrice>>>> =
+    Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
+
+pub fn get_all_prices() -> Vec<CachedPrice> {
+    PRICE_CACHE.read().values().cloned().collect()
+}
+
+pub fn get_price(symbol: &str) -> Option<CachedPrice> {
+    PRICE_CACHE.read().get(&symbol.to_uppercase()).cloned()
+}
 
 pub async fn run(redis_url: String, hub: Arc<ws::Hub>) {
     loop {
@@ -52,7 +81,7 @@ async fn subscribe_loop(redis_url: &str, hub: &Arc<ws::Hub>) -> anyhow::Result<(
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
-        let symbol = parsed
+        let raw_symbol = parsed
             .get("symbol")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
@@ -63,17 +92,52 @@ async fn subscribe_loop(redis_url: &str, hub: &Arc<ws::Hub>) -> anyhow::Result<(
             continue;
         }
 
+        let symbol = normalize_symbol(source, raw_symbol);
+        let bid = parsed.get("bid").and_then(|v| v.as_f64());
+        let ask = parsed.get("ask").and_then(|v| v.as_f64());
+        let volume = parsed.get("volume").and_then(|v| v.as_f64());
+        let received_at = parsed
+            .get("received_at")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let asset_type = match source {
+            "binance" => "crypto",
+            "finnhub" | "tiingo" => "forex",
+            _ => "unknown",
+        }
+        .to_string();
+
+        {
+            let mut cache = PRICE_CACHE.write();
+            cache.insert(
+                symbol.clone(),
+                CachedPrice {
+                    symbol: symbol.clone(),
+                    price,
+                    bid,
+                    ask,
+                    volume,
+                    source: source.to_string(),
+                    asset_type: asset_type.clone(),
+                    received_at: received_at.clone(),
+                    updated_at: Some(Instant::now()),
+                },
+            );
+        }
+
         let tick_data = serde_json::json!({
             "tick": {
-                "symbol": normalize_symbol(source, symbol),
+                "symbol": &symbol,
                 "price": price,
-                "bid": parsed.get("bid").and_then(|v| v.as_f64()),
-                "ask": parsed.get("ask").and_then(|v| v.as_f64()),
-                "volume": parsed.get("volume").and_then(|v| v.as_f64()),
+                "bid": bid,
+                "ask": ask,
+                "volume": volume,
                 "source": source,
-                "received_at": parsed.get("received_at").and_then(|v| v.as_str()),
+                "asset_type": &asset_type,
+                "received_at": received_at,
             },
-            "asset_type": "forex",
+            "asset_type": &asset_type,
         });
 
         let _ = hub
@@ -82,27 +146,23 @@ async fn subscribe_loop(redis_url: &str, hub: &Arc<ws::Hub>) -> anyhow::Result<(
     }
 }
 
-
 fn normalize_symbol(source: &str, raw: &str) -> String {
     match source {
         "finnhub" => {
-            if let Some((venue, pair)) = raw.split_once(':') {
-                format!("{}:{}", venue, pair.replace('_', ""))
+            if let Some((_venue, pair)) = raw.split_once(':') {
+                pair.replace('_', "").to_uppercase()
             } else {
-                raw.to_string()
+                raw.replace('_', "").to_uppercase()
             }
         }
-        "tiingo" => {
-            format!("OANDA:{}", raw.to_uppercase())
-        }
+        "tiingo" => raw.to_uppercase(),
         "binance" => {
-            let upper = raw.to_uppercase();
-            if upper.contains(':') {
-                upper
+            if let Some((_prefix, pair)) = raw.to_uppercase().split_once(':') {
+                pair.to_string()
             } else {
-                format!("BINANCE:{}", upper)
+                raw.to_uppercase()
             }
         }
-        _ => raw.to_string(),
+        _ => raw.to_uppercase(),
     }
 }
