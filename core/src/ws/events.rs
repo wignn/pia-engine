@@ -41,7 +41,15 @@ pub struct NewsArticleData {
 
 pub fn build_news_embed(a: &NewsArticleData) -> Value {
     let color = 0x0099FF;
-    let impact_bar = "▰▰▰";
+    let impact_bars: std::collections::HashMap<&str, &str> = [
+        ("high", "▰▰▰"),
+        ("medium", "▰▰▱"),
+        ("low", "▰▱▱"),
+    ]
+    .into_iter()
+    .collect();
+    let impact_level_lower = a.impact_level.as_deref().unwrap_or("low").to_lowercase();
+    let impact_bar = impact_bars.get(impact_level_lower.as_str()).unwrap_or(&"▰▱▱");
 
     let time_str = format_wib(a.published_at.as_deref());
     let footer_date = format_footer_date(a.published_at.as_deref());
@@ -103,11 +111,8 @@ pub fn build_equity_embed(s: &EquityNewsData) -> Value {
     ]
     .into_iter()
     .collect();
-    let impact_bar = s
-        .impact_level
-        .as_deref()
-        .and_then(|l| impact_bars.get(l).copied())
-        .unwrap_or("▰▱▱");
+    let impact_level_lower = s.impact_level.as_deref().unwrap_or("low").to_lowercase();
+    let impact_bar = impact_bars.get(impact_level_lower.as_str()).unwrap_or(&"▰▱▱");
 
     let time_str = format_wib(s.published_at.as_deref());
     let footer_date = format_footer_date(s.published_at.as_deref());
@@ -200,15 +205,33 @@ pub fn build_x_embed(t: &XPostData) -> Value {
     result
 }
 
-// --- Helpers ---
+
+fn parse_flexible_time(iso: &str) -> Option<chrono::DateTime<Utc>> {
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(iso) {
+        return Some(dt.with_timezone(&Utc));
+    }
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc2822(iso) {
+        return Some(dt.with_timezone(&Utc));
+    }
+    if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(iso, "%Y-%m-%dT%H:%M:%S%.f") {
+        return Some(chrono::TimeZone::from_utc_datetime(&Utc, &ndt));
+    }
+    if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(iso, "%Y-%m-%dT%H:%M:%S") {
+        return Some(chrono::TimeZone::from_utc_datetime(&Utc, &ndt));
+    }
+    if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(iso, "%Y-%m-%d %H:%M:%S") {
+        return Some(chrono::TimeZone::from_utc_datetime(&Utc, &ndt));
+    }
+    None
+}
 
 fn format_wib(iso_time: Option<&str>) -> String {
     let Some(iso) = iso_time else {
         return "N/A".to_string();
     };
-    match iso.parse::<chrono::DateTime<Utc>>() {
-        Ok(dt) => dt.with_timezone(&Jakarta).format("%H:%M WIB").to_string(),
-        Err(_) => "N/A".to_string(),
+    match parse_flexible_time(iso) {
+        Some(dt) => dt.with_timezone(&Jakarta).format("%H:%M WIB").to_string(),
+        None => "N/A".to_string(),
     }
 }
 
@@ -216,12 +239,12 @@ fn format_footer_date(iso_time: Option<&str>) -> String {
     let Some(iso) = iso_time else {
         return String::new();
     };
-    match iso.parse::<chrono::DateTime<Utc>>() {
-        Ok(dt) => dt
+    match parse_flexible_time(iso) {
+        Some(dt) => dt
             .with_timezone(&Jakarta)
             .format("%d/%m/%Y %H:%M")
             .to_string(),
-        Err(_) => String::new(),
+        None => String::new(),
     }
 }
 

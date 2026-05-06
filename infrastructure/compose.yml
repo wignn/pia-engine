@@ -139,6 +139,24 @@ services:
     networks:
       - private
 
+  bot:
+    container_name: world-bot
+    image: wign/atlsd-bot
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.bot
+      args:
+        - DOCKER_BUILD_TYPE=release
+    env_file:
+      - ./env/.env.bot
+    environment:
+      - DATABASE_PATH=/app/data/bot.db
+    volumes:
+      - ./data/bot:/app/data
+    restart: always
+    networks:
+      - private
+
   rsshub:
     image: diygod/rsshub:latest
     container_name: rsshubs
