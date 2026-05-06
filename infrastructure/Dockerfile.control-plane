@@ -8,10 +8,12 @@ COPY Cargo.toml Cargo.lock ./
 COPY core/Cargo.toml core/Cargo.toml
 COPY control-plane/Cargo.toml control-plane/Cargo.toml
 COPY ingestion-gateway/Cargo.toml ingestion-gateway/Cargo.toml
+COPY bot/Cargo.toml bot/Cargo.toml
 
 RUN mkdir -p core/src && echo "fn main(){}" > core/src/main.rs && \
     mkdir -p control-plane/src && echo "fn main(){}" > control-plane/src/main.rs && \
-    mkdir -p ingestion-gateway/src && echo "fn main(){}" > ingestion-gateway/src/main.rs
+    mkdir -p ingestion-gateway/src && echo "fn main(){}" > ingestion-gateway/src/main.rs && \
+    mkdir -p bot/src && echo "fn main(){}" > bot/src/main.rs
 
 RUN cargo chef prepare --recipe-path recipe.json
 
@@ -34,8 +36,10 @@ COPY Cargo.toml Cargo.lock ./
 COPY control-plane/ control-plane/
 COPY core/Cargo.toml core/Cargo.toml
 COPY ingestion-gateway/Cargo.toml ingestion-gateway/Cargo.toml
+COPY bot/Cargo.toml bot/Cargo.toml
 RUN mkdir -p core/src && echo "fn main(){}" > core/src/main.rs && \
-    mkdir -p ingestion-gateway/src && echo "fn main(){}" > ingestion-gateway/src/main.rs
+    mkdir -p ingestion-gateway/src && echo "fn main(){}" > ingestion-gateway/src/main.rs && \
+    mkdir -p bot/src && echo "fn main(){}" > bot/src/main.rs
 
 RUN <<EOF
   if [ "$DOCKER_BUILD_TYPE" = "release" ]; then
