@@ -12,7 +12,6 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 const RECONNECT_DELAY_BASE: u64 = 5;
 const RECONNECT_DELAY_MAX: u64 = 300;
 
-// --- Event data structures ---
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoreEvent {
@@ -135,7 +134,7 @@ impl CoreWsService {
 
     async fn connect_and_listen(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let url = format!(
-            "{}/api/v1/ws/market?bot_id={}&channels=all",
+            "{}/api/v1/ws?bot_id={}&channels=all",
             self.core_url, self.bot_id
         );
         println!("[CORE-WS] Connecting to: {}", url);
@@ -216,13 +215,15 @@ impl CoreWsService {
     // --- Market trade: update price cache + check alerts ---
     async fn handle_market_trade(&self, text: &str) {
         if let Ok(trade_event) = serde_json::from_str::<crate::services::market_ws::MarketTradeEvent>(text) {
-            if let Some(data) = trade_event.data {
-                crate::services::market_ws::update_price(&data);
+            if let Some(wrapper) = trade_event.data {
+                let cached = crate::services::market_ws::update_price(&wrapper.tick);
                 crate::services::price_alert::check_price(
-                    &data.symbol, data.price, &data.price_str, &data.asset_type,
+                    &cached.symbol, cached.price, &cached.price_str, &cached.asset_type,
                     &self.http, &self.db,
                 ).await;
             }
+        } else {
+            // println!("[CORE-WS] Failed to parse market trade: {}", text);
         }
     }
 

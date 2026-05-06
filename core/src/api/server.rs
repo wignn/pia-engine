@@ -47,6 +47,8 @@ pub fn build_router(state: AppState) -> Router {
     let public_api = Router::new()
         .route("/health", get(handlers::health::health))
         .route("/", get(handlers::health::root))
+        // --- General WebSocket (for Bot / all channels) ---
+        .route("/api/v1/ws", get(ws_general_handler))
         // --- WebSocket streams — each route auto-subscribes to its channel ---
         .route("/api/v1/ws/market", get(ws_market_handler))
         .route("/api/v1/ws/market/{symbol}", get(ws_handler_single_symbol))
@@ -139,6 +141,14 @@ async fn ws_handler_inner(
     })
 }
 
+
+async fn ws_general_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    ws_handler_inner(ws, state, params, None).await
+}
 
 async fn ws_market_handler(
     ws: WebSocketUpgrade,

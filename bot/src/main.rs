@@ -71,11 +71,11 @@ async fn main() -> Result<(), BotError> {
                 // Logging commands
                 moderation::log_setup(),
                 moderation::log_disable(),
-                // Forex commands
-                forex::forex_setup(),
-                forex::forex_disable(),
-                forex::forex_enable(),
-                forex::forex_status(),
+                // Forex news commands
+                forex::forex_news_setup(),
+                forex::forex_news_disable(),
+                forex::forex_news_enable(),
+                forex::forex_news_status(),
                 forex::forex_calendar(),
                 // Calendar reminder commands
                 calendar::calendar_setup(),

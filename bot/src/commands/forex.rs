@@ -11,7 +11,7 @@ type Context<'a> = poise::Context<'a, super::Data, Error>;
     guild_only,
     required_permissions = "ADMINISTRATOR"
 )]
-pub async fn forex_setup(
+pub async fn forex_news_setup(
     ctx: Context<'_>,
     #[description = "Channel for forex news"] channel: serenity::GuildChannel,
 ) -> Result<(), Error> {
@@ -48,7 +48,7 @@ pub async fn forex_setup(
     guild_only,
     required_permissions = "ADMINISTRATOR"
 )]
-pub async fn forex_disable(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn forex_news_disable(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or("Must be used in a guild")?.get();
 
     let pool = ctx.data().db.as_ref();
@@ -57,7 +57,7 @@ pub async fn forex_disable(ctx: Context<'_>) -> Result<(), Error> {
     let embed = CreateEmbed::default()
         .title("Forex News Disabled")
         .description(
-            "Forex news notifications have been disabled.\n\nUse `/forex_setup` to enable again.",
+            "Forex news notifications have been disabled.\n\nUse `/forex_news_setup` to enable again.",
         )
         .color(serenity::Colour::from_rgb(158, 158, 158))
         .timestamp(Timestamp::now());
@@ -73,7 +73,7 @@ pub async fn forex_disable(ctx: Context<'_>) -> Result<(), Error> {
     guild_only,
     required_permissions = "ADMINISTRATOR"
 )]
-pub async fn forex_enable(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn forex_news_enable(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or("Must be used in a guild")?.get();
 
     let pool = ctx.data().db.as_ref();
@@ -91,7 +91,7 @@ pub async fn forex_enable(ctx: Context<'_>) -> Result<(), Error> {
 
 /// Check forex news status
 #[poise::command(slash_command, prefix_command, guild_only)]
-pub async fn forex_status(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn forex_news_status(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or("Must be used in a guild")?.get();
 
     let pool = ctx.data().db.as_ref();
@@ -115,7 +115,7 @@ pub async fn forex_status(ctx: Context<'_>) -> Result<(), Error> {
         }
         None => CreateEmbed::default()
             .title("Forex News Status")
-            .description("Not configured. Use `/forex_setup` to enable.")
+            .description("Not configured. Use `/forex_news_setup` to enable.")
             .color(serenity::Colour::from_rgb(158, 158, 158))
             .timestamp(Timestamp::now()),
     };

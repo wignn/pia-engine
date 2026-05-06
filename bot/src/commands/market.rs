@@ -193,7 +193,7 @@ pub async fn prices(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 
-#[poise::command(slash_command, rename = "alert")]
+#[poise::command(slash_command, rename = "market_alert")]
 pub async fn alert(
     ctx: Context<'_>,
     #[description = "Symbol (e.g. XAUUSD, BTCUSDT)"]
@@ -314,7 +314,7 @@ pub async fn alert(
     Ok(())
 }
 
-#[poise::command(slash_command, rename = "alerts")]
+#[poise::command(slash_command, rename = "market_alerts")]
 pub async fn alerts(ctx: Context<'_>) -> Result<(), Error> {
     let db = &ctx.data().db;
     let user_id = ctx.author().id.get();
@@ -370,7 +370,7 @@ pub async fn alerts(ctx: Context<'_>) -> Result<(), Error> {
         .description(lines.join("\n"))
         .color(0x8B5CF6u32)
         .footer(poise::serenity_prelude::CreateEmbedFooter::new(
-            "Hapus alert dengan /alert_remove <id>",
+            "Hapus alert dengan /market_alert_remove <id>",
         ))
         .timestamp(poise::serenity_prelude::Timestamp::now());
 
@@ -384,7 +384,7 @@ pub async fn alerts(ctx: Context<'_>) -> Result<(), Error> {
 // ---------------------------------------------------------------------------
 
 /// Remove a price alert by ID
-#[poise::command(slash_command, rename = "alert_remove")]
+#[poise::command(slash_command, rename = "market_alert_remove")]
 pub async fn alert_remove(
     ctx: Context<'_>,
     #[description = "Alert ID to remove"] alert_id: i64,
