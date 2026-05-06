@@ -23,6 +23,8 @@ pub fn build_router(state: AppState) -> Router {
         "http://localhost:8080",
         "https://forex.wign.cloud",
         "http://forex.wign.cloud",
+        "https://fio-page.vercel.app",
+        "https://fio.wign.dev",
     ]
     .iter()
     .filter_map(|o| o.parse().ok())
