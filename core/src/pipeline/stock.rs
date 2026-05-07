@@ -1,12 +1,12 @@
 use std::sync::Arc;
 use chrono::Utc;
 use sqlx::PgPool;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::collector::stock::StockCollector;
 use crate::ws::{self, EquityNewsData, Hub};
 
-const MAX_STOCK_NEWS_AGE_HOURS: i64 = 2;
+const MAX_STOCK_NEWS_AGE_HOURS: i64 = 12;
 
 pub struct StockPipeline {
     collector: Arc<StockCollector>,
@@ -25,34 +25,56 @@ impl StockPipeline {
         info!(count = entries.len(), "stock pipeline: entries fetched");
 
         let mut processed = 0u32;
+        let mut too_old = 0u32;
+        let mut duplicate = 0u32;
+        let mut db_error = 0u32;
         let mut skipped = 0u32;
 
         for entry in &entries {
             match self.process_entry(entry).await {
                 "processed" => processed += 1,
+                "too_old" => too_old += 1,
+                "duplicate" => duplicate += 1,
+                "db_error" => db_error += 1,
                 _ => skipped += 1,
             }
         }
 
-        info!(processed, skipped, "stock pipeline: completed");
+        info!(processed, too_old, duplicate, db_error, skipped, "stock pipeline: completed");
     }
 
     async fn process_entry(&self, entry: &crate::collector::stock::StockNewsEntry) -> &'static str {
         if let Some(pub_at) = entry.published_at {
             let cutoff = Utc::now() - chrono::Duration::hours(MAX_STOCK_NEWS_AGE_HOURS);
-            if pub_at < cutoff { return "too_old"; }
+            if pub_at < cutoff {
+                debug!(
+                    title = %truncate_title(&entry.title, 60),
+                    age_hours = (Utc::now() - pub_at).num_hours(),
+                    "stock article skipped: too_old"
+                );
+                return "too_old";
+            }
         }
 
-        let exists: Option<(bool,)> = sqlx::query_as(
+        let is_duplicate = match sqlx::query_as::<_, (bool,)>(
             "SELECT EXISTS(SELECT 1 FROM stock_news WHERE content_hash = $1)"
         )
         .bind(&entry.content_hash)
-        .fetch_optional(&self.db)
+        .fetch_one(&self.db)
         .await
-        .ok()
-        .flatten();
+        {
+            Ok((true,)) => true,
+            Ok((false,)) => false,
+            Err(e) => {
+                warn!(error = %e, hash = %entry.content_hash, "stock duplicate check failed, continuing");
+                false
+            }
+        };
 
-        if let Some((true,)) = exists { return "duplicate"; }
+        if is_duplicate {
+            debug!(hash = %entry.content_hash, title = %truncate_title(&entry.title, 60), "stock article skipped: duplicate");
+            return "duplicate";
+        }
 
         let impact_level = if entry.tickers.len() >= 3 {
             "high"
@@ -83,8 +105,18 @@ impl StockPipeline {
         .execute(&self.db)
         .await;
 
-        if let Err(e) = res {
-            warn!(error = %e, "stock db insert failed");
+        match res {
+            Ok(r) => {
+                if r.rows_affected() == 0 {
+                    debug!(hash = %entry.content_hash, title = %truncate_title(&entry.title, 60), "stock article skipped: duplicate (ON CONFLICT)");
+                    return "duplicate";
+                }
+                info!(title = %truncate_title(&entry.title, 50), source = %entry.source_name, "stock article saved");
+            }
+            Err(e) => {
+                warn!(error = %e, "stock db insert failed");
+                return "db_error";
+            }
         }
 
         let summary_truncated = if entry.content.len() > 1000 {
@@ -117,9 +149,16 @@ impl StockPipeline {
         });
         let count = self.hub.broadcast(ws::EVENT_EQUITY_NEWS_NEW, data, "equity_news").await;
 
-        let title_short = if entry.title.len() > 50 { &entry.title[..50] } else { &entry.title };
-        info!(clients = count, title = title_short, tickers = ?entry.tickers, "stock broadcast ok");
+        info!(clients = count, title = %truncate_title(&entry.title, 50), tickers = ?entry.tickers, "stock broadcast ok");
 
         "processed"
+    }
+}
+
+fn truncate_title(s: &str, max_len: usize) -> String {
+    if s.len() > max_len {
+        s[..max_len].to_string()
+    } else {
+        s.to_string()
     }
 }

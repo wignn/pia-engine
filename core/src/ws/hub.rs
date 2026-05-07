@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use tracing::{info, error, warn};
+use tracing::{info, debug, error, warn};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -163,7 +163,12 @@ impl Hub {
             }
         }
 
-        info!(event = event_type, channel = channel, clients = count, "broadcast sent");
+        // Use debug for high-frequency market ticks, info for everything else
+        if channel == "market_data" {
+            debug!(event = event_type, channel = channel, clients = count, "broadcast sent");
+        } else {
+            info!(event = event_type, channel = channel, clients = count, "broadcast sent");
+        }
         count
     }
 

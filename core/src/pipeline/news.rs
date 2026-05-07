@@ -14,7 +14,7 @@ use crate::html;
 use crate::scraper::article::ArticleScraper;
 use crate::ws::{self, Hub, NewsArticleData};
 
-const MAX_NEWS_AGE_HOURS: i64 = 2;
+const MAX_NEWS_AGE_HOURS: i64 = 12;
 const REDIS_STREAM_MAX_LEN: usize = 50_000;
 
 static SLUG_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^a-z0-9]+").unwrap());
@@ -76,6 +76,9 @@ impl NewsPipeline {
 
         let mut enqueued = 0u32;
         let mut direct_processed = 0u32;
+        let mut too_old = 0u32;
+        let mut duplicate = 0u32;
+        let mut db_error = 0u32;
         let mut skipped = 0u32;
 
         for (feed_url, entries) in &results {
@@ -106,12 +109,15 @@ impl NewsPipeline {
                 .await
                 {
                     "processed" => direct_processed += 1,
+                    "too_old" => too_old += 1,
+                    "duplicate" => duplicate += 1,
+                    "db_error" => db_error += 1,
                     _ => skipped += 1,
                 }
             }
         }
 
-        info!(enqueued, direct_processed, skipped, "news ingest producer: completed");
+        info!(enqueued, direct_processed, too_old, duplicate, db_error, skipped, "news ingest producer: completed");
     }
 
     pub fn build_worker(&self) -> Option<NewsIngestWorker> {
@@ -246,19 +252,31 @@ async fn process_entry(
     if let Some(pub_at) = parse_rfc3339_utc(msg.published_at.as_deref()) {
         let cutoff = Utc::now() - chrono::Duration::hours(MAX_NEWS_AGE_HOURS);
         if pub_at < cutoff {
+            debug!(
+                title = %truncate_str(&msg.title, 60),
+                age_hours = (Utc::now() - pub_at).num_hours(),
+                "article skipped: too_old"
+            );
             return "too_old";
         }
     }
 
     let hash = &msg.content_hash;
-    let exists: Option<(bool,)> = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM news_articles WHERE content_hash = $1)")
+    let is_duplicate = match sqlx::query_as::<_, (bool,)>("SELECT EXISTS(SELECT 1 FROM news_articles WHERE content_hash = $1)")
         .bind(hash)
-        .fetch_optional(db)
+        .fetch_one(db)
         .await
-        .ok()
-        .flatten();
+    {
+        Ok((true,)) => true,
+        Ok((false,)) => false,
+        Err(e) => {
+            warn!(error = %e, hash = %hash, "duplicate check query failed, continuing");
+            false
+        }
+    };
 
-    if let Some((true,)) = exists {
+    if is_duplicate {
+        debug!(hash = %hash, title = %truncate_str(&msg.title, 60), "article skipped: duplicate");
         return "duplicate";
     }
 
@@ -318,7 +336,13 @@ async fn process_entry(
     .await;
 
     match res {
-        Ok(_) => info!(title = %truncate_str(title, 50), source = %msg.source_name, "article saved"),
+        Ok(r) => {
+            if r.rows_affected() == 0 {
+                debug!(hash = %hash, title = %truncate_str(title, 60), "article skipped: duplicate (ON CONFLICT)");
+                return "duplicate";
+            }
+            info!(title = %truncate_str(title, 50), source = %msg.source_name, "article saved");
+        }
         Err(e) => {
             warn!(error = %e, url = %msg.link, "db insert failed");
             return "db_error";
@@ -347,7 +371,7 @@ async fn process_entry(
         "discord_embed": embed,
     });
     let count = hub.broadcast(ws::EVENT_NEWS_NEW, data, "news").await;
-    info!(clients = count, title = %truncate_str(title, 50), "broadcast ok");
+    info!(clients = count, title = %truncate_str(title, 50), "news broadcast ok");
 
     "processed"
 }

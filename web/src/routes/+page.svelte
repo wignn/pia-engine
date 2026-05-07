@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { DISCORD_INVITE } from '$lib/config';
-	import { startWebSocket, stopWebSocket, marketStore } from '$lib/stores/websocket.svelte';
+	import { startWebSocket, stopWebSocket, marketStore, realtimeNewsStore } from '$lib/stores/websocket.svelte';
 	import { forexNews, equityNews, newsLoading, startNewsPolling, stopNewsPolling } from '$lib/stores/news';
 	import { startCalendarPolling, stopCalendarPolling } from '$lib/stores/calendar';
 
@@ -11,6 +11,7 @@
 	import CalendarTable from '$lib/components/CalendarTable.svelte';
 	import FeatureGrid from '$lib/components/FeatureGrid.svelte';
 	import CommandRef from '$lib/components/CommandRef.svelte';
+	import logoUrl from '$lib/assets/logo.png';
 
 	onMount(() => {
 		startWebSocket();
@@ -41,7 +42,8 @@
 		<!-- Logo -->
 		<div class="mb-6 inline-flex items-center gap-3">
 			<div class="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 border border-accent/20">
-				<span class="text-2xl font-black text-accent">F</span>
+				<!-- <span class="text-2xl font-black text-accent">F</span> -->
+				<img src={logoUrl} alt="Fio logo">
 			</div>
 			<span class="text-3xl font-bold tracking-tight">Fio</span>
 		</div>
@@ -115,8 +117,8 @@
 		</div>
 
 		<div class="grid gap-8 lg:grid-cols-2">
-			<NewsFeed title="Forex & Global" items={$forexNews} loading={$newsLoading} />
-			<NewsFeed title="Equity / Saham" items={$equityNews} loading={$newsLoading} />
+			<NewsFeed title="Forex & Global" items={realtimeNewsStore.mergeForex($forexNews)} loading={$newsLoading} />
+			<NewsFeed title="Equity / Saham" items={realtimeNewsStore.mergeEquity($equityNews)} loading={$newsLoading} />
 		</div>
 	</div>
 </section>
