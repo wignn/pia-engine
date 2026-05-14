@@ -175,7 +175,7 @@ impl NewsPipeline {
 
 impl NewsIngestWorker {
     pub async fn run_forever(&self) {
-        let mut last_id = "$".to_string();
+        let mut last_id = "0-0".to_string();
         info!(stream_key = %self.stream_key, "news ingest worker started");
 
         loop {
@@ -451,11 +451,7 @@ fn parse_rfc3339_utc(input: Option<&str>) -> Option<chrono::DateTime<Utc>> {
 }
 
 fn truncate_str(s: &str, max_len: usize) -> String {
-    if s.len() > max_len {
-        s[..max_len].to_string()
-    } else {
-        s.to_string()
-    }
+    s.chars().take(max_len).collect()
 }
 
 fn to_slug(name: &str) -> String {

@@ -1,5 +1,5 @@
 use reqwest::Client;
-use scraper::{Html, Selector};
+use scraper::{ElementRef, Html, Selector};
 use std::time::Duration;
 use tracing::debug;
 use url::Url;
@@ -20,6 +20,7 @@ pub struct ScrapedArticle {
 
 pub struct ArticleScraper {
     client: Client,
+    max_retries: usize,
 }
 
 impl ArticleScraper {
@@ -27,36 +28,32 @@ impl ArticleScraper {
         Self {
             client: Client::builder()
                 .timeout(timeout)
+                .connect_timeout(timeout.min(Duration::from_secs(15)))
                 .user_agent(user_agent)
                 .redirect(reqwest::redirect::Policy::limited(5))
-                .pool_max_idle_per_host(3)
+                .pool_max_idle_per_host(8)
+                .pool_idle_timeout(Duration::from_secs(90))
+                .tcp_keepalive(Some(Duration::from_secs(60)))
                 .build()
                 .expect("failed to build HTTP client"),
+            max_retries: 3,
         }
     }
 
     pub async fn scrape(&self, article_url: &str) -> Result<ScrapedArticle, String> {
-        let resp = self
-            .client
-            .get(article_url)
-            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-            .header("Accept-Language", "en-US,en;q=0.5")
-            .send()
-            .await
-            .map_err(|e| format!("fetch page: {}", e))?;
-
-        if !resp.status().is_success() {
-            return Err(format!("page returned {}", resp.status()));
+        let parsed_url = Url::parse(article_url).map_err(|e| format!("invalid url: {}", e))?;
+        if !matches!(parsed_url.scheme(), "http" | "https") {
+            return Err(format!("unsupported url scheme: {}", parsed_url.scheme()));
         }
 
-        let body = resp.text().await.map_err(|e| format!("read body: {}", e))?;
+        let body = self.fetch_html(article_url).await?;
         let doc = Html::parse_document(&body);
 
         let title = extract_title(&doc);
         let content = extract_content(&doc);
 
-        if title.is_empty() || content.is_empty() {
-            return Err("could not extract title or content".into());
+        if content.is_empty() {
+            return Err("could not extract article content".into());
         }
 
         let content = html::clean_content(&content);
@@ -73,6 +70,62 @@ impl ArticleScraper {
             word_count,
         })
     }
+
+    async fn fetch_html(&self, article_url: &str) -> Result<String, String> {
+        let mut last_error = String::new();
+
+        for attempt in 1..=self.max_retries {
+            let resp = self
+                .client
+                .get(article_url)
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .header("Accept-Language", "en-US,en;q=0.9,id;q=0.8")
+                .header("Cache-Control", "no-cache")
+                .header("Pragma", "no-cache")
+                .header("Upgrade-Insecure-Requests", "1")
+                .send()
+                .await;
+
+            match resp {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if !status.is_success() {
+                        let msg = format!("page returned {}", status);
+                        if !is_retryable_status(status.as_u16()) {
+                            return Err(msg);
+                        }
+                        last_error = msg;
+                    } else {
+                        match resp.text().await {
+                            Ok(body) => return Ok(body),
+                            Err(e) => last_error = format!("read body: {}", e),
+                        }
+                    }
+                }
+                Err(e) => {
+                    last_error = format!("fetch page: {}", e);
+                }
+            }
+
+            if attempt < self.max_retries {
+                let backoff = Duration::from_millis(300 * attempt as u64);
+                debug!(
+                    url = %article_url,
+                    attempt,
+                    error = %last_error,
+                    backoff_ms = backoff.as_millis(),
+                    "article fetch failed, retrying"
+                );
+                tokio::time::sleep(backoff).await;
+            }
+        }
+
+        Err(last_error)
+    }
+}
+
+fn is_retryable_status(status: u16) -> bool {
+    status == 408 || status == 409 || status == 425 || status == 429 || status >= 500
 }
 
 fn extract_title(doc: &Html) -> String {
@@ -87,7 +140,7 @@ fn extract_title(doc: &Html) -> String {
     for sel_str in &selectors {
         if let Ok(sel) = Selector::parse(sel_str) {
             if let Some(el) = doc.select(&sel).next() {
-                let text: String = el.text().collect::<String>().trim().to_string();
+                let text = element_text(el);
                 if !text.is_empty() { return text; }
             }
         }
@@ -102,7 +155,7 @@ fn extract_title(doc: &Html) -> String {
     }
     if let Ok(sel) = Selector::parse("title") {
         if let Some(el) = doc.select(&sel).next() {
-            return el.text().collect::<String>().trim().to_string();
+            return element_text(el);
         }
     }
     String::new()
@@ -114,14 +167,24 @@ fn extract_content(doc: &Html) -> String {
         "article .entry-content",
         "article .post-content",
         "article .article-body",
+        "article .article-content",
+        "article .read__content",
+        "article .detail_text",
         ".article-content",
+        ".article__content",
+        ".article-body",
+        ".entry-content",
+        ".post-content",
+        ".read__content",
+        ".detail_text",
         ".story-body",
+        "#article-content",
         "[itemprop='articleBody']",
     ];
     for sel_str in &selectors {
         if let Ok(sel) = Selector::parse(sel_str) {
             if let Some(el) = doc.select(&sel).next() {
-                let text: String = el.text().collect::<String>().trim().to_string();
+                let text = element_text(el);
                 if text.len() > 200 { return text; }
             }
         }
@@ -129,7 +192,7 @@ fn extract_content(doc: &Html) -> String {
     // Fallback: article paragraphs
     if let Ok(sel) = Selector::parse("article p") {
         let paragraphs: Vec<String> = doc.select(&sel)
-            .map(|el| el.text().collect::<String>().trim().to_string())
+            .map(element_text)
             .filter(|s| !s.is_empty())
             .collect();
         let joined = paragraphs.join("\n\n");
@@ -138,7 +201,7 @@ fn extract_content(doc: &Html) -> String {
     // Final fallback: all long paragraphs
     if let Ok(sel) = Selector::parse("p") {
         let paragraphs: Vec<String> = doc.select(&sel)
-            .map(|el| el.text().collect::<String>().trim().to_string())
+            .map(element_text)
             .filter(|s| s.len() > 50)
             .collect();
         return paragraphs.join("\n\n");
@@ -151,7 +214,7 @@ fn extract_author(doc: &Html) -> String {
     for sel_str in &selectors {
         if let Ok(sel) = Selector::parse(sel_str) {
             if let Some(el) = doc.select(&sel).next() {
-                let text: String = el.text().collect::<String>().trim().to_string();
+                let text = element_text(el);
                 if !text.is_empty() { return text; }
             }
         }
@@ -225,7 +288,7 @@ fn extract_tags(doc: &Html) -> Vec<String> {
     }
     if let Ok(sel) = Selector::parse(".tags a, .post-tags a, [rel='tag']") {
         for el in doc.select(&sel) {
-            let text: String = el.text().collect::<String>().trim().to_string();
+            let text = element_text(el);
             if !text.is_empty() && seen.insert(text.clone()) { tags.push(text); }
         }
     }
@@ -242,4 +305,12 @@ fn resolve_url(base: &str, reference: &str) -> String {
         .and_then(|b| b.join(reference).ok())
         .map(|u| u.to_string())
         .unwrap_or_else(|| reference.to_string())
+}
+
+fn element_text(el: ElementRef<'_>) -> String {
+    el.text()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }

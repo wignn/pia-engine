@@ -19,7 +19,10 @@ pub async fn scrape_article(
         return Json(json!({ "error": "link is required" }));
     }
 
-    let scraper = ArticleScraper::new("Mozilla/5.0", Duration::from_secs(10));
+    let scraper = ArticleScraper::new(
+        &state.config.scraper_ua,
+        Duration::from_secs(state.config.scraper_timeout),
+    );
 
     match scraper.scrape(&body.link).await {
         Ok(article) => Json(json!({

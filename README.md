@@ -105,7 +105,6 @@ The infrastructure layer composes containers for key components:
 - Core service and control plane as separate backend services.
 - Portal as a containerized frontend application.
 - RSSHub as the social feed source.
-- Cloudflare WARP as a networking component in specific deployment scenarios.
 
 This composition provides a consistent deployment foundation across development and production environments.
 

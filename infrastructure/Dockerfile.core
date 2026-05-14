@@ -69,6 +69,6 @@ EOF
 COPY --from=builder /app/target/core /usr/local/bin/core
 COPY --from=builder /app/core/migrations /app/migrations
 
-EXPOSE 8000
+EXPOSE 8090
 
 ENTRYPOINT ["/usr/local/bin/core"]

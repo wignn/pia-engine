@@ -13,7 +13,7 @@ services:
       private:
         ipv4_address: 172.29.0.10
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d forex" ]
+      test: [ "CMD-SHELL", "pg_isready -U atlsd -d core" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -42,28 +42,6 @@ services:
       timeout: 5s
       retries: 5
 
-  warp:
-    image: caomingjun/warp
-    container_name: warp
-    restart: always
-    device_cgroup_rules:
-      - 'c 10:200 rwm'
-    environment:
-      - WARP_SLEEP=2
-    cap_add:
-      - MKNOD
-      - AUDIT_WRITE
-      - NET_ADMIN
-    sysctls:
-      - net.ipv6.conf.all.disable_ipv6=0
-      - net.ipv4.conf.all.src_valid_mark=1
-    volumes:
-      - ./data/warp:/var/lib/cloudflare-warp
-    ports:
-      - "8090:8090"
-    networks:
-      - private
-
   core:
     container_name: world-core
     image: wign/atlsd-core
@@ -74,11 +52,9 @@ services:
         - DOCKER_BUILD_TYPE=release
     env_file:
       - ./env/.env.core
-    network_mode: "service:warp"
+    ports:
+      - "${CORE_PORT:-8090}:8090"
     depends_on:
-      warp:
-        condition: service_started
-        restart: true
       rsshub:
         condition: service_started
         restart: true
@@ -88,6 +64,8 @@ services:
       redis:
         condition: service_healthy
         restart: true
+    networks:
+      - private
     restart: always
 
   control-plane:
@@ -115,12 +93,23 @@ services:
     container_name: portal
     image: wign/atlsd-portal
     build:
-      context: .
-      dockerfile: ./Dockerfile.portal
+      context: ..
+      dockerfile: infrastructure/Dockerfile.portal
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8081/api/v1}
+        VITE_CORE_API_BASE: ${VITE_CORE_API_BASE:-http://localhost:8090}
+        VITE_CORE_WS_BASE: ${VITE_CORE_WS_BASE:-ws://localhost:8090}
     env_file:
       - ./env/.env.portal
     ports:
-      - "5173:5173"
+      - "${PORTAL_PORT:-5173}:80"
+    depends_on:
+      control-plane:
+        condition: service_started
+      core:
+        condition: service_started
+    networks:
+      - private
 
   ingestion-gateway:
     container_name: ingestion-gateway
@@ -153,6 +142,9 @@ services:
       - DATABASE_PATH=/app/data/bot.db
     volumes:
       - ./data/bot:/app/data
+    depends_on:
+      core:
+        condition: service_started
     restart: always
     networks:
       - private
