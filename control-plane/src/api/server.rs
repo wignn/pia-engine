@@ -11,7 +11,7 @@ use tracing::info;
 
 use super::AppState;
 use crate::api::auth;
-use crate::models::api_key;
+use crate::models::{api_key, user::User};
 
 /// Middleware: authenticate requests using JWT Bearer token, X-API-Key header, or ?token= query param.
 /// Injects AuthContext into request extensions.
@@ -44,10 +44,19 @@ pub async fn auth_middleware(
     if let Some(token) = bearer_token {
         if let Some(claims) = auth::decode_jwt(&token, &state.config.jwt_secret) {
             if let Ok(user_id) = claims.sub.parse::<uuid::Uuid>() {
+                let user = User::find_by_id(&state.db, user_id)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                let Some(user) = user else {
+                    return Err(StatusCode::UNAUTHORIZED);
+                };
+                if !user.is_active {
+                    return Err(StatusCode::FORBIDDEN);
+                }
                 request.extensions_mut().insert(AuthContext {
                     user_id,
                     key_id: uuid::Uuid::nil(),
-                    plan: claims.plan,
+                    plan: user.plan,
                     is_admin: false,
                 });
                 return Ok(next.run(request).await);
@@ -180,10 +189,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/keys", post(super::keys::create_key))
         .route("/api/v1/keys/{id}", delete(super::keys::revoke_key))
         .route("/api/v1/keys/{id}", patch(super::keys::update_key))
-        .route(
-            "/api/v1/config",
-            get(super::tenant_config::list_config),
-        )
+        .route("/api/v1/config", get(super::tenant_config::list_config))
         .route(
             "/api/v1/config/{key}",
             put(super::tenant_config::set_config),
@@ -197,8 +203,14 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/plans/upgrade", post(super::plans::upgrade))
         // Admin routes
         .route("/api/v1/admin/users", get(super::admin::list_users))
-        .route("/api/v1/admin/users/{id}/plan", post(super::admin::set_user_plan))
-        .route("/api/v1/admin/users/{id}/toggle", post(super::admin::toggle_user))
+        .route(
+            "/api/v1/admin/users/{id}/plan",
+            post(super::admin::set_user_plan),
+        )
+        .route(
+            "/api/v1/admin/users/{id}/toggle",
+            post(super::admin::toggle_user),
+        )
         .route("/api/v1/admin/stats", get(super::admin::platform_stats))
         // Middleware
         .layer(axum::middleware::from_fn_with_state(

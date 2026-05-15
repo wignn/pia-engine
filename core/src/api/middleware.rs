@@ -15,7 +15,7 @@ pub async fn optional_api_key_auth(
     mut request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    let _ = attach_tenant_context_if_valid(&state, &mut request).await;
+    let _ = attach_tenant_context_if_valid(&state, &mut request, true).await;
 
     if let Some(ctx) = request.extensions().get::<TenantContext>() {
         if !state.usage_tracker.try_consume_daily_quota(ctx).await {
@@ -31,7 +31,7 @@ pub async fn strict_api_key_auth(
     mut request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    if !attach_tenant_context_if_valid(&state, &mut request).await {
+    if !attach_tenant_context_if_valid(&state, &mut request, false).await {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
@@ -75,7 +75,11 @@ pub async fn usage_logger(
     Ok(response)
 }
 
-async fn attach_tenant_context_if_valid(state: &AppState, request: &mut Request) -> bool {
+async fn attach_tenant_context_if_valid(
+    state: &AppState,
+    request: &mut Request,
+    allow_missing_key: bool,
+) -> bool {
     let raw_key = extract_key(&request);
 
     match raw_key {
@@ -96,7 +100,7 @@ async fn attach_tenant_context_if_valid(state: &AppState, request: &mut Request)
             }
         }
         None => {
-            if state.config.api_keys.is_empty() {
+            if allow_missing_key && state.config.api_keys.is_empty() {
                 tracing::warn!("no API keys configured, all requests allowed");
                 return true;
             }

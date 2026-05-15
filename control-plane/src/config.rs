@@ -34,8 +34,7 @@ impl Config {
             admin_api_key: env::var("ADMIN_API_KEY").unwrap_or_default(),
             log_level: env::var("LOG_LEVEL").unwrap_or_else(|_| "info".into()),
             // JWT
-            jwt_secret: env::var("JWT_SECRET")
-                .unwrap_or_else(|_| "change-me-in-production-please".into()),
+            jwt_secret: load_jwt_secret(),
             jwt_expiry_days: env::var("JWT_EXPIRY_DAYS")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -56,5 +55,13 @@ impl Config {
 
     pub fn has_github_oauth(&self) -> bool {
         !self.github_client_id.is_empty() && !self.github_client_secret.is_empty()
+    }
+}
+
+fn load_jwt_secret() -> String {
+    match env::var("JWT_SECRET") {
+        Ok(value) if !value.trim().is_empty() && value != "change-me-in-production-please" => value,
+        _ if cfg!(debug_assertions) => "dev-only-insecure-jwt-secret".into(),
+        _ => panic!("JWT_SECRET must be set to a non-default value"),
     }
 }

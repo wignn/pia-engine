@@ -23,9 +23,16 @@ use crate::sync;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JwtClaims {
-    pub sub: String,   // user_id
+    pub sub: String, // user_id
     pub email: String,
     pub plan: String,
+    pub exp: usize,
+    pub iat: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OAuthStateClaims {
+    pub provider: String,
     pub exp: usize,
     pub iat: usize,
 }
@@ -65,6 +72,35 @@ pub fn decode_jwt(token: &str, secret: &str) -> Option<JwtClaims> {
     .map(|data| data.claims)
 }
 
+fn create_oauth_state(provider: &str, secret: &str) -> Result<String, StatusCode> {
+    let now = Utc::now();
+    let claims = OAuthStateClaims {
+        provider: provider.to_string(),
+        exp: (now + Duration::minutes(10)).timestamp() as usize,
+        iat: now.timestamp() as usize,
+    };
+
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_bytes()),
+    )
+    .map_err(|e| {
+        warn!(error = %e, "failed to create OAuth state");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })
+}
+
+fn validate_oauth_state(provider: &str, state_token: &str, secret: &str) -> bool {
+    decode::<OAuthStateClaims>(
+        state_token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &Validation::default(),
+    )
+    .map(|data| data.claims.provider == provider)
+    .unwrap_or(false)
+}
+
 // ─── POST /api/v1/auth/register ──────────────────────────────────────────────
 
 pub async fn register(
@@ -83,7 +119,9 @@ pub async fn register(
     // Validate password
     let password = body.password.as_deref().unwrap_or("");
     if password.len() < 6 {
-        return Ok(Json(json!({ "error": "Password must be at least 6 characters" })));
+        return Ok(Json(
+            json!({ "error": "Password must be at least 6 characters" }),
+        ));
     }
 
     // Check existing
@@ -116,7 +154,11 @@ pub async fn register(
     sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
 
     // Issue JWT
-    let token = create_jwt(&user, &state.config.jwt_secret, state.config.jwt_expiry_days)?;
+    let token = create_jwt(
+        &user,
+        &state.config.jwt_secret,
+        state.config.jwt_expiry_days,
+    )?;
 
     Ok(Json(json!({
         "user": {
@@ -129,7 +171,6 @@ pub async fn register(
         },
         "token": token,
         "api_key": raw_key,
-        "verify_token": verify_token,
         "message": "Registration successful. Save your API key — it will only be shown once."
     })))
 }
@@ -161,7 +202,11 @@ pub async fn login(
         return Ok(Json(json!({ "error": "Account is deactivated" })));
     }
 
-    let token = create_jwt(&user, &state.config.jwt_secret, state.config.jwt_expiry_days)?;
+    let token = create_jwt(
+        &user,
+        &state.config.jwt_secret,
+        state.config.jwt_expiry_days,
+    )?;
 
     info!(user_id = %user.id, email = %user.email, "user logged in via email/password");
 
@@ -206,7 +251,9 @@ pub async fn verify_email(
                 }
             })))
         }
-        None => Ok(Json(json!({ "error": "Invalid or expired verification token" }))),
+        None => Ok(Json(
+            json!({ "error": "Invalid or expired verification token" }),
+        )),
     }
 }
 
@@ -277,6 +324,7 @@ pub async fn oauth_url(
     Path(provider): Path<String>,
 ) -> Result<Json<Value>, StatusCode> {
     let redirect_uri = format!("{}/auth/callback/{}", state.config.frontend_url, provider);
+    let state_token = create_oauth_state(&provider, &state.config.jwt_secret)?;
 
     match provider.as_str() {
         "google" => {
@@ -284,22 +332,24 @@ pub async fn oauth_url(
                 return Ok(Json(json!({ "error": "Google OAuth not configured" })));
             }
             let url = format!(
-                "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&redirect_uri={}&response_type=code&scope=openid%20email%20profile&access_type=offline",
+                "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&redirect_uri={}&response_type=code&scope=openid%20email%20profile&access_type=offline&state={}",
                 state.config.google_client_id,
                 urlencoding::encode(&redirect_uri),
+                urlencoding::encode(&state_token),
             );
-            Ok(Json(json!({ "url": url })))
+            Ok(Json(json!({ "url": url, "state": state_token })))
         }
         "github" => {
             if !state.config.has_github_oauth() {
                 return Ok(Json(json!({ "error": "GitHub OAuth not configured" })));
             }
             let url = format!(
-                "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}&scope=user:email",
+                "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}&scope=user:email&state={}",
                 state.config.github_client_id,
                 urlencoding::encode(&redirect_uri),
+                urlencoding::encode(&state_token),
             );
-            Ok(Json(json!({ "url": url })))
+            Ok(Json(json!({ "url": url, "state": state_token })))
         }
         _ => Ok(Json(json!({ "error": "Unsupported provider" }))),
     }
@@ -310,6 +360,7 @@ pub async fn oauth_url(
 #[derive(Deserialize)]
 pub struct OAuthCallbackBody {
     pub code: String,
+    pub state: String,
 }
 
 pub async fn oauth_callback(
@@ -318,6 +369,9 @@ pub async fn oauth_callback(
     Json(body): Json<OAuthCallbackBody>,
 ) -> Result<Json<Value>, StatusCode> {
     let redirect_uri = format!("{}/auth/callback/{}", state.config.frontend_url, provider);
+    if !validate_oauth_state(&provider, &body.state, &state.config.jwt_secret) {
+        return Ok(Json(json!({ "error": "Invalid OAuth state" })));
+    }
 
     match provider.as_str() {
         "google" => handle_google_oauth(&state, &body.code, &redirect_uri).await,
@@ -370,16 +424,23 @@ async fn handle_google_oauth(
 
     let google_user: Value = user_res.json().await.map_err(|_| StatusCode::BAD_GATEWAY)?;
 
-    let google_id = google_user["id"]
-        .as_str()
-        .ok_or(StatusCode::BAD_GATEWAY)?;
+    let google_id = google_user["id"].as_str().ok_or(StatusCode::BAD_GATEWAY)?;
     let email = google_user["email"]
         .as_str()
         .ok_or(StatusCode::BAD_GATEWAY)?;
     let name = google_user["name"].as_str().unwrap_or(email);
     let avatar = google_user["picture"].as_str();
 
-    complete_oauth_flow(state, "google", google_id, email, name, avatar, Some(access_token)).await
+    complete_oauth_flow(
+        state,
+        "google",
+        google_id,
+        email,
+        name,
+        avatar,
+        Some(access_token),
+    )
+    .await
 }
 
 /// Exchange GitHub auth code for tokens, fetch user info, create/link account.
@@ -407,7 +468,10 @@ async fn handle_github_oauth(
             StatusCode::BAD_GATEWAY
         })?;
 
-    let token_data: Value = token_res.json().await.map_err(|_| StatusCode::BAD_GATEWAY)?;
+    let token_data: Value = token_res
+        .json()
+        .await
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
 
     let access_token = token_data["access_token"]
         .as_str()
@@ -444,7 +508,10 @@ async fn handle_github_oauth(
             .await
             .map_err(|_| StatusCode::BAD_GATEWAY)?;
 
-        let emails: Vec<Value> = emails_res.json().await.map_err(|_| StatusCode::BAD_GATEWAY)?;
+        let emails: Vec<Value> = emails_res
+            .json()
+            .await
+            .map_err(|_| StatusCode::BAD_GATEWAY)?;
         emails
             .iter()
             .find(|e| e["primary"].as_bool() == Some(true))
@@ -519,7 +586,11 @@ async fn complete_oauth_flow(
     sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
 
     // Issue JWT
-    let token = create_jwt(&user, &state.config.jwt_secret, state.config.jwt_expiry_days)?;
+    let token = create_jwt(
+        &user,
+        &state.config.jwt_secret,
+        state.config.jwt_expiry_days,
+    )?;
 
     info!(
         user_id = %user.id,
@@ -543,9 +614,25 @@ async fn complete_oauth_flow(
 
     if let Some(key) = raw_api_key {
         response["api_key"] = json!(key);
-        response["message"] =
-            json!("Welcome! Your first API key has been generated. Save it — it won't be shown again.");
+        response["message"] = json!(
+            "Welcome! Your first API key has been generated. Save it — it won't be shown again."
+        );
     }
 
     Ok(Json(response))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{create_oauth_state, validate_oauth_state};
+
+    #[test]
+    fn oauth_state_is_signed_and_provider_bound() {
+        let secret = "test-secret-with-enough-entropy";
+        let state = create_oauth_state("github", secret).unwrap();
+
+        assert!(validate_oauth_state("github", &state, secret));
+        assert!(!validate_oauth_state("google", &state, secret));
+        assert!(!validate_oauth_state("github", &state, "different-secret"));
+    }
 }
