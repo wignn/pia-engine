@@ -29,6 +29,7 @@ export default function LoginPage() {
     try {
       const data = await api.getOAuthUrl(provider)
       if (data.url) {
+        if (data.state) sessionStorage.setItem(`oauth_state_${provider}`, data.state)
         window.location.href = data.url
       } else {
         setError(data.error || `${provider} login not available`)

@@ -1,60 +1,69 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, Json};
 use serde_json::{json, Value};
 
 use crate::api::server::AuthContext;
 use crate::api::AppState;
+use crate::sync;
 
 /// GET /api/v1/admin/users — list all users (admin only)
 pub async fn list_users(
     State(state): State<AppState>,
     request: axum::extract::Request,
 ) -> Result<Json<Value>, StatusCode> {
-    let auth = request.extensions().get::<AuthContext>().cloned()
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     if !auth.is_admin {
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let rows: Vec<(uuid::Uuid, String, String, String, bool, bool, chrono::DateTime<chrono::Utc>)> =
-        sqlx::query_as(
-            "SELECT u.id, u.email, u.name, u.plan, u.is_active, u.email_verified, u.created_at \
+    let rows: Vec<(
+        uuid::Uuid,
+        String,
+        String,
+        String,
+        bool,
+        bool,
+        chrono::DateTime<chrono::Utc>,
+    )> = sqlx::query_as(
+        "SELECT u.id, u.email, u.name, u.plan, u.is_active, u.email_verified, u.created_at \
              FROM users u \
              ORDER BY u.created_at DESC \
              LIMIT 500",
-        )
-        .fetch_all(&state.db)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    )
+    .fetch_all(&state.db)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Key counts per user
-    let key_counts: Vec<(uuid::Uuid, i64)> =
-        sqlx::query_as("SELECT user_id, COUNT(*) FROM api_keys WHERE is_active = TRUE GROUP BY user_id")
-            .fetch_all(&state.db)
-            .await
-            .unwrap_or_default();
+    let key_counts: Vec<(uuid::Uuid, i64)> = sqlx::query_as(
+        "SELECT user_id, COUNT(*) FROM api_keys WHERE is_active = TRUE GROUP BY user_id",
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
 
-    let key_map: std::collections::HashMap<uuid::Uuid, i64> =
-        key_counts.into_iter().collect();
+    let key_map: std::collections::HashMap<uuid::Uuid, i64> = key_counts.into_iter().collect();
 
     let users: Vec<Value> = rows
         .into_iter()
-        .map(|(id, email, name, plan, is_active, email_verified, created_at)| {
-            json!({
-                "id": id,
-                "email": email,
-                "name": name,
-                "plan": plan,
-                "is_active": is_active,
-                "email_verified": email_verified,
-                "created_at": created_at,
-                "active_keys": key_map.get(&id).copied().unwrap_or(0),
-            })
-        })
+        .map(
+            |(id, email, name, plan, is_active, email_verified, created_at)| {
+                json!({
+                    "id": id,
+                    "email": email,
+                    "name": name,
+                    "plan": plan,
+                    "is_active": is_active,
+                    "email_verified": email_verified,
+                    "created_at": created_at,
+                    "active_keys": key_map.get(&id).copied().unwrap_or(0),
+                })
+            },
+        )
         .collect();
 
     Ok(Json(json!({
@@ -69,7 +78,10 @@ pub async fn set_user_plan(
     axum::extract::Path(user_id): axum::extract::Path<uuid::Uuid>,
     request: axum::extract::Request,
 ) -> Result<Json<Value>, StatusCode> {
-    let auth = request.extensions().get::<AuthContext>().cloned()
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     if !auth.is_admin {
@@ -80,14 +92,15 @@ pub async fn set_user_plan(
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    let body: Value = serde_json::from_slice(&body_bytes)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let body: Value = serde_json::from_slice(&body_bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
 
     let plan = body["plan"].as_str().ok_or(StatusCode::BAD_REQUEST)?;
 
     let valid_plans = ["free", "basic", "pro", "enterprise"];
     if !valid_plans.contains(&plan) {
-        return Ok(Json(json!({ "error": "Invalid plan. Must be one of: free, basic, pro, enterprise" })));
+        return Ok(Json(
+            json!({ "error": "Invalid plan. Must be one of: free, basic, pro, enterprise" }),
+        ));
     }
 
     sqlx::query("UPDATE users SET plan = $1, updated_at = NOW() WHERE id = $2")
@@ -97,7 +110,11 @@ pub async fn set_user_plan(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok(Json(json!({ "message": format!("User plan updated to {}", plan) })))
+    sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
+
+    Ok(Json(
+        json!({ "message": format!("User plan updated to {}", plan) }),
+    ))
 }
 
 /// POST /api/v1/admin/users/:id/toggle — activate/deactivate user (admin only)
@@ -106,19 +123,21 @@ pub async fn toggle_user(
     axum::extract::Path(user_id): axum::extract::Path<uuid::Uuid>,
     request: axum::extract::Request,
 ) -> Result<Json<Value>, StatusCode> {
-    let auth = request.extensions().get::<AuthContext>().cloned()
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     if !auth.is_admin {
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let row: Option<(bool,)> =
-        sqlx::query_as("SELECT is_active FROM users WHERE id = $1")
-            .bind(user_id)
-            .fetch_optional(&state.db)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let row: Option<(bool,)> = sqlx::query_as("SELECT is_active FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let Some((current,)) = row else {
         return Ok(Json(json!({ "error": "User not found" })));
@@ -132,6 +151,8 @@ pub async fn toggle_user(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
+
     Ok(Json(json!({
         "message": if new_status { "User activated" } else { "User deactivated" },
         "is_active": new_status,
@@ -143,7 +164,10 @@ pub async fn platform_stats(
     State(state): State<AppState>,
     request: axum::extract::Request,
 ) -> Result<Json<Value>, StatusCode> {
-    let auth = request.extensions().get::<AuthContext>().cloned()
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     if !auth.is_admin {

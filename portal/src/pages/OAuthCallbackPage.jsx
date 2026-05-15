@@ -13,6 +13,7 @@ export default function OAuthCallbackPage() {
 
   useEffect(() => {
     const code = searchParams.get('code')
+    const state = searchParams.get('state')
     const errorParam = searchParams.get('error')
 
     if (errorParam) {
@@ -27,9 +28,17 @@ export default function OAuthCallbackPage() {
       return
     }
 
+    const expectedState = sessionStorage.getItem(`oauth_state_${provider}`)
+    sessionStorage.removeItem(`oauth_state_${provider}`)
+    if (!state || state !== expectedState) {
+      setError('Invalid OAuth state')
+      setStatus('')
+      return
+    }
+
     setStatus(`Completing ${provider} login...`)
 
-    api.oauthCallback(provider, code)
+    api.oauthCallback(provider, code, state)
       .then(data => {
         if (data.error) {
           setError(data.error)

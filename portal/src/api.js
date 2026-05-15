@@ -48,7 +48,7 @@ export const api = {
 
   // OAuth
   getOAuthUrl: (provider) => request('GET', `/auth/oauth/${provider}/url`),
-  oauthCallback: (provider, code) => request('POST', `/auth/oauth/${provider}/callback`, { code }),
+  oauthCallback: (provider, code, state) => request('POST', `/auth/oauth/${provider}/callback`, { code, state }),
 
   // Keys
   listKeys: () => request('GET', '/keys'),

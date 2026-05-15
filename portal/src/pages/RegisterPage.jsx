@@ -60,6 +60,7 @@ export default function RegisterPage() {
     try {
       const data = await api.getOAuthUrl(provider)
       if (data.url) {
+        if (data.state) sessionStorage.setItem(`oauth_state_${provider}`, data.state)
         window.location.href = data.url
       } else {
         setError(data.error || `${provider} signup not available`)
@@ -185,11 +186,6 @@ export default function RegisterPage() {
                   </button>
                 </div>
               </>
-            )}
-            {result.verify_token && (
-              <p className="verify-note">
-                Verification token: <code>{result.verify_token}</code>
-              </p>
             )}
             <button className="btn-primary full" onClick={handleContinue}>
               Continue to Dashboard
