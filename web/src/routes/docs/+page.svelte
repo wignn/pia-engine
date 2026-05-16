@@ -533,11 +533,11 @@ curl "$CONTROL_PLANE_URL/health"`
 {/snippet}
 
 {#snippet CodeBlock(title: string, code: string)}
-	<div class="overflow-hidden rounded-lg border border-border bg-[#101014]">
-		<div class="flex items-center justify-between border-b border-border px-4 py-3">
+	<div class="overflow-hidden rounded-lg border border-border bg-surface-2">
+		<div class="flex items-center justify-between border-b border-border bg-surface px-4 py-3">
 			<div class="text-sm font-semibold text-text">{title}</div>
 			<Code2 class="h-4 w-4 text-text-dim" />
 		</div>
-		<pre class="overflow-x-auto p-4 text-xs leading-6 text-text-muted"><code>{code}</code></pre>
+		<pre class="overflow-x-auto p-4 text-xs leading-6 text-text"><code>{code}</code></pre>
 	</div>
 {/snippet}
