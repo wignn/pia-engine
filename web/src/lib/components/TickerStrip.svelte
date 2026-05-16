@@ -14,12 +14,12 @@
 </script>
 
 {#if items.length > 0}
-<div class="relative overflow-hidden border-b border-border-subtle bg-surface/50 backdrop-blur-sm">
+<div class="relative flex h-8 items-center overflow-hidden border-b border-border bg-bg">
 	<div class="flex animate-[ticker-scroll_40s_linear_infinite] whitespace-nowrap">
 		{#each tickerItems as p (p._key)}
-			<span class="inline-flex items-center gap-2 px-5 py-2.5 text-xs tracking-wide">
-				<span class="font-mono font-semibold text-text">{p.symbol}</span>
-				<span class="font-mono {p.direction === 'up' ? 'text-green' : p.direction === 'down' ? 'text-red' : 'text-text-muted'}">
+			<span class="inline-flex items-center gap-1.5 px-4 text-xs tracking-wide border-r border-border/50 hover:bg-surface-2 cursor-default transition-colors">
+				<span class="font-semibold text-text">{p.symbol}</span>
+				<span class="{p.direction === 'up' ? 'text-green' : p.direction === 'down' ? 'text-red' : 'text-text-muted'}">
 					{p.asset_type === 'crypto' ? '$' : ''}{p.price.toFixed(p.asset_type === 'crypto' ? 2 : p.symbol.includes('JPY') ? 3 : 5)}
 				</span>
 				<span class="text-[10px] {p.direction === 'up' ? 'text-green' : p.direction === 'down' ? 'text-red' : 'text-text-dim'}">

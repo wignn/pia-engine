@@ -40,58 +40,49 @@
 	}
 </script>
 
-<div>
+<div class="flex flex-col p-4">
 	<div class="mb-4 flex items-center justify-between">
-		<h3 class="text-lg font-semibold tracking-tight">{title}</h3>
-		<span class="text-xs text-text-dim">{displayItems.length} items</span>
+		<h3 class="text-xs font-semibold uppercase tracking-wider text-text-muted">{title}</h3>
 	</div>
 
 	{#if loading}
 		<div class="space-y-3">
 			{#each Array(4) as _}
-				<div class="h-20 animate-pulse rounded-lg bg-surface"></div>
+				<div class="h-12 animate-pulse rounded bg-surface-2"></div>
 			{/each}
 		</div>
 	{:else if items.length === 0}
-		<div class="rounded-lg border border-border-subtle bg-surface p-8 text-center text-sm text-text-muted">
+		<div class="p-8 text-center text-sm text-text-muted">
 			No news available
 		</div>
 	{:else}
-		<div class="space-y-2">
+		<div class="flex flex-col gap-1">
 			{#each displayItems as item, i (item.id ?? i)}
-				<article class="group rounded-lg border border-border-subtle bg-surface p-4 transition-all hover:border-border hover:bg-surface-2">
-					<div class="flex items-start gap-3">
-						<span class="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full {sentimentDot(item.sentiment)}"></span>
-						<div class="min-w-0 flex-1">
-							<h4 class="text-sm font-medium leading-snug text-text group-hover:text-accent transition-colors">
-								{#if item.original_url || item.url}
-									<a href={item.original_url ?? item.url} target="_blank" rel="noopener noreferrer" class="hover:underline">
-										{getTitle(item)}
-									</a>
-								{:else}
-									{item.translated_title ?? item.original_title ?? item.title}
-								{/if}
-							</h4>
-							{#if item.summary}
-								<p class="mt-1 text-xs leading-relaxed text-text-muted line-clamp-2">{item.summary}</p>
-							{/if}
-							<div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-text-dim">
-								{#if item.source_name}
-									<span>{item.source_name}</span>
-								{/if}
-								{#if item.published_at || item.processed_at}
-									<span>{formatTime(item.published_at ?? item.processed_at)}</span>
-								{/if}
-								{#if item.sentiment}
-									<span class="{sentimentColor(item.sentiment)} font-medium uppercase">{item.sentiment}</span>
-								{/if}
-								{#if item.currency_pairs}
-									<span class="font-mono text-accent">{item.currency_pairs}</span>
-								{/if}
-								{#if item.tickers}
-									<span class="font-mono text-blue">{item.tickers}</span>
-								{/if}
+				<article class="group rounded border-b border-border py-3 px-2 transition-colors hover:bg-surface-2 cursor-pointer last:border-0">
+					<div class="flex flex-col gap-1.5">
+						<div class="flex items-center justify-between gap-2 text-xs text-text-dim">
+							<div class="flex items-center gap-2">
+								<span class="inline-block h-2 w-2 shrink-0 rounded-full {sentimentDot(item.sentiment)}"></span>
+								<span class="font-medium text-text-muted">{item.source_name || 'Source'}</span>
 							</div>
+							<span>{formatTime(item.published_at ?? item.processed_at)}</span>
+						</div>
+						<h4 class="text-sm leading-relaxed text-text group-hover:text-accent transition-colors line-clamp-2">
+							{#if item.original_url || item.url}
+								<a href={item.original_url ?? item.url} target="_blank" rel="noopener noreferrer" class="hover:underline">
+									{getTitle(item)}
+								</a>
+							{:else}
+								{item.translated_title ?? item.original_title ?? item.title}
+							{/if}
+						</h4>
+						<div class="flex flex-wrap gap-2 mt-1">
+							{#if item.currency_pairs}
+								<span class="rounded bg-surface px-1.5 py-0.5 text-[10px] font-mono text-accent border border-border">{item.currency_pairs}</span>
+							{/if}
+							{#if item.tickers}
+								<span class="rounded bg-surface px-1.5 py-0.5 text-[10px] font-mono text-blue border border-border">{item.tickers}</span>
+							{/if}
 						</div>
 					</div>
 				</article>

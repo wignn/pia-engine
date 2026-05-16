@@ -33,58 +33,64 @@
 	}
 </script>
 
-<section id="calendar" class="px-4 py-12 md:px-8 lg:px-16">
-	<div class="mx-auto max-w-7xl">
-		<div class="mb-8">
-			<h2 class="text-2xl font-bold tracking-tight">Economic Calendar</h2>
-			<p class="mt-1 text-sm text-text-muted">High-impact events this week · Source: Forex Factory</p>
-		</div>
-
-		{#if $calendarLoading}
-			<div class="space-y-2">
-				{#each Array(5) as _}
-					<div class="h-14 animate-pulse rounded-lg bg-surface"></div>
-				{/each}
-			</div>
-		{:else if $calendarEvents.length === 0}
-			<div class="rounded-lg border border-border bg-surface p-12 text-center">
-				<p class="text-text-muted">No high-impact events scheduled this week</p>
-			</div>
-		{:else}
-			<div class="overflow-x-auto rounded-lg border border-border bg-surface">
-				<table class="w-full text-sm">
-					<thead>
-						<tr class="border-b border-border text-left text-xs font-medium uppercase tracking-wider text-text-dim">
-							<th class="px-4 py-3">Currency</th>
-							<th class="px-4 py-3">Event</th>
-							<th class="hidden px-4 py-3 sm:table-cell">Date</th>
-							<th class="px-4 py-3 text-right">Forecast</th>
-							<th class="px-4 py-3 text-right">Previous</th>
-							<th class="hidden px-4 py-3 text-right md:table-cell">Actual</th>
-							<th class="hidden px-4 py-3 text-center lg:table-cell">Impact</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-border-subtle">
-						{#each $calendarEvents as ev, i (ev.title + i)}
-							<tr class="transition-colors hover:bg-surface-2">
-								<td class="px-4 py-3">
-									<span class="font-mono font-semibold text-text">{ev.currency}</span>
-								</td>
-								<td class="max-w-xs px-4 py-3 text-text">{ev.title}</td>
-								<td class="hidden px-4 py-3 whitespace-nowrap text-xs text-text-muted sm:table-cell">{formatDate(ev.date)}</td>
-								<td class="px-4 py-3 text-right font-mono text-text-muted">{ev.forecast || '—'}</td>
-								<td class="px-4 py-3 text-right font-mono text-text-muted">{ev.previous || '—'}</td>
-								<td class="hidden px-4 py-3 text-right font-mono text-text-muted md:table-cell">{ev.actual || '—'}</td>
-								<td class="hidden px-4 py-3 text-center lg:table-cell">
-									<span class="inline-block rounded border px-2 py-0.5 text-[10px] font-semibold uppercase {impactBg(ev.impact)} {impactColor(ev.impact)}">
-										{ev.impact}
-									</span>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		{/if}
+<div class="flex flex-col">
+	<div class="flex h-10 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
+		<h3 class="text-xs font-semibold uppercase tracking-wider text-text">Upcoming Events</h3>
 	</div>
-</section>
+
+	{#if $calendarLoading}
+		<div class="p-8 text-center text-sm text-text-muted">
+			<div class="animate-pulse">Loading calendar...</div>
+		</div>
+	{:else if $calendarEvents.length === 0}
+		<div class="p-8 text-center text-sm text-text-muted">
+			No upcoming events
+		</div>
+	{:else}
+		<div class="max-h-[600px] overflow-auto custom-scrollbar">
+			<table class="w-full text-sm">
+				<thead class="sticky top-0 z-10 bg-surface">
+					<tr class="border-b border-border text-left text-[11px] text-text-dim">
+						<th class="py-2 pl-4 pr-2 font-normal">Time</th>
+						<th class="py-2 px-2 font-normal">Currency</th>
+						<th class="py-2 px-2 font-normal">Impact</th>
+						<th class="py-2 px-2 font-normal">Event</th>
+						<th class="py-2 px-2 text-right font-normal">Actual</th>
+						<th class="py-2 px-2 text-right font-normal">Forecast</th>
+						<th class="py-2 pl-2 pr-4 text-right font-normal">Previous</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-border">
+					{#each $calendarEvents as ev, i (ev.title + i)}
+						<tr class="cursor-pointer transition-colors hover:bg-surface-2 text-text">
+							<td class="py-2 pl-4 pr-2 text-xs text-text-muted whitespace-nowrap">
+								{formatDate(ev.date)}
+							</td>
+							<td class="py-2 px-2 font-mono font-semibold">
+								{ev.currency}
+							</td>
+							<td class="py-2 px-2">
+								<span class="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[10px] uppercase font-medium border {impactBg(ev.impact)}">
+									<span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full {impactBg(ev.impact).includes('red') ? 'bg-red' : impactBg(ev.impact).includes('amber') ? 'bg-amber' : 'bg-text-dim'}"></span>
+									{ev.impact}
+								</span>
+							</td>
+							<td class="py-2 px-2 text-sm">
+								{ev.title}
+							</td>
+							<td class="py-2 px-2 text-right font-mono text-xs">
+								{ev.actual || '—'}
+							</td>
+							<td class="py-2 px-2 text-right font-mono text-xs">
+								{ev.forecast || '—'}
+							</td>
+							<td class="py-2 pl-2 pr-4 text-right font-mono text-xs text-text-muted">
+								{ev.previous || '—'}
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	{/if}
+</div>
