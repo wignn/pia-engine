@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { BookOpen } from 'lucide-svelte';
 	import { DISCORD_INVITE } from '$lib/config';
 	import { startWebSocket, stopWebSocket, marketStore, realtimeNewsStore } from '$lib/stores/websocket.svelte';
 	import { forexNews, equityNews, newsLoading, startNewsPolling, stopNewsPolling } from '$lib/stores/news';
 	import { startCalendarPolling, stopCalendarPolling } from '$lib/stores/calendar';
-
 	import TickerStrip from '$lib/components/TickerStrip.svelte';
 	import MarketGrid from '$lib/components/MarketGrid.svelte';
 	import NewsFeed from '$lib/components/NewsFeed.svelte';
@@ -74,6 +74,10 @@
 			</a>
 			<a href="#market" class="text-sm font-medium text-text-muted transition-colors hover:text-text">
 				View Live Data ↓
+			</a>
+			<a href="/docs" class="inline-flex items-center gap-2 text-sm font-medium text-text-muted transition-colors hover:text-text">
+				<BookOpen class="h-4 w-4" />
+				Documentation
 			</a>
 		</div>
 

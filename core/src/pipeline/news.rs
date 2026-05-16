@@ -17,6 +17,14 @@ use crate::ws::{self, Hub, NewsArticleData};
 const MAX_NEWS_AGE_HOURS: i64 = 12;
 const REDIS_STREAM_MAX_LEN: usize = 50_000;
 
+// Consumer group settings
+const CONSUMER_GROUP: &str = "news-ingest-group";
+const CONSUMER_NAME: &str = "news-worker-1";
+const CONSUMER_BATCH_SIZE: usize = 50;
+const CONSUMER_BLOCK_MS: usize = 5000;
+const BACKOFF_INITIAL_MS: u64 = 500;
+const BACKOFF_MAX_MS: u64 = 30_000;
+
 static SLUG_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^a-z0-9]+").unwrap());
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -175,70 +183,228 @@ impl NewsPipeline {
 
 impl NewsIngestWorker {
     pub async fn run_forever(&self) {
-        let mut last_id = "0-0".to_string();
-        info!(stream_key = %self.stream_key, "news ingest worker started");
+        info!(
+            stream = %self.stream_key,
+            group = CONSUMER_GROUP,
+            consumer = CONSUMER_NAME,
+            "NEWS CONSUMER STARTED — connecting to Redis stream"
+        );
+
+        let mut backoff_ms: u64 = BACKOFF_INITIAL_MS;
 
         loop {
-            let mut conn = match self.redis_client.get_multiplexed_async_connection().await {
-                Ok(c) => c,
-                Err(e) => {
-                    error!(error = %e, "news ingest worker redis connection failed");
-                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                    continue;
-                }
+            // Establish connection (reused across iterations)
+            let mut conn = match self.connect_redis(&mut backoff_ms).await {
+                Some(c) => c,
+                None => continue,
             };
 
-            let reply: redis::RedisResult<StreamReadReply> = redis::cmd("XREAD")
-                .arg("COUNT")
-                .arg(50)
-                .arg("BLOCK")
-                .arg(5000)
-                .arg("STREAMS")
-                .arg(&self.stream_key)
-                .arg(&last_id)
-                .query_async(&mut conn)
-                .await;
+            // Ensure consumer group exists
+            if !self.ensure_consumer_group(&mut conn).await {
+                tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
+                backoff_ms = (backoff_ms * 2).min(BACKOFF_MAX_MS);
+                continue;
+            }
+            backoff_ms = BACKOFF_INITIAL_MS;
 
-            let reply = match reply {
-                Ok(r) => r,
-                Err(e) => {
-                    warn!(error = %e, stream = %self.stream_key, "news ingest worker XREAD failed");
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                    continue;
-                }
-            };
+            // Recover any pending messages from previous crash
+            self.recover_pending(&mut conn).await;
 
-            for key in reply.keys {
-                for id in key.ids {
-                    let msg_id = id.id.clone();
-                    let payload = id
-                        .map
-                        .get("payload")
-                        .and_then(|v| redis::from_redis_value::<String>(v).ok());
+            info!(stream = %self.stream_key, "WAITING FOR REDIS STREAM MESSAGES");
 
-                    let Some(payload) = payload else {
-                        warn!(msg_id = %msg_id, "news ingest message missing payload field");
-                        last_id = msg_id;
-                        continue;
-                    };
+            // Main consumer loop — reuses the same connection
+            loop {
+                let reply: redis::RedisResult<StreamReadReply> = redis::cmd("XREADGROUP")
+                    .arg("GROUP")
+                    .arg(CONSUMER_GROUP)
+                    .arg(CONSUMER_NAME)
+                    .arg("COUNT")
+                    .arg(CONSUMER_BATCH_SIZE)
+                    .arg("BLOCK")
+                    .arg(CONSUMER_BLOCK_MS)
+                    .arg("STREAMS")
+                    .arg(&self.stream_key)
+                    .arg(">")
+                    .query_async(&mut conn)
+                    .await;
 
-                    let msg: NewsIngestMessage = match serde_json::from_str(&payload) {
-                        Ok(m) => m,
-                        Err(e) => {
-                            warn!(msg_id = %msg_id, error = %e, "failed to deserialize news ingest payload");
-                            last_id = msg_id;
-                            continue;
-                        }
-                    };
-
-                    let result = process_entry(&self.scraper, &self.db, &self.hub, &msg).await;
-                    if result == "processed" {
-                        info!(msg_id = %msg_id, title = %truncate_str(&msg.title, 50), "news ingest processed");
+                let reply = match reply {
+                    Ok(r) => {
+                        backoff_ms = BACKOFF_INITIAL_MS;
+                        r
                     }
+                    Err(e) => {
+                        warn!(error = %e, stream = %self.stream_key, "XREADGROUP failed, reconnecting");
+                        tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
+                        backoff_ms = (backoff_ms * 2).min(BACKOFF_MAX_MS);
+                        break; // break inner loop → reconnect in outer loop
+                    }
+                };
 
-                    last_id = msg_id;
+                let msg_count: usize = reply.keys.iter().map(|k| k.ids.len()).sum();
+                if msg_count > 0 {
+                    info!(count = msg_count, "received news stream messages");
+                }
+
+                for key in reply.keys {
+                    for id in key.ids {
+                        let msg_id = id.id.clone();
+                        self.process_stream_message(&mut conn, &msg_id, &id.map).await;
+                    }
                 }
             }
+        }
+    }
+
+    /// Connect to Redis with exponential backoff on failure.
+    async fn connect_redis(
+        &self,
+        backoff_ms: &mut u64,
+    ) -> Option<redis::aio::MultiplexedConnection> {
+        match self.redis_client.get_multiplexed_async_connection().await {
+            Ok(c) => {
+                *backoff_ms = BACKOFF_INITIAL_MS;
+                Some(c)
+            }
+            Err(e) => {
+                error!(error = %e, backoff_ms = *backoff_ms, "news consumer redis connection failed");
+                tokio::time::sleep(std::time::Duration::from_millis(*backoff_ms)).await;
+                *backoff_ms = (*backoff_ms * 2).min(BACKOFF_MAX_MS);
+                None
+            }
+        }
+    }
+
+    /// Create consumer group if it doesn't exist.
+    /// Uses "0" as start ID to process any backlog messages.
+    async fn ensure_consumer_group(
+        &self,
+        conn: &mut redis::aio::MultiplexedConnection,
+    ) -> bool {
+        let result: redis::RedisResult<String> = redis::cmd("XGROUP")
+            .arg("CREATE")
+            .arg(&self.stream_key)
+            .arg(CONSUMER_GROUP)
+            .arg("0")
+            .arg("MKSTREAM")
+            .query_async(conn)
+            .await;
+
+        match result {
+            Ok(_) => {
+                info!(
+                    stream = %self.stream_key,
+                    group = CONSUMER_GROUP,
+                    "news consumer group created"
+                );
+                true
+            }
+            Err(e) if e.to_string().contains("BUSYGROUP") => {
+                info!(
+                    stream = %self.stream_key,
+                    group = CONSUMER_GROUP,
+                    "news consumer group already exists"
+                );
+                true
+            }
+            Err(e) => {
+                error!(error = %e, "failed to create news consumer group");
+                false
+            }
+        }
+    }
+
+    /// Recover pending messages (delivered but not ACK'd, e.g. from a crash).
+    async fn recover_pending(&self, conn: &mut redis::aio::MultiplexedConnection) {
+        info!("checking for pending (unacked) messages from previous run");
+
+        loop {
+            let reply: redis::RedisResult<StreamReadReply> = redis::cmd("XREADGROUP")
+                .arg("GROUP")
+                .arg(CONSUMER_GROUP)
+                .arg(CONSUMER_NAME)
+                .arg("COUNT")
+                .arg(CONSUMER_BATCH_SIZE)
+                .arg("STREAMS")
+                .arg(&self.stream_key)
+                .arg("0") // "0" reads pending messages, not new ones
+                .query_async(conn)
+                .await;
+
+            match reply {
+                Ok(r) => {
+                    let msg_count: usize = r.keys.iter().map(|k| k.ids.len()).sum();
+                    if msg_count == 0 {
+                        info!("no pending messages to recover");
+                        return;
+                    }
+                    info!(count = msg_count, "recovering pending messages");
+                    for key in r.keys {
+                        for id in key.ids {
+                            let msg_id = id.id.clone();
+                            self.process_stream_message(conn, &msg_id, &id.map).await;
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!(error = %e, "failed to read pending messages, skipping recovery");
+                    return;
+                }
+            }
+        }
+    }
+
+    /// Process a single stream message: deserialize, process, and ACK.
+    /// Poison messages (malformed) are ACK'd to prevent infinite reprocessing.
+    async fn process_stream_message(
+        &self,
+        conn: &mut redis::aio::MultiplexedConnection,
+        msg_id: &str,
+        map: &std::collections::HashMap<String, redis::Value>,
+    ) {
+        let payload = map
+            .get("payload")
+            .and_then(|v| redis::from_redis_value::<String>(v).ok());
+
+        let Some(payload) = payload else {
+            warn!(msg_id = %msg_id, "news ingest message missing payload field — ACK to skip");
+            self.ack_message(conn, msg_id).await;
+            return;
+        };
+
+        let msg: NewsIngestMessage = match serde_json::from_str(&payload) {
+            Ok(m) => m,
+            Err(e) => {
+                warn!(msg_id = %msg_id, error = %e, "poison message: failed to deserialize — ACK to skip");
+                self.ack_message(conn, msg_id).await;
+                return;
+            }
+        };
+
+        let result = process_entry(&self.scraper, &self.db, &self.hub, &msg).await;
+        if result == "processed" {
+            info!(msg_id = %msg_id, title = %truncate_str(&msg.title, 50), "news ingest processed");
+        }
+
+        // Always ACK after processing (success or skip)
+        self.ack_message(conn, msg_id).await;
+    }
+
+    /// Acknowledge a message so Redis removes it from the pending list.
+    async fn ack_message(
+        &self,
+        conn: &mut redis::aio::MultiplexedConnection,
+        msg_id: &str,
+    ) {
+        let result: redis::RedisResult<i64> = redis::cmd("XACK")
+            .arg(&self.stream_key)
+            .arg(CONSUMER_GROUP)
+            .arg(msg_id)
+            .query_async(conn)
+            .await;
+
+        if let Err(e) = result {
+            warn!(error = %e, msg_id = %msg_id, "XACK failed");
         }
     }
 }
@@ -261,24 +427,9 @@ async fn process_entry(
         }
     }
 
+    // Duplicate check is handled by ON CONFLICT in the INSERT below.
+    // Removed redundant SELECT EXISTS query to halve DB roundtrips per message.
     let hash = &msg.content_hash;
-    let is_duplicate = match sqlx::query_as::<_, (bool,)>("SELECT EXISTS(SELECT 1 FROM news_articles WHERE content_hash = $1)")
-        .bind(hash)
-        .fetch_one(db)
-        .await
-    {
-        Ok((true,)) => true,
-        Ok((false,)) => false,
-        Err(e) => {
-            warn!(error = %e, hash = %hash, "duplicate check query failed, continuing");
-            false
-        }
-    };
-
-    if is_duplicate {
-        debug!(hash = %hash, title = %truncate_str(&msg.title, 60), "article skipped: duplicate");
-        return "duplicate";
-    }
 
     let title = &msg.title;
     let mut content = html::strip_tags(&msg.content);
