@@ -126,9 +126,20 @@ async fn main() {
     ));
 
     if let Some(worker) = news_pipeline.build_worker() {
+        let mut shutdown = shutdown_tx.subscribe();
+        info!("news ingest worker spawning");
         tokio::spawn(async move {
-            worker.run_forever().await;
+            tokio::select! {
+                _ = worker.run_forever() => {
+                    error!("news ingest worker exited unexpectedly — this should never happen");
+                }
+                _ = shutdown.changed() => {
+                    info!("news ingest worker shutting down gracefully");
+                }
+            }
         });
+    } else {
+        warn!("news ingest worker NOT started — redis not configured");
     }
     {
         let news_pipeline = news_pipeline.clone();
