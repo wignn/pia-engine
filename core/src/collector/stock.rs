@@ -9,7 +9,7 @@ use std::time::Duration;
 use tokio::sync::Semaphore;
 use tracing::{error, info};
 
-use super::rss::FeedSource;
+use super::forex::FeedSource;
 
 /// A stock news entry parsed from RSS feeds.
 #[derive(Debug, Clone)]

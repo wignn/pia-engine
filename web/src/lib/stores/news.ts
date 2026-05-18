@@ -11,22 +11,36 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 async function fetchForexNews() {
 	try {
 		const res = await fetch(`${CORE_REST_URL}/api/v1/forex/news/latest?limit=15`);
-		if (!res.ok) return;
+		if (!res.ok) {
+			console.warn(`[News] forex fetch failed: ${res.status} ${res.statusText}`);
+			return;
+		}
 		const data = await res.json();
+		if (data.error) {
+			console.warn(`[News] forex API error:`, data.error);
+			return;
+		}
 		if (data.items) forexNews.set(data.items);
-	} catch {
-		// silent
+	} catch (e) {
+		console.warn('[News] forex fetch error:', e);
 	}
 }
 
 async function fetchEquityNews() {
 	try {
 		const res = await fetch(`${CORE_REST_URL}/api/v1/equity/news?limit=15`);
-		if (!res.ok) return;
+		if (!res.ok) {
+			console.warn(`[News] equity fetch failed: ${res.status} ${res.statusText}`);
+			return;
+		}
 		const data = await res.json();
+		if (data.error) {
+			console.warn(`[News] equity API error:`, data.error);
+			return;
+		}
 		if (data.items) equityNews.set(data.items);
-	} catch {
-		// silent
+	} catch (e) {
+		console.warn('[News] equity fetch error:', e);
 	}
 }
 

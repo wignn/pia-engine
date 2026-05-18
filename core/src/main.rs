@@ -17,11 +17,11 @@ use tracing_subscriber::{fmt, EnvFilter};
 use api::state::AppState;
 use api::usage_tracker::UsageTracker;
 use collector::calendar::CalendarCollector;
-use collector::rss::RSSCollector;
+use collector::forex::ForexCollector;
 use collector::stock::StockCollector;
 use collector::twitter::TwitterCollector;
 use pipeline::calendar::CalendarPipeline;
-use pipeline::news::NewsPipeline;
+use pipeline::forex::ForexPipeline;
 use pipeline::stock::StockPipeline;
 use pipeline::twitter::TwitterPipeline;
 use scraper::article::ArticleScraper;
@@ -114,10 +114,10 @@ async fn main() {
 
     let timeout = Duration::from_secs(cfg.scraper_timeout);
 
-    let rss_collector = Arc::new(RSSCollector::new(cfg.rss_max_entries, &cfg.scraper_ua, timeout));
+    let forex_collector = Arc::new(ForexCollector::new(cfg.rss_max_entries, &cfg.scraper_ua, timeout));
     let article_scraper = Arc::new(ArticleScraper::new(&cfg.scraper_ua, timeout));
-    let news_pipeline = Arc::new(NewsPipeline::new(
-        rss_collector,
+    let forex_pipeline = Arc::new(ForexPipeline::new(
+        forex_collector,
         article_scraper,
         pool.clone(),
         hub.clone(),
@@ -125,28 +125,28 @@ async fn main() {
         &cfg.redis_channel_prefix,
     ));
 
-    if let Some(worker) = news_pipeline.build_worker() {
+    if let Some(worker) = forex_pipeline.build_worker() {
         let mut shutdown = shutdown_tx.subscribe();
-        info!("news ingest worker spawning");
+        info!("forex ingest worker spawning");
         tokio::spawn(async move {
             tokio::select! {
                 _ = worker.run_forever() => {
-                    error!("news ingest worker exited unexpectedly — this should never happen");
+                    error!("forex ingest worker exited unexpectedly — this should never happen");
                 }
                 _ = shutdown.changed() => {
-                    info!("news ingest worker shutting down gracefully");
+                    info!("forex ingest worker shutting down gracefully");
                 }
             }
         });
     } else {
-        warn!("news ingest worker NOT started — redis not configured");
+        warn!("forex ingest worker NOT started — redis not configured");
     }
     {
-        let news_pipeline = news_pipeline.clone();
+        let forex_pipeline = forex_pipeline.clone();
         let interval = Duration::from_secs(cfg.rss_fetch_sec);
         tokio::spawn(async move {
-            pipeline::run_scheduled("news", interval, || {
-                let p = news_pipeline.clone();
+            pipeline::run_scheduled("forex", interval, || {
+                let p = forex_pipeline.clone();
                 async move { p.run().await }
             })
             .await;

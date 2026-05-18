@@ -8,9 +8,9 @@ use std::time::Duration;
 use tokio::sync::{RwLock, Semaphore};
 use tracing::{error, info, warn};
 
-/// A single RSS feed entry after parsing.
+/// A single forex news entry parsed from RSS feeds.
 #[derive(Debug, Clone)]
-pub struct RSSEntry {
+pub struct ForexNewsEntry {
     pub title: String,
     pub link: String,
     pub content: String,
@@ -109,8 +109,8 @@ pub fn feed_name_by_url(rss_url: &str) -> String {
     }
 }
 
-/// Concurrent RSS feed collector with semaphore-limited parallelism.
-pub struct RSSCollector {
+/// Concurrent forex news RSS collector with semaphore-limited parallelism.
+pub struct ForexCollector {
     client: Client,
     max_entries: usize,
     semaphore: Semaphore,
@@ -136,7 +136,7 @@ struct SourceFetchState {
 }
 
 enum AttemptResult {
-    Parsed(Vec<RSSEntry>, Option<String>, Option<String>, u128),
+    Parsed(Vec<ForexNewsEntry>, Option<String>, Option<String>, u128),
     NotModified(Option<String>, Option<String>, u128),
     Forbidden,
     RetryableHttp(u16),
@@ -146,7 +146,7 @@ enum AttemptResult {
     Parse(String, String),
 }
 
-impl RSSCollector {
+impl ForexCollector {
     pub fn new(max_entries: usize, user_agent: &str, timeout: Duration) -> Self {
         Self {
             client: Client::builder()
@@ -163,7 +163,7 @@ impl RSSCollector {
     }
 
     /// Fetch a single RSS feed and parse its entries.
-    pub async fn fetch_feed(&self, source: &FeedSource) -> Vec<RSSEntry> {
+    pub async fn fetch_feed(&self, source: &FeedSource) -> Vec<ForexNewsEntry> {
         let _permit = match self.semaphore.acquire().await {
             Ok(p) => p,
             Err(_) => return vec![],
@@ -248,7 +248,7 @@ impl RSSCollector {
     pub async fn fetch_all_feeds(
         &self,
         feeds: &[FeedSource],
-    ) -> std::collections::HashMap<String, Vec<RSSEntry>> {
+    ) -> std::collections::HashMap<String, Vec<ForexNewsEntry>> {
         let mut handles = Vec::new();
 
         for feed in feeds {
@@ -265,7 +265,7 @@ impl RSSCollector {
         results.into_iter().collect()
     }
 
-    fn parse_item(&self, item: &feed_rs::model::Entry, source_name: &str) -> Option<RSSEntry> {
+    fn parse_item(&self, item: &feed_rs::model::Entry, source_name: &str) -> Option<ForexNewsEntry> {
         let title = item.title.as_ref()?.content.trim().to_string();
         let link = item.links.first()?.href.trim().to_string();
 
@@ -297,7 +297,7 @@ impl RSSCollector {
 
         let hash = compute_content_hash(&link, &title);
 
-        Some(RSSEntry {
+        Some(ForexNewsEntry {
             title,
             link,
             content,

@@ -36,9 +36,10 @@ pub async fn list_news(
 
     let items: Vec<Value> = match rows {
         Ok(rows) => rows.iter().map(|r| json!({
-            "id": r.0,
+            "id": r.2,
             "content_hash": r.2,
             "original_url": r.3,
+            "title": r.4,
             "original_title": r.4,
             "summary": r.5,
             "is_processed": r.6,
@@ -78,14 +79,14 @@ pub async fn latest_news(
 ) -> Json<Value> {
     let limit = query.limit.unwrap_or(10).clamp(1, 50);
 
-    let rows = sqlx::query_as::<_, (String, String, String, String, Option<String>, Option<String>, Option<chrono::DateTime<chrono::Utc>>, Option<chrono::DateTime<chrono::Utc>>, String, Option<String>, Option<String>, Option<String>)>(
+    // Query without LEFT JOIN to news_analyses — that table may not exist yet.
+    // Sentiment/impact/currency_pairs are returned as null for now.
+    let rows = sqlx::query_as::<_, (String, String, String, String, Option<String>, Option<String>, Option<chrono::DateTime<chrono::Utc>>, Option<chrono::DateTime<chrono::Utc>>, String)>(
         "SELECT a.id::text, a.content_hash, a.original_url, a.original_title, \
          a.translated_title, a.summary, a.published_at, a.processed_at, \
-         COALESCE(s.name, 'Unknown') AS source_name, \
-         an.sentiment, an.impact_level, an.currency_pairs \
+         COALESCE(s.name, 'Unknown') AS source_name \
          FROM news_articles a \
          LEFT JOIN news_sources s ON a.source_id = s.id \
-         LEFT JOIN news_analyses an ON an.article_id = a.id \
          WHERE a.is_processed = TRUE \
          ORDER BY a.processed_at DESC NULLS LAST \
          LIMIT $1"
@@ -96,18 +97,19 @@ pub async fn latest_news(
 
     let items: Vec<Value> = match rows {
         Ok(rows) => rows.iter().map(|r| json!({
-            "id": r.0,
+            "id": r.1,
             "content_hash": r.1,
             "original_url": r.2,
+            "title": r.3,
             "original_title": r.3,
             "translated_title": r.4,
             "summary": r.5,
             "published_at": r.6,
             "processed_at": r.7,
             "source_name": r.8,
-            "sentiment": r.9,
-            "impact_level": r.10,
-            "currency_pairs": r.11,
+            "sentiment": null,
+            "impact_level": null,
+            "currency_pairs": null,
         })).collect(),
         Err(e) => {
             error!(error = %e, "latest news query failed");
@@ -136,10 +138,11 @@ pub async fn get_news(
 
     match row {
         Ok(Some(r)) => Json(json!({
-            "id": r.0,
+            "id": r.2,
             "source_id": r.1,
             "content_hash": r.2,
             "original_url": r.3,
+            "title": r.4,
             "original_title": r.4,
             "original_content": r.5,
             "summary": r.6,

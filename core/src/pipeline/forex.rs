@@ -9,7 +9,7 @@ use sqlx::PgPool;
 use std::sync::LazyLock;
 use tracing::{debug, error, info, warn};
 
-use crate::collector::rss::{default_forex_feeds, feed_name_by_url, RSSCollector};
+use crate::collector::forex::{default_forex_feeds, feed_name_by_url, ForexCollector};
 use crate::html;
 use crate::scraper::article::ArticleScraper;
 use crate::ws::{self, Hub, NewsArticleData};
@@ -28,7 +28,7 @@ const BACKOFF_MAX_MS: u64 = 30_000;
 static SLUG_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^a-z0-9]+").unwrap());
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct NewsIngestMessage {
+struct ForexIngestMessage {
     source_name: String,
     feed_url: String,
     title: String,
@@ -38,8 +38,8 @@ struct NewsIngestMessage {
     content_hash: String,
 }
 
-pub struct NewsPipeline {
-    rss: Arc<RSSCollector>,
+pub struct ForexPipeline {
+    collector: Arc<ForexCollector>,
     scraper: Arc<ArticleScraper>,
     db: PgPool,
     hub: Arc<Hub>,
@@ -47,7 +47,7 @@ pub struct NewsPipeline {
     stream_key: String,
 }
 
-pub struct NewsIngestWorker {
+pub struct ForexIngestWorker {
     scraper: Arc<ArticleScraper>,
     db: PgPool,
     hub: Arc<Hub>,
@@ -55,9 +55,9 @@ pub struct NewsIngestWorker {
     stream_key: String,
 }
 
-impl NewsPipeline {
+impl ForexPipeline {
     pub fn new(
-        rss: Arc<RSSCollector>,
+        collector: Arc<ForexCollector>,
         scraper: Arc<ArticleScraper>,
         db: PgPool,
         hub: Arc<Hub>,
@@ -65,7 +65,7 @@ impl NewsPipeline {
         redis_channel_prefix: &str,
     ) -> Self {
         Self {
-            rss,
+            collector,
             scraper,
             db,
             hub,
@@ -75,12 +75,12 @@ impl NewsPipeline {
     }
 
     pub async fn run(&self) {
-        info!(stream_key = %self.stream_key, redis_enabled = self.redis_client.is_some(), "news ingest producer: starting");
+        info!(stream_key = %self.stream_key, redis_enabled = self.redis_client.is_some(), "forex ingest producer: starting");
         let feeds = default_forex_feeds();
-        let results = self.rss.fetch_all_feeds(&feeds).await;
+        let results = self.collector.fetch_all_feeds(&feeds).await;
 
         let total: usize = results.values().map(|v| v.len()).sum();
-        info!(feeds = results.len(), total_entries = total, "news ingest producer: feeds fetched");
+        info!(feeds = results.len(), total_entries = total, "forex ingest producer: feeds fetched");
 
         let mut enqueued = 0u32;
         let mut direct_processed = 0u32;
@@ -92,7 +92,7 @@ impl NewsPipeline {
         for (feed_url, entries) in &results {
             let source_name = feed_name_by_url(feed_url);
             for entry in entries {
-                let msg = NewsIngestMessage {
+                let msg = ForexIngestMessage {
                     source_name: source_name.clone(),
                     feed_url: feed_url.clone(),
                     title: entry.title.clone(),
@@ -125,12 +125,12 @@ impl NewsPipeline {
             }
         }
 
-        info!(enqueued, direct_processed, too_old, duplicate, db_error, skipped, "news ingest producer: completed");
+        info!(enqueued, direct_processed, too_old, duplicate, db_error, skipped, "forex ingest producer: completed");
     }
 
-    pub fn build_worker(&self) -> Option<NewsIngestWorker> {
+    pub fn build_worker(&self) -> Option<ForexIngestWorker> {
         let redis_client = self.redis_client.clone()?;
-        Some(NewsIngestWorker {
+        Some(ForexIngestWorker {
             scraper: self.scraper.clone(),
             db: self.db.clone(),
             hub: self.hub.clone(),
@@ -139,7 +139,7 @@ impl NewsPipeline {
         })
     }
 
-    async fn enqueue_message(&self, msg: &NewsIngestMessage) -> bool {
+    async fn enqueue_message(&self, msg: &ForexIngestMessage) -> bool {
         let Some(redis_client) = &self.redis_client else {
             return false;
         };
@@ -181,7 +181,7 @@ impl NewsPipeline {
     }
 }
 
-impl NewsIngestWorker {
+impl ForexIngestWorker {
     pub async fn run_forever(&self) {
         info!(
             stream = %self.stream_key,
@@ -372,7 +372,7 @@ impl NewsIngestWorker {
             return;
         };
 
-        let msg: NewsIngestMessage = match serde_json::from_str(&payload) {
+        let msg: ForexIngestMessage = match serde_json::from_str(&payload) {
             Ok(m) => m,
             Err(e) => {
                 warn!(msg_id = %msg_id, error = %e, "poison message: failed to deserialize — ACK to skip");
@@ -413,7 +413,7 @@ async fn process_entry(
     scraper: &Arc<ArticleScraper>,
     db: &PgPool,
     hub: &Arc<Hub>,
-    msg: &NewsIngestMessage,
+    msg: &ForexIngestMessage,
 ) -> &'static str {
     if let Some(pub_at) = parse_rfc3339_utc(msg.published_at.as_deref()) {
         let cutoff = Utc::now() - chrono::Duration::hours(MAX_NEWS_AGE_HOURS);
