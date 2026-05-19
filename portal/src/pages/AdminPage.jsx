@@ -10,12 +10,16 @@ function useLiveWS(endpoint) {
   const reconnectTimer = useRef(null)
   const apiKey = localStorage.getItem('wi_api_key') || ''
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return
-    const url = `${CORE_WS_BASE}/api/v1/ws/${endpoint}?api_key=${apiKey}&bot_id=admin-${endpoint}`
     setStatus('connecting')
-    const ws = new WebSocket(url)
-    wsRef.current = ws
+    try {
+      const res = await api.coreWsTicket()
+      if (!res.ticket) return
+      
+      const url = `${CORE_WS_BASE}/api/v1/ws/${endpoint}?ticket=${res.ticket}&bot_id=admin-${endpoint}`
+      const ws = new WebSocket(url)
+      wsRef.current = ws
 
     ws.onopen = () => setStatus('live')
     ws.onclose = () => {
@@ -30,7 +34,12 @@ function useLiveWS(endpoint) {
         setMessages(prev => [{ ...data, _ts: Date.now() }, ...prev].slice(0, 80))
       } catch {}
     }
-  }, [endpoint, apiKey])
+    } catch (e) {
+      console.error(e)
+      setStatus('error')
+      reconnectTimer.current = setTimeout(connect, 4000)
+    }
+  }, [endpoint])
 
   useEffect(() => {
     connect()

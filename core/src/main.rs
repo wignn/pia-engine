@@ -10,10 +10,6 @@ mod scraper;
 mod tenant;
 mod ws;
 
-use std::sync::Arc;
-use std::time::Duration;
-use tracing::{error, info, warn};
-use tracing_subscriber::{fmt, EnvFilter};
 use api::state::AppState;
 use api::usage_tracker::UsageTracker;
 use collector::calendar::CalendarCollector;
@@ -25,7 +21,11 @@ use pipeline::forex::ForexPipeline;
 use pipeline::stock::StockPipeline;
 use pipeline::twitter::TwitterPipeline;
 use scraper::article::ArticleScraper;
+use std::sync::Arc;
+use std::time::Duration;
 use tenant::registry::TenantRegistry;
+use tracing::{error, info, warn};
+use tracing_subscriber::{fmt, EnvFilter};
 
 #[tokio::main]
 async fn main() {
@@ -95,14 +95,14 @@ async fn main() {
         config: cfg.clone(),
         tenant_registry: Some(tenant_registry.clone()),
         usage_tracker,
+        ticket_store: std::sync::Arc::new(tokio::sync::RwLock::new(
+            std::collections::HashMap::new(),
+        )),
     };
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
 
-    // Stats hub background task
-    
-
-    // Tenant registry background sync
+    // Keep the in-memory tenant cache aligned with control-plane updates.
     {
         let registry = tenant_registry.clone();
         let sync_rx = shutdown_tx.subscribe();
@@ -114,7 +114,11 @@ async fn main() {
 
     let timeout = Duration::from_secs(cfg.scraper_timeout);
 
-    let forex_collector = Arc::new(ForexCollector::new(cfg.rss_max_entries, &cfg.scraper_ua, timeout));
+    let forex_collector = Arc::new(ForexCollector::new(
+        cfg.rss_max_entries,
+        &cfg.scraper_ua,
+        timeout,
+    ));
     let article_scraper = Arc::new(ArticleScraper::new(&cfg.scraper_ua, timeout));
     let forex_pipeline = Arc::new(ForexPipeline::new(
         forex_collector,
@@ -131,7 +135,7 @@ async fn main() {
         tokio::spawn(async move {
             tokio::select! {
                 _ = worker.run_forever() => {
-                    error!("forex ingest worker exited unexpectedly — this should never happen");
+                    error!("forex ingest worker exited unexpectedly");
                 }
                 _ = shutdown.changed() => {
                     info!("forex ingest worker shutting down gracefully");
@@ -187,7 +191,7 @@ async fn main() {
         });
     }
 
-    // Twitter pipeline: merge env usernames + all tenant usernames
+    // Poll RSSHub for globally configured and tenant-configured X usernames.
     if cfg.has_twitter() {
         let twitter_collector = Arc::new(TwitterCollector::new(&cfg.rsshub_url, timeout));
         let env_usernames = cfg.x_usernames.clone();

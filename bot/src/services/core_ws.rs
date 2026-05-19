@@ -12,7 +12,6 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 const RECONNECT_DELAY_BASE: u64 = 5;
 const RECONNECT_DELAY_MAX: u64 = 300;
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoreEvent {
     pub event: String,
@@ -98,8 +97,6 @@ pub struct TweetData {
     pub media_urls: Vec<String>,
 }
 
-// --- Core WebSocket Service ---
-
 pub struct CoreWsService {
     db: DbPool,
     http: Arc<Http>,
@@ -109,7 +106,12 @@ pub struct CoreWsService {
 
 impl CoreWsService {
     pub fn new(db: DbPool, http: Arc<Http>, core_url: String, bot_id: String) -> Self {
-        Self { db, http, core_url, bot_id }
+        Self {
+            db,
+            http,
+            core_url,
+            bot_id,
+        }
     }
 
     pub async fn start(self: Arc<Self>) {
@@ -175,35 +177,31 @@ impl CoreWsService {
         Ok(())
     }
 
-    async fn handle_message(&self, text: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_message(
+        &self,
+        text: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let event: CoreEvent = serde_json::from_str(text)?;
 
         match event.event.as_str() {
-            // Forex news
             "news.new" | "news.high_impact" => {
                 self.handle_news_event(&event).await?;
             }
-            // Stock/equity news
             "stock.news.new" | "stock.news.high_impact" | "equity.news.new" => {
                 self.handle_stock_news_event(&event).await?;
             }
-            // Calendar reminders
             "calendar.reminder" => {
                 self.handle_calendar_event(&event).await?;
             }
-            // Gold volatility spike
             "gold.volatility_spike" => {
                 self.handle_volatility_spike(&event).await?;
             }
-            // X/Twitter posts
             "twitter.new" | "x.new" => {
                 self.handle_twitter_event(&event).await?;
             }
-            // Market price ticks — CRITICAL for /price, /prices, /alert
             "market.trade" => {
                 self.handle_market_trade(text).await;
             }
-            // System events
             "connected" | "subscribed" | "heartbeat" => {}
             _ => {
                 println!("[CORE-WS] Unknown event: {}", event.event);
@@ -212,36 +210,49 @@ impl CoreWsService {
         Ok(())
     }
 
-    // --- Market trade: update price cache + check alerts ---
     async fn handle_market_trade(&self, text: &str) {
-        if let Ok(trade_event) = serde_json::from_str::<crate::services::market_ws::MarketTradeEvent>(text) {
+        if let Ok(trade_event) =
+            serde_json::from_str::<crate::services::market_ws::MarketTradeEvent>(text)
+        {
             if let Some(wrapper) = trade_event.data {
                 let cached = crate::services::market_ws::update_price(&wrapper.tick);
                 crate::services::price_alert::check_price(
-                    &cached.symbol, cached.price, &cached.price_str, &cached.asset_type,
-                    &self.http, &self.db,
-                ).await;
+                    &cached.symbol,
+                    cached.price,
+                    &cached.price_str,
+                    &cached.asset_type,
+                    &self.http,
+                    &self.db,
+                )
+                .await;
             }
-        } else {
-            // println!("[CORE-WS] Failed to parse market trade: {}", text);
         }
     }
 
-    // --- Forex news ---
-    async fn handle_news_event(&self, event: &CoreEvent) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_news_event(
+        &self,
+        event: &CoreEvent,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let data = event.data.as_ref().ok_or("No data in event")?;
-        let article: ArticleData = serde_json::from_value(data.get("article").cloned().ok_or("No article")?)?;
-        let discord_embed: DiscordEmbed = serde_json::from_value(data.get("discord_embed").cloned().ok_or("No embed")?)?;
+        let article: ArticleData =
+            serde_json::from_value(data.get("article").cloned().ok_or("No article")?)?;
+        let discord_embed: DiscordEmbed =
+            serde_json::from_value(data.get("discord_embed").cloned().ok_or("No embed")?)?;
 
         if ForexRepository::is_news_sent(&self.db, &article.id).await? {
             return Ok(());
         }
         let channels = ForexRepository::get_active_channels(&self.db).await?;
-        if channels.is_empty() { return Ok(()); }
+        if channels.is_empty() {
+            return Ok(());
+        }
 
         let embed = self.build_embed(&discord_embed);
         let is_high_impact = event.event == "news.high_impact";
-        let mention = data.get("mention_everyone").and_then(|v| v.as_bool()).unwrap_or(false);
+        let mention = data
+            .get("mention_everyone")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         for channel in &channels {
             let channel_id = ChannelId::new(channel.channel_id as u64);
@@ -250,25 +261,38 @@ impl CoreWsService {
                 message = message.content("@everyone **HIGH IMPACT NEWS**");
             }
             if let Err(e) = channel_id.send_message(&self.http, message).await {
-                println!("[CORE-WS] Failed to send news to {}: {}", channel.channel_id, e);
+                println!(
+                    "[CORE-WS] Failed to send news to {}: {}",
+                    channel.channel_id, e
+                );
             }
         }
         ForexRepository::insert_news(&self.db, &article.id, &article.source_name).await?;
-        println!("[CORE-WS] Sent forex news to {} channels: {}", channels.len(), article.title);
+        println!(
+            "[CORE-WS] Sent forex news to {} channels: {}",
+            channels.len(),
+            article.title
+        );
         Ok(())
     }
 
-    // --- Stock/equity news ---
-    async fn handle_stock_news_event(&self, event: &CoreEvent) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_stock_news_event(
+        &self,
+        event: &CoreEvent,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let data = event.data.as_ref().ok_or("No data")?;
-        let article: ArticleData = serde_json::from_value(data.get("article").cloned().ok_or("No article")?)?;
-        let discord_embed: DiscordEmbed = serde_json::from_value(data.get("discord_embed").cloned().ok_or("No embed")?)?;
+        let article: ArticleData =
+            serde_json::from_value(data.get("article").cloned().ok_or("No article")?)?;
+        let discord_embed: DiscordEmbed =
+            serde_json::from_value(data.get("discord_embed").cloned().ok_or("No embed")?)?;
 
         if StockRepository::is_stock_news_sent(&self.db, &article.id).await? {
             return Ok(());
         }
         let channels = StockRepository::get_active_channels(&self.db).await?;
-        if channels.is_empty() { return Ok(()); }
+        if channels.is_empty() {
+            return Ok(());
+        }
 
         let embed = self.build_embed(&discord_embed);
         let is_high_impact = event.event == "stock.news.high_impact";
@@ -280,24 +304,39 @@ impl CoreWsService {
                 message = message.content("@everyone **BERITA SAHAM PENTING**");
             }
             if let Err(e) = channel_id.send_message(&self.http, message).await {
-                println!("[CORE-WS] Failed to send stock news to {}: {}", channel.channel_id, e);
+                println!(
+                    "[CORE-WS] Failed to send stock news to {}: {}",
+                    channel.channel_id, e
+                );
             }
         }
         StockRepository::insert_stock_news(&self.db, &article.id, &article.source_name).await?;
-        println!("[CORE-WS] Sent stock news to {} channels: {}", channels.len(), article.title);
+        println!(
+            "[CORE-WS] Sent stock news to {} channels: {}",
+            channels.len(),
+            article.title
+        );
         Ok(())
     }
 
-    // --- Calendar reminder ---
-    async fn handle_calendar_event(&self, event: &CoreEvent) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_calendar_event(
+        &self,
+        event: &CoreEvent,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let data = event.data.as_ref().ok_or("No data")?;
-        let cal: CalendarEventData = serde_json::from_value(data.get("calendar_event").cloned().ok_or("No calendar_event")?)?;
+        let cal: CalendarEventData = serde_json::from_value(
+            data.get("calendar_event")
+                .cloned()
+                .ok_or("No calendar_event")?,
+        )?;
 
         if CalendarRepository::is_event_sent(&self.db, &cal.event_id).await? {
             return Ok(());
         }
         let channels = CalendarRepository::get_active_channels(&self.db).await?;
-        if channels.is_empty() { return Ok(()); }
+        if channels.is_empty() {
+            return Ok(());
+        }
 
         let embed = CreateEmbed::new()
             .title("CALENDAR REMINDER")
@@ -305,7 +344,14 @@ impl CoreWsService {
             .field("Waktu", &cal.date_wib, true)
             .field("Forecast", &cal.forecast, true)
             .field("Previous", &cal.previous, true)
-            .field("Status", format!("High impact event starting in {} minutes", cal.minutes_until), false)
+            .field(
+                "Status",
+                format!(
+                    "High impact event starting in {} minutes",
+                    cal.minutes_until
+                ),
+                false,
+            )
             .color(0xDC3545)
             .footer(CreateEmbedFooter::new("Fio"))
             .timestamp(poise::serenity_prelude::Timestamp::now());
@@ -317,21 +363,33 @@ impl CoreWsService {
                 message = message.content("@everyone **HIGH IMPACT EVENT**");
             }
             if let Err(e) = channel_id.send_message(&self.http, message).await {
-                println!("[CORE-WS] Failed to send calendar to {}: {}", channel.channel_id, e);
+                println!(
+                    "[CORE-WS] Failed to send calendar to {}: {}",
+                    channel.channel_id, e
+                );
             }
         }
         CalendarRepository::insert_event(&self.db, &cal.event_id, &cal.title).await?;
-        println!("[CORE-WS] Sent calendar reminder to {} channels: {}", channels.len(), cal.title);
+        println!(
+            "[CORE-WS] Sent calendar reminder to {} channels: {}",
+            channels.len(),
+            cal.title
+        );
         Ok(())
     }
 
-    // --- Volatility spike ---
-    async fn handle_volatility_spike(&self, event: &CoreEvent) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_volatility_spike(
+        &self,
+        event: &CoreEvent,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let data = event.data.as_ref().ok_or("No data")?;
-        let discord_embed: DiscordEmbed = serde_json::from_value(data.get("discord_embed").cloned().ok_or("No embed")?)?;
+        let discord_embed: DiscordEmbed =
+            serde_json::from_value(data.get("discord_embed").cloned().ok_or("No embed")?)?;
 
         let channels = VolatilityRepository::get_active_channels(&self.db).await?;
-        if channels.is_empty() { return Ok(()); }
+        if channels.is_empty() {
+            return Ok(());
+        }
 
         let mut embed = self.build_embed(&discord_embed);
         embed = embed.timestamp(poise::serenity_prelude::Timestamp::now());
@@ -342,24 +400,40 @@ impl CoreWsService {
                 .content("@everyone **GOLD VOLATILITY SPIKE**")
                 .embed(embed.clone());
             if let Err(e) = channel_id.send_message(&self.http, message).await {
-                println!("[CORE-WS] Failed to send volatility to {}: {}", channel.channel_id, e);
+                println!(
+                    "[CORE-WS] Failed to send volatility to {}: {}",
+                    channel.channel_id, e
+                );
             }
         }
-        println!("[CORE-WS] Sent gold volatility alert to {} channels", channels.len());
+        println!(
+            "[CORE-WS] Sent gold volatility alert to {} channels",
+            channels.len()
+        );
         Ok(())
     }
 
-    // --- X/Twitter ---
-    async fn handle_twitter_event(&self, event: &CoreEvent) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_twitter_event(
+        &self,
+        event: &CoreEvent,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let data = event.data.as_ref().ok_or("No data")?;
-        let discord_embed: DiscordEmbed = serde_json::from_value(data.get("discord_embed").cloned().ok_or("No embed")?)?;
-        let tweet: TweetData = serde_json::from_value(data.get("tweet").or_else(|| data.get("post")).cloned().ok_or("No tweet/post")?)?;
+        let discord_embed: DiscordEmbed =
+            serde_json::from_value(data.get("discord_embed").cloned().ok_or("No embed")?)?;
+        let tweet: TweetData = serde_json::from_value(
+            data.get("tweet")
+                .or_else(|| data.get("post"))
+                .cloned()
+                .ok_or("No tweet/post")?,
+        )?;
 
         if TwitterRepository::is_tweet_sent(&self.db, &tweet.id).await? {
             return Ok(());
         }
         let channels = TwitterRepository::get_active_channels(&self.db).await?;
-        if channels.is_empty() { return Ok(()); }
+        if channels.is_empty() {
+            return Ok(());
+        }
 
         let mut embed = self.build_embed(&discord_embed);
         embed = embed.timestamp(poise::serenity_prelude::Timestamp::now());
@@ -368,26 +442,47 @@ impl CoreWsService {
             let channel_id = ChannelId::new(channel.channel_id as u64);
             let message = CreateMessage::new().embed(embed.clone());
             if let Err(e) = channel_id.send_message(&self.http, message).await {
-                println!("[CORE-WS] Failed to send tweet to {}: {}", channel.channel_id, e);
+                println!(
+                    "[CORE-WS] Failed to send tweet to {}: {}",
+                    channel.channel_id, e
+                );
             }
         }
         TwitterRepository::insert_tweet(&self.db, &tweet.id, &tweet.author_username).await?;
-        println!("[CORE-WS] Sent tweet to {} channels: @{}", channels.len(), tweet.author_username);
+        println!(
+            "[CORE-WS] Sent tweet to {} channels: @{}",
+            channels.len(),
+            tweet.author_username
+        );
         Ok(())
     }
 
-    // --- Helper: build serenity embed from core's discord_embed JSON ---
+    /// Converts the core service's Discord embed payload into a Serenity embed.
     fn build_embed(&self, de: &DiscordEmbed) -> CreateEmbed {
         let mut embed = CreateEmbed::new();
-        if let Some(t) = &de.title { embed = embed.title(t); }
-        if let Some(d) = &de.description { embed = embed.description(d); }
-        if let Some(u) = &de.url { embed = embed.url(u); }
-        if let Some(c) = de.color { embed = embed.color(c); }
-        if let Some(fields) = &de.fields {
-            for f in fields { embed = embed.field(&f.name, &f.value, f.inline); }
+        if let Some(t) = &de.title {
+            embed = embed.title(t);
         }
-        if let Some(th) = &de.thumbnail { embed = embed.thumbnail(&th.url); }
-        if let Some(img) = &de.image { embed = embed.image(&img.url); }
+        if let Some(d) = &de.description {
+            embed = embed.description(d);
+        }
+        if let Some(u) = &de.url {
+            embed = embed.url(u);
+        }
+        if let Some(c) = de.color {
+            embed = embed.color(c);
+        }
+        if let Some(fields) = &de.fields {
+            for f in fields {
+                embed = embed.field(&f.name, &f.value, f.inline);
+            }
+        }
+        if let Some(th) = &de.thumbnail {
+            embed = embed.thumbnail(&th.url);
+        }
+        if let Some(img) = &de.image {
+            embed = embed.image(&img.url);
+        }
         if let Some(ft) = &de.footer {
             embed = embed.footer(CreateEmbedFooter::new(&ft.text));
         }
@@ -397,5 +492,7 @@ impl CoreWsService {
 
 pub fn start_core_ws_service(db: DbPool, http: Arc<Http>, core_url: String, bot_id: String) {
     let service = Arc::new(CoreWsService::new(db, http, core_url, bot_id));
-    tokio::spawn(async move { service.start().await; });
+    tokio::spawn(async move {
+        service.start().await;
+    });
 }

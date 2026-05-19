@@ -2,6 +2,7 @@ mod api;
 mod config;
 mod models;
 mod billing;
+mod crypto;
 mod sync;
 
 use tracing::info;

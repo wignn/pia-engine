@@ -5,10 +5,6 @@ use poise::serenity_prelude::{CreateEmbed, CreateEmbedFooter, Timestamp};
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
-// ---------------------------------------------------------------------------
-// /stocknews <sub-command>
-// ---------------------------------------------------------------------------
-
 #[poise::command(
     slash_command,
     subcommands("subscribe", "unsubscribe", "status", "latest"),
@@ -48,10 +44,24 @@ pub async fn subscribe(
     let embed = CreateEmbed::new()
         .title("Stock News Alert Aktif")
         .description("Channel ini sekarang menerima alert berita saham Indonesia.")
-        .field("Sumber", "CNBC Indonesia, Kontan, Bisnis Indonesia, Detik Finance, IDX Channel", false)
-        .field("Mention Everyone", if mention { "Ya (untuk high impact)" } else { "Tidak" }, true)
+        .field(
+            "Sumber",
+            "CNBC Indonesia, Kontan, Bisnis Indonesia, Detik Finance, IDX Channel",
+            false,
+        )
+        .field(
+            "Mention Everyone",
+            if mention {
+                "Ya (untuk high impact)"
+            } else {
+                "Tidak"
+            },
+            true,
+        )
         .color(0x00FF00)
-        .footer(CreateEmbedFooter::new("Gunakan /stocknews unsubscribe untuk berhenti"))
+        .footer(CreateEmbedFooter::new(
+            "Gunakan /stocknews unsubscribe untuk berhenti",
+        ))
         .timestamp(Timestamp::now());
 
     ctx.send(poise::CreateReply::default().embed(embed)).await?;
@@ -87,8 +97,12 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
     let embed = match channel {
         Some(ch) if ch.is_active => CreateEmbed::new()
             .title("Stock News Alert Status")
-            .field("Status", "✅ Aktif", true)
-            .field("Mention Everyone", if ch.mention_everyone { "Ya" } else { "Tidak" }, true)
+            .field("Status", "✅ ==Aktif", true)
+            .field(
+                "Mention Everyone",
+                if ch.mention_everyone { "Ya" } else { "Tidak" },
+                true,
+            )
             .color(0x00FF00)
             .timestamp(Timestamp::now()),
         _ => CreateEmbed::new()

@@ -22,12 +22,25 @@ pub async fn list_news(
     let page_size = query.page_size.unwrap_or(20).clamp(1, 100);
     let offset = (page - 1) * page_size;
 
-    let rows = sqlx::query_as::<_, (String, Option<String>, String, String, String, Option<String>, bool, Option<chrono::DateTime<chrono::Utc>>, Option<chrono::DateTime<chrono::Utc>>)>(
+    let rows = sqlx::query_as::<
+        _,
+        (
+            String,
+            Option<String>,
+            String,
+            String,
+            String,
+            Option<String>,
+            bool,
+            Option<chrono::DateTime<chrono::Utc>>,
+            Option<chrono::DateTime<chrono::Utc>>,
+        ),
+    >(
         "SELECT id::text, source_id, content_hash, original_url, original_title, \
          summary, is_processed, processed_at, published_at \
          FROM news_articles \
          ORDER BY processed_at DESC NULLS LAST \
-         LIMIT $1 OFFSET $2"
+         LIMIT $1 OFFSET $2",
     )
     .bind(page_size)
     .bind(offset)
@@ -35,17 +48,22 @@ pub async fn list_news(
     .await;
 
     let items: Vec<Value> = match rows {
-        Ok(rows) => rows.iter().map(|r| json!({
-            "id": r.2,
-            "content_hash": r.2,
-            "original_url": r.3,
-            "title": r.4,
-            "original_title": r.4,
-            "summary": r.5,
-            "is_processed": r.6,
-            "processed_at": r.7,
-            "published_at": r.8,
-        })).collect(),
+        Ok(rows) => rows
+            .iter()
+            .map(|r| {
+                json!({
+                    "id": r.0,
+                    "content_hash": r.2,
+                    "original_url": r.3,
+                    "title": r.4,
+                    "original_title": r.4,
+                    "summary": r.5,
+                    "is_processed": r.6,
+                    "processed_at": r.7,
+                    "published_at": r.8,
+                })
+            })
+            .collect(),
         Err(e) => {
             error!(error = %e, "list news query failed");
             return Json(json!({ "error": "query failed" }));
@@ -79,9 +97,22 @@ pub async fn latest_news(
 ) -> Json<Value> {
     let limit = query.limit.unwrap_or(10).clamp(1, 50);
 
-    // Query without LEFT JOIN to news_analyses — that table may not exist yet.
-    // Sentiment/impact/currency_pairs are returned as null for now.
-    let rows = sqlx::query_as::<_, (String, String, String, String, Option<String>, Option<String>, Option<chrono::DateTime<chrono::Utc>>, Option<chrono::DateTime<chrono::Utc>>, String)>(
+    // Keep this query independent from optional enrichment tables so the feed
+    // response remains stable during partial schema rollouts.
+    let rows = sqlx::query_as::<
+        _,
+        (
+            String,
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<chrono::DateTime<chrono::Utc>>,
+            Option<chrono::DateTime<chrono::Utc>>,
+            String,
+        ),
+    >(
         "SELECT a.id::text, a.content_hash, a.original_url, a.original_title, \
          a.translated_title, a.summary, a.published_at, a.processed_at, \
          COALESCE(s.name, 'Unknown') AS source_name \
@@ -89,28 +120,33 @@ pub async fn latest_news(
          LEFT JOIN news_sources s ON a.source_id = s.id \
          WHERE a.is_processed = TRUE \
          ORDER BY a.processed_at DESC NULLS LAST \
-         LIMIT $1"
+         LIMIT $1",
     )
     .bind(limit)
     .fetch_all(&state.db)
     .await;
 
     let items: Vec<Value> = match rows {
-        Ok(rows) => rows.iter().map(|r| json!({
-            "id": r.1,
-            "content_hash": r.1,
-            "original_url": r.2,
-            "title": r.3,
-            "original_title": r.3,
-            "translated_title": r.4,
-            "summary": r.5,
-            "published_at": r.6,
-            "processed_at": r.7,
-            "source_name": r.8,
-            "sentiment": null,
-            "impact_level": null,
-            "currency_pairs": null,
-        })).collect(),
+        Ok(rows) => rows
+            .iter()
+            .map(|r| {
+                json!({
+                    "id": r.0,
+                    "content_hash": r.1,
+                    "original_url": r.2,
+                    "title": r.3,
+                    "original_title": r.3,
+                    "translated_title": r.4,
+                    "summary": r.5,
+                    "published_at": r.6,
+                    "processed_at": r.7,
+                    "source_name": r.8,
+                    "sentiment": null,
+                    "impact_level": null,
+                    "currency_pairs": null,
+                })
+            })
+            .collect(),
         Err(e) => {
             error!(error = %e, "latest news query failed");
             return Json(json!({ "error": "query failed" }));
@@ -123,14 +159,25 @@ pub async fn latest_news(
     }))
 }
 
-pub async fn get_news(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Json<Value> {
-    let row = sqlx::query_as::<_, (String, Option<String>, String, String, String, Option<String>, Option<String>, bool, Option<chrono::DateTime<chrono::Utc>>, Option<chrono::DateTime<chrono::Utc>>)>(
+pub async fn get_news(State(state): State<AppState>, Path(id): Path<String>) -> Json<Value> {
+    let row = sqlx::query_as::<
+        _,
+        (
+            String,
+            Option<String>,
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            bool,
+            Option<chrono::DateTime<chrono::Utc>>,
+            Option<chrono::DateTime<chrono::Utc>>,
+        ),
+    >(
         "SELECT id::text, source_id, content_hash, original_url, original_title, \
          original_content, summary, is_processed, processed_at, published_at \
-         FROM news_articles WHERE id::text = $1"
+         FROM news_articles WHERE id::text = $1",
     )
     .bind(&id)
     .fetch_optional(&state.db)
@@ -138,7 +185,7 @@ pub async fn get_news(
 
     match row {
         Ok(Some(r)) => Json(json!({
-            "id": r.2,
+            "id": r.0,
             "source_id": r.1,
             "content_hash": r.2,
             "original_url": r.3,

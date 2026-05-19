@@ -65,15 +65,12 @@ pub async fn create_key(
     let label = normalize_label(body.label.as_deref(), true)?;
     let permissions: Vec<String> = body.permissions.unwrap_or_default();
 
-    // Check max keys per user (limit: 10)
     let existing = ApiKey::list_by_user(&state.db, auth.user_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let active_count = existing.iter().filter(|k| k.is_active).count();
     if active_count >= 10 {
-        return Ok(Json(
-            json!({ "error": "Maximum 10 active API keys per user" }),
-        ));
+        return Err(StatusCode::TOO_MANY_REQUESTS);
     }
 
     let (key, raw) = ApiKey::create(&state.db, auth.user_id, &label, &permissions)
@@ -111,7 +108,7 @@ pub async fn revoke_key(
         sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
         Ok(Json(json!({ "message": "API key revoked successfully" })))
     } else {
-        Ok(Json(json!({ "error": "Key not found or already revoked" })))
+        Err(StatusCode::NOT_FOUND)
     }
 }
 
@@ -142,7 +139,7 @@ pub async fn update_key(
         sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
         Ok(Json(json!({ "message": "API key updated" })))
     } else {
-        Ok(Json(json!({ "error": "Key not found" })))
+        Err(StatusCode::NOT_FOUND)
     }
 }
 

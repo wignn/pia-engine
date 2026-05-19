@@ -17,7 +17,7 @@ use crate::ws::{self, Hub, NewsArticleData};
 const MAX_NEWS_AGE_HOURS: i64 = 12;
 const REDIS_STREAM_MAX_LEN: usize = 50_000;
 
-// Consumer group settings
+// Redis stream consumer tuning.
 const CONSUMER_GROUP: &str = "news-ingest-group";
 const CONSUMER_NAME: &str = "news-worker-1";
 const CONSUMER_BATCH_SIZE: usize = 50;
@@ -80,7 +80,11 @@ impl ForexPipeline {
         let results = self.collector.fetch_all_feeds(&feeds).await;
 
         let total: usize = results.values().map(|v| v.len()).sum();
-        info!(feeds = results.len(), total_entries = total, "forex ingest producer: feeds fetched");
+        info!(
+            feeds = results.len(),
+            total_entries = total,
+            "forex ingest producer: feeds fetched"
+        );
 
         let mut enqueued = 0u32;
         let mut direct_processed = 0u32;
@@ -107,15 +111,8 @@ impl ForexPipeline {
                     continue;
                 }
 
-                // Fallback mode: if Redis is unavailable, process directly.
-                match process_entry(
-                    &self.scraper,
-                    &self.db,
-                    &self.hub,
-                    &msg,
-                )
-                .await
-                {
+                // Preserve ingestion availability when Redis cannot accept new stream entries.
+                match process_entry(&self.scraper, &self.db, &self.hub, &msg).await {
                     "processed" => direct_processed += 1,
                     "too_old" => too_old += 1,
                     "duplicate" => duplicate += 1,
@@ -125,7 +122,15 @@ impl ForexPipeline {
             }
         }
 
-        info!(enqueued, direct_processed, too_old, duplicate, db_error, skipped, "forex ingest producer: completed");
+        info!(
+            enqueued,
+            direct_processed,
+            too_old,
+            duplicate,
+            db_error,
+            skipped,
+            "forex ingest producer: completed"
+        );
     }
 
     pub fn build_worker(&self) -> Option<ForexIngestWorker> {
@@ -193,13 +198,11 @@ impl ForexIngestWorker {
         let mut backoff_ms: u64 = BACKOFF_INITIAL_MS;
 
         loop {
-            // Establish connection (reused across iterations)
             let mut conn = match self.connect_redis(&mut backoff_ms).await {
                 Some(c) => c,
                 None => continue,
             };
 
-            // Ensure consumer group exists
             if !self.ensure_consumer_group(&mut conn).await {
                 tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
                 backoff_ms = (backoff_ms * 2).min(BACKOFF_MAX_MS);
@@ -207,12 +210,10 @@ impl ForexIngestWorker {
             }
             backoff_ms = BACKOFF_INITIAL_MS;
 
-            // Recover any pending messages from previous crash
             self.recover_pending(&mut conn).await;
 
-            info!(stream = %self.stream_key, "WAITING FOR REDIS STREAM MESSAGES");
+            info!(stream = %self.stream_key, "waiting for redis stream messages");
 
-            // Main consumer loop — reuses the same connection
             loop {
                 let reply: redis::RedisResult<StreamReadReply> = redis::cmd("XREADGROUP")
                     .arg("GROUP")
@@ -237,7 +238,7 @@ impl ForexIngestWorker {
                         warn!(error = %e, stream = %self.stream_key, "XREADGROUP failed, reconnecting");
                         tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
                         backoff_ms = (backoff_ms * 2).min(BACKOFF_MAX_MS);
-                        break; // break inner loop → reconnect in outer loop
+                        break;
                     }
                 };
 
@@ -249,7 +250,8 @@ impl ForexIngestWorker {
                 for key in reply.keys {
                     for id in key.ids {
                         let msg_id = id.id.clone();
-                        self.process_stream_message(&mut conn, &msg_id, &id.map).await;
+                        self.process_stream_message(&mut conn, &msg_id, &id.map)
+                            .await;
                     }
                 }
             }
@@ -277,10 +279,7 @@ impl ForexIngestWorker {
 
     /// Create consumer group if it doesn't exist.
     /// Uses "0" as start ID to process any backlog messages.
-    async fn ensure_consumer_group(
-        &self,
-        conn: &mut redis::aio::MultiplexedConnection,
-    ) -> bool {
+    async fn ensure_consumer_group(&self, conn: &mut redis::aio::MultiplexedConnection) -> bool {
         let result: redis::RedisResult<String> = redis::cmd("XGROUP")
             .arg("CREATE")
             .arg(&self.stream_key)
@@ -327,7 +326,7 @@ impl ForexIngestWorker {
                 .arg(CONSUMER_BATCH_SIZE)
                 .arg("STREAMS")
                 .arg(&self.stream_key)
-                .arg("0") // "0" reads pending messages, not new ones
+                .arg("0")
                 .query_async(conn)
                 .await;
 
@@ -386,16 +385,12 @@ impl ForexIngestWorker {
             info!(msg_id = %msg_id, title = %truncate_str(&msg.title, 50), "news ingest processed");
         }
 
-        // Always ACK after processing (success or skip)
+        // Acknowledge every handled message so failed payloads do not loop forever.
         self.ack_message(conn, msg_id).await;
     }
 
     /// Acknowledge a message so Redis removes it from the pending list.
-    async fn ack_message(
-        &self,
-        conn: &mut redis::aio::MultiplexedConnection,
-        msg_id: &str,
-    ) {
+    async fn ack_message(&self, conn: &mut redis::aio::MultiplexedConnection, msg_id: &str) {
         let result: redis::RedisResult<i64> = redis::cmd("XACK")
             .arg(&self.stream_key)
             .arg(CONSUMER_GROUP)
@@ -427,8 +422,7 @@ async fn process_entry(
         }
     }
 
-    // Duplicate check is handled by ON CONFLICT in the INSERT below.
-    // Removed redundant SELECT EXISTS query to halve DB roundtrips per message.
+    // Deduplication is enforced by the INSERT's ON CONFLICT clause.
     let hash = &msg.content_hash;
 
     let title = &msg.title;
@@ -511,9 +505,17 @@ async fn process_entry(
         summary_id: None,
         sentiment: None,
         impact_level: Some("medium".to_string()),
-        published_at: if published_at.is_empty() { None } else { Some(published_at) },
+        published_at: if published_at.is_empty() {
+            None
+        } else {
+            Some(published_at)
+        },
         processed_at: Utc::now().to_rfc3339(),
-        image_url: if image_url.is_empty() { None } else { Some(image_url) },
+        image_url: if image_url.is_empty() {
+            None
+        } else {
+            Some(image_url)
+        },
     };
 
     let embed = ws::build_news_embed(&article_data);
@@ -535,12 +537,13 @@ async fn ensure_source(db: &PgPool, source_name: &str, feed_url: &str) -> String
         slug
     };
 
-    let existing: Option<(String,)> = sqlx::query_as("SELECT id FROM news_sources WHERE slug = $1 LIMIT 1")
-        .bind(&slug)
-        .fetch_optional(db)
-        .await
-        .ok()
-        .flatten();
+    let existing: Option<(String,)> =
+        sqlx::query_as("SELECT id FROM news_sources WHERE slug = $1 LIMIT 1")
+            .bind(&slug)
+            .fetch_optional(db)
+            .await
+            .ok()
+            .flatten();
 
     if let Some((id,)) = existing {
         return id;
@@ -585,12 +588,13 @@ async fn ensure_source(db: &PgPool, source_name: &str, feed_url: &str) -> String
     .execute(db)
     .await;
 
-    let re_read: Option<(String,)> = sqlx::query_as("SELECT id FROM news_sources WHERE slug = $1 LIMIT 1")
-        .bind(&slug)
-        .fetch_optional(db)
-        .await
-        .ok()
-        .flatten();
+    let re_read: Option<(String,)> =
+        sqlx::query_as("SELECT id FROM news_sources WHERE slug = $1 LIMIT 1")
+            .bind(&slug)
+            .fetch_optional(db)
+            .await
+            .ok()
+            .flatten();
 
     re_read.map(|(id,)| id).unwrap_or(new_id)
 }

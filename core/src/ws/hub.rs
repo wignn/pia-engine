@@ -1,16 +1,15 @@
+use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use tracing::{info, debug, error, warn};
-use serde_json::json;
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use super::client::ClientHandle;
 
 pub type ClientId = u64;
 
-/// Central WebSocket hub managing client connections and channel-based broadcasting.
-/// Enhanced with tenant-aware filtering for X feed and market data.
+/// Central WebSocket hub for client registration, channel fanout, and tenant-aware filtering.
 pub struct Hub {
     clients: Arc<RwLock<HashMap<ClientId, ClientHandle>>>,
     next_id: Arc<RwLock<u64>>,
@@ -57,7 +56,7 @@ impl Hub {
         let count = self.clients.read().await.len();
         info!(bot_id = %bot_id, user_id = ?user_id, total = count, "ws client connected");
 
-        // Send welcome message
+        // Confirm the WebSocket session after the client is registered.
         let welcome = serde_json::to_vec(&json!({
             "event": "connected",
             "data": {
@@ -86,7 +85,12 @@ impl Hub {
     /// Broadcast a message to all clients subscribed to the given channel.
     /// For "x" channel: filters by client's x_usernames set.
     /// For "market_data" channel: filters by client's tv_symbols set.
-    pub async fn broadcast(&self, event_type: &str, data: serde_json::Value, channel: &str) -> usize {
+    pub async fn broadcast(
+        &self,
+        event_type: &str,
+        data: serde_json::Value,
+        channel: &str,
+    ) -> usize {
         let msg = json!({
             "event": event_type,
             "data": data,
@@ -106,14 +110,14 @@ impl Hub {
         let mut count = 0;
 
         for client in clients.values() {
-            // Channel check
             if !client.channels.contains("all") && !client.channels.contains(channel) {
                 continue;
             }
 
-            // Tenant-specific filtering for X feed
+            // Apply tenant X username filters when a client has configured them.
             if channel == "x" && !client.x_usernames.is_empty() {
-                let author = data.get("post")
+                let author = data
+                    .get("post")
                     .and_then(|p| p.get("author_username"))
                     .and_then(|a| a.as_str())
                     .unwrap_or("")
@@ -123,9 +127,10 @@ impl Hub {
                 }
             }
 
-            // Tenant-specific filtering for market data
+            // Apply tenant symbol filters when a client has configured them.
             if channel == "market_data" && !client.tv_symbols.is_empty() {
-                let symbol = data.get("tick")
+                let symbol = data
+                    .get("tick")
                     .and_then(|t| t.get("symbol"))
                     .and_then(|s| s.as_str())
                     .unwrap_or("");
@@ -140,7 +145,6 @@ impl Hub {
             }
         }
 
-        // Redis fanout
         if let Some(redis_client) = &self.redis_client {
             let payload_text = String::from_utf8_lossy(&payload).to_string();
             let redis_channel = format!("{}:{}", self.redis_channel_prefix, channel);
@@ -163,11 +167,21 @@ impl Hub {
             }
         }
 
-        // Use debug for high-frequency market ticks, info for everything else
+        // Market ticks are high-volume, so keep them at debug level.
         if channel == "market_data" {
-            debug!(event = event_type, channel = channel, clients = count, "broadcast sent");
+            debug!(
+                event = event_type,
+                channel = channel,
+                clients = count,
+                "broadcast sent"
+            );
         } else {
-            info!(event = event_type, channel = channel, clients = count, "broadcast sent");
+            info!(
+                event = event_type,
+                channel = channel,
+                clients = count,
+                "broadcast sent"
+            );
         }
         count
     }
@@ -180,7 +194,8 @@ impl Hub {
     /// Count WS connections for a specific user.
     pub async fn user_connection_count(&self, user_id: &Uuid) -> usize {
         let clients = self.clients.read().await;
-        clients.values()
+        clients
+            .values()
             .filter(|c| c.user_id.as_ref() == Some(user_id))
             .count()
     }

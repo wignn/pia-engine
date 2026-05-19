@@ -16,7 +16,10 @@ pub async fn list_config(
     State(state): State<AppState>,
     request: axum::extract::Request,
 ) -> Result<Json<Value>, StatusCode> {
-    let auth = request.extensions().get::<AuthContext>().cloned()
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     let configs = TenantConfig::list_by_user(&state.db, auth.user_id)
@@ -44,25 +47,26 @@ pub async fn set_config(
     Path(config_key): Path<String>,
     request: axum::extract::Request,
 ) -> Result<Json<Value>, StatusCode> {
-    let auth = request.extensions().get::<AuthContext>().cloned()
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    // Validate config key
-    let allowed_keys = ["tv_symbols", "custom_rss_feeds"];
+    // Restrict writes to supported tenant-scoped configuration keys.
+    let allowed_keys = ["tv_symbols", "custom_rss_feeds", "x_usernames"];
     if !allowed_keys.contains(&config_key.as_str()) {
-        return Ok(Json(json!({ "error": format!("Unknown config key: {}. Allowed: {:?}", config_key, allowed_keys) })));
+        return Err(StatusCode::BAD_REQUEST);
     }
 
-    // We need to extract body - use a workaround since we already read extensions
-    // In practice, the body would be parsed before extensions
-    // For now, we'll create a placeholder
+    // Read the request body after authentication context has been extracted.
     let body_bytes = axum::body::to_bytes(request.into_body(), 1024 * 64)
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)?;
-    let body: SetConfigRequest = serde_json::from_slice(&body_bytes)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let body: SetConfigRequest =
+        serde_json::from_slice(&body_bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    // Validate against plan limits
+    // Enforce plan limits before persisting tenant configuration.
     let plan = Plan::find_by_id(&state.db, &auth.plan)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -78,7 +82,7 @@ pub async fn set_config(
 
     info!(user_id = %auth.user_id, key = %config_key, "tenant config updated");
 
-    // Notify core via Redis
+    // Notify core services so their tenant caches can refresh promptly.
     sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
 
     Ok(Json(json!({
@@ -97,7 +101,10 @@ pub async fn delete_config(
     Path(config_key): Path<String>,
     request: axum::extract::Request,
 ) -> Result<Json<Value>, StatusCode> {
-    let auth = request.extensions().get::<AuthContext>().cloned()
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     let deleted = TenantConfig::delete(&state.db, auth.user_id, &config_key)
@@ -106,22 +113,45 @@ pub async fn delete_config(
 
     if deleted {
         sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
-        Ok(Json(json!({ "message": format!("Config '{}' deleted", config_key) })))
+        Ok(Json(
+            json!({ "message": format!("Config '{}' deleted", config_key) }),
+        ))
     } else {
-        Ok(Json(json!({ "error": "Config not found" })))
+        Err(StatusCode::NOT_FOUND)
     }
 }
 
 fn validate_config(key: &str, value: &Value, plan: &Plan) -> Result<(), String> {
     match key {
         "tv_symbols" => {
-            let arr = value.as_array().ok_or("tv_symbols must be an array of strings")?;
+            let arr = value
+                .as_array()
+                .ok_or("tv_symbols must be an array of strings")?;
             if arr.len() > plan.tv_symbols_max as usize {
                 return Err(format!(
                     "Your plan allows max {} TV symbols, got {}. Upgrade your plan for more.",
                     plan.tv_symbols_max,
                     arr.len()
                 ));
+            }
+            Ok(())
+        }
+        "x_usernames" => {
+            let arr = value
+                .as_array()
+                .ok_or("x_usernames must be an array of strings")?;
+            if arr.len() > plan.x_usernames_max as usize {
+                return Err(format!(
+                    "Your plan allows max {} X usernames, got {}. Upgrade your plan for more.",
+                    plan.x_usernames_max,
+                    arr.len()
+                ));
+            }
+            for item in arr {
+                match item.as_str() {
+                    Some(s) if !s.trim().is_empty() => {}
+                    _ => return Err("Each x_username must be a non-empty string".into()),
+                }
             }
             Ok(())
         }

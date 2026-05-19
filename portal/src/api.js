@@ -4,13 +4,8 @@ export const CORE_API_BASE = (import.meta.env.VITE_CORE_API_BASE || 'http://loca
 
 function headers() {
   const h = { 'Content-Type': 'application/json' }
-  const jwt = localStorage.getItem('wi_jwt')
-  if (jwt) {
-    h['Authorization'] = `Bearer ${jwt}`
-  } else {
-    const key = localStorage.getItem('wi_api_key')
-    if (key) h['X-API-Key'] = key
-  }
+  const key = localStorage.getItem('wi_api_key')
+  if (key) h['X-API-Key'] = key
   return h
 }
 
@@ -19,9 +14,9 @@ async function request(method, path, body) {
     method,
     headers: headers(),
     body: body ? JSON.stringify(body) : undefined,
+    credentials: 'include',
   })
   if (res.status === 401) {
-    localStorage.removeItem('wi_jwt')
     localStorage.removeItem('wi_api_key')
     if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
       window.location.href = '/login'
@@ -31,10 +26,15 @@ async function request(method, path, body) {
   return res.json()
 }
 
-async function coreRequest(path) {
+async function coreRequest(path, method = 'GET', body = null) {
   const apiKey = localStorage.getItem('wi_api_key') || import.meta.env.VITE_ADMIN_API_KEY || ''
   const res = await fetch(`${CORE_API_BASE}${path}`, {
-    headers: { 'X-API-Key': apiKey }
+    method,
+    headers: { 
+      'X-API-Key': apiKey,
+      ...(body ? { 'Content-Type': 'application/json' } : {})
+    },
+    body: body ? JSON.stringify(body) : undefined
   })
   return res.json()
 }
@@ -75,6 +75,7 @@ export const api = {
   adminToggleUser: (userId) => request('POST', `/admin/users/${userId}/toggle`),
 
   // Core data (news, feeds)
+  coreWsTicket: () => coreRequest('/api/v1/ws/ticket', 'POST'),
   coreForexNews: (limit = 20) => coreRequest(`/api/v1/forex/news/latest?limit=${limit}`),
-  coreEquityNews: (limit = 20) => coreRequest(`/api/v1/equity/news/latest?limit=${limit}`),
+  coreEquityNews: (limit = 20) => coreRequest(`/api/v1/equity/news?limit=${limit}`),
 }

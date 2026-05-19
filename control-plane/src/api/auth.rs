@@ -1,6 +1,7 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
+    response::{IntoResponse, Response},
     Json,
 };
 use chrono::{Duration, Utc};
@@ -19,11 +20,9 @@ use crate::models::{
 };
 use crate::sync;
 
-// ─── JWT Claims ──────────────────────────────────────────────────────────────
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JwtClaims {
-    pub sub: String, // user_id
+    pub sub: String,
     pub email: String,
     pub plan: String,
     pub exp: usize,
@@ -101,38 +100,46 @@ fn validate_oauth_state(provider: &str, state_token: &str, secret: &str) -> bool
     .unwrap_or(false)
 }
 
-// ─── POST /api/v1/auth/register ──────────────────────────────────────────────
+fn json_with_cookie(body: Value, token: &str, expiry_days: u64) -> Response {
+    let mut resp = axum::Json(body).into_response();
+    let max_age = expiry_days * 24 * 60 * 60;
+
+    let cookie = format!(
+        "wi_jwt={}; HttpOnly; SameSite=Lax; Path=/; Max-Age={}",
+        token, max_age
+    );
+
+    if let Ok(hv) = cookie.parse() {
+        resp.headers_mut()
+            .insert(axum::http::header::SET_COOKIE, hv);
+    }
+    resp
+}
 
 pub async fn register(
     State(state): State<AppState>,
     Json(body): Json<CreateUserRequest>,
-) -> Result<Json<Value>, StatusCode> {
+) -> Result<Response, StatusCode> {
     let email = body.email.trim().to_lowercase();
     if email.is_empty() || !email.contains('@') {
-        return Ok(Json(json!({ "error": "Invalid email address" })));
+        return Err(StatusCode::BAD_REQUEST);
     }
     let name = body.name.trim().to_string();
     if name.is_empty() {
-        return Ok(Json(json!({ "error": "Name is required" })));
+        return Err(StatusCode::BAD_REQUEST);
     }
 
-    // Validate password
     let password = body.password.as_deref().unwrap_or("");
     if password.len() < 6 {
-        return Ok(Json(
-            json!({ "error": "Password must be at least 6 characters" }),
-        ));
+        return Err(StatusCode::BAD_REQUEST);
     }
 
-    // Check existing
     if let Ok(Some(_)) = User::find_by_email(&state.db, &email).await {
-        return Ok(Json(json!({ "error": "Email already registered" })));
+        return Err(StatusCode::CONFLICT);
     }
 
-    // Generate verify token
     let verify_token = format!("{}", Uuid::new_v4());
 
-    // Create user with password
     let user = User::create(&state.db, &email, &name, &verify_token, Some(password))
         .await
         .map_err(|e| {
@@ -140,7 +147,6 @@ pub async fn register(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    // Generate first API key
     let (_key, raw_key) = ApiKey::create(&state.db, user.id, "default", &[])
         .await
         .map_err(|e| {
@@ -150,17 +156,15 @@ pub async fn register(
 
     info!(user_id = %user.id, email = %email, "new user registered");
 
-    // Sync to Redis
     sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
 
-    // Issue JWT
     let token = create_jwt(
         &user,
         &state.config.jwt_secret,
         state.config.jwt_expiry_days,
     )?;
 
-    Ok(Json(json!({
+    let response_body = json!({
         "user": {
             "id": user.id,
             "email": user.email,
@@ -172,18 +176,22 @@ pub async fn register(
         "token": token,
         "api_key": raw_key,
         "message": "Registration successful. Save your API key — it will only be shown once."
-    })))
-}
+    });
 
-// ─── POST /api/v1/auth/login ─────────────────────────────────────────────────
+    Ok(json_with_cookie(
+        response_body,
+        &token,
+        state.config.jwt_expiry_days,
+    ))
+}
 
 pub async fn login(
     State(state): State<AppState>,
     Json(body): Json<LoginRequest>,
-) -> Result<Json<Value>, StatusCode> {
+) -> Result<Response, StatusCode> {
     let email = body.email.trim().to_lowercase();
     if email.is_empty() {
-        return Ok(Json(json!({ "error": "Email is required" })));
+        return Err(StatusCode::BAD_REQUEST);
     }
 
     let user = User::find_by_email(&state.db, &email)
@@ -191,15 +199,15 @@ pub async fn login(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let Some(user) = user else {
-        return Ok(Json(json!({ "error": "Invalid email or password" })));
+        return Err(StatusCode::UNAUTHORIZED);
     };
 
     if !user.verify_password(&body.password) {
-        return Ok(Json(json!({ "error": "Invalid email or password" })));
+        return Err(StatusCode::UNAUTHORIZED);
     }
 
     if !user.is_active {
-        return Ok(Json(json!({ "error": "Account is deactivated" })));
+        return Err(StatusCode::FORBIDDEN);
     }
 
     let token = create_jwt(
@@ -210,7 +218,7 @@ pub async fn login(
 
     info!(user_id = %user.id, email = %user.email, "user logged in via email/password");
 
-    Ok(Json(json!({
+    let response_body = json!({
         "user": {
             "id": user.id,
             "email": user.email,
@@ -221,10 +229,14 @@ pub async fn login(
             "created_at": user.created_at,
         },
         "token": token,
-    })))
-}
+    });
 
-// ─── POST /api/v1/auth/verify ────────────────────────────────────────────────
+    Ok(json_with_cookie(
+        response_body,
+        &token,
+        state.config.jwt_expiry_days,
+    ))
+}
 
 pub async fn verify_email(
     State(state): State<AppState>,
@@ -257,8 +269,6 @@ pub async fn verify_email(
     }
 }
 
-// ─── GET /api/v1/auth/me ─────────────────────────────────────────────────────
-
 pub async fn me(
     State(state): State<AppState>,
     request: axum::extract::Request,
@@ -289,12 +299,10 @@ pub async fn me(
             .await
             .unwrap_or((0,));
 
-    // Get plan limits
     let plan = crate::models::plan::Plan::find_by_id(&state.db, &user.plan)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Get linked OAuth providers
     let oauth_accounts = OAuthAccount::list_by_user(&state.db, user.id)
         .await
         .unwrap_or_default();
@@ -316,8 +324,6 @@ pub async fn me(
         "linked_providers": linked_providers,
     })))
 }
-
-// ─── OAuth: GET /api/v1/auth/oauth/:provider/url ─────────────────────────────
 
 pub async fn oauth_url(
     State(state): State<AppState>,
@@ -355,8 +361,6 @@ pub async fn oauth_url(
     }
 }
 
-// ─── OAuth: POST /api/v1/auth/oauth/:provider/callback ──────────────────────
-
 #[derive(Deserialize)]
 pub struct OAuthCallbackBody {
     pub code: String,
@@ -367,28 +371,26 @@ pub async fn oauth_callback(
     State(state): State<AppState>,
     Path(provider): Path<String>,
     Json(body): Json<OAuthCallbackBody>,
-) -> Result<Json<Value>, StatusCode> {
+) -> Result<Response, StatusCode> {
     let redirect_uri = format!("{}/auth/callback/{}", state.config.frontend_url, provider);
     if !validate_oauth_state(&provider, &body.state, &state.config.jwt_secret) {
-        return Ok(Json(json!({ "error": "Invalid OAuth state" })));
+        return Ok(Json(json!({ "error": "Invalid OAuth state" })).into_response());
     }
 
     match provider.as_str() {
         "google" => handle_google_oauth(&state, &body.code, &redirect_uri).await,
         "github" => handle_github_oauth(&state, &body.code, &redirect_uri).await,
-        _ => Ok(Json(json!({ "error": "Unsupported provider" }))),
+        _ => Ok(Json(json!({ "error": "Unsupported provider" })).into_response()),
     }
 }
 
-/// Exchange Google auth code for tokens, fetch user info, create/link account.
 async fn handle_google_oauth(
     state: &AppState,
     code: &str,
     redirect_uri: &str,
-) -> Result<Json<Value>, StatusCode> {
+) -> Result<Response, StatusCode> {
     let client = reqwest::Client::new();
 
-    // Exchange code for tokens
     let token_res = client
         .post("https://oauth2.googleapis.com/token")
         .form(&[
@@ -414,7 +416,6 @@ async fn handle_google_oauth(
         .as_str()
         .ok_or(StatusCode::BAD_GATEWAY)?;
 
-    // Fetch user info
     let user_res = client
         .get("https://www.googleapis.com/oauth2/v2/userinfo")
         .bearer_auth(access_token)
@@ -443,15 +444,13 @@ async fn handle_google_oauth(
     .await
 }
 
-/// Exchange GitHub auth code for tokens, fetch user info, create/link account.
 async fn handle_github_oauth(
     state: &AppState,
     code: &str,
     redirect_uri: &str,
-) -> Result<Json<Value>, StatusCode> {
+) -> Result<Response, StatusCode> {
     let client = reqwest::Client::new();
 
-    // Exchange code for access token
     let token_res = client
         .post("https://github.com/login/oauth/access_token")
         .header("Accept", "application/json")
@@ -477,7 +476,6 @@ async fn handle_github_oauth(
         .as_str()
         .ok_or(StatusCode::BAD_GATEWAY)?;
 
-    // Fetch user info
     let user_res = client
         .get("https://api.github.com/user")
         .header("User-Agent", "world-info-portal")
@@ -496,7 +494,6 @@ async fn handle_github_oauth(
         .unwrap_or("User");
     let avatar = gh_user["avatar_url"].as_str();
 
-    // GitHub may not return email in user profile; fetch from /user/emails
     let email = if let Some(e) = gh_user["email"].as_str() {
         e.to_string()
     } else {
@@ -523,7 +520,7 @@ async fn handle_github_oauth(
     if email.is_empty() {
         return Ok(Json(
             json!({ "error": "Could not retrieve email from GitHub. Please make your email public or use email/password login." }),
-        ));
+        ).into_response());
     }
 
     complete_oauth_flow(
@@ -538,7 +535,6 @@ async fn handle_github_oauth(
     .await
 }
 
-/// Shared logic: find/create user, link OAuth account, issue JWT.
 async fn complete_oauth_flow(
     state: &AppState,
     provider: &str,
@@ -547,8 +543,7 @@ async fn complete_oauth_flow(
     name: &str,
     avatar_url: Option<&str>,
     access_token: Option<&str>,
-) -> Result<Json<Value>, StatusCode> {
-    // Find or create the user
+) -> Result<Response, StatusCode> {
     let user = User::find_or_create_oauth(&state.db, email, name, avatar_url)
         .await
         .map_err(|e| {
@@ -556,7 +551,6 @@ async fn complete_oauth_flow(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    // Link OAuth account
     OAuthAccount::create(
         &state.db,
         user.id,
@@ -564,6 +558,7 @@ async fn complete_oauth_flow(
         provider_id,
         Some(email),
         access_token,
+        &state.config.encryption_key,
     )
     .await
     .map_err(|e| {
@@ -571,7 +566,6 @@ async fn complete_oauth_flow(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Ensure user has at least one API key
     let existing_keys = ApiKey::list_by_user(&state.db, user.id)
         .await
         .unwrap_or_default();
@@ -582,10 +576,8 @@ async fn complete_oauth_flow(
         }
     }
 
-    // Sync to Redis
     sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
 
-    // Issue JWT
     let token = create_jwt(
         &user,
         &state.config.jwt_secret,
@@ -619,7 +611,11 @@ async fn complete_oauth_flow(
         );
     }
 
-    Ok(Json(response))
+    Ok(json_with_cookie(
+        response,
+        &token,
+        state.config.jwt_expiry_days,
+    ))
 }
 
 #[cfg(test)]

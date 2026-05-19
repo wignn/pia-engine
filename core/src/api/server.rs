@@ -6,7 +6,7 @@ use axum::{
     middleware,
     response::Response,
     routing::{get, post},
-    Router,
+    Json, Router,
 };
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::info;
@@ -49,41 +49,73 @@ pub fn build_router(state: AppState) -> Router {
     let public_api = Router::new()
         .route("/health", get(handlers::health::health))
         .route("/", get(handlers::health::root))
-        // --- General WebSocket (for Bot / all channels) ---
+        .route("/api/v1/market/prices", get(handlers::market::list_prices))
+        .route(
+            "/api/v1/market/prices/{symbol}",
+            get(handlers::market::get_price),
+        )
+        .route("/api/v1/forex/news", get(handlers::news::list_news))
+        .route(
+            "/api/v1/forex/news/latest",
+            get(handlers::news::latest_news),
+        )
+        .route("/api/v1/forex/news/{id}", get(handlers::news::get_news))
+        .route(
+            "/api/v1/forex/calendar",
+            get(handlers::calendar::list_calendar),
+        )
+        .route(
+            "/api/v1/equity/news",
+            get(handlers::stock::latest_stock_news),
+        )
+        .layer(middleware::from_fn_with_state(state.clone(), usage_logger))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            optional_api_key_auth,
+        ));
+
+    let ws_api = Router::new()
         .route("/api/v1/ws", get(ws_general_handler))
-        // --- WebSocket streams — each route auto-subscribes to its channel ---
         .route("/api/v1/ws/market", get(ws_market_handler))
         .route("/api/v1/ws/market/{symbol}", get(ws_handler_single_symbol))
         .route("/api/v1/ws/news", get(ws_news_handler))
         .route("/api/v1/ws/equity", get(ws_equity_handler))
         .route("/api/v1/ws/calendar", get(ws_calendar_handler))
         .route("/api/v1/ws/x", get(ws_x_handler))
-        .route("/api/v1/ws/x/{symbol}", get(ws_handler_single_symbol))
-        // --- Market prices (REST) ---
-        .route("/api/v1/market/prices", get(handlers::market::list_prices))
-        .route("/api/v1/market/prices/{symbol}", get(handlers::market::get_price))
-        // --- Forex ---
-        .route("/api/v1/forex/news", get(handlers::news::list_news))
-        .route("/api/v1/forex/news/latest", get(handlers::news::latest_news))
-        .route("/api/v1/forex/news/{id}", get(handlers::news::get_news))
-        .route("/api/v1/forex/calendar", get(handlers::calendar::list_calendar))
-        // --- Equity / Stock ---
-        .route("/api/v1/equity/news", get(handlers::stock::latest_stock_news))
+        .route("/api/v1/ws/x/{username}", get(ws_handler_single_x_username))
         .layer(middleware::from_fn_with_state(state.clone(), usage_logger))
-        .layer(middleware::from_fn_with_state(state.clone(), optional_api_key_auth));
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            strict_api_key_auth,
+        ));
+
+    let ticket_api = Router::new()
+        .route("/api/v1/ws/ticket", post(generate_ws_ticket))
+        .layer(middleware::from_fn_with_state(state.clone(), usage_logger))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            strict_api_key_auth,
+        ));
 
     let private_api = Router::new()
-        .route("/api/v1/content/scrape", post(handlers::scraping::scrape_article))
+        .route(
+            "/api/v1/content/scrape",
+            post(handlers::scraping::scrape_article),
+        )
         .layer(middleware::from_fn_with_state(state.clone(), usage_logger))
-        .layer(middleware::from_fn_with_state(state.clone(), strict_api_key_auth));
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            strict_api_key_auth,
+        ));
 
     Router::new()
         .merge(public_api)
+        .merge(ws_api)
+        .merge(ticket_api)
         .merge(private_api)
         .layer(cors)
         .with_state(state)
 }
-
 
 async fn ws_handler_inner(
     ws: WebSocketUpgrade,
@@ -97,10 +129,23 @@ async fn ws_handler_inner(
         .cloned()
         .unwrap_or_else(|| "unknown".into());
 
-    let token = params.get("token").or_else(|| params.get("api_key")).cloned();
+    let mut token = params
+        .get("token")
+        .or_else(|| params.get("api_key"))
+        .cloned();
+
+    if let Some(ticket_id) = params.get("ticket") {
+        let mut store = state.ticket_store.write().await;
+        if let Some(ticket) = store.remove(ticket_id) {
+            if std::time::Instant::now() < ticket.expires_at {
+                token = Some(ticket.api_key);
+            }
+        }
+    }
 
     let mut user_id = None;
     let mut tv_symbols = HashSet::new();
+    let mut authenticated = false;
 
     let channels_query: Option<HashSet<String>> = channel_override
         .map(|ch| std::iter::once(ch.to_string()).collect())
@@ -112,24 +157,36 @@ async fn ws_handler_inner(
 
     let symbols_query = params
         .get("symbols")
-        .map(|s| s.split(',').map(|s| s.trim().to_string()).collect::<HashSet<_>>())
+        .map(|s| {
+            s.split(',')
+                .map(|s| s.trim().to_string())
+                .collect::<HashSet<_>>()
+        })
         .unwrap_or_default();
 
     if let Some(raw_key) = &token {
         if state.config.api_keys.contains(raw_key) {
             tv_symbols = symbols_query;
+            authenticated = true;
         } else if let Some(registry) = &state.tenant_registry {
             if let Some(ctx) = registry.validate_key(raw_key).await {
                 let current = state.hub.user_connection_count(&ctx.user_id).await;
                 if current >= ctx.ws_connections as usize {
                     return axum::response::Response::builder()
                         .status(429)
-                        .body(axum::body::Body::from("WebSocket connection limit reached for your plan"))
+                        .body(axum::body::Body::from(
+                            "WebSocket connection limit reached for your plan",
+                        ))
                         .unwrap();
                 }
                 user_id = Some(ctx.user_id);
+                authenticated = true;
                 if !symbols_query.is_empty() {
-                    tv_symbols = ctx.tv_symbols.intersection(&symbols_query).cloned().collect();
+                    tv_symbols = ctx
+                        .tv_symbols
+                        .intersection(&symbols_query)
+                        .cloned()
+                        .collect();
                 } else {
                     tv_symbols = ctx.tv_symbols;
                 }
@@ -137,12 +194,66 @@ async fn ws_handler_inner(
         }
     }
 
+    if !authenticated {
+        return axum::response::Response::builder()
+            .status(401)
+            .body(axum::body::Body::from(
+                "Valid API key required for WebSocket connection",
+            ))
+            .unwrap();
+    }
+
     let hub = state.hub.clone();
     ws.on_upgrade(move |socket| {
-        ws::client::handle_socket(socket, hub, bot_id, user_id, HashSet::new(), tv_symbols, channels_query)
+        ws::client::handle_socket(
+            socket,
+            hub,
+            bot_id,
+            user_id,
+            HashSet::new(),
+            tv_symbols,
+            channels_query,
+        )
     })
 }
 
+#[derive(serde::Serialize)]
+struct TicketResponse {
+    ticket: String,
+}
+
+async fn generate_ws_ticket(
+    State(state): State<AppState>,
+    request: axum::extract::Request,
+) -> Result<Json<TicketResponse>, axum::http::StatusCode> {
+    // strict_api_key_auth has already validated the credential; this preserves it for the one-time ticket.
+    let api_key = request
+        .headers()
+        .get("X-API-Key")
+        .or_else(|| request.headers().get(axum::http::header::AUTHORIZATION))
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.strip_prefix("Bearer ").unwrap_or(s).to_string())
+        .ok_or(axum::http::StatusCode::UNAUTHORIZED)?;
+
+    let ticket_id = uuid::Uuid::new_v4().to_string();
+
+    let ticket = crate::api::state::Ticket {
+        api_key,
+        expires_at: std::time::Instant::now() + std::time::Duration::from_secs(30),
+    };
+
+    state
+        .ticket_store
+        .write()
+        .await
+        .insert(ticket_id.clone(), ticket);
+
+    let mut store = state.ticket_store.write().await;
+    let now = std::time::Instant::now();
+    store.retain(|_, t| t.expires_at > now);
+
+    Ok(Json(TicketResponse { ticket: ticket_id }))
+}
 
 async fn ws_general_handler(
     ws: WebSocketUpgrade,
@@ -196,12 +307,25 @@ async fn ws_handler_single_symbol(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
     axum::extract::Path(symbol): axum::extract::Path<String>,
-    axum::extract::Query(mut params): axum::extract::Query<std::collections::HashMap<String, String>>,
+    axum::extract::Query(mut params): axum::extract::Query<
+        std::collections::HashMap<String, String>,
+    >,
 ) -> Response {
     params.insert("symbols".to_string(), symbol);
     ws_handler_inner(ws, state, params, Some("market_data")).await
 }
 
+async fn ws_handler_single_x_username(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    axum::extract::Path(username): axum::extract::Path<String>,
+    axum::extract::Query(mut params): axum::extract::Query<
+        std::collections::HashMap<String, String>,
+    >,
+) -> Response {
+    params.insert("x_username".to_string(), username);
+    ws_handler_inner(ws, state, params, Some("x")).await
+}
 
 pub async fn start(state: AppState) -> Result<(), Box<dyn std::error::Error>> {
     let port = state.config.server_port;
@@ -220,7 +344,9 @@ pub async fn start(state: AppState) -> Result<(), Box<dyn std::error::Error>> {
 
 async fn shutdown_signal() {
     let ctrl_c = async {
-        tokio::signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
     };
 
     #[cfg(unix)]

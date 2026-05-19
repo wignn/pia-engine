@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::crypto;
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct OAuthAccount {
     pub id: Uuid,
@@ -31,7 +33,7 @@ impl OAuthAccount {
         .await
     }
 
-    /// Create a new OAuth account link.
+    /// Create a new OAuth account link. Access token is encrypted before storage.
     pub async fn create(
         db: &PgPool,
         user_id: Uuid,
@@ -39,7 +41,15 @@ impl OAuthAccount {
         provider_id: &str,
         provider_email: Option<&str>,
         access_token: Option<&str>,
+        encryption_key: &str,
     ) -> Result<Self, sqlx::Error> {
+        // Encrypt the access token if provided
+        let encrypted_token = access_token.and_then(|t| {
+            crypto::encrypt(t, encryption_key)
+                .map_err(|e| tracing::warn!(error = %e, "failed to encrypt OAuth token"))
+                .ok()
+        });
+
         sqlx::query_as::<_, Self>(
             "INSERT INTO oauth_accounts (user_id, provider, provider_id, provider_email, access_token) \
              VALUES ($1, $2, $3, $4, $5) \
@@ -50,9 +60,18 @@ impl OAuthAccount {
         .bind(provider)
         .bind(provider_id)
         .bind(provider_email)
-        .bind(access_token)
+        .bind(encrypted_token.as_deref())
         .fetch_one(db)
         .await
+    }
+
+    /// Decrypt the stored access token.
+    pub fn decrypt_access_token(&self, encryption_key: &str) -> Option<String> {
+        self.access_token.as_ref().and_then(|t| {
+            crypto::decrypt(t, encryption_key)
+                .map_err(|e| tracing::warn!(error = %e, "failed to decrypt OAuth token"))
+                .ok()
+        })
     }
 
     /// List all OAuth accounts for a user.
@@ -65,3 +84,4 @@ impl OAuthAccount {
         .await
     }
 }
+

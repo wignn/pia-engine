@@ -8,13 +8,10 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const jwt = localStorage.getItem('wi_jwt')
-    const key = localStorage.getItem('wi_api_key')
-    if (!jwt && !key) { setLoading(false); return }
+    // Validate the HttpOnly session cookie before rendering authenticated state.
     api.me().then(data => {
       if (data.user) setUser(data)
       else {
-        localStorage.removeItem('wi_jwt')
         localStorage.removeItem('wi_api_key')
       }
       setLoading(false)
@@ -24,15 +21,13 @@ export function AuthProvider({ children }) {
   }, [])
 
   const loginWithJwt = (token, userData) => {
-    localStorage.setItem('wi_jwt', token)
     setUser(userData)
   }
 
   const loginWithCredentials = async (email, password) => {
     const data = await api.login(email, password)
     if (data.token && data.user) {
-      localStorage.setItem('wi_jwt', data.token)
-      // Fetch full user info (plan_limits etc.)
+      // Refresh the full account profile after the browser stores the cookie.
       const me = await api.me()
       if (me.user) setUser(me)
       return { success: true }
@@ -49,7 +44,7 @@ export function AuthProvider({ children }) {
   }
 
   const logout = () => {
-    localStorage.removeItem('wi_jwt')
+    // Clear client-side credentials; the server session cookie expires separately.
     localStorage.removeItem('wi_api_key')
     setUser(null)
   }

@@ -1,10 +1,16 @@
-use std::sync::Arc;
 use sqlx::PgPool;
+use std::sync::Arc;
 
+use super::usage_tracker::UsageTracker;
 use crate::config::Config;
 use crate::tenant::registry::TenantRegistry;
 use crate::ws::Hub;
-use super::usage_tracker::UsageTracker;
+
+#[derive(Clone)]
+pub struct Ticket {
+    pub api_key: String,
+    pub expires_at: std::time::Instant,
+}
 
 #[derive(Clone)]
 pub struct AppState {
@@ -13,4 +19,5 @@ pub struct AppState {
     pub config: Config,
     pub tenant_registry: Option<Arc<TenantRegistry>>,
     pub usage_tracker: Arc<UsageTracker>,
+    pub ticket_store: Arc<tokio::sync::RwLock<std::collections::HashMap<String, Ticket>>>,
 }

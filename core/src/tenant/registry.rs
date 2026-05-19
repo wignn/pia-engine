@@ -1,7 +1,8 @@
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -20,6 +21,7 @@ struct CachedKey {
     requests_per_day: i32,
     ws_connections: i32,
     rate_limit_per_min: i32,
+    expires_at: Option<DateTime<Utc>>,
 }
 
 /// Cached per-user config.
@@ -30,8 +32,8 @@ struct UserConfig {
 
 /// In-memory registry of API keys and tenant configs, synced from DB.
 pub struct TenantRegistry {
-    keys: Arc<RwLock<HashMap<String, CachedKey>>>,    // key_hash → CachedKey
-    configs: Arc<RwLock<HashMap<Uuid, UserConfig>>>,   // user_id → UserConfig
+    keys: Arc<RwLock<HashMap<String, CachedKey>>>, // key_hash → CachedKey
+    configs: Arc<RwLock<HashMap<Uuid, UserConfig>>>, // user_id → UserConfig
     db: PgPool,
 }
 
@@ -47,15 +49,31 @@ impl TenantRegistry {
     /// Load all active keys and configs from DB.
     pub async fn reload(&self) {
         // Load keys with plan info
-        let rows: Result<Vec<(String, Uuid, Uuid, String, bool, bool, bool, i32, i32, i32)>, _> = sqlx::query_as(
+        let rows: Result<
+            Vec<(
+                String,
+                Uuid,
+                Uuid,
+                String,
+                bool,
+                bool,
+                bool,
+                i32,
+                i32,
+                i32,
+                Option<DateTime<Utc>>,
+            )>,
+            _,
+        > = sqlx::query_as(
             "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, \
                     COALESCE(p.can_scrape, FALSE), \
                     COALESCE(p.requests_per_day, 100), \
                     COALESCE(p.ws_connections, 1), \
-                    COALESCE(p.rate_limit_per_min, 10) \
+                    COALESCE(p.rate_limit_per_min, 10), \
+                    k.expires_at \
              FROM api_keys k \
              JOIN users u ON u.id = k.user_id \
-             LEFT JOIN plans p ON p.id = u.plan"
+             LEFT JOIN plans p ON p.id = u.plan",
         )
         .fetch_all(&self.db)
         .await;
@@ -63,12 +81,23 @@ impl TenantRegistry {
         match rows {
             Ok(rows) => {
                 let mut map = HashMap::new();
-                for (hash, uid, kid, plan, kactive, uactive, scrape, rpd, wsc, rlm) in rows {
-                    map.insert(hash, CachedKey {
-                        user_id: uid, key_id: kid, plan, is_active: kactive,
-                        user_active: uactive, can_scrape: scrape,
-                        requests_per_day: rpd, ws_connections: wsc, rate_limit_per_min: rlm,
-                    });
+                for (hash, uid, kid, plan, kactive, uactive, scrape, rpd, wsc, rlm, expires) in rows
+                {
+                    map.insert(
+                        hash,
+                        CachedKey {
+                            user_id: uid,
+                            key_id: kid,
+                            plan,
+                            is_active: kactive,
+                            user_active: uactive,
+                            can_scrape: scrape,
+                            requests_per_day: rpd,
+                            ws_connections: wsc,
+                            rate_limit_per_min: rlm,
+                            expires_at: expires,
+                        },
+                    );
                 }
                 let count = map.len();
                 *self.keys.write().await = map;
@@ -78,11 +107,10 @@ impl TenantRegistry {
         }
 
         // Load tenant configs
-        let cfg_rows: Result<Vec<(Uuid, String, serde_json::Value)>, _> = sqlx::query_as(
-            "SELECT user_id, config_key, config_value FROM tenant_configs"
-        )
-        .fetch_all(&self.db)
-        .await;
+        let cfg_rows: Result<Vec<(Uuid, String, serde_json::Value)>, _> =
+            sqlx::query_as("SELECT user_id, config_key, config_value FROM tenant_configs")
+                .fetch_all(&self.db)
+                .await;
 
         match cfg_rows {
             Ok(rows) => {
@@ -118,6 +146,14 @@ impl TenantRegistry {
 
         if !cached.is_active || !cached.user_active {
             return None;
+        }
+
+        // Check expiry
+        if let Some(expires) = cached.expires_at {
+            if Utc::now() > expires {
+                warn!(key_id = %cached.key_id, "API key expired");
+                return None;
+            }
         }
 
         let configs = self.configs.read().await;

@@ -13,8 +13,10 @@ use super::AppState;
 use crate::api::auth;
 use crate::models::{api_key, user::User};
 
-/// Middleware: authenticate requests using JWT Bearer token, X-API-Key header, or ?token= query param.
-/// Injects AuthContext into request extensions.
+/// Authenticates requests and stores the resolved principal in request extensions.
+///
+/// Accepted credentials are JWT bearer tokens, `X-API-Key`, and `token` or
+/// `api_key` query parameters for clients that cannot set custom headers.
 pub async fn auth_middleware(
     State(state): State<AppState>,
     mut request: Request,
@@ -22,7 +24,6 @@ pub async fn auth_middleware(
 ) -> Result<Response, StatusCode> {
     let path = request.uri().path();
 
-    // Public endpoints (no auth required)
     if path == "/health"
         || path == "/"
         || path == "/api/v1/auth/register"
@@ -36,11 +37,9 @@ pub async fn auth_middleware(
         return Ok(next.run(request).await);
     }
 
-    // Try to extract auth from the request
     let raw_key = extract_key(&request);
     let bearer_token = extract_bearer(&request);
 
-    // 1. Try JWT Bearer token first
     if let Some(token) = bearer_token {
         if let Some(claims) = auth::decode_jwt(&token, &state.config.jwt_secret) {
             if let Ok(user_id) = claims.sub.parse::<uuid::Uuid>() {
@@ -64,9 +63,7 @@ pub async fn auth_middleware(
         }
     }
 
-    // 2. Try API key
     if let Some(raw) = raw_key {
-        // Admin bypass
         if !state.config.admin_api_key.is_empty() && raw == state.config.admin_api_key {
             request.extensions_mut().insert(AuthContext {
                 user_id: uuid::Uuid::nil(),
@@ -77,7 +74,6 @@ pub async fn auth_middleware(
             return Ok(next.run(request).await);
         }
 
-        // Lookup in DB
         let hashed = api_key::hash_key(&raw);
         let lookup = api_key::ApiKey::find_by_hash(&state.db, &hashed)
             .await
@@ -88,7 +84,6 @@ pub async fn auth_middleware(
                 return Err(StatusCode::FORBIDDEN);
             }
 
-            // Touch last_used_at (fire-and-forget)
             let db = state.db.clone();
             let kid = key_info.key_id;
             tokio::spawn(async move { api_key::ApiKey::touch(&db, kid).await });
@@ -106,9 +101,8 @@ pub async fn auth_middleware(
     Err(StatusCode::UNAUTHORIZED)
 }
 
-/// Extract raw API key from X-API-Key header or ?token=/?api_key= query param.
+/// Extracts an API key from headers or supported query parameters.
 fn extract_key(request: &Request) -> Option<String> {
-    // Try X-API-Key header
     if let Some(val) = request.headers().get("X-API-Key") {
         if let Ok(s) = val.to_str() {
             if !s.is_empty() {
@@ -117,7 +111,6 @@ fn extract_key(request: &Request) -> Option<String> {
         }
     }
 
-    // Try query param
     let uri = request.uri();
     uri.query().and_then(|q| {
         url::form_urlencoded::parse(q.as_bytes())
@@ -126,7 +119,6 @@ fn extract_key(request: &Request) -> Option<String> {
     })
 }
 
-/// Extract JWT from Authorization: Bearer <token> header.
 fn extract_bearer(request: &Request) -> Option<String> {
     if let Some(val) = request.headers().get(header::AUTHORIZATION) {
         if let Ok(s) = val.to_str() {
@@ -137,10 +129,23 @@ fn extract_bearer(request: &Request) -> Option<String> {
             }
         }
     }
+
+    if let Some(val) = request.headers().get(header::COOKIE) {
+        if let Ok(s) = val.to_str() {
+            for cookie in s.split(';') {
+                let cookie = cookie.trim();
+                if let Some(token) = cookie.strip_prefix("wi_jwt=") {
+                    if !token.is_empty() {
+                        return Some(token.to_string());
+                    }
+                }
+            }
+        }
+    }
+
     None
 }
 
-/// Auth context injected into request extensions after successful auth.
 #[derive(Debug, Clone)]
 pub struct AuthContext {
     pub user_id: uuid::Uuid,
@@ -150,8 +155,16 @@ pub struct AuthContext {
 }
 
 pub fn build_router(state: AppState) -> Router {
+    let allowed_origins: Vec<axum::http::HeaderValue> = std::env::var("ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| {
+            "http://localhost:3000,http://localhost:5173,http://localhost:8080".to_string()
+        })
+        .split(',')
+        .filter_map(|o| o.trim().parse().ok())
+        .collect();
+
     let cors = CorsLayer::new()
-        .allow_origin(AllowOrigin::any())
+        .allow_origin(AllowOrigin::list(allowed_origins))
         .allow_methods([
             axum::http::Method::GET,
             axum::http::Method::POST,
@@ -164,17 +177,16 @@ pub fn build_router(state: AppState) -> Router {
             header::CONTENT_TYPE,
             header::AUTHORIZATION,
             axum::http::HeaderName::from_static("x-api-key"),
-        ]);
+        ])
+        .allow_credentials(true);
 
     Router::new()
-        // Public
         .route("/health", get(health))
         .route("/", get(root))
         .route("/api/v1/auth/register", post(super::auth::register))
         .route("/api/v1/auth/login", post(super::auth::login))
         .route("/api/v1/auth/verify", post(super::auth::verify_email))
         .route("/api/v1/plans", get(super::plans::list_plans))
-        // OAuth (public)
         .route(
             "/api/v1/auth/oauth/{provider}/url",
             get(super::auth::oauth_url),
@@ -183,7 +195,6 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/auth/oauth/{provider}/callback",
             post(super::auth::oauth_callback),
         )
-        // Authenticated
         .route("/api/v1/auth/me", get(super::auth::me))
         .route("/api/v1/keys", get(super::keys::list_keys))
         .route("/api/v1/keys", post(super::keys::create_key))
@@ -201,7 +212,6 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/usage", get(super::usage::summary))
         .route("/api/v1/usage/history", get(super::usage::history))
         .route("/api/v1/plans/upgrade", post(super::plans::upgrade))
-        // Admin routes
         .route("/api/v1/admin/users", get(super::admin::list_users))
         .route(
             "/api/v1/admin/users/{id}/plan",
@@ -212,7 +222,6 @@ pub fn build_router(state: AppState) -> Router {
             post(super::admin::toggle_user),
         )
         .route("/api/v1/admin/stats", get(super::admin::platform_stats))
-        // Middleware
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

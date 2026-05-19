@@ -8,16 +8,13 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 
 const MAX_ALERTS_PER_USER: i64 = 10;
 
-async fn autocomplete_symbol<'a>(
-    _ctx: Context<'a>,
-    partial: &'a str,
-) -> Vec<AutocompleteChoice> {
+async fn autocomplete_symbol<'a>(_ctx: Context<'a>, partial: &'a str) -> Vec<AutocompleteChoice> {
     let partial_upper = partial.to_uppercase();
 
     let mut choices: Vec<(String, String)> = market_ws::get_all_prices()
         .into_iter()
         .filter(|p| p.symbol.starts_with(&partial_upper) || partial.is_empty())
-        .take(25) // Discord hard limit
+        .take(25)
         .map(|p| {
             let label = format!(
                 "{} ({}) — {}",
@@ -36,7 +33,6 @@ async fn autocomplete_symbol<'a>(
         .collect()
 }
 
-
 #[poise::command(prefix_command, slash_command, rename = "price")]
 pub async fn price(
     ctx: Context<'_>,
@@ -49,16 +45,16 @@ pub async fn price(
     match market_ws::get_price(&upper) {
         Some(cached) => {
             let (color, arrow) = match cached.direction.as_str() {
-                "buy"  => (0x34D399u32, "BUY"),
+                "buy" => (0x34D399u32, "BUY"),
                 "sell" => (0xF87171u32, "SELL"),
-                _      => (0x60A5FAu32, "BUY"),
+                _ => (0x60A5FAu32, "BUY"),
             };
 
             let asset_label = match cached.asset_type.as_str() {
                 "crypto" => "Crypto",
-                "forex"  => "Forex",
-                "stock"  => "Stock",
-                _        => "Market",
+                "forex" => "Forex",
+                "stock" => "Stock",
+                _ => "Market",
             };
 
             let price_display = if cached.asset_type == "crypto" {
@@ -120,10 +116,6 @@ pub async fn price(
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// /prices — show all current market prices
-// ---------------------------------------------------------------------------
-
 /// Show all current market prices
 #[poise::command(prefix_command, slash_command, rename = "prices")]
 pub async fn prices(ctx: Context<'_>) -> Result<(), Error> {
@@ -149,9 +141,9 @@ pub async fn prices(ctx: Context<'_>) -> Result<(), Error> {
 
     for p in &sorted {
         let arrow = match p.direction.as_str() {
-            "buy"  => "🟢",
+            "buy" => "🟢",
             "sell" => "🔴",
-            _      => "⚪",
+            _ => "⚪",
         };
 
         let line = if p.asset_type == "crypto" {
@@ -191,7 +183,6 @@ pub async fn prices(ctx: Context<'_>) -> Result<(), Error> {
 
     Ok(())
 }
-
 
 #[poise::command(slash_command, rename = "market_alert")]
 pub async fn alert(
@@ -378,10 +369,6 @@ pub async fn alerts(ctx: Context<'_>) -> Result<(), Error> {
 
     Ok(())
 }
-
-// ---------------------------------------------------------------------------
-// /alert_remove <id>
-// ---------------------------------------------------------------------------
 
 /// Remove a price alert by ID
 #[poise::command(slash_command, rename = "market_alert_remove")]

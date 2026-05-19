@@ -1,16 +1,16 @@
-use dotenvy::dotenv;
-use poise::serenity_prelude::UserId;
-use serenity::all::{ActivityData, GatewayIntents, OnlineStatus};
-use std::collections::HashSet;
 use bot::commands::{
-    Data, admin, calendar, forex, general, market, moderation, ping, stock, sys,
-    twitter, volatility,
+    Data, admin, calendar, forex, general, market, moderation, ping, stock, sys, twitter,
+    volatility,
 };
 use bot::config::Config;
 use bot::error::BotError;
 use bot::handlers::{handle_event, on_error};
 use bot::repository::create_pool;
 use bot::services::core_ws::start_core_ws_service;
+use dotenvy::dotenv;
+use poise::serenity_prelude::UserId;
+use serenity::all::{ActivityData, GatewayIntents, OnlineStatus};
+use std::collections::HashSet;
 
 #[tokio::main]
 async fn main() -> Result<(), BotError> {
@@ -27,13 +27,15 @@ async fn main() -> Result<(), BotError> {
         | GatewayIntents::GUILD_VOICE_STATES
         | GatewayIntents::GUILD_MEMBERS;
 
-    let owner_id = config.client_id.parse::<u64>()
+    let owner_id = config
+        .client_id
+        .parse::<u64>()
         .expect("CLIENT_ID must be a valid u64");
 
     let mut owners = HashSet::new();
     owners.insert(UserId::new(owner_id));
 
-    // SQLite — no external DB required
+    // The bot stores guild configuration and alerts in SQLite.
     let db = create_pool(&config.db_path)
         .await
         .map_err(|e| BotError::Config(format!("Failed to initialize database: {}", e)))?;
@@ -49,12 +51,10 @@ async fn main() -> Result<(), BotError> {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![
-                // General commands
                 ping::ping(),
                 general::ping(),
                 general::say(),
                 general::purge(),
-                // Admin commands
                 admin::everyone(),
                 sys::sys(),
                 moderation::warn(),
@@ -65,38 +65,29 @@ async fn main() -> Result<(), BotError> {
                 moderation::kick(),
                 moderation::ban(),
                 moderation::unban(),
-                // Auto-role commands
                 moderation::autorole_set(),
                 moderation::autorole_disable(),
-                // Logging commands
                 moderation::log_setup(),
                 moderation::log_disable(),
-                // Forex news commands
                 forex::forex_news_setup(),
                 forex::forex_news_disable(),
                 forex::forex_news_enable(),
                 forex::forex_news_status(),
                 forex::forex_calendar(),
-                // Calendar reminder commands
                 calendar::calendar_setup(),
                 calendar::calendar_disable(),
                 calendar::calendar_enable(),
                 calendar::calendar_status(),
                 calendar::calendar_mention(),
-                // Stock news commands (subscribe/unsubscribe/status/latest via subcommands)
                 stock::stocknews(),
-                // Market price commands
                 market::price(),
                 market::prices(),
-                // Price alert commands
                 market::alert(),
                 market::alerts(),
                 market::alert_remove(),
-                // Volatility spike detector commands
                 volatility::volatility_setup(),
                 volatility::volatility_disable(),
                 volatility::volatility_status(),
-                // X/Twitter feed commands
                 twitter::twitter_setup(),
                 twitter::twitter_disable(),
                 twitter::twitter_enable(),
@@ -135,7 +126,7 @@ async fn main() -> Result<(), BotError> {
     let shard_manager = client.shard_manager.clone();
     let http = client.http.clone();
 
-    // Bot status rotation (XAUUSD price display)
+    // Rotate presence with the latest XAUUSD display when market data is available.
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
         let mut idx = 0;
@@ -160,7 +151,7 @@ async fn main() -> Result<(), BotError> {
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    // Single unified WebSocket connection to core
+    // Maintain one WebSocket connection for all core event channels.
     let bot_id = config.client_id.clone();
     start_core_ws_service(db_for_ws, http.clone(), config.core_ws_url.clone(), bot_id);
     println!(
