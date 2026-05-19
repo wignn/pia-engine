@@ -48,8 +48,7 @@ impl Config {
             github_client_secret: env::var("GITHUB_CLIENT_SECRET").unwrap_or_default(),
             frontend_url: env::var("FRONTEND_URL")
                 .unwrap_or_else(|_| "http://localhost:5173".into()),
-            encryption_key: env::var("ENCRYPTION_KEY")
-                .unwrap_or_else(|_| load_jwt_secret()),
+            encryption_key: env::var("ENCRYPTION_KEY").unwrap_or_else(|_| load_jwt_secret()),
         }
     }
 

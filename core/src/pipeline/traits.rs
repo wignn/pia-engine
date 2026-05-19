@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use crate::error::AppError;
+use async_trait::async_trait;
 
 /// Trait for extensible data processing pipelines.
 #[async_trait]

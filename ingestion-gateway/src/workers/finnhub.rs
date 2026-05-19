@@ -9,10 +9,10 @@ use tokio::time::{interval, MissedTickBehavior};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
 
+use super::reconnect::ReconnectPolicy;
 use crate::broker::BrokerPublisher;
 use crate::config::Config;
 use crate::market_hours;
-use super::reconnect::ReconnectPolicy;
 
 #[derive(Debug, Deserialize)]
 struct FinnhubTrade {
@@ -47,10 +47,13 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
             continue;
         }
 
-
         let url = format!("wss://ws.finnhub.io/?token={}", cfg.finnhub_api_key.trim());
 
-        info!(worker = "finnhub", symbol = SYMBOL, "connecting to finnhub websocket");
+        info!(
+            worker = "finnhub",
+            symbol = SYMBOL,
+            "connecting to finnhub websocket"
+        );
 
         let ws_stream = match connect_async(&url).await {
             Ok((stream, _response)) => {
@@ -78,7 +81,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
             "symbol": SYMBOL
         });
 
-        if let Err(e) = write.send(Message::Text(sub_msg.to_string().into())).await {
+        if let Err(e) = write.send(Message::Text(sub_msg.to_string())).await {
             error!(worker = "finnhub", error = %e, "failed to send subscribe message");
             let delay = backoff.next_delay();
             tokio::time::sleep(delay).await;
@@ -123,7 +126,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
                             disconnect_reason = "stream_end";
                             break;
                         }
-                        _ => {} 
+                        _ => {}
                     }
                 }
                 _ = market_check.tick() => {
@@ -151,7 +154,9 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
             "type": "unsubscribe",
             "symbol": SYMBOL
         });
-        let _ = write.send(Message::Text(unsub_msg.to_string().into())).await;
+        let _ = write
+            .send(Message::Text(unsub_msg.to_string()))
+            .await;
         let _ = write.send(Message::Close(None)).await;
         let _ = write.close().await;
 

@@ -42,9 +42,7 @@ impl StockRepository {
         Ok(())
     }
 
-    pub async fn get_active_channels(
-        pool: &SqlitePool,
-    ) -> Result<Vec<StockChannel>, sqlx::Error> {
+    pub async fn get_active_channels(pool: &SqlitePool) -> Result<Vec<StockChannel>, sqlx::Error> {
         let rows = sqlx::query_as::<_, (i64, i64, i64, Option<String>, Option<String>, Option<String>, bool, bool)>(
             "SELECT id, channel_id, guild_id, tickers_filter, min_impact, categories, mention_everyone, is_active
              FROM stock_channels WHERE is_active = 1",
@@ -55,7 +53,16 @@ impl StockRepository {
         Ok(rows
             .into_iter()
             .map(
-                |(id, channel_id, guild_id, tickers_filter, min_impact, categories, mention_everyone, is_active)| {
+                |(
+                    id,
+                    channel_id,
+                    guild_id,
+                    tickers_filter,
+                    min_impact,
+                    categories,
+                    mention_everyone,
+                    is_active,
+                )| {
                     StockChannel {
                         id,
                         channel_id,
@@ -84,7 +91,16 @@ impl StockRepository {
         .await?;
 
         Ok(row.map(
-            |(id, channel_id, guild_id, tickers_filter, min_impact, categories, mention_everyone, is_active)| {
+            |(
+                id,
+                channel_id,
+                guild_id,
+                tickers_filter,
+                min_impact,
+                categories,
+                mention_everyone,
+                is_active,
+            )| {
                 StockChannel {
                     id,
                     channel_id,
@@ -99,16 +115,12 @@ impl StockRepository {
         ))
     }
 
-    pub async fn is_stock_news_sent(
-        pool: &SqlitePool,
-        news_id: &str,
-    ) -> Result<bool, sqlx::Error> {
+    pub async fn is_stock_news_sent(pool: &SqlitePool, news_id: &str) -> Result<bool, sqlx::Error> {
         let prefixed_id = format!("stock_{}", news_id);
-        let count: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM sent_items WHERE item_id = ?")
-                .bind(&prefixed_id)
-                .fetch_one(pool)
-                .await?;
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM sent_items WHERE item_id = ?")
+            .bind(&prefixed_id)
+            .fetch_one(pool)
+            .await?;
 
         Ok(count.0 > 0)
     }

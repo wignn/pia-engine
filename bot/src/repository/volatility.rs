@@ -36,19 +36,30 @@ impl VolatilityRepository {
         Ok(())
     }
 
-    pub async fn get_active_channels(pool: &SqlitePool) -> Result<Vec<VolatilityChannel>, sqlx::Error> {
+    pub async fn get_active_channels(
+        pool: &SqlitePool,
+    ) -> Result<Vec<VolatilityChannel>, sqlx::Error> {
         let rows = sqlx::query_as::<_, (i64, i64, i64, bool)>(
             "SELECT id, channel_id, guild_id, is_active FROM volatility_channels WHERE is_active = 1",
         )
         .fetch_all(pool)
         .await?;
 
-        Ok(rows.into_iter().map(|(id, channel_id, guild_id, is_active)| VolatilityChannel {
-            id, channel_id, guild_id, is_active,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|(id, channel_id, guild_id, is_active)| VolatilityChannel {
+                id,
+                channel_id,
+                guild_id,
+                is_active,
+            })
+            .collect())
     }
 
-    pub async fn get_channel(pool: &SqlitePool, guild_id: u64) -> Result<Option<VolatilityChannel>, sqlx::Error> {
+    pub async fn get_channel(
+        pool: &SqlitePool,
+        guild_id: u64,
+    ) -> Result<Option<VolatilityChannel>, sqlx::Error> {
         let row = sqlx::query_as::<_, (i64, i64, i64, bool)>(
             "SELECT id, channel_id, guild_id, is_active FROM volatility_channels WHERE guild_id = ?",
         )
@@ -56,8 +67,13 @@ impl VolatilityRepository {
         .fetch_optional(pool)
         .await?;
 
-        Ok(row.map(|(id, channel_id, guild_id, is_active)| VolatilityChannel {
-            id, channel_id, guild_id, is_active,
-        }))
+        Ok(
+            row.map(|(id, channel_id, guild_id, is_active)| VolatilityChannel {
+                id,
+                channel_id,
+                guild_id,
+                is_active,
+            }),
+        )
     }
 }

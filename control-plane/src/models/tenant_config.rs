@@ -29,11 +29,7 @@ impl TenantConfig {
     }
 
     /// Get a specific config.
-    pub async fn get(
-        db: &PgPool,
-        user_id: Uuid,
-        key: &str,
-    ) -> Result<Option<Self>, sqlx::Error> {
+    pub async fn get(db: &PgPool, user_id: Uuid, key: &str) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
             "SELECT * FROM tenant_configs WHERE user_id = $1 AND config_key = $2",
         )
@@ -66,13 +62,11 @@ impl TenantConfig {
 
     /// Delete a config key.
     pub async fn delete(db: &PgPool, user_id: Uuid, key: &str) -> Result<bool, sqlx::Error> {
-        let r = sqlx::query(
-            "DELETE FROM tenant_configs WHERE user_id = $1 AND config_key = $2",
-        )
-        .bind(user_id)
-        .bind(key)
-        .execute(db)
-        .await?;
+        let r = sqlx::query("DELETE FROM tenant_configs WHERE user_id = $1 AND config_key = $2")
+            .bind(user_id)
+            .bind(key)
+            .execute(db)
+            .await?;
         Ok(r.rows_affected() > 0)
     }
 

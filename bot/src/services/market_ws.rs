@@ -38,14 +38,20 @@ static PRICE_CACHE: Lazy<Arc<RwLock<HashMap<String, CachedPrice>>>> =
 
 pub fn update_price(data: &MarketTradeData) -> CachedPrice {
     let mut cache = PRICE_CACHE.write();
-    
-    let old_price = cache.get(&data.symbol).map(|c| c.price).unwrap_or(data.price);
+
+    let old_price = cache
+        .get(&data.symbol)
+        .map(|c| c.price)
+        .unwrap_or(data.price);
     let direction = if data.price > old_price {
         "buy".to_string()
     } else if data.price < old_price {
         "sell".to_string()
     } else {
-        cache.get(&data.symbol).map(|c| c.direction.clone()).unwrap_or_else(|| "none".to_string())
+        cache
+            .get(&data.symbol)
+            .map(|c| c.direction.clone())
+            .unwrap_or_else(|| "none".to_string())
     };
 
     let price_str = if data.asset_type == "crypto" {
@@ -83,7 +89,5 @@ pub fn get_all_prices() -> Vec<CachedPrice> {
 }
 
 pub fn get_xauusd_display() -> Option<String> {
-    get_price("XAUUSD").map(|p| {
-        format!("XAUUSD ${:.2}", p.price)
-    })
+    get_price("XAUUSD").map(|p| format!("XAUUSD ${:.2}", p.price))
 }

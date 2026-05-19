@@ -78,21 +78,22 @@ impl TwitterRepository {
         .fetch_optional(pool)
         .await?;
 
-        Ok(row.map(|(id, channel_id, guild_id, is_active)| TwitterChannel {
-            id,
-            channel_id,
-            guild_id,
-            is_active,
-        }))
+        Ok(
+            row.map(|(id, channel_id, guild_id, is_active)| TwitterChannel {
+                id,
+                channel_id,
+                guild_id,
+                is_active,
+            }),
+        )
     }
 
     pub async fn is_tweet_sent(pool: &SqlitePool, tweet_id: &str) -> Result<bool, sqlx::Error> {
         let prefixed_id = format!("tweet_{}", tweet_id);
-        let count: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM sent_items WHERE item_id = ?")
-                .bind(&prefixed_id)
-                .fetch_one(pool)
-                .await?;
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM sent_items WHERE item_id = ?")
+            .bind(&prefixed_id)
+            .fetch_one(pool)
+            .await?;
 
         Ok(count.0 > 0)
     }

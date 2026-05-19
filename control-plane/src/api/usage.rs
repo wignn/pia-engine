@@ -1,4 +1,8 @@
-use axum::{extract::{Query, State}, http::StatusCode, Json};
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+    Json,
+};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -12,11 +16,16 @@ pub async fn summary(
     State(state): State<AppState>,
     request: axum::extract::Request,
 ) -> Result<Json<Value>, StatusCode> {
-    let auth = request.extensions().get::<AuthContext>().cloned()
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
         .ok_or(StatusCode::UNAUTHORIZED)?;
     let (today, week, month) = UsageLog::summary(&state.db, auth.user_id)
-        .await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let plan = Plan::find_by_id(&state.db, &auth.plan).await
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let plan = Plan::find_by_id(&state.db, &auth.plan)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let limit = plan.map(|p| p.requests_per_day).unwrap_or(100);
     Ok(Json(json!({
@@ -27,7 +36,9 @@ pub async fn summary(
 }
 
 #[derive(Deserialize)]
-pub struct HistoryQuery { pub days: Option<i32> }
+pub struct HistoryQuery {
+    pub days: Option<i32>,
+}
 
 /// GET /api/v1/usage/history
 pub async fn history(
@@ -35,10 +46,14 @@ pub async fn history(
     Query(q): Query<HistoryQuery>,
     request: axum::extract::Request,
 ) -> Result<Json<Value>, StatusCode> {
-    let auth = request.extensions().get::<AuthContext>().cloned()
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
         .ok_or(StatusCode::UNAUTHORIZED)?;
     let days = q.days.unwrap_or(30).min(90);
     let data = UsageLog::daily_history(&state.db, auth.user_id, days)
-        .await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(json!({ "history": data, "days": days })))
 }

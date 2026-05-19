@@ -40,7 +40,10 @@ impl IntoResponse for AppError {
             Self::Scraper(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
             Self::Config(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
             Self::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
-            Self::Unauthorized => (StatusCode::UNAUTHORIZED, "invalid or missing API key".into()),
+            Self::Unauthorized => (
+                StatusCode::UNAUTHORIZED,
+                "invalid or missing API key".into(),
+            ),
             Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
             Self::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
         };

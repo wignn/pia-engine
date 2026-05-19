@@ -113,11 +113,7 @@ impl UsageTracker {
 
     pub async fn daily_count(&self, user_id: Uuid) -> Option<i64> {
         let redis_client = self.redis_client.as_ref()?;
-        let key = format!(
-            "usage:daily:{}:{}",
-            user_id,
-            Utc::now().format("%Y-%m-%d")
-        );
+        let key = format!("usage:daily:{}:{}", user_id, Utc::now().format("%Y-%m-%d"));
 
         let mut conn = redis_client.get_multiplexed_tokio_connection().await.ok()?;
         conn.get::<_, Option<i64>>(key).await.ok().flatten()

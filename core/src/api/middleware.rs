@@ -80,7 +80,7 @@ async fn attach_tenant_context_if_valid(
     request: &mut Request,
     allow_missing_key: bool,
 ) -> bool {
-    let raw_key = extract_key(&request);
+    let raw_key = extract_key(request);
 
     match raw_key {
         Some(raw) => {

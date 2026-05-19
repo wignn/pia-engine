@@ -8,10 +8,10 @@ use tokio::time::{interval, MissedTickBehavior};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
 
+use super::reconnect::ReconnectPolicy;
 use crate::broker::BrokerPublisher;
 use crate::config::Config;
 use crate::market_hours;
-use super::reconnect::ReconnectPolicy;
 
 const TICKERS: &[&str] = &["gbpusd", "eurusd", "usdjpy"];
 const TOPIC: &str = "tiingo:forex";
@@ -68,7 +68,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
             }
         });
 
-        if let Err(e) = write.send(Message::Text(sub_msg.to_string().into())).await {
+        if let Err(e) = write.send(Message::Text(sub_msg.to_string())).await {
             error!(worker = "tiingo", error = %e, "failed to send subscribe message");
             let delay = backoff.next_delay();
             tokio::time::sleep(delay).await;
@@ -180,8 +180,7 @@ async fn handle_message(
             debug!(worker = "tiingo", "heartbeat received");
             return Ok(());
         }
-        "A" => {
-        }
+        "A" => {}
         other => {
             debug!(worker = "tiingo", msg_type = other, "unknown message type");
             return Ok(());
@@ -210,10 +209,7 @@ async fn handle_message(
     let mid_price = data[5].as_f64();
     let ask_price = data[6].as_f64();
 
-    let price = mid_price
-        .or(bid_price)
-        .or(ask_price)
-        .unwrap_or(0.0);
+    let price = mid_price.or(bid_price).or(ask_price).unwrap_or(0.0);
 
     if price <= 0.0 {
         return Ok(());

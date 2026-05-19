@@ -46,7 +46,9 @@ pub async fn handle_socket(
     use tracing::{debug, warn};
 
     let channels = custom_channels.unwrap_or_else(default_channels);
-    let (client_id, mut rx) = hub.register(bot_id.clone(), channels, user_id, x_usernames, tv_symbols).await;
+    let (client_id, mut rx) = hub
+        .register(bot_id.clone(), channels, user_id, x_usernames, tv_symbols)
+        .await;
 
     let (mut ws_tx, mut ws_rx) = socket.split();
 

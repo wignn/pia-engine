@@ -43,11 +43,10 @@ async fn handle_voice_state_update(
     new: &serenity::all::VoiceState,
     data: &Data,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    if let Ok(user) = ctx.http.get_user(new.user_id).await {
-        if user.bot {
+    if let Ok(user) = ctx.http.get_user(new.user_id).await
+        && user.bot {
             return Ok(());
         }
-    }
 
     let old_channel = old.as_ref().and_then(|vs| vs.channel_id);
     let new_channel = new.channel_id;
@@ -71,15 +70,15 @@ async fn handle_voice_logging(
     let pool = data.db.as_ref();
     let config = ModerationRepository::get_config(pool, guild_id.get()).await;
 
-    if let Ok(Some(config)) = config {
-        if let Some(log_channel_id) = config.log_channel_id {
+    if let Ok(Some(config)) = config
+        && let Some(log_channel_id) = config.log_channel_id {
             let log_channel = ChannelId::new(log_channel_id as u64);
             let user = ctx.http.get_user(user_id).await?;
             let avatar = user.avatar_url();
 
             // User joined a voice channel
-            if new_channel.is_some() && old_channel != new_channel {
-                if let Some(joined_channel_id) = new_channel {
+            if new_channel.is_some() && old_channel != new_channel
+                && let Some(joined_channel_id) = new_channel {
                     let channel_name = get_channel_name(ctx, guild_id, joined_channel_id);
                     let embed_msg = embed::voice_join(
                         &user.name,
@@ -90,11 +89,10 @@ async fn handle_voice_logging(
                     let message = CreateMessage::new().embed(embed_msg);
                     let _ = log_channel.send_message(&ctx.http, message).await;
                 }
-            }
 
             // User left a voice channel
-            if old_channel.is_some() && old_channel != new_channel {
-                if let Some(left_channel_id) = old_channel {
+            if old_channel.is_some() && old_channel != new_channel
+                && let Some(left_channel_id) = old_channel {
                     let channel_name = get_channel_name(ctx, guild_id, left_channel_id);
                     let embed_msg = embed::voice_leave(
                         &user.name,
@@ -105,9 +103,7 @@ async fn handle_voice_logging(
                     let message = CreateMessage::new().embed(embed_msg);
                     let _ = log_channel.send_message(&ctx.http, message).await;
                 }
-            }
         }
-    }
 
     Ok(())
 }
@@ -184,8 +180,8 @@ async fn handle_member_leave(
     let pool = data.db.as_ref();
     let config = ModerationRepository::get_config(pool, guild_id.get()).await;
 
-    if let Ok(Some(config)) = config {
-        if let Some(log_channel_id) = config.log_channel_id {
+    if let Ok(Some(config)) = config
+        && let Some(log_channel_id) = config.log_channel_id {
             let channel = ChannelId::new(log_channel_id as u64);
 
             let guild_name = ctx
@@ -204,7 +200,6 @@ async fn handle_member_leave(
                 eprintln!("[MOD] Failed to send leave log: {}", e);
             }
         }
-    }
 
     Ok(())
 }

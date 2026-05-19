@@ -1,4 +1,4 @@
-use chrono::{TimeZone, Utc};
+use chrono::Utc;
 use chrono_tz::Asia::Jakarta;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -41,15 +41,14 @@ pub struct NewsArticleData {
 
 pub fn build_news_embed(a: &NewsArticleData) -> Value {
     let color = 0x0099FF;
-    let impact_bars: std::collections::HashMap<&str, &str> = [
-        ("high", "▰▰▰"),
-        ("medium", "▰▰▱"),
-        ("low", "▰▱▱"),
-    ]
-    .into_iter()
-    .collect();
+    let impact_bars: std::collections::HashMap<&str, &str> =
+        [("high", "▰▰▰"), ("medium", "▰▰▱"), ("low", "▰▱▱")]
+            .into_iter()
+            .collect();
     let impact_level_lower = a.impact_level.as_deref().unwrap_or("low").to_lowercase();
-    let impact_bar = impact_bars.get(impact_level_lower.as_str()).unwrap_or(&"▰▱▱");
+    let impact_bar = impact_bars
+        .get(impact_level_lower.as_str())
+        .unwrap_or(&"▰▱▱");
 
     let time_str = format_wib(a.published_at.as_deref());
     let footer_date = format_footer_date(a.published_at.as_deref());
@@ -104,15 +103,14 @@ pub struct EquityNewsData {
 pub fn build_equity_embed(s: &EquityNewsData) -> Value {
     let color = 0x5865F2;
 
-    let impact_bars: std::collections::HashMap<&str, &str> = [
-        ("high", "▰▰▰"),
-        ("medium", "▰▰▱"),
-        ("low", "▰▱▱"),
-    ]
-    .into_iter()
-    .collect();
+    let impact_bars: std::collections::HashMap<&str, &str> =
+        [("high", "▰▰▰"), ("medium", "▰▰▱"), ("low", "▰▱▱")]
+            .into_iter()
+            .collect();
     let impact_level_lower = s.impact_level.as_deref().unwrap_or("low").to_lowercase();
-    let impact_bar = impact_bars.get(impact_level_lower.as_str()).unwrap_or(&"▰▱▱");
+    let impact_bar = impact_bars
+        .get(impact_level_lower.as_str())
+        .unwrap_or(&"▰▱▱");
 
     let time_str = format_wib(s.published_at.as_deref());
     let footer_date = format_footer_date(s.published_at.as_deref());
@@ -132,7 +130,13 @@ pub fn build_equity_embed(s: &EquityNewsData) -> Value {
     ];
 
     if !s.tickers.is_empty() {
-        let tickers_str: String = s.tickers.iter().take(5).cloned().collect::<Vec<_>>().join(", ");
+        let tickers_str: String = s
+            .tickers
+            .iter()
+            .take(5)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ");
         fields.push(json!({ "name": "Tickers", "value": tickers_str, "inline": true }));
     }
 
@@ -204,7 +208,6 @@ pub fn build_x_embed(t: &XPostData) -> Value {
 
     result
 }
-
 
 fn parse_flexible_time(iso: &str) -> Option<chrono::DateTime<Utc>> {
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(iso) {

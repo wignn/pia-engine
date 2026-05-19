@@ -22,8 +22,10 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Self {
-        let mut database_url =
-            get_env("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/forex");
+        let mut database_url = get_env(
+            "DATABASE_URL",
+            "postgres://postgres:postgres@localhost:5432/forex",
+        );
         database_url = database_url.replace("postgresql+asyncpg://", "postgres://");
         database_url = database_url.replace("postgresql://", "postgres://");
         database_url = sanitize_database_url(&database_url);

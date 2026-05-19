@@ -40,9 +40,7 @@ impl Config {
             finnhub_api_key: get_env("FINNHUB_API_KEY", ""),
             tiingo_api_key: get_env("TIINGO_API_KEY", ""),
             binance_symbols,
-            binance_enabled: get_env("BINANCE_ENABLED", "true")
-                .to_lowercase()
-                .eq("true"),
+            binance_enabled: get_env("BINANCE_ENABLED", "true").to_lowercase().eq("true"),
             redis_url: get_env("REDIS_URL", ""),
             redis_channel_prefix: get_env("REDIS_CHANNEL_PREFIX", "ingestion"),
             reconnect_base_sec: get_env_u64("RECONNECT_BASE_SEC", 5),

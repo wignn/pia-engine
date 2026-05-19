@@ -81,9 +81,7 @@ pub fn duration_until_next_open_from(now: chrono::DateTime<Utc>) -> Duration {
     }
 
     // Full days remaining + time on Sunday until 22:00
-    let total_secs = remaining_today
-        + (days_until_sunday - 1) * 86400
-        + target_seconds_in_day;
+    let total_secs = remaining_today + (days_until_sunday - 1) * 86400 + target_seconds_in_day;
 
     Duration::from_secs(total_secs.max(0) as u64)
 }
@@ -139,9 +137,7 @@ pub fn duration_until_close_from(now: chrono::DateTime<Utc>) -> Option<Duration>
 
     // Full days remaining + time on Friday until 22:00
     let remaining_today = 86400 - current_seconds_in_day;
-    let total_secs = remaining_today
-        + (days_until_friday - 1) * 86400
-        + target_seconds_in_day;
+    let total_secs = remaining_today + (days_until_friday - 1) * 86400 + target_seconds_in_day;
 
     Some(Duration::from_secs(total_secs.max(0) as u64))
 }
@@ -152,7 +148,8 @@ mod tests {
     use chrono::TimeZone;
 
     fn utc(year: i32, month: u32, day: u32, hour: u32, min: u32) -> chrono::DateTime<Utc> {
-        Utc.with_ymd_and_hms(year, month, day, hour, min, 0).unwrap()
+        Utc.with_ymd_and_hms(year, month, day, hour, min, 0)
+            .unwrap()
     }
 
     #[test]

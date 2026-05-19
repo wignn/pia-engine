@@ -63,7 +63,6 @@ pub fn member_join(
     embed
 }
 
-
 pub fn member_leave(
     username: &str,
     member_count: u64,
@@ -89,7 +88,6 @@ pub fn member_leave(
 
     embed
 }
-
 
 pub fn voice_join(
     username: &str,

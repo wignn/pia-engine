@@ -1,6 +1,6 @@
 use aes_gcm::{
     aead::{Aead, KeyInit, OsRng},
-    Aes256Gcm, AeadCore,
+    AeadCore, Aes256Gcm,
 };
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use sha2::{Digest, Sha256};
@@ -10,7 +10,6 @@ fn derive_key(secret: &str) -> [u8; 32] {
     hasher.update(secret.as_bytes());
     hasher.finalize().into()
 }
-
 
 pub fn encrypt(plaintext: &str, secret: &str) -> Result<String, String> {
     let key = derive_key(secret);
@@ -29,7 +28,9 @@ pub fn decrypt(encoded: &str, secret: &str) -> Result<String, String> {
     let key = derive_key(secret);
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| format!("cipher init: {e}"))?;
 
-    let combined = B64.decode(encoded).map_err(|e| format!("base64 decode: {e}"))?;
+    let combined = B64
+        .decode(encoded)
+        .map_err(|e| format!("base64 decode: {e}"))?;
     if combined.len() < 12 {
         return Err("ciphertext too short".into());
     }

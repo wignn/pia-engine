@@ -293,7 +293,7 @@ pub async fn alert(
         .field("Harga Saat Ini", &current_display, true)
         .field("Target", &target_display, true)
         .field("Direction", direction, true)
-        .field("Alert ID", &format!("#{}", created.id), true)
+        .field("Alert ID", format!("#{}", created.id), true)
         .color(0x8B5CF6u32)
         .footer(poise::serenity_prelude::CreateEmbedFooter::new(
             "Fio Price Alert",

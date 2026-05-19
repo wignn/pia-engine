@@ -6,8 +6,7 @@ static RE_SCRIPT: LazyLock<Regex> =
 static RE_STYLE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?is)<style[^>]*>.*?</style>").unwrap());
 static RE_HTML_TAGS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<[^>]+>").unwrap());
-static RE_CDATA: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"<!\[CDATA\[(.*?)\]\]>").unwrap());
+static RE_CDATA: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<!\[CDATA\[(.*?)\]\]>").unwrap());
 static RE_MULTI_NL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\n{3,}").unwrap());
 static RE_MULTI_SPACE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s{2,}").unwrap());
 static RE_PARAGRAPHS: LazyLock<Regex> =

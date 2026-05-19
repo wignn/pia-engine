@@ -127,7 +127,10 @@ impl ApiKey {
     }
 
     /// Lookup key by its hash — used for authentication.
-    pub async fn find_by_hash(db: &PgPool, key_hash: &str) -> Result<Option<ApiKeyWithPlan>, sqlx::Error> {
+    pub async fn find_by_hash(
+        db: &PgPool,
+        key_hash: &str,
+    ) -> Result<Option<ApiKeyWithPlan>, sqlx::Error> {
         sqlx::query_as::<_, ApiKeyWithPlan>(
             "SELECT k.id AS key_id, k.user_id, k.permissions, u.plan, \
                     u.is_active AS user_is_active, k.is_active AS key_is_active \
@@ -142,13 +145,12 @@ impl ApiKey {
 
     /// Revoke (deactivate) a key.
     pub async fn revoke(db: &PgPool, key_id: Uuid, user_id: Uuid) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(
-            "UPDATE api_keys SET is_active = FALSE WHERE id = $1 AND user_id = $2",
-        )
-        .bind(key_id)
-        .bind(user_id)
-        .execute(db)
-        .await?;
+        let result =
+            sqlx::query("UPDATE api_keys SET is_active = FALSE WHERE id = $1 AND user_id = $2")
+                .bind(key_id)
+                .bind(user_id)
+                .execute(db)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -159,14 +161,12 @@ impl ApiKey {
         user_id: Uuid,
         label: &str,
     ) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(
-            "UPDATE api_keys SET label = $1 WHERE id = $2 AND user_id = $3",
-        )
-        .bind(label)
-        .bind(key_id)
-        .bind(user_id)
-        .execute(db)
-        .await?;
+        let result = sqlx::query("UPDATE api_keys SET label = $1 WHERE id = $2 AND user_id = $3")
+            .bind(label)
+            .bind(key_id)
+            .bind(user_id)
+            .execute(db)
+            .await?;
         Ok(result.rows_affected() > 0)
     }
 

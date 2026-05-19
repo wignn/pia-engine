@@ -1,5 +1,5 @@
-use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::SqlitePool;
+use sqlx::sqlite::SqlitePoolOptions;
 use std::sync::Arc;
 
 pub type DbPool = Arc<SqlitePool>;

@@ -92,7 +92,11 @@ impl UsageLog {
     }
 
     /// Daily breakdown for the last N days.
-    pub async fn daily_history(db: &PgPool, user_id: Uuid, days: i32) -> Result<Vec<DailyUsage>, sqlx::Error> {
+    pub async fn daily_history(
+        db: &PgPool,
+        user_id: Uuid,
+        days: i32,
+    ) -> Result<Vec<DailyUsage>, sqlx::Error> {
         sqlx::query_as::<_, DailyUsage>(
             "SELECT to_char(created_at::date, 'YYYY-MM-DD') AS day, COUNT(*) AS count \
              FROM usage_logs \

@@ -117,17 +117,14 @@ impl TenantRegistry {
                 let mut map: HashMap<Uuid, UserConfig> = HashMap::new();
                 for (uid, key, val) in rows {
                     let entry = map.entry(uid).or_default();
-                    match key.as_str() {
-                        "tv_symbols" => {
-                            if let Some(arr) = val.as_array() {
-                                for item in arr {
-                                    if let Some(s) = item.as_str() {
-                                        entry.tv_symbols.insert(s.to_string());
-                                    }
+                    if key.as_str() == "tv_symbols" {
+                        if let Some(arr) = val.as_array() {
+                            for item in arr {
+                                if let Some(s) = item.as_str() {
+                                    entry.tv_symbols.insert(s.to_string());
                                 }
                             }
                         }
-                        _ => {}
                     }
                 }
                 let count = map.len();

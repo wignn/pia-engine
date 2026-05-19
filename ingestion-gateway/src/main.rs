@@ -50,7 +50,10 @@ async fn main() {
                     prefix = %cfg.redis_channel_prefix,
                     "redis broker publisher initialized"
                 );
-                Arc::new(RedisBrokerPublisher::new(client, cfg.redis_channel_prefix.clone()))
+                Arc::new(RedisBrokerPublisher::new(
+                    client,
+                    cfg.redis_channel_prefix.clone(),
+                ))
             }
             Err(e) => {
                 warn!(error = %e, "invalid REDIS_URL, falling back to noop broker");

@@ -100,7 +100,7 @@ async fn main() {
         )),
     };
 
-    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+    let (shutdown_tx, _shutdown_rx) = tokio::sync::watch::channel(false);
 
     // Keep the in-memory tenant cache aligned with control-plane updates.
     {

@@ -73,13 +73,15 @@ impl CalendarRepository {
 
         Ok(rows
             .into_iter()
-            .map(|(id, channel_id, guild_id, is_active, mention_everyone)| CalendarChannel {
-                id,
-                channel_id,
-                guild_id,
-                is_active,
-                mention_everyone,
-            })
+            .map(
+                |(id, channel_id, guild_id, is_active, mention_everyone)| CalendarChannel {
+                    id,
+                    channel_id,
+                    guild_id,
+                    is_active,
+                    mention_everyone,
+                },
+            )
             .collect())
     }
 
@@ -94,22 +96,23 @@ impl CalendarRepository {
         .fetch_optional(pool)
         .await?;
 
-        Ok(row.map(|(id, channel_id, guild_id, is_active, mention_everyone)| CalendarChannel {
-            id,
-            channel_id,
-            guild_id,
-            is_active,
-            mention_everyone,
-        }))
+        Ok(row.map(
+            |(id, channel_id, guild_id, is_active, mention_everyone)| CalendarChannel {
+                id,
+                channel_id,
+                guild_id,
+                is_active,
+                mention_everyone,
+            },
+        ))
     }
 
     pub async fn is_event_sent(pool: &SqlitePool, event_id: &str) -> Result<bool, sqlx::Error> {
         let prefixed_id = format!("cal_{}", event_id);
-        let count: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM sent_items WHERE item_id = ?")
-                .bind(&prefixed_id)
-                .fetch_one(pool)
-                .await?;
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM sent_items WHERE item_id = ?")
+            .bind(&prefixed_id)
+            .fetch_one(pool)
+            .await?;
 
         Ok(count.0 > 0)
     }

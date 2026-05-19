@@ -1,6 +1,9 @@
 use chrono::{DateTime, Utc};
 use feed_rs::parser;
-use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE, CACHE_CONTROL, ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED, REFERER};
+use reqwest::header::{
+    ACCEPT, ACCEPT_LANGUAGE, CACHE_CONTROL, ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED,
+    REFERER,
+};
 use reqwest::Client;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -265,7 +268,11 @@ impl ForexCollector {
         results.into_iter().collect()
     }
 
-    fn parse_item(&self, item: &feed_rs::model::Entry, source_name: &str) -> Option<ForexNewsEntry> {
+    fn parse_item(
+        &self,
+        item: &feed_rs::model::Entry,
+        source_name: &str,
+    ) -> Option<ForexNewsEntry> {
         let title = item.title.as_ref()?.content.trim().to_string();
         let link = item.links.first()?.href.trim().to_string();
 
@@ -373,7 +380,8 @@ impl ForexCollector {
         let feed = match parser::parse(&normalized[..]) {
             Ok(f) => f,
             Err(e) => {
-                let head = String::from_utf8_lossy(&normalized[..normalized.len().min(160)]).replace('\n', " ");
+                let head = String::from_utf8_lossy(&normalized[..normalized.len().min(160)])
+                    .replace('\n', " ");
                 return AttemptResult::Parse(e.to_string(), head);
             }
         };
@@ -389,7 +397,10 @@ impl ForexCollector {
         AttemptResult::Parsed(entries, etag_next, last_modified_next, latency_ms)
     }
 
-    async fn get_conditional_headers(&self, source: &FeedSource) -> (Option<String>, Option<String>) {
+    async fn get_conditional_headers(
+        &self,
+        source: &FeedSource,
+    ) -> (Option<String>, Option<String>) {
         let state = self.source_state.read().await;
         if let Some(s) = state.get(&source.name) {
             (s.etag.clone(), s.last_modified.clone())
@@ -436,7 +447,8 @@ impl ForexCollector {
         s.last_status = status;
         s.last_latency_ms = Some(latency_ms);
         s.blocked_until = None;
-        s.next_allowed_poll_at = Some(Utc::now() + chrono::Duration::seconds(per_source_poll_sec(source) as i64));
+        s.next_allowed_poll_at =
+            Some(Utc::now() + chrono::Duration::seconds(per_source_poll_sec(source) as i64));
         if etag.is_some() {
             s.etag = etag;
         }
@@ -465,7 +477,12 @@ impl ForexCollector {
         s.next_allowed_poll_at = s.blocked_until;
     }
 
-    async fn on_source_error(&self, source: &FeedSource, status: Option<u16>, is_parse_error: bool) {
+    async fn on_source_error(
+        &self,
+        source: &FeedSource,
+        status: Option<u16>,
+        is_parse_error: bool,
+    ) {
         let mut state = self.source_state.write().await;
         let s = state.entry(source.name.clone()).or_default();
         s.error_count += 1;
@@ -474,7 +491,8 @@ impl ForexCollector {
         }
         s.last_error_at = Some(Utc::now());
         s.last_status = status;
-        s.next_allowed_poll_at = Some(Utc::now() + chrono::Duration::seconds(per_source_poll_sec(source) as i64));
+        s.next_allowed_poll_at =
+            Some(Utc::now() + chrono::Duration::seconds(per_source_poll_sec(source) as i64));
     }
 
     async fn log_source_metrics(&self, source: &FeedSource) {

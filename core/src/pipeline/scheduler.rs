@@ -1,10 +1,9 @@
 use std::future::Future;
 use std::time::Duration;
 use tokio::time;
-use tracing::{error, debug, info};
+use tracing::debug;
 
 pub async fn run_scheduled<F, Fut>(name: &str, interval: Duration, f: F)
-
 where
     F: Fn() -> Fut + Send + Sync,
     Fut: Future<Output = ()> + Send,
@@ -12,7 +11,7 @@ where
     safe_run(name, &f).await;
 
     let mut ticker = time::interval(interval);
-    ticker.tick().await; 
+    ticker.tick().await;
 
     loop {
         ticker.tick().await;

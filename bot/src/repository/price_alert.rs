@@ -17,7 +17,12 @@ pub struct PriceAlertRepository;
 
 impl PriceAlertRepository {
     pub async fn create_alert(
-        pool: &SqlitePool, user_id: u64, guild_id: u64, symbol: &str, target_price: f64, direction: &str,
+        pool: &SqlitePool,
+        user_id: u64,
+        guild_id: u64,
+        symbol: &str,
+        target_price: f64,
+        direction: &str,
     ) -> Result<PriceAlert, sqlx::Error> {
         let result = sqlx::query(
             "INSERT INTO price_alerts (user_id, guild_id, symbol, target_price, direction) VALUES (?, ?, ?, ?, ?)",
@@ -39,13 +44,22 @@ impl PriceAlertRepository {
         .await?;
 
         Ok(PriceAlert {
-            id: row.0, user_id: row.1, guild_id: row.2, symbol: row.3,
-            target_price: row.4, direction: row.5, is_triggered: row.6,
-            created_at: row.7, triggered_at: row.8,
+            id: row.0,
+            user_id: row.1,
+            guild_id: row.2,
+            symbol: row.3,
+            target_price: row.4,
+            direction: row.5,
+            is_triggered: row.6,
+            created_at: row.7,
+            triggered_at: row.8,
         })
     }
 
-    pub async fn get_user_alerts(pool: &SqlitePool, user_id: u64) -> Result<Vec<PriceAlert>, sqlx::Error> {
+    pub async fn get_user_alerts(
+        pool: &SqlitePool,
+        user_id: u64,
+    ) -> Result<Vec<PriceAlert>, sqlx::Error> {
         let rows = sqlx::query_as::<_, (i64, i64, i64, String, f64, String, bool, String, Option<String>)>(
             "SELECT id, user_id, guild_id, symbol, target_price, direction, is_triggered, created_at, triggered_at
              FROM price_alerts WHERE user_id = ? AND is_triggered = 0 ORDER BY created_at DESC",
@@ -54,14 +68,26 @@ impl PriceAlertRepository {
         .fetch_all(pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| PriceAlert {
-            id: r.0, user_id: r.1, guild_id: r.2, symbol: r.3,
-            target_price: r.4, direction: r.5, is_triggered: r.6,
-            created_at: r.7, triggered_at: r.8,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| PriceAlert {
+                id: r.0,
+                user_id: r.1,
+                guild_id: r.2,
+                symbol: r.3,
+                target_price: r.4,
+                direction: r.5,
+                is_triggered: r.6,
+                created_at: r.7,
+                triggered_at: r.8,
+            })
+            .collect())
     }
 
-    pub async fn get_active_alerts_by_symbol(pool: &SqlitePool, symbol: &str) -> Result<Vec<PriceAlert>, sqlx::Error> {
+    pub async fn get_active_alerts_by_symbol(
+        pool: &SqlitePool,
+        symbol: &str,
+    ) -> Result<Vec<PriceAlert>, sqlx::Error> {
         let rows = sqlx::query_as::<_, (i64, i64, i64, String, f64, String, bool, String, Option<String>)>(
             "SELECT id, user_id, guild_id, symbol, target_price, direction, is_triggered, created_at, triggered_at
              FROM price_alerts WHERE symbol = ? AND is_triggered = 0",
@@ -70,11 +96,20 @@ impl PriceAlertRepository {
         .fetch_all(pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| PriceAlert {
-            id: r.0, user_id: r.1, guild_id: r.2, symbol: r.3,
-            target_price: r.4, direction: r.5, is_triggered: r.6,
-            created_at: r.7, triggered_at: r.8,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| PriceAlert {
+                id: r.0,
+                user_id: r.1,
+                guild_id: r.2,
+                symbol: r.3,
+                target_price: r.4,
+                direction: r.5,
+                is_triggered: r.6,
+                created_at: r.7,
+                triggered_at: r.8,
+            })
+            .collect())
     }
 
     pub async fn get_all_active_symbols(pool: &SqlitePool) -> Result<Vec<String>, sqlx::Error> {
@@ -96,7 +131,11 @@ impl PriceAlertRepository {
         Ok(())
     }
 
-    pub async fn delete_alert(pool: &SqlitePool, alert_id: i64, user_id: u64) -> Result<bool, sqlx::Error> {
+    pub async fn delete_alert(
+        pool: &SqlitePool,
+        alert_id: i64,
+        user_id: u64,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             "DELETE FROM price_alerts WHERE id = ? AND user_id = ? AND is_triggered = 0",
         )

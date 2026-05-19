@@ -181,12 +181,24 @@ fn parse_calendar_event(raw: RawCalendarEvent) -> Option<CalendarEvent> {
         .unwrap_or_else(|| country.clone());
 
     let forecast = raw.forecast.unwrap_or_default().trim().to_string();
-    let forecast = if forecast.is_empty() { "—".to_string() } else { forecast };
+    let forecast = if forecast.is_empty() {
+        "—".to_string()
+    } else {
+        forecast
+    };
 
     let previous = raw.previous.unwrap_or_default().trim().to_string();
-    let previous = if previous.is_empty() { "—".to_string() } else { previous };
+    let previous = if previous.is_empty() {
+        "—".to_string()
+    } else {
+        previous
+    };
 
-    let truncated_title = if title.len() > 30 { &title[..30] } else { &title };
+    let truncated_title = if title.len() > 30 {
+        &title[..30]
+    } else {
+        &title
+    };
     let event_id = format!("{}_{}_{}", date_str, country, truncated_title);
 
     Some(CalendarEvent {

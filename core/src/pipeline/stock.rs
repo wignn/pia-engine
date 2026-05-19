@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use chrono::Utc;
 use sqlx::PgPool;
+use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 use crate::collector::stock::StockCollector;
@@ -40,7 +40,10 @@ impl StockPipeline {
             }
         }
 
-        info!(processed, too_old, duplicate, db_error, skipped, "stock pipeline: completed");
+        info!(
+            processed,
+            too_old, duplicate, db_error, skipped, "stock pipeline: completed"
+        );
     }
 
     async fn process_entry(&self, entry: &crate::collector::stock::StockNewsEntry) -> &'static str {
@@ -57,7 +60,7 @@ impl StockPipeline {
         }
 
         let is_duplicate = match sqlx::query_as::<_, (bool,)>(
-            "SELECT EXISTS(SELECT 1 FROM stock_news WHERE content_hash = $1)"
+            "SELECT EXISTS(SELECT 1 FROM stock_news WHERE content_hash = $1)",
         )
         .bind(&entry.content_hash)
         .fetch_one(&self.db)
@@ -84,7 +87,10 @@ impl StockPipeline {
             "low"
         };
 
-        let published_at = entry.published_at.map(|d| d.to_rfc3339()).unwrap_or_default();
+        let published_at = entry
+            .published_at
+            .map(|d| d.to_rfc3339())
+            .unwrap_or_default();
         let tickers_str = entry.tickers.join(",");
 
         let res = sqlx::query(
@@ -92,7 +98,7 @@ impl StockPipeline {
              (content_hash, original_url, title, source_name, category, \
               tickers, sentiment, impact_level, is_processed, processed_at) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW()) \
-             ON CONFLICT (content_hash) DO NOTHING"
+             ON CONFLICT (content_hash) DO NOTHING",
         )
         .bind(&entry.content_hash)
         .bind(&entry.link)
@@ -137,7 +143,11 @@ impl StockPipeline {
             tickers: entry.tickers.clone(),
             sentiment: Some("neutral".to_string()),
             impact_level: Some(impact_level.to_string()),
-            published_at: if published_at.is_empty() { None } else { Some(published_at) },
+            published_at: if published_at.is_empty() {
+                None
+            } else {
+                Some(published_at)
+            },
             processed_at: Utc::now().to_rfc3339(),
         };
 
@@ -147,7 +157,10 @@ impl StockPipeline {
             "discord_embed": embed,
             "asset_type": "equity",
         });
-        let count = self.hub.broadcast(ws::EVENT_EQUITY_NEWS_NEW, data, "equity_news").await;
+        let count = self
+            .hub
+            .broadcast(ws::EVENT_EQUITY_NEWS_NEW, data, "equity_news")
+            .await;
 
         info!(clients = count, title = %truncate_title(&entry.title, 50), tickers = ?entry.tickers, "stock broadcast ok");
 

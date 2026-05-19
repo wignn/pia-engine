@@ -76,20 +76,23 @@ impl ForexRepository {
         .fetch_optional(pool)
         .await?;
 
-        Ok(row.map(|(id, channel_id, guild_id, is_active)| ForexChannel {
-            id,
-            channel_id,
-            guild_id,
-            is_active,
-        }))
+        Ok(
+            row.map(|(id, channel_id, guild_id, is_active)| ForexChannel {
+                id,
+                channel_id,
+                guild_id,
+                is_active,
+            }),
+        )
     }
 
     pub async fn is_news_sent(pool: &SqlitePool, news_id: &str) -> Result<bool, sqlx::Error> {
-        let count: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM sent_items WHERE item_id = ? AND item_type = 'news'")
-                .bind(news_id)
-                .fetch_one(pool)
-                .await?;
+        let count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM sent_items WHERE item_id = ? AND item_type = 'news'",
+        )
+        .bind(news_id)
+        .fetch_one(pool)
+        .await?;
 
         Ok(count.0 > 0)
     }
@@ -114,11 +117,10 @@ impl ForexRepository {
 
     pub async fn cleanup_old_news(pool: &SqlitePool, days: i64) -> Result<u64, sqlx::Error> {
         let cutoff = chrono::Utc::now().timestamp() - (days * 86400);
-        let result =
-            sqlx::query("DELETE FROM sent_items WHERE item_type = 'news' AND sent_at < ?")
-                .bind(cutoff)
-                .execute(pool)
-                .await?;
+        let result = sqlx::query("DELETE FROM sent_items WHERE item_type = 'news' AND sent_at < ?")
+            .bind(cutoff)
+            .execute(pool)
+            .await?;
 
         Ok(result.rows_affected())
     }

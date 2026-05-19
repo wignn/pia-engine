@@ -17,13 +17,14 @@ impl CalendarPipeline {
     pub async fn run(&self) {
         debug!("calendar pipeline: checking");
 
-        let events: Vec<crate::collector::calendar::CalendarEvent> = match self.collector.get_upcoming_high_impact(15, 5).await {
-            Ok(e) => e,
-            Err(e) => {
-                error!(error = %e, "calendar pipeline: failed");
-                return;
-            }
-        };
+        let events: Vec<crate::collector::calendar::CalendarEvent> =
+            match self.collector.get_upcoming_high_impact(15, 5).await {
+                Ok(e) => e,
+                Err(e) => {
+                    error!(error = %e, "calendar pipeline: failed");
+                    return;
+                }
+            };
 
         if events.is_empty() {
             debug!("calendar pipeline: no upcoming events");
@@ -45,7 +46,10 @@ impl CalendarPipeline {
             });
 
             let data = serde_json::json!({ "calendar_event": event_data });
-            let count = self.hub.broadcast(ws::EVENT_CALENDAR_REMINDER, data, "calendar").await;
+            let count = self
+                .hub
+                .broadcast(ws::EVENT_CALENDAR_REMINDER, data, "calendar")
+                .await;
 
             info!(
                 event = %event.title,
@@ -58,8 +62,7 @@ impl CalendarPipeline {
 
         info!(
             events_found = events.len(),
-            broadcasted,
-            "calendar pipeline: completed"
+            broadcasted, "calendar pipeline: completed"
         );
     }
 }

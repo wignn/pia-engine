@@ -8,9 +8,7 @@ type Context<'a> = poise::Context<'a, super::Data, Error>;
 pub async fn sys(ctx: Context<'_>) -> Result<(), Error> {
     let sistem = SysInfo::new();
 
-
     ctx.defer_ephemeral().await?;
-
 
     let embed = serenity::CreateEmbed::default()
         .title("Sys")
@@ -20,11 +18,8 @@ pub async fn sys(ctx: Context<'_>) -> Result<(), Error> {
         .color(serenity::Colour::BLUE)
         .timestamp(serenity::Timestamp::now());
 
-    ctx.send(
-        poise::CreateReply::default()
-            .embed(embed)
-            .ephemeral(true)
-    ).await?;
+    ctx.send(poise::CreateReply::default().embed(embed).ephemeral(true))
+        .await?;
 
     Ok(())
 }

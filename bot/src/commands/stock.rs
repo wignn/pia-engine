@@ -188,7 +188,7 @@ pub async fn latest(
 pub async fn search(
     ctx: Context<'_>,
     #[description = "Keyword to search"] keyword: String,
-    #[description = "Number of results (max 10)"] limit: Option<i64>,
+    #[description = "Number of results (max 10)"] _limit: Option<i64>,
 ) -> Result<(), Error> {
     let embed = CreateEmbed::new()
         .title(format!("Pencarian: {}", keyword))

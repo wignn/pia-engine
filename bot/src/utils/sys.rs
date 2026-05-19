@@ -6,6 +6,12 @@ pub struct SysInfo {
     pub os: String,
 }
 
+impl Default for SysInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SysInfo {
     pub fn new() -> Self {
         let mut sys = System::new_all();
@@ -14,7 +20,11 @@ impl SysInfo {
         let os = System::long_os_version().unwrap_or_else(|| "Unknown OS".to_string());
 
         let cpu = if let Some(first_cpu) = sys.cpus().first() {
-            format!("{} ({:.2}% active)", first_cpu.brand(), first_cpu.cpu_usage())
+            format!(
+                "{} ({:.2}% active)",
+                first_cpu.brand(),
+                first_cpu.cpu_usage()
+            )
         } else {
             "Unknown CPU".to_string()
         };
@@ -25,5 +35,4 @@ impl SysInfo {
 
         Self { memory, cpu, os }
     }
-
 }

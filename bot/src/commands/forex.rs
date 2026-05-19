@@ -140,9 +140,9 @@ pub async fn forex_calendar(ctx: Context<'_>) -> Result<(), Error> {
 
     let mut high_impact_events: Vec<String> = Vec::new();
 
-    if let Ok(resp) = response {
-        if let Ok(body) = resp.json::<serde_json::Value>().await {
-            if let Some(items) = body["items"].as_array() {
+    if let Ok(resp) = response
+        && let Ok(body) = resp.json::<serde_json::Value>().await
+            && let Some(items) = body["items"].as_array() {
                 for event in items {
                     let title = event["title"].as_str().unwrap_or_default();
                     let currency = event["currency"].as_str().unwrap_or_default();
@@ -160,8 +160,6 @@ pub async fn forex_calendar(ctx: Context<'_>) -> Result<(), Error> {
                     ));
                 }
             }
-        }
-    }
 
     let description = if high_impact_events.is_empty() {
         "No high impact events scheduled.\n\nCheck back later or visit [Forex Factory](https://www.forexfactory.com/calendar) for the full calendar.".to_string()

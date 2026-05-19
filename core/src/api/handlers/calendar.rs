@@ -17,11 +17,7 @@ pub struct CalendarQuery {
 ///   - impact=high|medium|low  (default: high)
 ///   - limit=1..25             (default: 10)
 pub async fn list_calendar(Query(query): Query<CalendarQuery>) -> Json<Value> {
-    let impact_filter = query
-        .impact
-        .as_deref()
-        .unwrap_or("high")
-        .to_lowercase();
+    let impact_filter = query.impact.as_deref().unwrap_or("high").to_lowercase();
     let limit = query.limit.unwrap_or(10).clamp(1, 25);
 
     let client = match reqwest::Client::builder()
@@ -68,15 +64,15 @@ pub async fn list_calendar(Query(query): Query<CalendarQuery>) -> Json<Value> {
         None => return Json(json!({ "error": "unexpected calendar format" })),
     };
 
-    let mut items: Vec<Value> = arr
+    let items: Vec<Value> = arr
         .iter()
         .filter(|ev| {
             let impact = ev["impact"].as_str().unwrap_or("").to_lowercase();
             match impact_filter.as_str() {
-                "high"   => impact.contains("high") || impact == "red",
+                "high" => impact.contains("high") || impact == "red",
                 "medium" => impact.contains("medium") || impact == "orange",
-                "low"    => impact.contains("low") || impact == "yellow",
-                _        => true,
+                "low" => impact.contains("low") || impact == "yellow",
+                _ => true,
             }
         })
         .take(limit)

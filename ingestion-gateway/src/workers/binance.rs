@@ -7,9 +7,9 @@ use serde_json::json;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
 
+use super::reconnect::ReconnectPolicy;
 use crate::broker::BrokerPublisher;
 use crate::config::Config;
-use super::reconnect::ReconnectPolicy;
 
 #[derive(Debug, Deserialize)]
 struct BinanceTrade {
@@ -38,20 +38,17 @@ struct BinanceStreamMessage {
 const TOPIC: &str = "binance:crypto";
 
 const DEFAULT_SYMBOLS: &[&str] = &[
-    "btcusdt",
-    "ethusdt",
-    "solusdt",
-    "bnbusdt",
-    "xrpusdt",
-    "dogeusdt",
-    "adausdt",
+    "btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt", "dogeusdt", "adausdt",
 ];
 
 pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
     let mut backoff = ReconnectPolicy::new(cfg.reconnect_base_sec, cfg.reconnect_max_sec);
 
     let symbols = if cfg.binance_symbols.is_empty() {
-        DEFAULT_SYMBOLS.iter().map(|s| s.to_string()).collect::<Vec<_>>()
+        DEFAULT_SYMBOLS
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
     } else {
         cfg.binance_symbols.clone()
     };

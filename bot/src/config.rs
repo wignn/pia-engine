@@ -16,8 +16,8 @@ impl Config {
         let token = env::var("TOKEN").map_err(|_| "TOKEN not configured in .env")?;
         let client_id = env::var("CLIENT_ID").map_err(|_| "CLIENT_ID not configured in .env")?;
 
-        let core_ws_url = env::var("CORE_WS_URL")
-            .unwrap_or_else(|_| "ws://localhost:4000".to_string());
+        let core_ws_url =
+            env::var("CORE_WS_URL").unwrap_or_else(|_| "ws://localhost:4000".to_string());
 
         // Derive HTTP URL from WS URL if not explicitly set
         let core_http_url = env::var("CORE_HTTP_URL").unwrap_or_else(|_| {
@@ -26,8 +26,7 @@ impl Config {
                 .replace("ws://", "http://")
         });
 
-        let db_path = env::var("DATABASE_PATH")
-            .unwrap_or_else(|_| "bot.db".to_string());
+        let db_path = env::var("DATABASE_PATH").unwrap_or_else(|_| "bot.db".to_string());
 
         Ok(Self {
             token,

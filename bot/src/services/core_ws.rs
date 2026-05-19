@@ -213,8 +213,7 @@ impl CoreWsService {
     async fn handle_market_trade(&self, text: &str) {
         if let Ok(trade_event) =
             serde_json::from_str::<crate::services::market_ws::MarketTradeEvent>(text)
-        {
-            if let Some(wrapper) = trade_event.data {
+            && let Some(wrapper) = trade_event.data {
                 let cached = crate::services::market_ws::update_price(&wrapper.tick);
                 crate::services::price_alert::check_price(
                     &cached.symbol,
@@ -226,7 +225,6 @@ impl CoreWsService {
                 )
                 .await;
             }
-        }
     }
 
     async fn handle_news_event(

@@ -11,10 +11,7 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 #[poise::command(prefix_command, aliases("repeat", "echo"))]
-pub async fn say(
-    ctx: Context<'_>,
-    #[rest] text: String,
-) -> Result<(), Error> {
+pub async fn say(ctx: Context<'_>, #[rest] text: String) -> Result<(), Error> {
     ctx.say(text).await?;
     Ok(())
 }
@@ -33,7 +30,7 @@ pub async fn purge(
     amount: u8,
 ) -> Result<(), Error> {
     let channel_id = ctx.channel_id();
-    
+
     let messages = channel_id
         .messages(&ctx.http(), GetMessages::new().limit(amount))
         .await?;

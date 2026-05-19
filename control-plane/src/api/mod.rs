@@ -1,13 +1,13 @@
-pub mod server;
-pub mod auth;
 pub mod admin;
+pub mod auth;
 pub mod keys;
-pub mod tenant_config;
 pub mod plans;
+pub mod server;
+pub mod tenant_config;
 pub mod usage;
 
-use sqlx::PgPool;
 use crate::config::Config;
+use sqlx::PgPool;
 
 #[derive(Clone)]
 pub struct AppState {

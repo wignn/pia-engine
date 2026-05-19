@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::sync::Arc;
 
 use axum::{
     extract::{State, WebSocketUpgrade},

@@ -63,7 +63,7 @@ impl User {
         verify_token: &str,
         password: Option<&str>,
     ) -> Result<Self, sqlx::Error> {
-        let pw_hash = password.map(|pw| hash_password(pw));
+        let pw_hash = password.map(hash_password);
 
         sqlx::query_as::<_, Self>(
             "INSERT INTO users (email, name, verify_token, password_hash) \

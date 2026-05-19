@@ -31,10 +31,13 @@ pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
 
     info!(max_conns = 10, "database connected");
 
-    sqlx::migrate!("./migrations").run(&pool).await.map_err(|e| {
-        tracing::error!(error = %e, "migration failed");
-        sqlx::Error::Configuration(e.into())
-    })?;
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "migration failed");
+            sqlx::Error::Configuration(e.into())
+        })?;
 
     info!("database migrations applied");
     Ok(pool)
