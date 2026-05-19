@@ -61,9 +61,7 @@ pub fn duration_until_next_open_from(now: chrono::DateTime<Utc>) -> Duration {
         Weekday::Fri => 2, // Fri → Sun
         Weekday::Sat => 1, // Sat → Sun
         Weekday::Sun => 0, // Sun → Sun (same day, but before 22:00)
-        _ => {
-            0
-        }
+        _ => 0,
     };
 
     let remaining_today = 86400 - current_seconds_in_day;
