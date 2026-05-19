@@ -35,13 +35,11 @@ impl Config {
                 .unwrap_or(8080),
             admin_api_key: env::var("ADMIN_API_KEY").unwrap_or_default(),
             log_level: env::var("LOG_LEVEL").unwrap_or_else(|_| "info".into()),
-            // JWT
             jwt_secret: load_jwt_secret(),
             jwt_expiry_days: env::var("JWT_EXPIRY_DAYS")
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(7),
-            // OAuth
             google_client_id: env::var("GOOGLE_CLIENT_ID").unwrap_or_default(),
             google_client_secret: env::var("GOOGLE_CLIENT_SECRET").unwrap_or_default(),
             github_client_id: env::var("GITHUB_CLIENT_ID").unwrap_or_default(),
