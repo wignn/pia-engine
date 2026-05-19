@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 pub struct ClientHandle {
     pub id: super::hub::ClientId,
     pub bot_id: String,

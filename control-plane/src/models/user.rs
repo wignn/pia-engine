@@ -134,6 +134,7 @@ impl User {
         .await
     }
 
+    #[allow(dead_code)]
     pub async fn update_plan(
         db: &PgPool,
         user_id: Uuid,

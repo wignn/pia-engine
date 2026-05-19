@@ -13,6 +13,7 @@ use super::forex::FeedSource;
 
 /// A stock news entry parsed from RSS feeds.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct StockNewsEntry {
     pub title: String,
     pub link: String,
@@ -211,6 +212,7 @@ fn is_relevant_stock(entry: &StockNewsEntry) -> bool {
 }
 
 /// Collector for Indonesian stock market news from multiple RSS feeds.
+#[allow(dead_code)]
 pub struct StockCollector {
     client: Client,
     semaphore: Semaphore,

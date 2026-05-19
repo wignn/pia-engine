@@ -19,6 +19,7 @@ pub struct OAuthAccount {
 
 impl OAuthAccount {
     /// Find an OAuth account by provider + provider_id.
+    #[allow(dead_code)]
     pub async fn find_by_provider(
         db: &PgPool,
         provider: &str,
@@ -66,6 +67,7 @@ impl OAuthAccount {
     }
 
     /// Decrypt the stored access token.
+    #[allow(dead_code)]
     pub fn decrypt_access_token(&self, encryption_key: &str) -> Option<String> {
         self.access_token.as_ref().and_then(|t| {
             crypto::decrypt(t, encryption_key)

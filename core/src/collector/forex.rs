@@ -13,6 +13,7 @@ use tracing::{error, info, warn};
 
 /// A single forex news entry parsed from RSS feeds.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ForexNewsEntry {
     pub title: String,
     pub link: String,

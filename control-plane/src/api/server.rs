@@ -147,6 +147,7 @@ fn extract_bearer(request: &Request) -> Option<String> {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct AuthContext {
     pub user_id: uuid::Uuid,
     pub key_id: uuid::Uuid,

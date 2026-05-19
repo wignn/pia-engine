@@ -23,6 +23,7 @@ pub struct ApiKey {
 
 /// Result of looking up a key — includes the user's plan for convenience.
 #[derive(Debug, Clone, sqlx::FromRow)]
+#[allow(dead_code)]
 pub struct ApiKeyWithPlan {
     pub key_id: Uuid,
     pub user_id: Uuid,

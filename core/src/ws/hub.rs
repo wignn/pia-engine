@@ -139,9 +139,8 @@ impl Hub {
                 }
             }
 
-            match client.sender.try_send(payload.clone()) {
-                Ok(()) => count += 1,
-                Err(_) => {} // client send buffer full, skip
+            if let Ok(()) = client.sender.try_send(payload.clone()) {
+                count += 1;
             }
         }
 
@@ -187,6 +186,7 @@ impl Hub {
     }
 
     /// Get the number of connected clients.
+    #[allow(dead_code)]
     pub async fn client_count(&self) -> usize {
         self.clients.read().await.len()
     }

@@ -80,6 +80,7 @@ fn get_env_u64(key: &str, fallback: u64) -> u64 {
         .unwrap_or(fallback)
 }
 
+#[allow(dead_code)]
 fn get_env_f64(key: &str, fallback: f64) -> f64 {
     env::var(key)
         .ok()

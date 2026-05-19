@@ -24,6 +24,7 @@ pub fn encrypt(plaintext: &str, secret: &str) -> Result<String, String> {
     Ok(B64.encode(&combined))
 }
 
+#[allow(dead_code)]
 pub fn decrypt(encoded: &str, secret: &str) -> Result<String, String> {
     let key = derive_key(secret);
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| format!("cipher init: {e}"))?;

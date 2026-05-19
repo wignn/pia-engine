@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 /// Payment initiation response returned by the billing adapter.
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct PaymentResponse {
     pub status: String,
     pub message: String,
@@ -13,6 +14,7 @@ pub struct PaymentResponse {
 /// Starts a plan-upgrade payment flow.
 ///
 /// The current adapter reports billing as unavailable until a payment provider is configured.
+#[allow(dead_code)]
 pub async fn create_payment(_user_id: Uuid, _plan_id: &str) -> PaymentResponse {
     PaymentResponse {
         status: "not_available".into(),
@@ -23,6 +25,7 @@ pub async fn create_payment(_user_id: Uuid, _plan_id: &str) -> PaymentResponse {
 }
 
 /// Handles asynchronous payment-provider notifications.
+#[allow(dead_code)]
 pub async fn handle_notification(_body: &serde_json::Value) -> Result<(), String> {
     Err("Midtrans webhook handler not implemented yet".into())
 }

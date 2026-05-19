@@ -90,11 +90,13 @@ pub fn duration_until_next_open_from(now: chrono::DateTime<Utc>) -> Duration {
 ///
 /// Returns `None` if the market is currently closed.
 /// Market closes on Friday at 22:00 UTC.
+#[allow(dead_code)]
 pub fn duration_until_close() -> Option<Duration> {
     duration_until_close_from(Utc::now())
 }
 
 /// Testable version of `duration_until_close`.
+#[allow(dead_code)]
 pub fn duration_until_close_from(now: chrono::DateTime<Utc>) -> Option<Duration> {
     if !is_market_open_at(now) {
         return None;

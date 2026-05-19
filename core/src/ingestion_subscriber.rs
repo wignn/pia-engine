@@ -12,6 +12,7 @@ use tracing::{debug, error, info, warn};
 use crate::ws;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct CachedPrice {
     pub symbol: String,
     pub price: f64,

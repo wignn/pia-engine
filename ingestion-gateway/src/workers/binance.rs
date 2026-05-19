@@ -12,6 +12,7 @@ use crate::broker::BrokerPublisher;
 use crate::config::Config;
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct BinanceTrade {
     #[serde(rename = "e")]
     event_type: String,
@@ -30,6 +31,7 @@ struct BinanceTrade {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct BinanceStreamMessage {
     stream: String,
     data: BinanceTrade,

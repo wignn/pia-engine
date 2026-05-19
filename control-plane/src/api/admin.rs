@@ -20,7 +20,7 @@ pub async fn list_users(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let rows: Vec<(
+    type UserRow = (
         uuid::Uuid,
         String,
         String,
@@ -28,7 +28,8 @@ pub async fn list_users(
         bool,
         bool,
         chrono::DateTime<chrono::Utc>,
-    )> = sqlx::query_as(
+    );
+    let rows: Vec<UserRow> = sqlx::query_as(
         "SELECT u.id, u.email, u.name, u.plan, u.is_active, u.email_verified, u.created_at \
              FROM users u \
              ORDER BY u.created_at DESC \

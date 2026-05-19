@@ -9,6 +9,7 @@ static RE_HTML_TAGS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<[^>]+>").u
 static RE_CDATA: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<!\[CDATA\[(.*?)\]\]>").unwrap());
 static RE_MULTI_NL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\n{3,}").unwrap());
 static RE_MULTI_SPACE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s{2,}").unwrap());
+#[allow(dead_code)]
 static RE_PARAGRAPHS: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?is)<p[^>]*>(.*?)</p>").unwrap());
 
@@ -67,6 +68,7 @@ pub fn extract_summary(description: &str, max_len: usize) -> String {
 }
 
 /// Extract text from `<p>` tags in HTML content.
+#[allow(dead_code)]
 pub fn extract_paragraphs(html_content: &str) -> String {
     let captures: Vec<_> = RE_PARAGRAPHS.captures_iter(html_content).collect();
     if captures.is_empty() {

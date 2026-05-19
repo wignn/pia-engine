@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 /// Tenant context injected into request extensions after API key validation.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TenantContext {
     pub user_id: Uuid,
     pub api_key_id: Uuid,

@@ -37,6 +37,20 @@ pub struct TenantRegistry {
     db: PgPool,
 }
 
+type TenantRow = (
+    String,
+    Uuid,
+    Uuid,
+    String,
+    bool,
+    bool,
+    bool,
+    i32,
+    i32,
+    i32,
+    Option<DateTime<Utc>>,
+);
+
 impl TenantRegistry {
     pub fn new(db: PgPool) -> Arc<Self> {
         Arc::new(Self {
@@ -49,22 +63,7 @@ impl TenantRegistry {
     /// Load all active keys and configs from DB.
     pub async fn reload(&self) {
         // Load keys with plan info
-        let rows: Result<
-            Vec<(
-                String,
-                Uuid,
-                Uuid,
-                String,
-                bool,
-                bool,
-                bool,
-                i32,
-                i32,
-                i32,
-                Option<DateTime<Utc>>,
-            )>,
-            _,
-        > = sqlx::query_as(
+        let rows: Result<Vec<TenantRow>, _> = sqlx::query_as(
             "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, \
                     COALESCE(p.can_scrape, FALSE), \
                     COALESCE(p.requests_per_day, 100), \

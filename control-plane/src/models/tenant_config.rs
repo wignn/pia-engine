@@ -29,6 +29,7 @@ impl TenantConfig {
     }
 
     /// Get a specific config.
+    #[allow(dead_code)]
     pub async fn get(db: &PgPool, user_id: Uuid, key: &str) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
             "SELECT * FROM tenant_configs WHERE user_id = $1 AND config_key = $2",
@@ -71,6 +72,7 @@ impl TenantConfig {
     }
 
     /// Get all unique X usernames across all tenants (for the core pipeline merger).
+    #[allow(dead_code)]
     pub async fn all_x_usernames(db: &PgPool) -> Result<Vec<String>, sqlx::Error> {
         let rows: Vec<(serde_json::Value,)> = sqlx::query_as(
             "SELECT config_value FROM tenant_configs WHERE config_key = 'x_usernames'",

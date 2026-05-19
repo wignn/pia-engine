@@ -5,13 +5,17 @@ use serde_json::{json, Value};
 
 // Event type constants
 pub const EVENT_NEWS_NEW: &str = "news.new";
+#[allow(dead_code)]
 pub const EVENT_NEWS_HIGH_IMPACT: &str = "news.high_impact";
 pub const EVENT_EQUITY_NEWS_NEW: &str = "equity.news.new";
 pub const EVENT_CALENDAR_REMINDER: &str = "calendar.reminder";
 pub const EVENT_MARKET_TRADE: &str = "market.trade";
+#[allow(dead_code)]
 pub const EVENT_GOLD_VOLATILITY_SPIKE: &str = "gold.volatility_spike";
 pub const EVENT_X_NEW: &str = "x.new";
+#[allow(dead_code)]
 pub const EVENT_HEARTBEAT: &str = "heartbeat";
+#[allow(dead_code)]
 pub const EVENT_SYSTEM_STATUS: &str = "system.status";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

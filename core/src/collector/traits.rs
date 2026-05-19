@@ -8,6 +8,7 @@ use crate::error::AppError;
 /// Each collector fetches data from an external source and returns
 /// a vector of typed items.
 #[async_trait]
+#[allow(dead_code)]
 pub trait Collector: Send + Sync {
     type Item: Send;
 

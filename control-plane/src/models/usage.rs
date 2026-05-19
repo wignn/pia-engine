@@ -16,6 +16,7 @@ pub struct UsageLog {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct UsageSummary {
     pub today: i64,
     pub this_week: i64,
@@ -31,6 +32,7 @@ pub struct DailyUsage {
 
 impl UsageLog {
     /// Record a usage event (fire-and-forget).
+    #[allow(dead_code)]
     pub async fn record(
         db: &PgPool,
         user_id: Uuid,
@@ -55,6 +57,7 @@ impl UsageLog {
     }
 
     /// Count requests for today.
+    #[allow(dead_code)]
     pub async fn count_today(db: &PgPool, user_id: Uuid) -> Result<i64, sqlx::Error> {
         let count: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM usage_logs WHERE user_id = $1 AND created_at >= CURRENT_DATE",

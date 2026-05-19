@@ -28,22 +28,27 @@ impl From<PriceAlert> for CachedAlert {
     }
 }
 
-static ALERT_CACHE: Lazy<Arc<RwLock<HashMap<String, Vec<CachedAlert>>>>> =
+type AlertCacheType = Arc<RwLock<HashMap<String, Vec<CachedAlert>>>>;
+static ALERT_CACHE: Lazy<AlertCacheType> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 pub async fn load_alerts_to_cache(
     db: &DbPool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let symbols = PriceAlertRepository::get_all_active_symbols(db).await?;
-    let mut cache = ALERT_CACHE.write();
-    cache.clear();
-
+    let mut all_alerts = HashMap::new();
     let mut total = 0;
     for symbol in &symbols {
         let alerts = PriceAlertRepository::get_active_alerts_by_symbol(db, symbol).await?;
         let cached: Vec<CachedAlert> = alerts.into_iter().map(CachedAlert::from).collect();
         total += cached.len();
-        cache.insert(symbol.clone(), cached);
+        all_alerts.insert(symbol.clone(), cached);
+    }
+
+    {
+        let mut cache = ALERT_CACHE.write();
+        cache.clear();
+        cache.extend(all_alerts);
     }
 
     println!("[ALERT] Loaded {} active alerts to cache", total);

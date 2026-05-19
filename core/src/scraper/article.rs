@@ -8,6 +8,7 @@ use url::Url;
 use crate::html;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ScrapedArticle {
     pub url: String,
     pub title: String,

@@ -111,6 +111,7 @@ impl UsageTracker {
         count <= i64::from(tenant.requests_per_day)
     }
 
+    #[allow(dead_code)]
     pub async fn daily_count(&self, user_id: Uuid) -> Option<i64> {
         let redis_client = self.redis_client.as_ref()?;
         let key = format!("usage:daily:{}:{}", user_id, Utc::now().format("%Y-%m-%d"));
