@@ -62,9 +62,6 @@ pub fn duration_until_next_open_from(now: chrono::DateTime<Utc>) -> Duration {
         Weekday::Sat => 1, // Sat → Sun
         Weekday::Sun => 0, // Sun → Sun (same day, but before 22:00)
         _ => {
-            // Should not reach here if market is closed, but handle gracefully
-            // Mon=0 days would be wrong, let's compute correctly
-            // If we're here, market is closed, which only happens Fri 22+, Sat, Sun <22
             0
         }
     };
