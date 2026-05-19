@@ -29,8 +29,7 @@ impl From<PriceAlert> for CachedAlert {
 }
 
 type AlertCacheType = Arc<RwLock<HashMap<String, Vec<CachedAlert>>>>;
-static ALERT_CACHE: Lazy<AlertCacheType> =
-    Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
+static ALERT_CACHE: Lazy<AlertCacheType> = Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 pub async fn load_alerts_to_cache(
     db: &DbPool,
