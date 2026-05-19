@@ -9,24 +9,106 @@ on:
   workflow_dispatch:
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      has_changes: ${{ steps.matrix.outputs.has_changes }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Detect changed services
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            core:
+              - 'core/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.dockerignore'
+              - 'infrastructure/Dockerfile.core'
+            control_plane:
+              - 'control-plane/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.dockerignore'
+              - 'infrastructure/Dockerfile.control-plane'
+            portal:
+              - 'portal/**'
+              - '.dockerignore'
+              - 'infrastructure/Dockerfile.portal'
+            ingestion:
+              - 'ingestion-gateway/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.dockerignore'
+              - 'infrastructure/Dockerfile.ingestion'
+            bot:
+              - 'bot/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.dockerignore'
+              - 'infrastructure/Dockerfile.bot'
+
+      - name: Build Docker matrix
+        id: matrix
+        shell: bash
+        env:
+          BUILD_ALL: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
+          CORE_CHANGED: ${{ steps.filter.outputs.core }}
+          CONTROL_PLANE_CHANGED: ${{ steps.filter.outputs.control_plane }}
+          PORTAL_CHANGED: ${{ steps.filter.outputs.portal }}
+          INGESTION_CHANGED: ${{ steps.filter.outputs.ingestion }}
+          BOT_CHANGED: ${{ steps.filter.outputs.bot }}
+        run: |
+          json='{"include":['
+          sep=''
+
+          add() {
+            json="${json}${sep}$1"
+            sep=','
+          }
+
+          if [[ "$BUILD_ALL" == "true" || "$CORE_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-core","dockerfile":"infrastructure/Dockerfile.core"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$CONTROL_PLANE_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-control-plane","dockerfile":"infrastructure/Dockerfile.control-plane"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$PORTAL_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-portal","dockerfile":"infrastructure/Dockerfile.portal"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$INGESTION_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-ingestion","dockerfile":"infrastructure/Dockerfile.ingestion"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$BOT_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-bot","dockerfile":"infrastructure/Dockerfile.bot"}'
+          fi
+
+          json="${json}]}";
+          echo "matrix=$json" >> "$GITHUB_OUTPUT"
+
+          if [[ "$json" == '{"include":[]}' ]]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
   docker:
+    needs: changes
+    if: needs.changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - image: atlsd-core
-            dockerfile: infrastructure/Dockerfile.core
-          - image: atlsd-control-plane
-            dockerfile: infrastructure/Dockerfile.control-plane
-          - image: atlsd-portal
-            dockerfile: infrastructure/Dockerfile.portal
-          - image: atlsd-ingestion
-            dockerfile: infrastructure/Dockerfile.ingestion
-          - image: atlsd-bot
-            dockerfile: infrastructure/Dockerfile.bot
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
