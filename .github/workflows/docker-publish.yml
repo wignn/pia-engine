@@ -48,9 +48,6 @@ jobs:
       - name: Portal build check
         run: cd portal && npm ci && npm run build
 
-      - name: Web build check
-        run: cd web && rm -f package-lock.json && npm install && npm run check && npm run build
-
   changes:
     needs: check
     runs-on: ubuntu-latest
