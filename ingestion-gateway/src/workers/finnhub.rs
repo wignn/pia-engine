@@ -154,9 +154,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
             "type": "unsubscribe",
             "symbol": SYMBOL
         });
-        let _ = write
-            .send(Message::Text(unsub_msg.to_string()))
-            .await;
+        let _ = write.send(Message::Text(unsub_msg.to_string())).await;
         let _ = write.send(Message::Close(None)).await;
         let _ = write.close().await;
 

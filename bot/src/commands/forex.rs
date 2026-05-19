@@ -142,24 +142,25 @@ pub async fn forex_calendar(ctx: Context<'_>) -> Result<(), Error> {
 
     if let Ok(resp) = response
         && let Ok(body) = resp.json::<serde_json::Value>().await
-            && let Some(items) = body["items"].as_array() {
-                for event in items {
-                    let title = event["title"].as_str().unwrap_or_default();
-                    let currency = event["currency"].as_str().unwrap_or_default();
-                    let date = event["date"].as_str().unwrap_or_default();
-                    let forecast = event["forecast"].as_str().unwrap_or_default();
-                    let previous = event["previous"].as_str().unwrap_or_default();
+        && let Some(items) = body["items"].as_array()
+    {
+        for event in items {
+            let title = event["title"].as_str().unwrap_or_default();
+            let currency = event["currency"].as_str().unwrap_or_default();
+            let date = event["date"].as_str().unwrap_or_default();
+            let forecast = event["forecast"].as_str().unwrap_or_default();
+            let previous = event["previous"].as_str().unwrap_or_default();
 
-                    high_impact_events.push(format!(
-                        "**{}**  `{}`\n{}\nForecast: `{}` | Previous: `{}`",
-                        currency,
-                        date,
-                        title,
-                        if forecast.is_empty() { "—" } else { forecast },
-                        if previous.is_empty() { "—" } else { previous }
-                    ));
-                }
-            }
+            high_impact_events.push(format!(
+                "**{}**  `{}`\n{}\nForecast: `{}` | Previous: `{}`",
+                currency,
+                date,
+                title,
+                if forecast.is_empty() { "—" } else { forecast },
+                if previous.is_empty() { "—" } else { previous }
+            ));
+        }
+    }
 
     let description = if high_impact_events.is_empty() {
         "No high impact events scheduled.\n\nCheck back later or visit [Forex Factory](https://www.forexfactory.com/calendar) for the full calendar.".to_string()
