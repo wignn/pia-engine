@@ -11,18 +11,13 @@ pub struct CalendarQuery {
     pub limit: Option<usize>,
 }
 
-/// GET /api/v1/forex/calendar
-/// Fetches upcoming high-impact economic events from Forex Factory.
-/// Query params:
-///   - impact=high|medium|low  (default: high)
-///   - limit=1..25             (default: 10)
 pub async fn list_calendar(Query(query): Query<CalendarQuery>) -> Json<Value> {
     let impact_filter = query.impact.as_deref().unwrap_or("high").to_lowercase();
     let limit = query.limit.unwrap_or(10).clamp(1, 25);
 
     let client = match reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
-        .user_agent("Mozilla/5.0 (compatible; AtlsdBot/1.0)")
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         .build()
     {
         Ok(c) => c,
@@ -38,13 +33,20 @@ pub async fn list_calendar(Query(query): Query<CalendarQuery>) -> Json<Value> {
         .await;
 
     let body = match response {
-        Ok(resp) => match resp.text().await {
-            Ok(text) => text,
-            Err(e) => {
-                warn!(error = %e, "failed to read calendar response body");
-                return Json(json!({ "error": "upstream read error" }));
+        Ok(resp) => {
+            let status = resp.status();
+            if !status.is_success() {
+                warn!(status = %status, "forex factory calendar request returned non-success status");
+                return Json(json!({ "error": format!("upstream returned status: {}", status) }));
             }
-        },
+            match resp.text().await {
+                Ok(text) => text,
+                Err(e) => {
+                    warn!(error = %e, "failed to read calendar response body");
+                    return Json(json!({ "error": "upstream read error" }));
+                }
+            }
+        }
         Err(e) => {
             warn!(error = %e, "failed to fetch forex factory calendar");
             return Json(json!({ "error": "upstream request failed" }));
