@@ -15,8 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY services/analyzer/ .
 
 # Pre-download model weights during image building to ensure offline-ready container and fast start times
-RUN python -c "from transformers import AutoTokenizer, AutoModelForSequenceClassification; \
-               AutoTokenizer.from_pretrained('yiyanghkust/finbert-tone', use_fast=False); \
+RUN python -c "from transformers import BertTokenizer, AutoModelForSequenceClassification; \
+               BertTokenizer.from_pretrained('yiyanghkust/finbert-tone'); \
                AutoModelForSequenceClassification.from_pretrained('yiyanghkust/finbert-tone')"
 
 EXPOSE 5000
