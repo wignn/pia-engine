@@ -1,5 +1,11 @@
 [workspace]
-members = ["core", "control-plane", "ingestion-gateway", "bot"]
+members = [
+    "services/core",
+    "services/control-plane",
+    "services/ingestion-gateway",
+    "services/bot",
+    "crates/*"
+]
 resolver = "2"
 
 [workspace.dependencies]

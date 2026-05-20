@@ -1,0 +1,63 @@
+# Production Docker Compose Configuration
+# Extends or configures production-ready settings
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: atlsd-prod
+    restart: always
+    env_file:
+      - ../env/.env.db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - private
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-prod
+    restart: always
+    command:
+      - redis-server
+      - --appendonly
+      - yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - private
+
+  core:
+    container_name: world-core-prod
+    image: wign/atlsd-core:latest
+    env_file:
+      - ../env/.env.core
+    ports:
+      - "8090:8090"
+    depends_on:
+      - postgres
+      - redis
+      - analyzer
+    networks:
+      - private
+    restart: always
+
+  analyzer:
+    container_name: world-analyzer-prod
+    image: wign/atlsd-analyzer:latest
+    ports:
+      - "5000:5000"
+    restart: always
+    networks:
+      - private
+
+networks:
+  private:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

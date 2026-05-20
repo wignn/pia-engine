@@ -1,0 +1,181 @@
+use chrono::Utc;
+use sqlx::PgPool;
+use std::sync::Arc;
+use tracing::{debug, info, warn};
+
+use crate::collector::stock::StockCollector;
+use crate::ws::{self, EquityNewsData, Hub};
+
+const MAX_STOCK_NEWS_AGE_HOURS: i64 = 12;
+
+pub struct StockPipeline {
+    collector: Arc<StockCollector>,
+    db: PgPool,
+    hub: Arc<Hub>,
+}
+
+impl StockPipeline {
+    pub fn new(collector: Arc<StockCollector>, db: PgPool, hub: Arc<Hub>) -> Self {
+        Self { collector, db, hub }
+    }
+
+    pub async fn run(&self) {
+        info!("stock pipeline: starting");
+        let entries = self.collector.fetch_latest(30).await;
+        info!(count = entries.len(), "stock pipeline: entries fetched");
+
+        let mut processed = 0u32;
+        let mut too_old = 0u32;
+        let mut duplicate = 0u32;
+        let mut db_error = 0u32;
+        let mut skipped = 0u32;
+
+        for entry in &entries {
+            match self.process_entry(entry).await {
+                "processed" => processed += 1,
+                "too_old" => too_old += 1,
+                "duplicate" => duplicate += 1,
+                "db_error" => db_error += 1,
+                _ => skipped += 1,
+            }
+        }
+
+        info!(
+            processed,
+            too_old, duplicate, db_error, skipped, "stock pipeline: completed"
+        );
+    }
+
+    async fn process_entry(&self, entry: &crate::collector::stock::StockNewsEntry) -> &'static str {
+        if let Some(pub_at) = entry.published_at {
+            let cutoff = Utc::now() - chrono::Duration::hours(MAX_STOCK_NEWS_AGE_HOURS);
+            if pub_at < cutoff {
+                debug!(
+                    title = %truncate_title(&entry.title, 60),
+                    age_hours = (Utc::now() - pub_at).num_hours(),
+                    "stock article skipped: too_old"
+                );
+                return "too_old";
+            }
+        }
+
+        let is_duplicate = match sqlx::query_as::<_, (bool,)>(
+            "SELECT EXISTS(SELECT 1 FROM stock_news WHERE content_hash = $1)",
+        )
+        .bind(&entry.content_hash)
+        .fetch_one(&self.db)
+        .await
+        {
+            Ok((true,)) => true,
+            Ok((false,)) => false,
+            Err(e) => {
+                warn!(error = %e, hash = %entry.content_hash, "stock duplicate check failed, continuing");
+                false
+            }
+        };
+
+        if is_duplicate {
+            debug!(hash = %entry.content_hash, title = %truncate_title(&entry.title, 60), "stock article skipped: duplicate");
+            return "duplicate";
+        }
+
+        let impact_level = if entry.tickers.len() >= 3 {
+            "high"
+        } else if !entry.tickers.is_empty() {
+            "medium"
+        } else {
+            "low"
+        };
+
+        let published_at = entry
+            .published_at
+            .map(|d| d.to_rfc3339())
+            .unwrap_or_default();
+        let tickers_str = entry.tickers.join(",");
+
+        let sentiment_val =
+            crate::pipeline::sentiment::analyze(&format!("{} - {}", entry.title, entry.content))
+                .await;
+
+        let res = sqlx::query(
+            "INSERT INTO stock_news \
+             (content_hash, original_url, title, source_name, category, \
+              tickers, sentiment, impact_level, is_processed, processed_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW()) \
+             ON CONFLICT (content_hash) DO NOTHING",
+        )
+        .bind(&entry.content_hash)
+        .bind(&entry.link)
+        .bind(&entry.title)
+        .bind(&entry.source_name)
+        .bind(&entry.category)
+        .bind(&tickers_str)
+        .bind(&sentiment_val)
+        .bind(impact_level)
+        .execute(&self.db)
+        .await;
+
+        match res {
+            Ok(r) => {
+                if r.rows_affected() == 0 {
+                    debug!(hash = %entry.content_hash, title = %truncate_title(&entry.title, 60), "stock article skipped: duplicate (ON CONFLICT)");
+                    return "duplicate";
+                }
+                info!(title = %truncate_title(&entry.title, 50), source = %entry.source_name, "stock article saved");
+            }
+            Err(e) => {
+                warn!(error = %e, "stock db insert failed");
+                return "db_error";
+            }
+        }
+
+        let summary_truncated = if entry.content.len() > 1000 {
+            entry.content[..1000].to_string()
+        } else {
+            entry.content.clone()
+        };
+
+        let equity_data = EquityNewsData {
+            id: entry.content_hash.clone(),
+            title: entry.title.clone(),
+            summary: Some(summary_truncated),
+            content: None,
+            source_name: entry.source_name.clone(),
+            source_url: entry.link.clone(),
+            url: entry.link.clone(),
+            category: entry.category.clone(),
+            tickers: entry.tickers.clone(),
+            sentiment: Some(sentiment_val),
+            impact_level: Some(impact_level.to_string()),
+            published_at: if published_at.is_empty() {
+                None
+            } else {
+                Some(published_at)
+            },
+            processed_at: Utc::now().to_rfc3339(),
+        };
+
+        let embed = ws::build_equity_embed(&equity_data);
+        let data = serde_json::json!({
+            "article": equity_data,
+            "discord_embed": embed,
+            "asset_type": "equity",
+        });
+        let count = self
+            .hub
+            .broadcast(ws::EVENT_EQUITY_NEWS_NEW, data, "equity_news")
+            .await;
+
+        info!(clients = count, title = %truncate_title(&entry.title, 50), tickers = ?entry.tickers, "stock broadcast ok");
+
+        "processed"
+    }
+}
+
+fn truncate_title(s: &str, max_len: usize) -> String {
+    if s.len() > max_len {
+        s[..max_len].to_string()
+    } else {
+        s.to_string()
+    }
+}

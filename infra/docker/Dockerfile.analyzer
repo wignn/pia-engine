@@ -1,0 +1,25 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install python packages
+COPY services/analyzer/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the source code
+COPY services/analyzer/ .
+
+# Pre-download model weights during image building to ensure offline-ready container and fast start times
+RUN python -c "from transformers import AutoTokenizer, AutoModelForSequenceClassification; \
+               AutoTokenizer.from_pretrained('yiyanghkust/finbert-tone'); \
+               AutoModelForSequenceClassification.from_pretrained('yiyanghkust/finbert-tone')"
+
+EXPOSE 5000
+
+ENV PORT=5000
+CMD ["python", "main.py"]

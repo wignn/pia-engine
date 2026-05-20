@@ -116,11 +116,13 @@ Code organization emphasizes clear domain boundaries, auditability of changes, a
 
 ## Repository Structure
 
-- `core/` - data aggregation engine, public API, access middleware, pipelines, WebSocket, and tenant registry.
-- `control-plane/` - identity domain, SaaS management APIs, service plans, and tenant configuration synchronization.
-- `portal/` - React frontend application for management interfaces.
-- `infrastructure/` - container composition, service Dockerfiles, and environment configuration.
-- `.github/workflows/` - automated build and container publishing pipelines.
+- `apps/` - frontend applications (React dashboard `portal`, Svelte marketing `public-web`).
+- `services/` - backend microservices (`core` engine, SaaS `control-plane`, tick-level `ingestion-gateway`, Telegram/Discord `bot`, Python `analyzer`).
+- `crates/` - shared Rust helper libraries (`atlsd-common`, `atlsd-domain`, `atlsd-auth`, `atlsd-observability`).
+- `packages/` - shared frontend packages (`api-client`, `ui`, `config`).
+- `db/` - unified database migrations, seeds, and fixtures.
+- `infra/` - Docker compose, Dockerfiles, environment configurations, and orchestration helpers.
+- `.github/workflows/` - automated CI/CD build and container publishing pipelines.
 
 ## Platform Positioning
 

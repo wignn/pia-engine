@@ -46,7 +46,7 @@ jobs:
           node-version: 20
 
       - name: Portal build check
-        run: cd portal && npm ci && npm run build
+        run: cd apps/portal && npm ci && npm run build
 
   changes:
     needs: check
@@ -66,33 +66,41 @@ jobs:
         with:
           filters: |
             core:
-              - 'core/**'
+              - 'services/core/**'
+              - 'crates/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.dockerignore'
-              - 'infrastructure/Dockerfile.core'
+              - 'infra/docker/Dockerfile.core'
             control_plane:
-              - 'control-plane/**'
+              - 'services/control-plane/**'
+              - 'crates/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.dockerignore'
-              - 'infrastructure/Dockerfile.control-plane'
+              - 'infra/docker/Dockerfile.control-plane'
             portal:
-              - 'portal/**'
+              - 'apps/portal/**'
               - '.dockerignore'
-              - 'infrastructure/Dockerfile.portal'
+              - 'infra/docker/Dockerfile.portal'
             ingestion:
-              - 'ingestion-gateway/**'
+              - 'services/ingestion-gateway/**'
+              - 'crates/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.dockerignore'
-              - 'infrastructure/Dockerfile.ingestion'
+              - 'infra/docker/Dockerfile.ingestion'
             bot:
-              - 'bot/**'
+              - 'services/bot/**'
+              - 'crates/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.dockerignore'
-              - 'infrastructure/Dockerfile.bot'
+              - 'infra/docker/Dockerfile.bot'
+            analyzer:
+              - 'services/analyzer/**'
+              - '.dockerignore'
+              - 'infra/docker/Dockerfile.analyzer'
 
       - name: Build Docker matrix
         id: matrix
@@ -104,6 +112,7 @@ jobs:
           PORTAL_CHANGED: ${{ steps.filter.outputs.portal }}
           INGESTION_CHANGED: ${{ steps.filter.outputs.ingestion }}
           BOT_CHANGED: ${{ steps.filter.outputs.bot }}
+          ANALYZER_CHANGED: ${{ steps.filter.outputs.analyzer }}
         run: |
           json='{"include":['
           sep=''
@@ -114,23 +123,27 @@ jobs:
           }
 
           if [[ "$BUILD_ALL" == "true" || "$CORE_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-core","dockerfile":"infrastructure/Dockerfile.core"}'
+            add '{"image":"atlsd-core","dockerfile":"infra/docker/Dockerfile.core"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$CONTROL_PLANE_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-control-plane","dockerfile":"infrastructure/Dockerfile.control-plane"}'
+            add '{"image":"atlsd-control-plane","dockerfile":"infra/docker/Dockerfile.control-plane"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$PORTAL_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-portal","dockerfile":"infrastructure/Dockerfile.portal"}'
+            add '{"image":"atlsd-portal","dockerfile":"infra/docker/Dockerfile.portal"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$INGESTION_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-ingestion","dockerfile":"infrastructure/Dockerfile.ingestion"}'
+            add '{"image":"atlsd-ingestion","dockerfile":"infra/docker/Dockerfile.ingestion"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$BOT_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-bot","dockerfile":"infrastructure/Dockerfile.bot"}'
+            add '{"image":"atlsd-bot","dockerfile":"infra/docker/Dockerfile.bot"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$ANALYZER_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-analyzer","dockerfile":"infra/docker/Dockerfile.analyzer"}'
           fi
 
           json="${json}]}";

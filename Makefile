@@ -1,11 +1,11 @@
-INFRA_DIR ?= infrastructure
+INFRA_DIR ?= infra/compose
 ENGINE ?= podman
-COMPOSE = $(ENGINE) compose
+COMPOSE = $(ENGINE) compose -f local.yml
 
 .PHONY: help up down restart logs ps build pull run-podman down-podman up-docker down-docker
 
 help:
-	@echo "Available commands:"
+	@echo "Available ATLSD commands:"
 	@echo "  make up           - Start services in background (default: podman)"
 	@echo "  make down         - Stop services and remove volumes"
 	@echo "  make restart      - Recreate full stack"

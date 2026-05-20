@@ -1,0 +1,85 @@
+FROM lukemathwalker/cargo-chef:latest-rust-1.95-bookworm AS chef
+
+WORKDIR /app
+
+FROM chef AS planner
+COPY Cargo.toml Cargo.lock ./
+COPY services/core/Cargo.toml services/core/Cargo.toml
+COPY services/control-plane/Cargo.toml services/control-plane/Cargo.toml
+COPY services/ingestion-gateway/Cargo.toml services/ingestion-gateway/Cargo.toml
+COPY services/bot/Cargo.toml services/bot/Cargo.toml
+COPY crates/atlsd-common/Cargo.toml crates/atlsd-common/Cargo.toml
+COPY crates/atlsd-domain/Cargo.toml crates/atlsd-domain/Cargo.toml
+COPY crates/atlsd-auth/Cargo.toml crates/atlsd-auth/Cargo.toml
+COPY crates/atlsd-observability/Cargo.toml crates/atlsd-observability/Cargo.toml
+
+RUN mkdir -p services/core/src && echo "fn main(){}" > services/core/src/main.rs && \
+    mkdir -p services/control-plane/src && echo "fn main(){}" > services/control-plane/src/main.rs && \
+    mkdir -p services/ingestion-gateway/src && echo "fn main(){}" > services/ingestion-gateway/src/main.rs && \
+    mkdir -p services/bot/src && echo "fn main(){}" > services/bot/src/main.rs && \
+    mkdir -p crates/atlsd-common/src && echo "" > crates/atlsd-common/src/lib.rs && \
+    mkdir -p crates/atlsd-domain/src && echo "" > crates/atlsd-domain/src/lib.rs && \
+    mkdir -p crates/atlsd-auth/src && echo "" > crates/atlsd-auth/src/lib.rs && \
+    mkdir -p crates/atlsd-observability/src && echo "" > crates/atlsd-observability/src/lib.rs
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+
+ARG DOCKER_BUILD_TYPE=release
+
+ENV SQLX_OFFLINE=true
+COPY --from=planner /app/recipe.json recipe.json
+
+RUN <<EOF
+  if [ "$DOCKER_BUILD_TYPE" = "release" ]; then
+    cargo chef cook --release --recipe-path recipe.json;
+  else
+    cargo chef cook --recipe-path recipe.json;
+  fi
+EOF
+
+# Copy real source
+COPY Cargo.toml Cargo.lock ./
+COPY services/core/ services/core/
+COPY services/control-plane/Cargo.toml services/control-plane/Cargo.toml
+COPY services/ingestion-gateway/Cargo.toml services/ingestion-gateway/Cargo.toml
+COPY services/bot/Cargo.toml services/bot/Cargo.toml
+COPY crates/ crates/
+COPY db/ db/
+
+RUN mkdir -p services/control-plane/src && echo "fn main(){}" > services/control-plane/src/main.rs && \
+    mkdir -p services/ingestion-gateway/src && echo "fn main(){}" > services/ingestion-gateway/src/main.rs && \
+    mkdir -p services/bot/src && echo "fn main(){}" > services/bot/src/main.rs
+
+RUN <<EOF
+  if [ "$DOCKER_BUILD_TYPE" = "release" ]; then
+    cargo build --release -p core;
+  else
+    cargo build -p core;
+  fi
+EOF
+RUN <<EOF
+  if [ "$DOCKER_BUILD_TYPE" = "release" ]; then
+    cp /app/target/release/core /app/target/core;
+  else
+    cp /app/target/debug/core /app/target/core;
+  fi
+EOF
+
+FROM debian:bookworm-slim AS runtime
+
+WORKDIR /app
+
+RUN <<EOF
+  apt-get update
+  apt-get install -y ca-certificates
+  rm -rf /var/lib/apt/lists/*
+EOF
+
+COPY --from=builder /app/target/core /usr/local/bin/core
+COPY --from=builder /app/db/migrations/core /app/migrations
+
+EXPOSE 8090
+
+ENTRYPOINT ["/usr/local/bin/core"]

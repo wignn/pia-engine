@@ -1,0 +1,7 @@
+{
+  "name": "@atlsd/config",
+  "version": "1.0.0",
+  "description": "Shared eslint, prettier, and tsconfig rules",
+  "main": "index.js",
+  "private": true
+}

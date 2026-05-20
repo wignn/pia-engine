@@ -1,0 +1,10 @@
+{
+  "name": "@atlsd/api-client",
+  "version": "1.0.0",
+  "description": "Shared TypeScript client for portal and public-web",
+  "main": "index.js",
+  "scripts": {
+    "build": "echo 'No build script configured'"
+  },
+  "private": true
+}

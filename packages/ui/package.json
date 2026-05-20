@@ -1,0 +1,7 @@
+{
+  "name": "@atlsd/ui",
+  "version": "1.0.0",
+  "description": "Shared frontend UI components library",
+  "main": "index.js",
+  "private": true
+}

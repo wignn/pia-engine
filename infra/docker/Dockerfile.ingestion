@@ -1,0 +1,61 @@
+FROM rust:1.95-slim AS builder
+
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+COPY Cargo.toml Cargo.lock ./
+COPY services/core/Cargo.toml services/core/Cargo.toml
+COPY services/control-plane/Cargo.toml services/control-plane/Cargo.toml
+COPY services/ingestion-gateway/Cargo.toml services/ingestion-gateway/Cargo.toml
+COPY services/bot/Cargo.toml services/bot/Cargo.toml
+COPY crates/atlsd-common/Cargo.toml crates/atlsd-common/Cargo.toml
+COPY crates/atlsd-domain/Cargo.toml crates/atlsd-domain/Cargo.toml
+COPY crates/atlsd-auth/Cargo.toml crates/atlsd-auth/Cargo.toml
+COPY crates/atlsd-observability/Cargo.toml crates/atlsd-observability/Cargo.toml
+
+RUN mkdir -p services/core/src services/control-plane/src services/ingestion-gateway/src services/bot/src \
+    crates/atlsd-common/src crates/atlsd-domain/src crates/atlsd-auth/src crates/atlsd-observability/src \
+    && echo "fn main(){}" > services/core/src/main.rs \
+    && echo "fn main(){}" > services/control-plane/src/main.rs \
+    && echo "fn main(){}" > services/ingestion-gateway/src/main.rs \
+    && echo "fn main(){}" > services/bot/src/main.rs \
+    && echo "" > crates/atlsd-common/src/lib.rs \
+    && echo "" > crates/atlsd-domain/src/lib.rs \
+    && echo "" > crates/atlsd-auth/src/lib.rs \
+    && echo "" > crates/atlsd-observability/src/lib.rs
+
+ARG DOCKER_BUILD_TYPE=release
+
+RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then \
+        cargo build --release -p ingestion-gateway; \
+    else \
+        cargo build -p ingestion-gateway; \
+    fi
+
+COPY services/ingestion-gateway/src services/ingestion-gateway/src
+COPY crates/ crates/
+
+RUN touch services/ingestion-gateway/src/main.rs
+
+RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then \
+        cargo build --release -p ingestion-gateway; \
+    else \
+        cargo build -p ingestion-gateway; \
+    fi
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG DOCKER_BUILD_TYPE=release
+
+COPY --from=builder /build/target/${DOCKER_BUILD_TYPE}/ingestion-gateway /usr/local/bin/ingestion-gateway
+
+CMD ["ingestion-gateway"]
