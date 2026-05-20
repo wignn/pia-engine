@@ -15,17 +15,16 @@ class AdvancedSentimentAnalyzer:
             return
         
         logger.info(f"Loading HF pipeline with '{self.model_name}'...")
-        from transformers import BertTokenizer, AutoModelForSequenceClassification, pipeline
+        from transformers import BertTokenizer, BertForSequenceClassification, pipeline
         
         tokenizer = BertTokenizer.from_pretrained(self.model_name)
-        model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
+        model = BertForSequenceClassification.from_pretrained(self.model_name)
         
-        # top_k=None ensures we get scores for all labels (positive, negative, neutral)
         self.pipeline = pipeline(
             "sentiment-analysis",
             model=model,
             tokenizer=tokenizer,
-            device=-1, # CPU by default
+            device=-1,
             top_k=None
         )
         logger.info("HF model and pipeline initialized successfully.")
