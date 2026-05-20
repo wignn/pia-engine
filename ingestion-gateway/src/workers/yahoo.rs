@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use std::time::Duration;
 use chrono::Utc;
 use serde_json::json;
-use tracing::{error, info, debug};
+use std::sync::Arc;
+use std::time::Duration;
+use tracing::{debug, error, info};
 
 use crate::broker::BrokerPublisher;
 use crate::config::Config;
@@ -11,8 +11,11 @@ const POLL_INTERVAL_SEC: u64 = 10;
 const TOPIC: &str = "yahoo:indices";
 
 pub async fn run(_cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
-    info!(worker = "yahoo", "starting yahoo finance poller for SPX and DXY");
-    
+    info!(
+        worker = "yahoo",
+        "starting yahoo finance poller for SPX and DXY"
+    );
+
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -49,7 +52,7 @@ async fn poll_symbol(
     }
 
     let val: serde_json::Value = res.json().await?;
-    
+
     let price = val
         .get("chart")
         .and_then(|v| v.get("result"))
@@ -60,7 +63,12 @@ async fn poll_symbol(
         .and_then(|p| p.as_f64())
         .ok_or_else(|| anyhow::anyhow!("failed to parse regularMarketPrice from Yahoo response"))?;
 
-    debug!(worker = "yahoo", ticker = yahoo_ticker, price = price, "fetched price");
+    debug!(
+        worker = "yahoo",
+        ticker = yahoo_ticker,
+        price = price,
+        "fetched price"
+    );
 
     let payload = json!({
         "source": "yahoo",
