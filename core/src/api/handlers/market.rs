@@ -75,24 +75,38 @@ pub async fn get_history(_state: State<AppState>, Path(symbol): Path<String>) ->
         );
         match HTTP_CLIENT.get(&url).send().await {
             Ok(res) => {
-                if let Ok(data) = res.json::<Vec<Vec<Value>>>().await {
-                    let history: Vec<Value> = data
-                        .iter()
-                        .filter_map(|item| {
-                            if item.len() >= 5 {
-                                let time_ms = item[0].as_i64()?;
-                                let close_str = item[4].as_str()?;
-                                let close_val: f64 = close_str.parse().ok()?;
-                                Some(json!({
-                                    "time": time_ms / 1000,
-                                    "value": close_val
-                                }))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    return Json(json!(history));
+                let status = res.status();
+                if !status.is_success() {
+                    tracing::warn!("Binance history HTTP error for {}: {}", sym, status);
+                    return Json(json!([]));
+                }
+                match res.json::<Vec<Vec<Value>>>().await {
+                    Ok(data) => {
+                        let history: Vec<Value> = data
+                            .iter()
+                            .filter_map(|item| {
+                                if item.len() >= 5 {
+                                    let time_ms = item[0].as_i64()?;
+                                    let close_str = item[4].as_str()?;
+                                    let close_val: f64 = close_str.parse().ok()?;
+                                    Some(json!({
+                                        "time": time_ms / 1000,
+                                        "value": close_val
+                                    }))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        return Json(json!(history));
+                    }
+                    Err(err) => {
+                        tracing::warn!(
+                            "Failed to parse Binance history JSON for {}: {:?}",
+                            sym,
+                            err
+                        );
+                    }
                 }
             }
             Err(e) => {
@@ -109,41 +123,74 @@ pub async fn get_history(_state: State<AppState>, Path(symbol): Path<String>) ->
         _ => format!("{}=X", sym),
     };
 
+    let yahoo_symbol_encoded = yahoo_symbol.replace('^', "%5E").replace('=', "%3D");
+
     let url = format!(
         "https://query1.finance.yahoo.com/v8/finance/chart/{}?interval=1m&range=1d",
-        yahoo_symbol
+        yahoo_symbol_encoded
     );
 
     match HTTP_CLIENT.get(&url).send().await {
         Ok(res) => {
-            if let Ok(json_data) = res.json::<Value>().await {
-                if let Some(result) = json_data["chart"]["result"].get(0) {
-                    if let (Some(timestamps), Some(closes)) = (
-                        result["timestamp"].as_array(),
-                        result["indicators"]["quote"][0]["close"].as_array(),
-                    ) {
-                        let mut history = Vec::new();
-                        let len = std::cmp::min(timestamps.len(), closes.len());
-                        for i in 0..len {
-                            if let (Some(t), Some(c)) = (timestamps[i].as_i64(), closes[i].as_f64())
-                            {
-                                history.push(json!({
-                                    "time": t,
-                                    "value": c
-                                }));
+            let status = res.status();
+            if !status.is_success() {
+                tracing::warn!(
+                    "Yahoo history HTTP error for {} (ticker: {}): {}",
+                    sym,
+                    yahoo_symbol,
+                    status
+                );
+                return Json(json!([]));
+            }
+            match res.json::<Value>().await {
+                Ok(json_data) => {
+                    if let Some(result) = json_data["chart"]["result"].get(0) {
+                        if let (Some(timestamps), Some(closes)) = (
+                            result["timestamp"].as_array(),
+                            result["indicators"]["quote"][0]["close"].as_array(),
+                        ) {
+                            let mut history = Vec::new();
+                            let len = std::cmp::min(timestamps.len(), closes.len());
+                            for i in 0..len {
+                                if let (Some(t), Some(c)) =
+                                    (timestamps[i].as_i64(), closes[i].as_f64())
+                                {
+                                    history.push(json!({
+                                        "time": t,
+                                        "value": c
+                                    }));
+                                }
                             }
+                            let limit = 120;
+                            if history.len() > limit {
+                                history = history.split_off(history.len() - limit);
+                            }
+                            return Json(json!(history));
                         }
-                        let limit = 120;
-                        if history.len() > limit {
-                            history = history.split_off(history.len() - limit);
-                        }
-                        return Json(json!(history));
                     }
+                    tracing::warn!(
+                        "Yahoo history JSON structure mismatch for {} (ticker: {})",
+                        sym,
+                        yahoo_symbol
+                    );
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        "Failed to parse Yahoo history JSON for {} (ticker: {}): {:?}",
+                        sym,
+                        yahoo_symbol,
+                        err
+                    );
                 }
             }
         }
         Err(e) => {
-            tracing::warn!("Failed to fetch Yahoo history for {}: {:?}", sym, e);
+            tracing::warn!(
+                "Failed to fetch Yahoo history for {} (ticker: {}): {:?}",
+                sym,
+                yahoo_symbol,
+                e
+            );
         }
     }
 
