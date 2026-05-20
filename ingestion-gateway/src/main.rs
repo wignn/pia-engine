@@ -108,6 +108,17 @@ async fn main() {
         warn!("BINANCE_ENABLED=false, binance worker disabled");
     }
 
+    // Spawn Yahoo Finance indices poller (SPX and DXY)
+    {
+        let cfg = cfg.clone();
+        let broker = broker.clone();
+        let handle = tokio::spawn(async move {
+            workers::yahoo::run(cfg, broker).await;
+        });
+        worker_handles.push(("yahoo", handle));
+        info!("yahoo worker spawned");
+    }
+
     if worker_handles.is_empty() {
         error!("no workers enabled");
         std::process::exit(1);

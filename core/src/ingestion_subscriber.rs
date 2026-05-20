@@ -104,6 +104,7 @@ async fn subscribe_loop(redis_url: &str, hub: &Arc<ws::Hub>) -> anyhow::Result<(
         let asset_type = match source {
             "binance" => "crypto",
             "finnhub" | "tiingo" => "forex",
+            "yahoo" => "index",
             _ => "unknown",
         }
         .to_string();
