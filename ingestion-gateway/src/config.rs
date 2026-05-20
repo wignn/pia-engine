@@ -28,7 +28,7 @@ impl Config {
     pub fn load() -> Self {
         let binance_symbols_raw = get_env(
             "BINANCE_SYMBOLS",
-            "btcusdt,ethusdt,solusdt,bnbusdt,xrpusdt,dogeusdt,adausdt",
+            "btcusdt,ethusdt,solusdt,bnbusdt",
         );
         let binance_symbols: Vec<String> = binance_symbols_raw
             .split(',')
