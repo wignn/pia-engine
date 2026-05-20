@@ -53,6 +53,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/market/prices/{symbol}",
             get(handlers::market::get_price),
         )
+        .route(
+            "/api/v1/market/history/{symbol}",
+            get(handlers::market::get_history),
+        )
         .route("/api/v1/forex/news", get(handlers::news::list_news))
         .route(
             "/api/v1/forex/news/latest",
@@ -225,7 +229,6 @@ async fn generate_ws_ticket(
     State(state): State<AppState>,
     request: axum::extract::Request,
 ) -> Result<Json<TicketResponse>, axum::http::StatusCode> {
-    // strict_api_key_auth has already validated the credential; this preserves it for the one-time ticket.
     let api_key = request
         .headers()
         .get("X-API-Key")
