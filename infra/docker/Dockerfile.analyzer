@@ -16,7 +16,7 @@ COPY services/analyzer/ .
 
 # Pre-download model weights during image building to ensure offline-ready container and fast start times
 RUN python -c "from transformers import AutoTokenizer, AutoModelForSequenceClassification; \
-               AutoTokenizer.from_pretrained('yiyanghkust/finbert-tone'); \
+               AutoTokenizer.from_pretrained('yiyanghkust/finbert-tone', use_fast=False); \
                AutoModelForSequenceClassification.from_pretrained('yiyanghkust/finbert-tone')"
 
 EXPOSE 5000

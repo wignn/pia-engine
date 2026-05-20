@@ -17,7 +17,7 @@ class AdvancedSentimentAnalyzer:
         logger.info(f"Loading HF pipeline with '{self.model_name}'...")
         from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
         
-        tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=False)
         model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
         
         # top_k=None ensures we get scores for all labels (positive, negative, neutral)
