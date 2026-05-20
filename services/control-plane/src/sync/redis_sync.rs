@@ -1,6 +1,5 @@
 use tracing::warn;
 
-/// Publish a config change event to Redis so the core service reloads tenant configs.
 pub async fn publish_config_changed(redis: &Option<redis::Client>, prefix: &str) {
     let Some(client) = redis else { return };
 

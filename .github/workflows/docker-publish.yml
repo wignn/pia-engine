@@ -40,13 +40,7 @@ jobs:
       - name: Cargo test
         run: cargo test --workspace
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
 
-      - name: Portal build check
-        run: cd apps/portal && npm ci && npm run build
 
   changes:
     needs: check
@@ -79,10 +73,6 @@ jobs:
               - 'Cargo.lock'
               - '.dockerignore'
               - 'infra/docker/Dockerfile.control-plane'
-            portal:
-              - 'apps/portal/**'
-              - '.dockerignore'
-              - 'infra/docker/Dockerfile.portal'
             ingestion:
               - 'services/ingestion-gateway/**'
               - 'crates/**'
@@ -109,7 +99,6 @@ jobs:
           BUILD_ALL: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
           CORE_CHANGED: ${{ steps.filter.outputs.core }}
           CONTROL_PLANE_CHANGED: ${{ steps.filter.outputs.control_plane }}
-          PORTAL_CHANGED: ${{ steps.filter.outputs.portal }}
           INGESTION_CHANGED: ${{ steps.filter.outputs.ingestion }}
           BOT_CHANGED: ${{ steps.filter.outputs.bot }}
           ANALYZER_CHANGED: ${{ steps.filter.outputs.analyzer }}
@@ -128,10 +117,6 @@ jobs:
 
           if [[ "$BUILD_ALL" == "true" || "$CONTROL_PLANE_CHANGED" == "true" ]]; then
             add '{"image":"atlsd-control-plane","dockerfile":"infra/docker/Dockerfile.control-plane"}'
-          fi
-
-          if [[ "$BUILD_ALL" == "true" || "$PORTAL_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-portal","dockerfile":"infra/docker/Dockerfile.portal"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$INGESTION_CHANGED" == "true" ]]; then

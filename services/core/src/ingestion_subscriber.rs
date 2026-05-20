@@ -208,7 +208,6 @@ async fn subscribe_loop(
                 }
             });
         }
-        // --- End Aggregation ---
 
         let tick_data = serde_json::json!({
             "tick": {

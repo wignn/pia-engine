@@ -18,7 +18,6 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# Instantiate the analyzer
 analyzer = AdvancedSentimentAnalyzer()
 
 class AnalysisRequest(BaseModel):
