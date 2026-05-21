@@ -103,24 +103,20 @@ class AdvancedSentimentAnalyzer:
         tickers = set()
         currencies = set()
         
-        # Match stock tickers prefixed with '$' (e.g. $AAPL, $TSLA)
         stock_matches = re.findall(r'\$[A-Z]{1,5}\b', text)
         for m in stock_matches:
             tickers.add(m.upper())
             
-        # Match forex currency pairs with slashes (e.g. EUR/USD, GBP/JPY)
         forex_slashes = re.findall(r'\b[A-Z]{3}/[A-Z]{3}\b', text)
         for m in forex_slashes:
             currencies.add(m.upper())
             
-        # Match currency pair combinations written together (e.g. EURUSD, USDJPY)
         common_currencies = r'\b(EUR|USD|GBP|JPY|AUD|CAD|CHF|NZD)(USD|JPY|GBP|EUR|CAD|CHF|AUD|NZD)\b'
         forex_merges = re.findall(common_currencies, text)
         for m1, m2 in forex_merges:
             if m1 != m2:
                 currencies.add(f"{m1.upper()}/{m2.upper()}")
                 
-        # Match common crypto tickers (e.g. BTC, ETH, SOL) in uppercase
         crypto_keywords = r'\b(BTC|ETH|SOL|ADA|XRP|DOT|DOGE|LTC|LINK|SHIB|AVAX|MATIC)\b'
         crypto_matches = re.findall(crypto_keywords, text)
         for m in crypto_matches:
