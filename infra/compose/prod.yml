@@ -72,6 +72,8 @@ services:
       - ../env/.env.rsshub
     ports:
       - "1201:1200"
+    networks:
+      - private
     healthcheck:
       test:
         [
