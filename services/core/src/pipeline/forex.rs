@@ -16,8 +16,6 @@ use crate::ws::{self, ForexNewsArticleData, Hub};
 
 const MAX_NEWS_AGE_HOURS: i64 = 12;
 const REDIS_STREAM_MAX_LEN: usize = 50_000;
-
-// Redis stream consumer tuning.
 const CONSUMER_GROUP: &str = "forex-news-ingest-group";
 const CONSUMER_NAME: &str = "forex-news-worker-1";
 const CONSUMER_BATCH_SIZE: usize = 50;
