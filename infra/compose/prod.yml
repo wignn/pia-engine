@@ -26,6 +26,11 @@ services:
       - redis_data:/data
     networks:
       - private
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   core:
     container_name: world-core-prod
