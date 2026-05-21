@@ -21,7 +21,7 @@ pub async fn analyze_text(
 
     if is_url {
         let cached: Option<(String, String, Value)> = sqlx::query_as(
-            "SELECT title, content, raw_response FROM url_analysis_cache WHERE url = $1"
+            "SELECT title, content, raw_response FROM url_analysis_cache WHERE url = $1",
         )
         .bind(text_trimmed)
         .fetch_optional(&_state.db)
@@ -56,7 +56,7 @@ pub async fn analyze_text(
                         if is_url {
                             let title = val.get("title").and_then(|t| t.as_str()).unwrap_or("");
                             let content = val.get("content").and_then(|c| c.as_str()).unwrap_or("");
-                            
+
                             let _ = sqlx::query(
                                 "INSERT INTO url_analysis_cache (url, title, content, raw_response) \
                                  VALUES ($1, $2, $3, $4) \
