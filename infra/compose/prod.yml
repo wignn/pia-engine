@@ -67,9 +67,6 @@ services:
       - ../env/.env.rsshub
     ports:
       - "1201:1200"
-    networks:
-      private:
-        ipv4_address: 172.29.0.12
     healthcheck:
       test:
         [
