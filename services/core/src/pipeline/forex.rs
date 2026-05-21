@@ -12,14 +12,14 @@ use tracing::{debug, error, info, warn};
 use crate::collector::forex::{default_forex_feeds, feed_name_by_url, ForexCollector};
 use crate::html;
 use crate::scraper::article::ArticleScraper;
-use crate::ws::{self, Hub, NewsArticleData};
+use crate::ws::{self, ForexNewsArticleData, Hub};
 
 const MAX_NEWS_AGE_HOURS: i64 = 12;
 const REDIS_STREAM_MAX_LEN: usize = 50_000;
 
 // Redis stream consumer tuning.
-const CONSUMER_GROUP: &str = "news-ingest-group";
-const CONSUMER_NAME: &str = "news-worker-1";
+const CONSUMER_GROUP: &str = "forex-news-ingest-group";
+const CONSUMER_NAME: &str = "forex-news-worker-1";
 const CONSUMER_BATCH_SIZE: usize = 50;
 const CONSUMER_BLOCK_MS: usize = 5000;
 const BACKOFF_INITIAL_MS: u64 = 500;
@@ -70,7 +70,7 @@ impl ForexPipeline {
             db,
             hub,
             redis_client,
-            stream_key: format!("{}:stream:news:ingest", redis_channel_prefix),
+            stream_key: format!("{}:stream:forex-news:ingest", redis_channel_prefix),
         }
     }
 
@@ -464,7 +464,7 @@ async fn process_entry(
     };
 
     let res: Result<Option<(uuid::Uuid,)>, _> = sqlx::query_as(
-        "INSERT INTO news_articles \
+        "INSERT INTO forex_news_articles \
          (id, source_id, content_hash, original_url, original_title, original_content, \
           translated_title, summary, is_processed, processed_at, published_at) \
          VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, '', $6, TRUE, NOW(), $7::timestamptz) \
@@ -501,7 +501,7 @@ async fn process_entry(
         crate::pipeline::sentiment::analyze(&format!("{} - {}", title, summary)).await;
 
     let _ = sqlx::query(
-        "INSERT INTO news_analyses (id, article_id, sentiment, impact_level) \
+        "INSERT INTO forex_news_analyses (id, article_id, sentiment, impact_level) \
          VALUES (gen_random_uuid(), $1, $2, 'medium')",
     )
     .bind(article_id)
@@ -509,7 +509,7 @@ async fn process_entry(
     .execute(db)
     .await;
 
-    let article_data = NewsArticleData {
+    let article_data = ForexNewsArticleData {
         id: hash.clone(),
         title: title.clone(),
         title_id: None,
@@ -533,12 +533,14 @@ async fn process_entry(
         },
     };
 
-    let embed = ws::build_news_embed(&article_data);
+    let embed = ws::build_forex_news_embed(&article_data);
     let data = serde_json::json!({
         "article": article_data,
         "discord_embed": embed,
     });
-    let count = hub.broadcast(ws::EVENT_NEWS_NEW, data, "news").await;
+    let count = hub
+        .broadcast(ws::EVENT_FOREX_NEWS_NEW, data, "forex_news")
+        .await;
     info!(clients = count, title = %truncate_str(title, 50), "news broadcast ok");
 
     "processed"
@@ -553,7 +555,7 @@ async fn ensure_source(db: &PgPool, source_name: &str, feed_url: &str) -> String
     };
 
     let existing: Option<(String,)> =
-        sqlx::query_as("SELECT id FROM news_sources WHERE slug = $1 LIMIT 1")
+        sqlx::query_as("SELECT id FROM forex_news_sources WHERE slug = $1 LIMIT 1")
             .bind(&slug)
             .fetch_optional(db)
             .await
@@ -591,7 +593,7 @@ async fn ensure_source(db: &PgPool, source_name: &str, feed_url: &str) -> String
     };
 
     let _ = sqlx::query(
-        "INSERT INTO news_sources (id, name, slug, source_type, url, rss_url, is_active) \
+        "INSERT INTO forex_news_sources (id, name, slug, source_type, url, rss_url, is_active) \
          VALUES ($1, $2, $3, 'rss', $4, $5, TRUE) \
          ON CONFLICT (slug) DO NOTHING",
     )
@@ -604,7 +606,7 @@ async fn ensure_source(db: &PgPool, source_name: &str, feed_url: &str) -> String
     .await;
 
     let re_read: Option<(String,)> =
-        sqlx::query_as("SELECT id FROM news_sources WHERE slug = $1 LIMIT 1")
+        sqlx::query_as("SELECT id FROM forex_news_sources WHERE slug = $1 LIMIT 1")
             .bind(&slug)
             .fetch_optional(db)
             .await

@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 // Event type constants
-pub const EVENT_NEWS_NEW: &str = "news.new";
+pub const EVENT_FOREX_NEWS_NEW: &str = "forex_news.new";
 #[allow(dead_code)]
-pub const EVENT_NEWS_HIGH_IMPACT: &str = "news.high_impact";
-pub const EVENT_EQUITY_NEWS_NEW: &str = "equity.news.new";
+pub const EVENT_FOREX_NEWS_HIGH_IMPACT: &str = "forex_news.high_impact";
+pub const EVENT_STOCK_NEWS_NEW: &str = "stock_news.new";
 pub const EVENT_CALENDAR_REMINDER: &str = "calendar.reminder";
 pub const EVENT_MARKET_TRADE: &str = "market.trade";
 #[allow(dead_code)]
@@ -19,7 +19,7 @@ pub const EVENT_HEARTBEAT: &str = "heartbeat";
 pub const EVENT_SYSTEM_STATUS: &str = "system.status";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewsArticleData {
+pub struct ForexNewsArticleData {
     pub id: String,
     #[serde(rename = "original_title")]
     pub title: String,
@@ -43,7 +43,7 @@ pub struct NewsArticleData {
     pub image_url: Option<String>,
 }
 
-pub fn build_news_embed(a: &NewsArticleData) -> Value {
+pub fn build_forex_news_embed(a: &ForexNewsArticleData) -> Value {
     let color = 0x0099FF;
     let impact_bars: std::collections::HashMap<&str, &str> =
         [("high", "▰▰▰"), ("medium", "▰▰▱"), ("low", "▰▱▱")]
@@ -83,7 +83,7 @@ pub fn build_news_embed(a: &NewsArticleData) -> Value {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EquityNewsData {
+pub struct StockNewsData {
     pub id: String,
     pub title: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -104,7 +104,7 @@ pub struct EquityNewsData {
     pub processed_at: String,
 }
 
-pub fn build_equity_embed(s: &EquityNewsData) -> Value {
+pub fn build_stock_embed(s: &StockNewsData) -> Value {
     let color = 0x5865F2;
 
     let impact_bars: std::collections::HashMap<&str, &str> =
@@ -156,7 +156,7 @@ pub fn build_equity_embed(s: &EquityNewsData) -> Value {
         "color": color,
         "fields": fields,
         "footer": {
-            "text": format!("Equity Alert • {} • {}", s.source_name, footer_date),
+            "text": format!("Stock Alert • {} • {}", s.source_name, footer_date),
         }
     })
 }

@@ -1,7 +1,6 @@
--- Self-healing migration to ensure news tables exist in case migration 1 was skipped on dirty DB volumes
+-- Self-healing migration to ensure forex news tables exist
 
--- News sources registry
-CREATE TABLE IF NOT EXISTS news_sources (
+CREATE TABLE IF NOT EXISTS forex_news_sources (
     id         TEXT PRIMARY KEY,
     name       TEXT NOT NULL,
     slug       TEXT NOT NULL UNIQUE,
@@ -12,10 +11,9 @@ CREATE TABLE IF NOT EXISTS news_sources (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- News articles
-CREATE TABLE IF NOT EXISTS news_articles (
+CREATE TABLE IF NOT EXISTS forex_news_articles (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source_id        TEXT REFERENCES news_sources(id),
+    source_id        TEXT REFERENCES forex_news_sources(id),
     content_hash     TEXT NOT NULL UNIQUE,
     original_url     TEXT NOT NULL,
     original_title   TEXT NOT NULL,
@@ -28,22 +26,20 @@ CREATE TABLE IF NOT EXISTS news_articles (
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_news_articles_processed_at ON news_articles(processed_at DESC NULLS LAST);
-CREATE INDEX IF NOT EXISTS idx_news_articles_content_hash ON news_articles(content_hash);
+CREATE INDEX IF NOT EXISTS idx_forex_news_articles_processed_at ON forex_news_articles(processed_at DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_forex_news_articles_content_hash ON forex_news_articles(content_hash);
 
--- News analysis (sentiment, impact)
-CREATE TABLE IF NOT EXISTS news_analyses (
+CREATE TABLE IF NOT EXISTS forex_news_analyses (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    article_id     UUID REFERENCES news_articles(id) ON DELETE CASCADE,
+    article_id     UUID REFERENCES forex_news_articles(id) ON DELETE CASCADE,
     sentiment      TEXT,
     impact_level   TEXT,
     currency_pairs TEXT,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_news_analyses_article_id ON news_analyses(article_id);
+CREATE INDEX IF NOT EXISTS idx_forex_news_analyses_article_id ON forex_news_analyses(article_id);
 
--- Stock news
 CREATE TABLE IF NOT EXISTS stock_news (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     content_hash   TEXT NOT NULL UNIQUE,

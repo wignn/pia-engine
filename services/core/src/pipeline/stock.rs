@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 use crate::collector::stock::StockCollector;
-use crate::ws::{self, EquityNewsData, Hub};
+use crate::ws::{self, Hub, StockNewsData};
 
 const MAX_STOCK_NEWS_AGE_HOURS: i64 = 12;
 
@@ -135,7 +135,7 @@ impl StockPipeline {
             entry.content.clone()
         };
 
-        let equity_data = EquityNewsData {
+        let stock_data = StockNewsData {
             id: entry.content_hash.clone(),
             title: entry.title.clone(),
             summary: Some(summary_truncated),
@@ -155,15 +155,15 @@ impl StockPipeline {
             processed_at: Utc::now().to_rfc3339(),
         };
 
-        let embed = ws::build_equity_embed(&equity_data);
+        let embed = ws::build_stock_embed(&stock_data);
         let data = serde_json::json!({
-            "article": equity_data,
+            "article": stock_data,
             "discord_embed": embed,
-            "asset_type": "equity",
+            "asset_type": "stock",
         });
         let count = self
             .hub
-            .broadcast(ws::EVENT_EQUITY_NEWS_NEW, data, "equity_news")
+            .broadcast(ws::EVENT_STOCK_NEWS_NEW, data, "stock_news")
             .await;
 
         info!(clients = count, title = %truncate_title(&entry.title, 50), tickers = ?entry.tickers, "stock broadcast ok");

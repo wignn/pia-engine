@@ -17,8 +17,8 @@ pub struct ClientHandle {
 pub fn default_channels() -> HashSet<String> {
     [
         "all",
-        "news",
-        "equity_news",
+        "forex_news",
+        "stock_news",
         "high_impact",
         "calendar",
         "market_data",

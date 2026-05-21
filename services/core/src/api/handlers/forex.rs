@@ -14,7 +14,7 @@ pub struct ListQuery {
     pub page_size: Option<i64>,
 }
 
-pub async fn list_news(
+pub async fn list_forex_news(
     State(state): State<AppState>,
     Query(query): Query<ListQuery>,
 ) -> Json<Value> {
@@ -41,8 +41,8 @@ pub async fn list_news(
         "SELECT a.id::text, a.source_id, a.content_hash, a.original_url, a.original_title, \
          a.summary, a.is_processed, a.processed_at, a.published_at, \
          an.sentiment, an.impact_level \
-         FROM news_articles a \
-         LEFT JOIN news_analyses an ON a.id = an.article_id \
+         FROM forex_news_articles a \
+         LEFT JOIN forex_news_analyses an ON a.id = an.article_id \
          ORDER BY a.processed_at DESC NULLS LAST \
          LIMIT $1 OFFSET $2",
     )
@@ -71,12 +71,12 @@ pub async fn list_news(
             })
             .collect(),
         Err(e) => {
-            error!(error = %e, "list news query failed");
+            error!(error = %e, "list forex news query failed");
             return Json(json!({ "error": "query failed" }));
         }
     };
 
-    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM news_articles")
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM forex_news_articles")
         .fetch_one(&state.db)
         .await
         .unwrap_or(0);
@@ -97,14 +97,12 @@ pub struct LatestQuery {
     pub limit: Option<i64>,
 }
 
-pub async fn latest_news(
+pub async fn latest_forex_news(
     State(state): State<AppState>,
     Query(query): Query<LatestQuery>,
 ) -> Json<Value> {
     let limit = query.limit.unwrap_or(10).clamp(1, 50);
 
-    // Keep this query independent from optional enrichment tables so the feed
-    // response remains stable during partial schema rollouts.
     let rows = sqlx::query_as::<
         _,
         (
@@ -125,9 +123,9 @@ pub async fn latest_news(
          a.translated_title, a.summary, a.published_at, a.processed_at, \
          COALESCE(s.name, 'Unknown') AS source_name, \
          an.sentiment, an.impact_level \
-         FROM news_articles a \
-         LEFT JOIN news_sources s ON a.source_id = s.id \
-         LEFT JOIN news_analyses an ON a.id = an.article_id \
+         FROM forex_news_articles a \
+         LEFT JOIN forex_news_sources s ON a.source_id = s.id \
+         LEFT JOIN forex_news_analyses an ON a.id = an.article_id \
          WHERE a.is_processed = TRUE \
          ORDER BY a.processed_at DESC NULLS LAST \
          LIMIT $1",
@@ -158,7 +156,7 @@ pub async fn latest_news(
             })
             .collect(),
         Err(e) => {
-            error!(error = %e, "latest news query failed");
+            error!(error = %e, "latest forex news query failed");
             return Json(json!({ "error": "query failed" }));
         }
     };
@@ -169,7 +167,7 @@ pub async fn latest_news(
     }))
 }
 
-pub async fn get_news(State(state): State<AppState>, Path(id): Path<String>) -> Json<Value> {
+pub async fn get_forex_news(State(state): State<AppState>, Path(id): Path<String>) -> Json<Value> {
     let row = sqlx::query_as::<
         _,
         (
@@ -187,7 +185,7 @@ pub async fn get_news(State(state): State<AppState>, Path(id): Path<String>) -> 
     >(
         "SELECT id::text, source_id, content_hash, original_url, original_title, \
          original_content, summary, is_processed, processed_at, published_at \
-         FROM news_articles WHERE id::text = $1",
+         FROM forex_news_articles WHERE id::text = $1",
     )
     .bind(&id)
     .fetch_optional(&state.db)
@@ -209,7 +207,7 @@ pub async fn get_news(State(state): State<AppState>, Path(id): Path<String>) -> 
         })),
         Ok(None) => Json(json!({ "error": "article not found" })),
         Err(e) => {
-            error!(error = %e, "get news query failed");
+            error!(error = %e, "get forex news query failed");
             Json(json!({ "error": "query failed" }))
         }
     }

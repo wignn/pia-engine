@@ -57,18 +57,21 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/market/history/{symbol}",
             get(handlers::market::get_history),
         )
-        .route("/api/v1/forex/news", get(handlers::news::list_news))
+        .route("/api/v1/forex/news", get(handlers::forex::list_forex_news))
         .route(
             "/api/v1/forex/news/latest",
-            get(handlers::news::latest_news),
+            get(handlers::forex::latest_forex_news),
         )
-        .route("/api/v1/forex/news/{id}", get(handlers::news::get_news))
+        .route(
+            "/api/v1/forex/news/{id}",
+            get(handlers::forex::get_forex_news),
+        )
         .route(
             "/api/v1/forex/calendar",
             get(handlers::calendar::list_calendar),
         )
         .route(
-            "/api/v1/equity/news",
+            "/api/v1/stock/news",
             get(handlers::stock::latest_stock_news),
         )
         .route("/api/v1/analyze", post(handlers::sentiment::analyze_text))
@@ -82,8 +85,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/ws", get(ws_general_handler))
         .route("/api/v1/ws/market", get(ws_market_handler))
         .route("/api/v1/ws/market/{symbol}", get(ws_handler_single_symbol))
-        .route("/api/v1/ws/news", get(ws_news_handler))
-        .route("/api/v1/ws/equity", get(ws_equity_handler))
+        .route("/api/v1/ws/forex-news", get(ws_forex_news_handler))
+        .route("/api/v1/ws/stock", get(ws_stock_handler))
         .route("/api/v1/ws/calendar", get(ws_calendar_handler))
         .route("/api/v1/ws/x", get(ws_x_handler))
         .route("/api/v1/ws/x/{username}", get(ws_handler_single_x_username))
@@ -274,20 +277,20 @@ async fn ws_market_handler(
     ws_handler_inner(ws, state, params, Some("market_data")).await
 }
 
-async fn ws_news_handler(
+async fn ws_forex_news_handler(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Response {
-    ws_handler_inner(ws, state, params, Some("news")).await
+    ws_handler_inner(ws, state, params, Some("forex_news")).await
 }
 
-async fn ws_equity_handler(
+async fn ws_stock_handler(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Response {
-    ws_handler_inner(ws, state, params, Some("equity_news")).await
+    ws_handler_inner(ws, state, params, Some("stock_news")).await
 }
 
 async fn ws_calendar_handler(
