@@ -1,129 +1,160 @@
 # ATLSD Platform
 
-ATLSD is a market information aggregation platform that combines multi-source data collection, content processing, real-time distribution, and tenant-based access control within a unified architecture. This repository is designed as the foundation for a data product that can evolve into a commercially operated subscription service.
+ATLSD is a real-time market intelligence and data distribution platform. It aggregates multi-source financial feeds, performs real-time Natural Language Processing (NLP) sentiment analysis, and distributes data via WebSockets and REST APIs under a tenant-aware subscription model.
 
-## Product Overview
+---
 
-The platform separates responsibilities into three primary layers:
+## Architecture Diagram
 
-- **Core engine** for market data ingestion, normalization, processing, and distribution.
-- **Control plane** for user identity, API key management, tenant configuration, service plans, and usage metrics.
-- **Web portal** as the interface for account and service configuration management.
+Below is the platform's service-oriented architecture, showing data flow from ingestion to final client distribution:
 
-This separation allows each layer to evolve independently without compromising domain consistency or inter-service API contracts.
+```mermaid
+graph TD
+    %% Clients
+    Browser["SvelteKit Web App (Vercel)"]
+    Bot["Discord / Telegram Bots"]
 
-## Architectural Characteristics
+    %% Data Ingress
+    subgraph Ingress ["Data Ingress Layer"]
+        Forex["Forex & Global News Feeds"]
+        Stock["Stock & Equity News Feeds"]
+        Calendar["Economic Calendar Sources"]
+        Twitter["X / Twitter Accounts (via RSSHub)"]
+    end
 
-ATLSD follows a service-oriented architecture with clear context boundaries:
+    %% Core Services
+    subgraph Backend ["Service Mesh (Docker Compose)"]
+        Core["Rust Core Engine (Axum & Tokio)"]
+        Plane["Rust Control Plane (SaaS Admin)"]
+        Analyzer["Python NLP Analyzer (FinBERT)"]
+    end
 
-- **Compute layer (Rust, Axum, Tokio):** handles HTTP endpoints, WebSocket channels, schedulers, and asynchronous pipelines.
-- **Persistence layer (PostgreSQL):** stores news content, tenant data, API keys, service plans, and usage logs.
-- **Realtime coordination (Redis, optional):** synchronizes tenant changes and enforces low-latency daily quota control.
-- **External data ingress:** RSS feeds, article scraping, X feeds via RSSHub, economic calendar events, and TradingView market streams.
+    %% Storage
+    subgraph Data ["Persistence & Cache"]
+        Postgres[("PostgreSQL Database")]
+        Redis[("Redis (Pub/Sub & Streams)")]
+    end
 
-This design prioritizes throughput, tenant isolation, and operational resilience under polling workloads and real-time event fanout.
+    %% Data Flow
+    Forex -->|Poll & Scrape| Core
+    Stock -->|Poll| Core
+    Calendar -->|Poll| Core
+    Twitter -->|Poll| Core
+
+    Core -->|Save & Read| Postgres
+    Core -->|Sentiment Analysis Request| Analyzer
+    Core -->|Event Stream Publish| Redis
+    
+    Plane -->|Identity & Entitlements| Postgres
+    Plane -->|Sync Tenant Limits| Redis
+
+    %% Client Access
+    Browser -->|REST & WebSockets| Core
+    Browser -->|Interactive NLP Sandbox| Core
+    Bot -->|REST & WebSockets| Core
+
+    classDef client fill:#2962FF,stroke:#1E53E5,color:#fff;
+    classDef service fill:#1E222D,stroke:#2A2E39,color:#D1D4DC;
+    classDef db fill:#089981,stroke:#056656,color:#fff;
+    
+    class Browser,Bot client;
+    class Core,Plane,Analyzer service;
+    class Postgres,Redis db;
+```
+
+---
+
+## How It Works
+
+The platform operates through five coordinated stages:
+
+### 1. Multi-Source Ingress
+* **News & Market Calendars:** The Core service runs scheduled worker threads to poll external global news RSS feeds and economic calendar events.
+* **Social Feeds:** Aggregates X (Twitter) posts via a unified RSSHub instance. It merges global configurations with custom, per-tenant user lists.
+* **Stock & Equity News:** Collects updates from regional equity markets and schedules regular checks for new publications.
+
+### 2. Natural Language Processing (NLP) Pipeline
+When news articles are fetched, they enter the Core processing pipeline:
+1. **Extraction & Sanitization:** Article HTML is parsed, stripped of boilerplate elements, and sanitized into plaintext.
+2. **Tone Analysis:** The Core service forwards the sanitized title and content to the Python **NLP Analyzer** service.
+3. **FinBERT Prediction:** The analyzer uses Hugging Face's `yiyanghkust/finbert-tone` model to evaluate whether the text has a *positive*, *negative*, or *neutral* tone, outputting a prediction, confidence scores, and sentence-level highlights.
+4. **Database Commit:** The computed sentiment and extracted metadata (e.g. currencies, stock tickers) are committed to PostgreSQL.
+
+### 3. Real-Time Distribution
+* **Redis Streams:** Processed events are published to Redis Streams (e.g. `world-info:stream:news:ingest`) for fan-out processing.
+* **Active WebSockets:** The Core WS Hub pushes news alerts and economic calendar events to all connected clients (browser apps, bots) with sub-second latency.
+
+### 4. Tenant Governance (SaaS Control Plane)
+* Access validation utilizes either secure JWTs or hashed API keys.
+* When a client connects, the system fetches the active plan configuration (limits on daily requests, max concurrent WebSockets, and restricted tickers/symbols).
+* Requests increment counters in Redis. If a tenant exceeds their plan quota, the request is throttled (rate-limited), ensuring resource isolation.
+
+### 5. Frontend & Interactive AI Sandbox
+* The **SvelteKit Web App** provides a dashboard with live news, and an economic calendar.
+* Users can use the **AI Sentiment Analyzer** sandbox to paste any custom financial text (headlines, press releases) to see the FinBERT model's probability distribution and color-coded sentiment highlights in real time.
+
+---
 
 ## Core Components
 
-### 1. Core Service
+1. **Core Service (Rust, Axum, Tokio):** The high-throughput data collector, API gateway, and WebSocket server. Runs embedded migrations and handles telemetry.
+2. **Control Plane (Rust, Axum):** The identity, key management, and subscription ledger. Authorizes tenant plans and updates limits.
+3. **NLP Analyzer (Python, FastAPI, PyTorch):** Houses the `finbert-tone` transformer model. Performs entity parsing (currencies, tickers) and tone highlights.
+4. **Web App (SvelteKit, Tailwind CSS v4):** High-performance frontend deployed on Vercel. Renders live market data and the interactive NLP sandbox.
 
-The core service is the primary data engine and runs multiple parallel pipelines:
-
-- **News pipeline** to consume RSS feeds, scrape article content, clean HTML, and publish processed content to real-time channels.
-- **Stock pipeline** to collect equity-related news and deliver timely updates.
-- **Calendar pipeline** to monitor scheduled economic events.
-- **Twitter/X pipeline** powered by RSSHub with username aggregation from both global and tenant configurations.
-- **Price stream pipeline** to consume TradingView streams with volatility spike detection.
-
-The core also exposes public HTTP endpoints, private key-protected endpoints, and multiple WebSocket channels for low-latency event distribution.
-
-### 2. Control Plane
-
-The control plane acts as the SaaS administration center:
-
-- Registration, login, account verification, and JWT-based identity.
-- Support for external OAuth providers.
-- API key creation, update, and revocation.
-- Per-user tenant configuration management.
-- Service plan catalog and plan upgrade flows.
-- Usage summary and API consumption history.
-
-This component is the authoritative source of tenant entitlements, which are synchronized to the core service.
-
-### 3. Portal
-
-The portal is built with React and Vite as the product-facing interface, communicating with the control plane via the v1 API. It focuses on account management, API credentials, tenant configuration, and visibility into plans and usage.
-
-## Multi-Tenant Model
-
-ATLSD applies a tenant-aware model at the request level:
-
-- Access validation can use either **JWT Bearer** tokens or **API keys**.
-- Tenant context includes user identity, active plan, and service limits.
-- Plan constraints include daily request quotas, WebSocket connection limits, per-minute rate limits, and feature capabilities.
-- Tenant configuration (such as X usernames and TradingView symbols) is loaded from centralized storage and cached in memory for fast access.
-
-With this approach, policy enforcement remains consistent across both API and real-time distribution layers.
-
-## Data Domain and Schema
-
-The database schema reflects two primary domains:
-
-- **Market content domain:** news sources, articles, news analyses, and stock news data.
-- **SaaS domain:** users, api_keys, tenant_configs, usage_logs, plans, and OAuth account relations.
-
-This modeling strategy cleanly separates editorial and market data concerns from business and access-control concerns, without duplicating control logic.
-
-## Security and Access Control
-
-The platform applies layered controls:
-
-- SHA-256 API key hashing and hash-only storage.
-- Middleware-based endpoint authorization for public, optional-auth, and strict-auth modes.
-- JWT token support for portal user sessions.
-- Tenant entitlement isolation based on active plan and account status.
-- Quota protection through daily counters in Redis (fail-open behavior if Redis is unavailable).
-
-This implementation balances practical security, performance, and service availability.
-
-## Observability and Operations
-
-ATLSD adopts production-oriented observability patterns:
-
-- Structured JSON logging for Rust services.
-- Scheduled background tasks for pipelines and tenant registry synchronization.
-- Batched usage log inserts for database I/O efficiency.
-- Graceful HTTP server shutdown to preserve state consistency during termination.
-
-These patterns support incident investigation, performance analysis, and stable operation under increasing traffic.
-
-## Infrastructure Integration
-
-The infrastructure layer composes containers for key components:
-
-- PostgreSQL as the primary datastore.
-- Core service and control plane as separate backend services.
-- Portal as a containerized frontend application.
-- RSSHub as the social feed source.
-
-This composition provides a consistent deployment foundation across development and production environments.
-
-## Delivery and Repository Standards
-
-The repository is managed as a multi-crate Rust workspace with a separate frontend application. CI/CD pipelines publish container images per major component, enabling service version traceability by commit, tag, and stable release channels.
-
-Code organization emphasizes clear domain boundaries, auditability of changes, and long-term product maintainability.
+---
 
 ## Repository Structure
 
-- `apps/` - frontend applications (React dashboard `portal`, Svelte marketing `public-web`).
-- `services/` - backend microservices (`core` engine, SaaS `control-plane`, tick-level `ingestion-gateway`, Telegram/Discord `bot`, Python `analyzer`).
-- `crates/` - shared Rust helper libraries (`atlsd-common`, `atlsd-domain`, `atlsd-auth`, `atlsd-observability`).
-- `packages/` - shared frontend packages (`api-client`, `ui`, `config`).
-- `db/` - unified database migrations, seeds, and fixtures.
-- `infra/` - Docker compose, Dockerfiles, environment configurations, and orchestration helpers.
-- `.github/workflows/` - automated CI/CD build and container publishing pipelines.
+```text
+├── apps/
+│   └── public-web/          # SvelteKit dashboard application (Tailwind v4, Vercel deployment)
+├── services/
+│   ├── core/                # Rust core engine (ingestion pipelines & WebSocket hub)
+│   ├── control-plane/       # Rust SaaS administration panel (identities, plans, API keys)
+│   ├── analyzer/            # Python FastAPI service (FinBERT NLP model)
+│   ├── bot/                 # Telegram/Discord notifications agent
+│   └── ingestion-gateway/   # High-speed data ingest adapter
+├── db/
+│   └── migrations/          # Embedded SQLx schema files for SaaS & market databases
+└── infra/
+    ├── compose/             # Docker Compose files (local.yml, prod.yml)
+    ├── docker/              # Component-specific Dockerfiles
+    └── env/                 # Multi-environment variable templates
+```
 
-## Platform Positioning
+---
 
-ATLSD is positioned as a foundational real-time data platform that combines **data ingestion**, **tenant-aware API governance**, and an **operational SaaS product model** in a single integrated codebase. Its design focus is domain accuracy, pipeline scalability, and readiness for plan-based service commercialization.
+## Getting Started
+
+### Prerequisites
+* Docker & Docker Compose
+* Node.js & Bun (for frontend development)
+* Rust toolchain (for local backend development)
+
+### Local Stack (Docker)
+1. Copy the environment variables:
+   ```bash
+   cp infra/env/.env.core.example infra/env/.env.core
+   # Fill in variables in infra/env/.env.* files
+   ```
+2. Start the local development compose stack:
+   ```bash
+   docker compose -f infra/compose/local.yml up --build
+   ```
+   * **Core Service API:** `http://localhost:8090`
+   * **Control Plane API:** `http://localhost:8081`
+   * **NLP Analyzer Service:** `http://localhost:5000`
+
+### Frontend Development (Outside Docker)
+The web app is deployed directly to Vercel in production. To run it locally for development:
+1. Navigate to the web app:
+   ```bash
+   cd apps/public-web
+   ```
+2. Install dependencies and start the dev server:
+   ```bash
+   bun install
+   bun run dev
+   ```
+3. Open `http://localhost:5173` in your browser.
