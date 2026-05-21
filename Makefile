@@ -39,7 +39,6 @@ up-build:
 pull:
 	cd $(INFRA_DIR) && $(COMPOSE) pull
 
-# Backward-compatible aliases
 run-podman: up
 down-podman: down
 
