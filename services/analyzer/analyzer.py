@@ -31,11 +31,7 @@ class AdvancedSentimentAnalyzer:
 
     @lru_cache(maxsize=2048)
     def _cached_inference(self, text: str) -> List[Dict[str, Any]]:
-        """
-        In-memory cached execution of the sentiment pipeline.
-        Cuts CPU overhead for duplicate ticker feeds/RSS entries.
-        """
-        # Truncate text to BERT context length limit
+
         truncated = text[:1500]
         return self.pipeline(truncated)[0]
 
@@ -52,28 +48,23 @@ class AdvancedSentimentAnalyzer:
         self.initialize()
         
         try:
-            # 1. Run Sentiment Model Inference
             raw_predictions = self._cached_inference(text)
             
-            # Map predictions to label dictionary
             dist = {}
             for pred in raw_predictions:
                 label = pred["label"].lower()
                 dist[label] = float(pred["score"])
                 
-            # Determine overall sentiment (highest score)
             top_sentiment = max(dist, key=dist.get)
             top_score = dist[top_sentiment]
             
-            # 2. Extract Key Sentences / Highlights
             sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s', text)
             highlights = []
             for s in sentences:
                 s = s.strip()
-                if len(s) < 25 or len(s) > 300: # filter out boilerplate or giant paragraphs
+                if len(s) < 25 or len(s) > 300: 
                     continue
                 
-                # Get sentiment of this specific sentence
                 s_preds = self._cached_inference(s)
                 s_dist = {p["label"].lower(): float(p["score"]) for p in s_preds}
                 s_top = max(s_dist, key=s_dist.get)
@@ -85,11 +76,9 @@ class AdvancedSentimentAnalyzer:
                         "score": s_dist[s_top]
                     })
             
-            # Sort highlights by score descending and keep top 2
             highlights.sort(key=lambda x: x["score"], reverse=True)
             highlights = highlights[:2]
             
-            # 3. Entity Extraction
             entities = self._extract_entities(text)
             
             return {

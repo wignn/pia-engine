@@ -2,10 +2,8 @@ import os
 import logging
 from contextlib import asynccontextmanager
 from typing import Dict, Any, List
-
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-
 from analyzer import AdvancedSentimentAnalyzer
 
 logging.basicConfig(
@@ -31,7 +29,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 class AnalysisRequest(BaseModel):
-    text: str
+    text: str | None = None
+    url: str | None = None
 
 class EntityResponse(BaseModel):
     tickers: List[str]
@@ -48,6 +47,8 @@ class AnalysisResponse(BaseModel):
     distribution: Dict[str, float]
     highlights: List[HighlightItem]
     entities: EntityResponse
+    title: str | None = None
+    content: str | None = None
 
 
 @app.get("/health")
@@ -57,9 +58,37 @@ def health():
 
 @app.post("/analyze", response_model=AnalysisResponse)
 def analyze(request: AnalysisRequest):
-    if not request.text or not request.text.strip():
-        raise HTTPException(status_code=422, detail="'text' field must not be empty.")
-    result = analyzer.analyze(request.text)
+    if not request.text and not request.url:
+        raise HTTPException(status_code=422, detail="Either 'text' or 'url' must be provided.")
+    
+    title = None
+    content = None
+    
+    if request.url:
+        url_str = request.url.strip()
+        if not url_str:
+            raise HTTPException(status_code=422, detail="'url' field must not be empty.")
+        try:
+            logger.info(f"Fetching and scraping URL: {url_str}")
+            from scraping import fetch, extract
+            html_content = fetch(url_str)
+            title, content = extract(html_content, url_str)
+        except Exception as e:
+            logger.error(f"Failed to scrape URL {url_str}: {e}", exc_info=True)
+            raise HTTPException(status_code=400, detail=f"Failed to scrape URL: {str(e)}")
+            
+        if not content or not content.strip():
+            raise HTTPException(status_code=400, detail="Scraped content is empty.")
+            
+        text_to_analyze = content
+    else:
+        text_to_analyze = request.text
+        if not text_to_analyze or not text_to_analyze.strip():
+            raise HTTPException(status_code=422, detail="'text' field must not be empty.")
+
+    result = analyzer.analyze(text_to_analyze)
+    result["title"] = title
+    result["content"] = content
     return result
 
 

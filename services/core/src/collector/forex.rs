@@ -11,7 +11,6 @@ use std::time::Duration;
 use tokio::sync::{RwLock, Semaphore};
 use tracing::{error, info, warn};
 
-/// A single forex news entry parsed from RSS feeds.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct ForexNewsEntry {
@@ -25,7 +24,6 @@ pub struct ForexNewsEntry {
     pub source_name: String,
 }
 
-/// A configured RSS feed source.
 #[derive(Debug, Clone)]
 pub struct FeedSource {
     pub name: String,
@@ -34,14 +32,12 @@ pub struct FeedSource {
     pub category: String,
 }
 
-/// Compute a content hash from URL and title.
 pub fn compute_content_hash(url: &str, title: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(format!("{}|{}", url, title));
     format!("{:x}", hasher.finalize())
 }
 
-/// Default forex news RSS feed sources.
 pub fn default_forex_feeds() -> Vec<FeedSource> {
     vec![
         FeedSource {
@@ -89,7 +85,6 @@ pub fn default_forex_feeds() -> Vec<FeedSource> {
     ]
 }
 
-/// Look up a feed name by its RSS URL.
 pub fn feed_name_by_url(rss_url: &str) -> String {
     for f in default_forex_feeds() {
         if f.rss_url == rss_url {
@@ -113,7 +108,7 @@ pub fn feed_name_by_url(rss_url: &str) -> String {
     }
 }
 
-/// Concurrent forex news RSS collector with semaphore-limited parallelism.
+/// Concurrent forex news RSS collector with semaphore-limited parallelis   
 pub struct ForexCollector {
     client: Client,
     max_entries: usize,
