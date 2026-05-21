@@ -90,6 +90,9 @@ services:
   analyzer:
     container_name: world-analyzer-prod
     image: wign/atlsd-analyzer:latest
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.analyzer
     ports:
       - "5000:5000"
     restart: always
