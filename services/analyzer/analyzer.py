@@ -22,7 +22,7 @@ class AdvancedSentimentAnalyzer:
         logger.info("Loading HF pipeline with '%s'...", self.model_name)
         from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
 
-        tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=False)
         model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
 
         self.pipeline = pipeline(
