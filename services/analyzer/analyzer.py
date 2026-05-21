@@ -20,10 +20,10 @@ class AdvancedSentimentAnalyzer:
             return
 
         logger.info("Loading HF pipeline with '%s'...", self.model_name)
-        from transformers import AutoModelForSequenceClassification, BertTokenizer, pipeline
+        from transformers import BertForSequenceClassification, BertTokenizer, pipeline
 
         tokenizer = BertTokenizer.from_pretrained(self.model_name)
-        model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
+        model = BertForSequenceClassification.from_pretrained(self.model_name)
 
         self.pipeline = pipeline(
             "sentiment-analysis",
