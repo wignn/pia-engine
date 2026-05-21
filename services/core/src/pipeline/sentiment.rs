@@ -4,7 +4,7 @@ use tracing::debug;
 
 static AI_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
     reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(2)) // Low timeout to prevent pipeline blocking
+        .timeout(std::time::Duration::from_secs(15))
         .build()
         .unwrap_or_default()
 });
