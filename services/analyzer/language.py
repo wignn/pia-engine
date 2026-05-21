@@ -1,38 +1,27 @@
-import re
+import logging
+from lingua import Language, LanguageDetectorBuilder
 
-ID_WORDS = {
-    "yang", "dan", "atau", "dengan", "menjadi", "naik", "turun", "minggu",
-    "bulan", "tahun", "perkiraan", "sebelumnya", "klaim", "pengangguran",
-    "suku", "bunga", "rupiah", "dolar", "emas", "berita", "pasar",
-}
+logger = logging.getLogger("finbert-service.language")
 
-EN_WORDS = {
-    "the", "and", "or", "with", "rose", "fell", "increased", "decreased",
-    "forecast", "previous", "jobless", "claims", "inflation", "rate", "market",
-    "dollar", "gold", "stocks", "economy", "economic",
+_detector = (
+    LanguageDetectorBuilder
+    .from_languages(Language.INDONESIAN, Language.ENGLISH)
+    .with_low_accuracy_mode()
+    .build()
+)
+
+_LANG_MAP = {
+    Language.INDONESIAN: "id",
+    Language.ENGLISH: "en",
 }
 
 
 def detect_language(text: str) -> str:
-    """
-    Lightweight language detector without new heavy dependencies.
-    Returns: id, en, or unknown.
-    """
     if not text or not text.strip():
         return "unknown"
 
-    words = re.findall(r"[A-Za-zÀ-ÿ]+", text.lower())
-    if not words:
+    result = _detector.detect_language_of(text)
+    if result is None:
         return "unknown"
 
-    sample = words[:300]
-    id_score = sum(1 for w in sample if w in ID_WORDS)
-    en_score = sum(1 for w in sample if w in EN_WORDS)
-
-    id_score += len(re.findall(r"\b(mem|men|meng|ber|ter|ke|se)[a-z]+", " ".join(sample))) * 0.15
-
-    if id_score >= en_score + 2:
-        return "id"
-    if en_score >= id_score + 2:
-        return "en"
-    return "unknown"
+    return _LANG_MAP.get(result, "unknown")
