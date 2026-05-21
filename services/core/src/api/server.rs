@@ -71,6 +71,7 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/equity/news",
             get(handlers::stock::latest_stock_news),
         )
+        .route("/api/v1/analyze", post(handlers::sentiment::analyze_text))
         .layer(middleware::from_fn_with_state(state.clone(), usage_logger))
         .layer(middleware::from_fn_with_state(
             state.clone(),
