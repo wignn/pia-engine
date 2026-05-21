@@ -30,8 +30,8 @@ pub async fn analyze(text: &str) -> String {
             if response.status().is_success() {
                 if let Ok(data) = response.json::<SentimentRes>().await {
                     let s = data.sentiment.to_lowercase();
-                    // Normalize labels
-                    if s == "positive" || s == "negative" || s == "neutral" {
+
+                    if s == "positive" || s == "negative" || s == "neutral" || s == "mixed" {
                         return s;
                     }
                 }

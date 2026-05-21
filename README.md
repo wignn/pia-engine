@@ -2,6 +2,7 @@
 
 ATLSD is a real-time market intelligence and data distribution platform for financial news, economic calendar events, market signals, and tenant-aware data delivery. The platform aggregates multiple financial information sources, enriches incoming content with Natural Language Processing (NLP), and distributes structured market intelligence through REST APIs, WebSockets, dashboards, and bot integrations.
 
+
 The system is designed around four main goals:
 
 * **Low-latency market intelligence delivery** for dashboards, bots, and API consumers.

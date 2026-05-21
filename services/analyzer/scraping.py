@@ -1,4 +1,3 @@
-import sys
 import re
 import httpx
 from urllib.parse import urlparse
@@ -48,14 +47,12 @@ DOMAIN_RULES: dict[str, list[str]] = {
         "div[class*='body']",
         "article",
     ],
-    # Federal Reserve
     "federalreserve.gov": [
         "div#article",
         "div.col-xs-12.col-sm-8",
         "div[class*='article']",
         "section",
     ],
-    # ECB
     "ecb.europa.eu": [
         "div.ecb-pressContent",
         "section.ecb-pressContent",
@@ -89,14 +86,17 @@ def get_domain(url: str) -> str:
 def clean(node: BeautifulSoup) -> str:
     for tag in node.find_all(NOISE_TAGS):
         tag.decompose()
+
     for tag in node.find_all(True):
         attrs = tag.attrs if tag.attrs is not None else {}
         classes = " ".join(attrs.get("class", []) or [])
         ids = attrs.get("id", "") or ""
-        if any(k in classes.lower() or k in ids.lower()
-               for k in ("related", "recommend", "promo", "banner", "subscribe",
-                         "newsletter", "cookie", "social", "share", "comment",
-                         "sidebar", "widget", "popup", "modal", "advert")):
+        haystack = f"{classes} {ids}".lower()
+        if any(k in haystack for k in (
+            "related", "recommend", "promo", "banner", "subscribe",
+            "newsletter", "cookie", "social", "share", "comment",
+            "sidebar", "widget", "popup", "modal", "advert", "broker",
+        )):
             tag.decompose()
 
     text = node.get_text(separator="\n")
@@ -110,7 +110,6 @@ def extract(html: str, url: str) -> tuple[str, str]:
     """Returns (title, content)."""
     soup = BeautifulSoup(html, "lxml")
 
-    # Title
     title = ""
     og_title = soup.find("meta", property="og:title")
     if og_title and og_title.get("content"):
@@ -119,8 +118,7 @@ def extract(html: str, url: str) -> tuple[str, str]:
         title = soup.title.get_text().strip()
 
     domain = get_domain(url)
-
-    selectors = DOMAIN_RULES.get("_generic")
+    selectors = DOMAIN_RULES.get("_generic", ["article", "main"])
     for d, sels in DOMAIN_RULES.items():
         if d != "_generic" and d in domain:
             selectors = sels
@@ -138,6 +136,10 @@ def extract(html: str, url: str) -> tuple[str, str]:
 
 
 def fetch(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("Only http/https URLs are allowed")
+
     with httpx.Client(
         headers=HEADERS,
         follow_redirects=True,
@@ -147,24 +149,3 @@ def fetch(url: str) -> str:
         resp = client.get(url)
         resp.raise_for_status()
         return resp.text
-
-
-def scrape(url: str) -> None:
-    print(f"\n{'─'*60}")
-    print(f"URL   : {url}")
-    print(f"{'─'*60}")
-
-    try:
-        html = fetch(url)
-    except Exception as e:
-        print(f"[ERROR] Gagal fetch: {e}")
-        return
-
-    title, content = extract(html, url)
-
-    print(f"TITLE : {title}")
-    print(f"WORDS : {len(content.split())}")
-    print(f"{'─'*60}")
-    print(content)
-    print(f"{'─'*60}\n")
-
