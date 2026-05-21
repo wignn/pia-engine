@@ -23,31 +23,26 @@ NOISE_TAGS = [
 ]
 
 DOMAIN_RULES: dict[str, list[str]] = {
-    # FXStreet Indonesia
     "fxstreet-id.com": [
         "div.fxs_article_content",
         "div[class*='fxs_article']",
         "article",
     ],
-    # FXStreet global
     "fxstreet.com": [
         "div.fxs_article_content",
         "article",
     ],
-    # Investing.com (id. / www.)
     "investing.com": [
         "div.articlePage",
         "div[data-test='article-content']",
         "div[class*='articleText']",
         "article",
     ],
-    # InvestingLive
     "investinglive.com": [
         "div.entry-content",
         "div.post-content",
         "article",
     ],
-    # Thomson Reuters IR
     "thomsonreuters.com": [
         "div.content__body",
         "div[class*='body']",
