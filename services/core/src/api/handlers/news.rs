@@ -34,12 +34,16 @@ pub async fn list_news(
             bool,
             Option<chrono::DateTime<chrono::Utc>>,
             Option<chrono::DateTime<chrono::Utc>>,
+            Option<String>,
+            Option<String>,
         ),
     >(
-        "SELECT id::text, source_id, content_hash, original_url, original_title, \
-         summary, is_processed, processed_at, published_at \
-         FROM news_articles \
-         ORDER BY processed_at DESC NULLS LAST \
+        "SELECT a.id::text, a.source_id, a.content_hash, a.original_url, a.original_title, \
+         a.summary, a.is_processed, a.processed_at, a.published_at, \
+         an.sentiment, an.impact_level \
+         FROM news_articles a \
+         LEFT JOIN news_analyses an ON a.id = an.article_id \
+         ORDER BY a.processed_at DESC NULLS LAST \
          LIMIT $1 OFFSET $2",
     )
     .bind(page_size)
@@ -61,6 +65,8 @@ pub async fn list_news(
                     "is_processed": r.6,
                     "processed_at": r.7,
                     "published_at": r.8,
+                    "sentiment": r.9,
+                    "impact_level": r.10,
                 })
             })
             .collect(),
@@ -111,13 +117,17 @@ pub async fn latest_news(
             Option<chrono::DateTime<chrono::Utc>>,
             Option<chrono::DateTime<chrono::Utc>>,
             String,
+            Option<String>,
+            Option<String>,
         ),
     >(
         "SELECT a.id::text, a.content_hash, a.original_url, a.original_title, \
          a.translated_title, a.summary, a.published_at, a.processed_at, \
-         COALESCE(s.name, 'Unknown') AS source_name \
+         COALESCE(s.name, 'Unknown') AS source_name, \
+         an.sentiment, an.impact_level \
          FROM news_articles a \
          LEFT JOIN news_sources s ON a.source_id = s.id \
+         LEFT JOIN news_analyses an ON a.id = an.article_id \
          WHERE a.is_processed = TRUE \
          ORDER BY a.processed_at DESC NULLS LAST \
          LIMIT $1",
@@ -141,8 +151,8 @@ pub async fn latest_news(
                     "published_at": r.6,
                     "processed_at": r.7,
                     "source_name": r.8,
-                    "sentiment": null,
-                    "impact_level": null,
+                    "sentiment": r.9,
+                    "impact_level": r.10,
                     "currency_pairs": null,
                 })
             })
