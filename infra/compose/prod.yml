@@ -45,8 +45,6 @@ services:
     ports:
       - "${CONTROL_PLANE_PORT:-8081}:8080"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     restart: always
