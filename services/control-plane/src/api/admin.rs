@@ -97,10 +97,10 @@ pub async fn set_user_plan(
 
     let plan = body["plan"].as_str().ok_or(StatusCode::BAD_REQUEST)?;
 
-    let valid_plans = ["free", "basic", "pro", "enterprise"];
+    let valid_plans = ["free", "starter", "pro", "enterprise"];
     if !valid_plans.contains(&plan) {
         return Ok(Json(
-            json!({ "error": "Invalid plan. Must be one of: free, basic, pro, enterprise" }),
+            json!({ "error": "Invalid plan. Must be one of: free, starter, pro, enterprise" }),
         ));
     }
 
@@ -114,7 +114,7 @@ pub async fn set_user_plan(
     sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
 
     Ok(Json(
-        json!({ "message": format!("User plan updated to {}", plan) }),
+        json!({ "message": format!("User plan updated to {}", plan), "plan": plan }),
     ))
 }
 

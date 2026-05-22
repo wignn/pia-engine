@@ -31,6 +31,28 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  
+  control-plane:
+    container_name: world-control-plane
+    image: wign/atlsd-control-plane
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.control-plane
+      args:
+        - DOCKER_BUILD_TYPE=release
+    env_file:
+      - ../env/.env.control-plane
+    ports:
+      - "${CONTROL_PLANE_PORT:-8081}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    networks:
+      - private
+
 
   core:
     container_name: world-core-prod
