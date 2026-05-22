@@ -16,18 +16,13 @@ use crate::api::state::AppState;
 use crate::ws;
 
 pub fn build_router(state: AppState) -> Router {
-    let allowed_origins: Vec<axum::http::HeaderValue> = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:8080",
-        "https://forex.wign.cloud",
-        "http://forex.wign.cloud",
-        "https://fio-page.vercel.app",
-        "https://fio.wign.dev",
-    ]
-    .iter()
-    .filter_map(|o| o.parse().ok())
-    .collect();
+    let allowed_origins: Vec<axum::http::HeaderValue> = std::env::var("ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| {
+            "http://localhost:3000,http://localhost:5173,http://localhost:8080,https://forex.wign.cloud,http://forex.wign.cloud,https://fio-page.vercel.app,https://fio.wign.dev".to_string()
+        })
+        .split(',')
+        .filter_map(|o| o.trim().parse().ok())
+        .collect();
 
     let cors = CorsLayer::new()
         .allow_origin(AllowOrigin::list(allowed_origins))
