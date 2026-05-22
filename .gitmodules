@@ -1,3 +1,6 @@
 [submodule "web"]
 	path = apps/public-web
 	url = https://github.com/wignn/fio-page.git
+[submodule "apps/admin-web"]
+	path = apps/admin-web
+	url = https://github.com/wignn/fio-admin-web.git
