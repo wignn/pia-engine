@@ -2,25 +2,15 @@ use std::env;
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// Finnhub WebSocket API key
     pub finnhub_api_key: String,
-    /// Tiingo WebSocket API key
     pub tiingo_api_key: String,
-    /// Binance trade stream symbols (lowercase, e.g. "btcusdt")
     pub binance_symbols: Vec<String>,
-    /// Whether Binance worker is enabled (default: true)
     pub binance_enabled: bool,
-    /// Redis connection URL
     pub redis_url: String,
-    /// Redis channel prefix for published messages (default: "ingestion")
     pub redis_channel_prefix: String,
-    /// Base reconnect delay in seconds (default: 5)
     pub reconnect_base_sec: u64,
-    /// Maximum reconnect delay in seconds (default: 300)
     pub reconnect_max_sec: u64,
-    /// How often to check market hours while connected, in seconds (default: 30)
     pub market_check_interval_sec: u64,
-    /// Log level (default: INFO)
     pub log_level: String,
 }
 
