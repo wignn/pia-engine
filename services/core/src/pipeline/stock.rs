@@ -1,5 +1,5 @@
 use atlsd_common::dlq::DeadLetterQueue;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -69,8 +69,7 @@ impl StockPipeline {
 
     async fn process_entry(&self, entry: &crate::collector::stock::StockNewsEntry) -> &'static str {
         if let Some(pub_at) = entry.published_at {
-            let cutoff = Utc::now() - chrono::Duration::hours(MAX_STOCK_NEWS_AGE_HOURS);
-            if pub_at < cutoff {
+            if is_too_old(pub_at, Utc::now()) {
                 debug!(
                     title = %truncate_title(&entry.title, 60),
                     age_hours = (Utc::now() - pub_at).num_hours(),
@@ -100,13 +99,7 @@ impl StockPipeline {
             return "duplicate";
         }
 
-        let impact_level = if entry.tickers.len() >= 3 {
-            "high"
-        } else if !entry.tickers.is_empty() {
-            "medium"
-        } else {
-            "low"
-        };
+        let impact_level = impact_level(entry.tickers.len());
 
         let published_at = entry
             .published_at
@@ -164,11 +157,7 @@ impl StockPipeline {
             }
         }
 
-        let summary_truncated = if entry.content.len() > 1000 {
-            entry.content[..1000].to_string()
-        } else {
-            entry.content.clone()
-        };
+        let summary_truncated = truncate_summary(&entry.content);
 
         let stock_data = StockNewsData {
             id: entry.content_hash.clone(),
@@ -207,10 +196,68 @@ impl StockPipeline {
     }
 }
 
+fn is_too_old(published_at: DateTime<Utc>, now: DateTime<Utc>) -> bool {
+    published_at < now - chrono::Duration::hours(MAX_STOCK_NEWS_AGE_HOURS)
+}
+
+fn impact_level(ticker_count: usize) -> &'static str {
+    if ticker_count >= 3 {
+        "high"
+    } else if ticker_count > 0 {
+        "medium"
+    } else {
+        "low"
+    }
+}
+
+fn truncate_summary(content: &str) -> String {
+    if content.len() > 1000 {
+        content[..1000].to_string()
+    } else {
+        content.to_string()
+    }
+}
+
 fn truncate_title(s: &str, max_len: usize) -> String {
     if s.len() > max_len {
         s[..max_len].to_string()
     } else {
         s.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn classifies_impact_level_from_ticker_count() {
+        assert_eq!(impact_level(0), "low");
+        assert_eq!(impact_level(1), "medium");
+        assert_eq!(impact_level(2), "medium");
+        assert_eq!(impact_level(3), "high");
+    }
+
+    #[test]
+    fn detects_articles_older_than_cutoff() {
+        let now = Utc::now();
+
+        assert!(!is_too_old(now - chrono::Duration::hours(12), now));
+        assert!(is_too_old(now - chrono::Duration::hours(13), now));
+    }
+
+    #[test]
+    fn truncates_summary_to_limit() {
+        let long = "a".repeat(1001);
+        let truncated = truncate_summary(&long);
+
+        assert_eq!(truncate_summary("short"), "short");
+        assert_eq!(truncated.len(), 1000);
+    }
+
+    #[test]
+    fn truncates_title_to_limit() {
+        assert_eq!(truncate_title("abcdef", 3), "abc");
+        assert_eq!(truncate_title("abc", 3), "abc");
     }
 }

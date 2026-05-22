@@ -129,3 +129,23 @@ fn fallback_analyze(text: &str) -> String {
         "neutral".to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fallback_detects_positive_negative_and_neutral_text() {
+        assert_eq!(fallback_analyze("profit growth rally higher"), "positive");
+        assert_eq!(fallback_analyze("loss crash decline lower"), "negative");
+        assert_eq!(
+            fallback_analyze("central bank holds policy steady"),
+            "neutral"
+        );
+    }
+
+    #[test]
+    fn fallback_returns_neutral_when_signals_tie() {
+        assert_eq!(fallback_analyze("profit loss"), "neutral");
+    }
+}

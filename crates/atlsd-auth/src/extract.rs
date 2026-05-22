@@ -47,3 +47,61 @@ pub fn extract_bearer(request: &Request) -> Option<String> {
 
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+
+    fn request(uri: &str) -> Request {
+        Request::builder().uri(uri).body(Body::empty()).unwrap()
+    }
+
+    #[test]
+    fn extracts_api_key_header_before_other_credentials() {
+        let req = Request::builder()
+            .uri("/ws?token=query-token")
+            .header("X-API-Key", "header-key")
+            .header(header::AUTHORIZATION, "Bearer bearer-token")
+            .body(Body::empty())
+            .unwrap();
+
+        assert_eq!(extract_key(&req).as_deref(), Some("header-key"));
+    }
+
+    #[test]
+    fn extracts_bearer_token_for_api_key() {
+        let req = Request::builder()
+            .uri("/ws")
+            .header(header::AUTHORIZATION, "Bearer bearer-token")
+            .body(Body::empty())
+            .unwrap();
+
+        assert_eq!(extract_key(&req).as_deref(), Some("bearer-token"));
+        assert_eq!(extract_bearer(&req).as_deref(), Some("bearer-token"));
+    }
+
+    #[test]
+    fn extracts_query_credentials() {
+        assert_eq!(
+            extract_key(&request("/ws?api_key=query-key")).as_deref(),
+            Some("query-key")
+        );
+        assert_eq!(
+            extract_key(&request("/ws?token=query-token")).as_deref(),
+            Some("query-token")
+        );
+    }
+
+    #[test]
+    fn extracts_cookie_jwt_as_bearer() {
+        let req = Request::builder()
+            .uri("/dashboard")
+            .header(header::COOKIE, "theme=dark; wi_jwt=cookie-token; other=1")
+            .body(Body::empty())
+            .unwrap();
+
+        assert_eq!(extract_bearer(&req).as_deref(), Some("cookie-token"));
+        assert_eq!(extract_key(&req).as_deref(), Some("cookie-token"));
+    }
+}

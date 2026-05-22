@@ -21,3 +21,26 @@ pub fn to_slug(name: &str) -> String {
     let s = SLUG_RE.replace_all(&s, "-");
     s.trim_matches('-').to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn truncate_str_respects_character_boundaries() {
+        assert_eq!(truncate_str("abcdef", 3), "abc");
+        assert_eq!(truncate_str("éclair", 2), "éc");
+    }
+
+    #[test]
+    fn truncate_bytes_keeps_short_strings() {
+        assert_eq!(truncate_bytes("short", 10), "short");
+        assert_eq!(truncate_bytes("abcdef", 3), "abc");
+    }
+
+    #[test]
+    fn to_slug_normalizes_whitespace_and_symbols() {
+        assert_eq!(to_slug("  Hello, ATLSD World!  "), "hello-atlsd-world");
+        assert_eq!(to_slug("---Already---Slug---"), "already-slug");
+    }
+}

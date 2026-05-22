@@ -200,3 +200,189 @@ impl Hub {
             .count()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::Value;
+
+    fn set(values: &[&str]) -> HashSet<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    async fn recv_json(rx: &mut mpsc::Receiver<Vec<u8>>) -> Value {
+        let bytes = rx.recv().await.unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn register_sends_welcome_and_tracks_client_count() {
+        let hub = Hub::new(None, "test".to_string());
+        let user_id = Uuid::new_v4();
+        let (_id, mut rx) = hub
+            .register(
+                "bot-1".to_string(),
+                set(&["forex_news"]),
+                Some(user_id),
+                HashSet::new(),
+                HashSet::new(),
+            )
+            .await;
+
+        assert_eq!(hub.client_count().await, 1);
+        assert_eq!(hub.user_connection_count(&user_id).await, 1);
+
+        let welcome = recv_json(&mut rx).await;
+        assert_eq!(welcome["event"], "connected");
+        assert_eq!(welcome["data"]["bot_id"], "bot-1");
+    }
+
+    #[tokio::test]
+    async fn unregister_removes_client_and_user_count() {
+        let hub = Hub::new(None, "test".to_string());
+        let user_id = Uuid::new_v4();
+        let (id, _rx) = hub
+            .register(
+                "bot-1".to_string(),
+                set(&["forex_news"]),
+                Some(user_id),
+                HashSet::new(),
+                HashSet::new(),
+            )
+            .await;
+
+        hub.unregister(id).await;
+
+        assert_eq!(hub.client_count().await, 0);
+        assert_eq!(hub.user_connection_count(&user_id).await, 0);
+    }
+
+    #[tokio::test]
+    async fn broadcast_respects_channel_subscriptions() {
+        let hub = Hub::new(None, "test".to_string());
+        let (_forex_id, mut forex_rx) = hub
+            .register(
+                "forex-bot".to_string(),
+                set(&["forex_news"]),
+                None,
+                HashSet::new(),
+                HashSet::new(),
+            )
+            .await;
+        let (_stock_id, mut stock_rx) = hub
+            .register(
+                "stock-bot".to_string(),
+                set(&["stock_news"]),
+                None,
+                HashSet::new(),
+                HashSet::new(),
+            )
+            .await;
+        recv_json(&mut forex_rx).await;
+        recv_json(&mut stock_rx).await;
+
+        let sent = hub
+            .broadcast("forex.new", json!({ "title": "EUR/USD" }), "forex_news")
+            .await;
+
+        assert_eq!(sent, 1);
+        assert_eq!(recv_json(&mut forex_rx).await["event"], "forex.new");
+        assert!(stock_rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn broadcast_all_subscription_receives_any_channel() {
+        let hub = Hub::new(None, "test".to_string());
+        let (_id, mut rx) = hub
+            .register(
+                "all-bot".to_string(),
+                set(&["all"]),
+                None,
+                HashSet::new(),
+                HashSet::new(),
+            )
+            .await;
+        recv_json(&mut rx).await;
+
+        let sent = hub
+            .broadcast("stock.new", json!({ "title": "AAPL" }), "stock_news")
+            .await;
+
+        assert_eq!(sent, 1);
+        assert_eq!(recv_json(&mut rx).await["channel"], "stock_news");
+    }
+
+    #[tokio::test]
+    async fn market_data_filter_matches_symbols() {
+        let hub = Hub::new(None, "test".to_string());
+        let (_aapl_id, mut aapl_rx) = hub
+            .register(
+                "aapl-bot".to_string(),
+                set(&["market_data"]),
+                None,
+                HashSet::new(),
+                set(&["AAPL"]),
+            )
+            .await;
+        let (_msft_id, mut msft_rx) = hub
+            .register(
+                "msft-bot".to_string(),
+                set(&["market_data"]),
+                None,
+                HashSet::new(),
+                set(&["MSFT"]),
+            )
+            .await;
+        recv_json(&mut aapl_rx).await;
+        recv_json(&mut msft_rx).await;
+
+        let sent = hub
+            .broadcast(
+                "market.tick",
+                json!({ "tick": { "symbol": "AAPL", "price": 100 } }),
+                "market_data",
+            )
+            .await;
+
+        assert_eq!(sent, 1);
+        assert_eq!(recv_json(&mut aapl_rx).await["event"], "market.tick");
+        assert!(msft_rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn x_filter_matches_author_username_case_insensitively() {
+        let hub = Hub::new(None, "test".to_string());
+        let (_matching_id, mut matching_rx) = hub
+            .register(
+                "matching-bot".to_string(),
+                set(&["x"]),
+                None,
+                set(&["federalreserve"]),
+                HashSet::new(),
+            )
+            .await;
+        let (_other_id, mut other_rx) = hub
+            .register(
+                "other-bot".to_string(),
+                set(&["x"]),
+                None,
+                set(&["ecb"]),
+                HashSet::new(),
+            )
+            .await;
+        recv_json(&mut matching_rx).await;
+        recv_json(&mut other_rx).await;
+
+        let sent = hub
+            .broadcast(
+                "x.post",
+                json!({ "post": { "author_username": "FederalReserve" } }),
+                "x",
+            )
+            .await;
+
+        assert_eq!(sent, 1);
+        assert_eq!(recv_json(&mut matching_rx).await["event"], "x.post");
+        assert!(other_rx.try_recv().is_err());
+    }
+}

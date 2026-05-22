@@ -137,4 +137,35 @@ mod tests {
         breaker.record_success().await;
         assert_eq!(breaker.state_name().await, CircuitStateName::Closed);
     }
+
+    #[tokio::test]
+    async fn half_open_failure_reopens_circuit() {
+        let breaker = CircuitBreaker::new(1, Duration::from_millis(1), 2);
+
+        breaker.record_failure().await;
+        assert_eq!(breaker.state_name().await, CircuitStateName::Open);
+
+        tokio::time::sleep(Duration::from_millis(2)).await;
+        assert!(breaker.allow_request().await);
+        assert_eq!(breaker.state_name().await, CircuitStateName::HalfOpen);
+
+        breaker.record_failure().await;
+        assert_eq!(breaker.state_name().await, CircuitStateName::Open);
+        assert!(!breaker.allow_request().await);
+    }
+
+    #[tokio::test]
+    async fn half_open_requires_configured_success_count() {
+        let breaker = CircuitBreaker::new(1, Duration::from_millis(1), 2);
+
+        breaker.record_failure().await;
+        tokio::time::sleep(Duration::from_millis(2)).await;
+        assert!(breaker.allow_request().await);
+
+        breaker.record_success().await;
+        assert_eq!(breaker.state_name().await, CircuitStateName::HalfOpen);
+
+        breaker.record_success().await;
+        assert_eq!(breaker.state_name().await, CircuitStateName::Closed);
+    }
 }

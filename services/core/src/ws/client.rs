@@ -31,6 +31,29 @@ pub fn default_channels() -> HashSet<String> {
     .collect()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_channels_include_expected_realtime_feeds() {
+        let channels = default_channels();
+
+        for channel in [
+            "all",
+            "forex_news",
+            "stock_news",
+            "calendar",
+            "market_data",
+            "x",
+            "system",
+        ] {
+            assert!(channels.contains(channel));
+        }
+        assert_eq!(channels.len(), 9);
+    }
+}
+
 /// Run the read/write pump for a connected WebSocket client.
 pub async fn handle_socket(
     socket: axum::extract::ws::WebSocket,
