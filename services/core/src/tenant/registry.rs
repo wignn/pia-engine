@@ -1,5 +1,5 @@
+use atlsd_auth::api_key::hash_key;
 use chrono::{DateTime, Utc};
-use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -178,10 +178,4 @@ impl TenantRegistry {
             }
         }
     }
-}
-
-fn hash_key(raw: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(raw.as_bytes());
-    hex::encode(hasher.finalize())
 }

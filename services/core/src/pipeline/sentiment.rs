@@ -1,3 +1,6 @@
+use std::time::Duration;
+
+use atlsd_common::circuit_breaker::CircuitBreaker;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tracing::debug;
@@ -13,6 +16,9 @@ static AI_URL: Lazy<String> = Lazy::new(|| {
     std::env::var("AI_SERVICE_URL").unwrap_or_else(|_| "http://localhost:5000".to_string())
 });
 
+static AI_CIRCUIT: Lazy<CircuitBreaker> =
+    Lazy::new(|| CircuitBreaker::new(5, Duration::from_secs(30), 2));
+
 #[derive(Deserialize)]
 struct SentimentRes {
     sentiment: String,
@@ -21,6 +27,11 @@ struct SentimentRes {
 }
 
 pub async fn analyze(text: &str) -> String {
+    if !AI_CIRCUIT.allow_request().await {
+        debug!("FinBERT circuit open, using regex/keyword fallback");
+        return fallback_analyze(text);
+    }
+
     let payload = serde_json::json!({ "text": text });
     let url = format!("{}/analyze", *AI_URL);
     let res = AI_CLIENT.post(&url).json(&payload).send().await;
@@ -28,18 +39,29 @@ pub async fn analyze(text: &str) -> String {
     match res {
         Ok(response) => {
             if response.status().is_success() {
-                if let Ok(data) = response.json::<SentimentRes>().await {
-                    let s = data.sentiment.to_lowercase();
-
-                    if s == "positive" || s == "negative" || s == "neutral" || s == "mixed" {
-                        return s;
+                match response.json::<SentimentRes>().await {
+                    Ok(data) => {
+                        let s = data.sentiment.to_lowercase();
+                        if s == "positive" || s == "negative" || s == "neutral" || s == "mixed" {
+                            AI_CIRCUIT.record_success().await;
+                            return s;
+                        }
+                        AI_CIRCUIT.record_failure().await;
+                    }
+                    Err(e) => {
+                        debug!(error = %e, "FinBERT response parse failed, using regex/keyword fallback");
+                        AI_CIRCUIT.record_failure().await;
                     }
                 }
+            } else {
+                debug!(status = %response.status(), "FinBERT returned non-success status, using regex/keyword fallback");
+                AI_CIRCUIT.record_failure().await;
             }
             fallback_analyze(text)
         }
         Err(e) => {
             debug!(error = %e, "FinBERT service unreachable, using regex/keyword fallback");
+            AI_CIRCUIT.record_failure().await;
             fallback_analyze(text)
         }
     }

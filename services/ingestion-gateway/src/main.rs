@@ -6,7 +6,6 @@ mod workers;
 use std::sync::Arc;
 
 use tracing::{error, info, warn};
-use tracing_subscriber::{fmt, EnvFilter};
 
 use broker::{BrokerPublisher, NoopBrokerPublisher, RedisBrokerPublisher};
 use config::Config;
@@ -18,21 +17,7 @@ async fn main() {
 
     let cfg = Config::load();
 
-    let log_level = match cfg.log_level.to_uppercase().as_str() {
-        "DEBUG" => "debug",
-        "WARN" | "WARNING" => "warn",
-        "ERROR" => "error",
-        "TRACE" => "trace",
-        _ => "info",
-    };
-
-    let env_filter = EnvFilter::new(format!("ingestion_gateway={}", log_level));
-    fmt()
-        .json()
-        .with_env_filter(env_filter)
-        .with_target(true)
-        .with_thread_ids(false)
-        .init();
+    atlsd_observability::init_tracing("ingestion_gateway", &cfg.log_level);
 
     info!(
         finnhub_enabled = cfg.has_finnhub(),

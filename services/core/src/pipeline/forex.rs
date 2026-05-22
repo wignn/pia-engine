@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use atlsd_common::dlq::DeadLetterQueue;
 use chrono::Utc;
 use redis::streams::StreamReadReply;
 use regex::Regex;
@@ -43,6 +44,7 @@ pub struct ForexPipeline {
     hub: Arc<Hub>,
     redis_client: Option<redis::Client>,
     stream_key: String,
+    dlq: Option<DeadLetterQueue>,
 }
 
 pub struct ForexIngestWorker {
@@ -51,6 +53,7 @@ pub struct ForexIngestWorker {
     hub: Arc<Hub>,
     redis_client: redis::Client,
     stream_key: String,
+    dlq: DeadLetterQueue,
 }
 
 impl ForexPipeline {
@@ -62,6 +65,14 @@ impl ForexPipeline {
         redis_client: Option<redis::Client>,
         redis_channel_prefix: &str,
     ) -> Self {
+        let dlq = redis_client.clone().map(|client| {
+            DeadLetterQueue::new(
+                client,
+                format!("{}:dlq:forex-news", redis_channel_prefix),
+                10_000,
+            )
+        });
+
         Self {
             collector,
             scraper,
@@ -69,6 +80,7 @@ impl ForexPipeline {
             hub,
             redis_client,
             stream_key: format!("{}:stream:forex-news:ingest", redis_channel_prefix),
+            dlq,
         }
     }
 
@@ -110,7 +122,7 @@ impl ForexPipeline {
                 }
 
                 // Preserve ingestion availability when Redis cannot accept new stream entries.
-                match process_entry(&self.scraper, &self.db, &self.hub, &msg).await {
+                match process_entry(&self.scraper, &self.db, &self.hub, &self.dlq, &msg).await {
                     "processed" => direct_processed += 1,
                     "too_old" => too_old += 1,
                     "duplicate" => duplicate += 1,
@@ -139,6 +151,7 @@ impl ForexPipeline {
             hub: self.hub.clone(),
             redis_client,
             stream_key: self.stream_key.clone(),
+            dlq: self.dlq.clone()?,
         })
     }
 
@@ -378,7 +391,14 @@ impl ForexIngestWorker {
             }
         };
 
-        let result = process_entry(&self.scraper, &self.db, &self.hub, &msg).await;
+        let result = process_entry(
+            &self.scraper,
+            &self.db,
+            &self.hub,
+            &Some(self.dlq.clone()),
+            &msg,
+        )
+        .await;
         if result == "processed" {
             info!(msg_id = %msg_id, title = %truncate_str(&msg.title, 50), "news ingest processed");
         }
@@ -406,6 +426,7 @@ async fn process_entry(
     scraper: &Arc<ArticleScraper>,
     db: &PgPool,
     hub: &Arc<Hub>,
+    dlq: &Option<DeadLetterQueue>,
     msg: &ForexIngestMessage,
 ) -> &'static str {
     if let Some(pub_at) = parse_rfc3339_utc(msg.published_at.as_deref()) {
@@ -490,6 +511,19 @@ async fn process_entry(
         }
         Err(e) => {
             warn!(error = %e, url = %msg.link, "db insert failed");
+            if let Some(dlq) = dlq {
+                let payload = serde_json::json!({
+                    "source_name": msg.source_name,
+                    "feed_url": msg.feed_url,
+                    "title": msg.title,
+                    "link": msg.link,
+                    "content": msg.content,
+                    "published_at": msg.published_at,
+                    "content_hash": msg.content_hash,
+                });
+                dlq.push("forex-news", &msg.content_hash, &e.to_string(), &payload)
+                    .await;
+            }
             return "db_error";
         }
     };

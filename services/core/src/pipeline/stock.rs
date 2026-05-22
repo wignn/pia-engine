@@ -1,3 +1,4 @@
+use atlsd_common::dlq::DeadLetterQueue;
 use chrono::Utc;
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -12,11 +13,31 @@ pub struct StockPipeline {
     collector: Arc<StockCollector>,
     db: PgPool,
     hub: Arc<Hub>,
+    dlq: Option<DeadLetterQueue>,
 }
 
 impl StockPipeline {
-    pub fn new(collector: Arc<StockCollector>, db: PgPool, hub: Arc<Hub>) -> Self {
-        Self { collector, db, hub }
+    pub fn new(
+        collector: Arc<StockCollector>,
+        db: PgPool,
+        hub: Arc<Hub>,
+        redis_client: Option<redis::Client>,
+        redis_channel_prefix: &str,
+    ) -> Self {
+        let dlq = redis_client.map(|client| {
+            DeadLetterQueue::new(
+                client,
+                format!("{}:dlq:stock-news", redis_channel_prefix),
+                10_000,
+            )
+        });
+
+        Self {
+            collector,
+            db,
+            hub,
+            dlq,
+        }
     }
 
     pub async fn run(&self) {
@@ -125,6 +146,20 @@ impl StockPipeline {
             }
             Err(e) => {
                 warn!(error = %e, "stock db insert failed");
+                if let Some(dlq) = &self.dlq {
+                    let payload = serde_json::json!({
+                        "content_hash": entry.content_hash,
+                        "link": entry.link,
+                        "title": entry.title,
+                        "content": entry.content,
+                        "source_name": entry.source_name,
+                        "category": entry.category,
+                        "tickers": entry.tickers,
+                        "published_at": entry.published_at.map(|d| d.to_rfc3339()),
+                    });
+                    dlq.push("stock-news", &entry.content_hash, &e.to_string(), &payload)
+                        .await;
+                }
                 return "db_error";
             }
         }

@@ -9,6 +9,10 @@ name = "control-plane"
 path = "src/main.rs"
 
 [dependencies]
+atlsd-auth = { path = "../../crates/atlsd-auth" }
+atlsd-common = { path = "../../crates/atlsd-common" }
+atlsd-domain = { path = "../../crates/atlsd-domain" }
+atlsd-observability = { path = "../../crates/atlsd-observability" }
 tokio = { workspace = true }
 axum = { workspace = true }
 tower = { workspace = true }

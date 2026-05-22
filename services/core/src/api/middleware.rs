@@ -1,10 +1,7 @@
-use axum::{
-    extract::Request,
-    http::{header, StatusCode},
-    middleware::Next,
-    response::Response,
-};
+use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
 use std::time::Instant;
+
+use atlsd_auth::extract::extract_key;
 
 use crate::api::state::AppState;
 use crate::api::usage_tracker::UsageEvent;
@@ -108,31 +105,4 @@ async fn attach_tenant_context_if_valid(
     }
 
     false
-}
-
-fn extract_key(request: &Request) -> Option<String> {
-    if let Some(val) = request.headers().get("X-API-Key") {
-        if let Ok(s) = val.to_str() {
-            if !s.is_empty() {
-                return Some(s.to_string());
-            }
-        }
-    }
-
-    if let Some(val) = request.headers().get(header::AUTHORIZATION) {
-        if let Ok(s) = val.to_str() {
-            if let Some(token) = s.strip_prefix("Bearer ") {
-                if !token.is_empty() {
-                    return Some(token.to_string());
-                }
-            }
-        }
-    }
-
-    let uri = request.uri();
-    uri.query().and_then(|q| {
-        url::form_urlencoded::parse(q.as_bytes())
-            .find(|(k, _)| k == "api_key" || k == "token")
-            .map(|(_, v)| v.to_string())
-    })
 }

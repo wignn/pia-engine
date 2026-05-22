@@ -1,12 +1,11 @@
+use atlsd_auth::jwt;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
-use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{json, Value};
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -20,84 +19,27 @@ use crate::models::{
 };
 use crate::sync;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct JwtClaims {
-    pub sub: String,
-    pub email: String,
-    pub plan: String,
-    pub exp: usize,
-    pub iat: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct OAuthStateClaims {
-    pub provider: String,
-    pub exp: usize,
-    pub iat: usize,
-}
-
-/// Create a signed JWT for a user.
 pub fn create_jwt(user: &User, secret: &str, expiry_days: u64) -> Result<String, StatusCode> {
-    let now = Utc::now();
-    let exp = now + Duration::days(expiry_days as i64);
-
-    let claims = JwtClaims {
-        sub: user.id.to_string(),
-        email: user.email.clone(),
-        plan: user.plan.clone(),
-        exp: exp.timestamp() as usize,
-        iat: now.timestamp() as usize,
-    };
-
-    encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(secret.as_bytes()),
+    jwt::create_jwt(
+        user.id.to_string(),
+        &user.email,
+        &user.plan,
+        secret,
+        expiry_days,
     )
-    .map_err(|e| {
-        warn!(error = %e, "failed to create JWT");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
-/// Decode and validate a JWT. Returns claims if valid.
-pub fn decode_jwt(token: &str, secret: &str) -> Option<JwtClaims> {
-    decode::<JwtClaims>(
-        token,
-        &DecodingKey::from_secret(secret.as_bytes()),
-        &Validation::default(),
-    )
-    .ok()
-    .map(|data| data.claims)
+pub fn decode_jwt(token: &str, secret: &str) -> Option<jwt::JwtClaims> {
+    jwt::decode_jwt(token, secret)
 }
 
 fn create_oauth_state(provider: &str, secret: &str) -> Result<String, StatusCode> {
-    let now = Utc::now();
-    let claims = OAuthStateClaims {
-        provider: provider.to_string(),
-        exp: (now + Duration::minutes(10)).timestamp() as usize,
-        iat: now.timestamp() as usize,
-    };
-
-    encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(secret.as_bytes()),
-    )
-    .map_err(|e| {
-        warn!(error = %e, "failed to create OAuth state");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })
+    jwt::create_oauth_state(provider, secret).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 fn validate_oauth_state(provider: &str, state_token: &str, secret: &str) -> bool {
-    decode::<OAuthStateClaims>(
-        state_token,
-        &DecodingKey::from_secret(secret.as_bytes()),
-        &Validation::default(),
-    )
-    .map(|data| data.claims.provider == provider)
-    .unwrap_or(false)
+    jwt::validate_oauth_state(provider, state_token, secret)
 }
 
 fn json_with_cookie(body: Value, token: &str, expiry_days: u64) -> Response {
@@ -620,7 +562,7 @@ async fn complete_oauth_flow(
 
 #[cfg(test)]
 mod tests {
-    use super::{create_oauth_state, validate_oauth_state};
+    use atlsd_auth::jwt::{create_oauth_state, validate_oauth_state};
 
     #[test]
     fn oauth_state_is_signed_and_provider_bound() {

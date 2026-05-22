@@ -1,11 +1,8 @@
+use atlsd_auth::api_key::{extract_prefix, generate_raw_key, hash_key};
 use chrono::{DateTime, Utc};
-use rand::Rng;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use uuid::Uuid;
-
-const KEY_PREFIX: &str = "wi_live_";
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ApiKey {
@@ -64,29 +61,6 @@ impl From<ApiKey> for ApiKeyInfo {
             expires_at: k.expires_at,
             created_at: k.created_at,
         }
-    }
-}
-
-/// Generate a new raw API key string (e.g., "wi_live_a1b2c3d4...").
-pub fn generate_raw_key() -> String {
-    let mut rng = rand::thread_rng();
-    let bytes: [u8; 24] = rng.gen();
-    format!("{}{}", KEY_PREFIX, hex::encode(bytes))
-}
-
-/// SHA-256 hash a raw API key for storage.
-pub fn hash_key(raw: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(raw.as_bytes());
-    hex::encode(hasher.finalize())
-}
-
-/// Extract the prefix portion for display (first 16 chars).
-pub fn extract_prefix(raw: &str) -> String {
-    if raw.len() >= 16 {
-        format!("{}...", &raw[..16])
-    } else {
-        raw.to_string()
     }
 }
 

@@ -1,3 +1,4 @@
+use atlsd_auth::extract::{extract_bearer, extract_key};
 use axum::{
     extract::{Request, State},
     http::{header, StatusCode},
@@ -12,6 +13,7 @@ use tracing::info;
 use super::AppState;
 use crate::api::auth;
 use crate::models::{api_key, user::User};
+use atlsd_auth::api_key::hash_key;
 
 /// Authenticates requests and stores the resolved principal in request extensions.
 ///
@@ -74,7 +76,7 @@ pub async fn auth_middleware(
             return Ok(next.run(request).await);
         }
 
-        let hashed = api_key::hash_key(&raw);
+        let hashed = hash_key(&raw);
         let lookup = api_key::ApiKey::find_by_hash(&state.db, &hashed)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -99,51 +101,6 @@ pub async fn auth_middleware(
     }
 
     Err(StatusCode::UNAUTHORIZED)
-}
-
-/// Extracts an API key from headers or supported query parameters.
-fn extract_key(request: &Request) -> Option<String> {
-    if let Some(val) = request.headers().get("X-API-Key") {
-        if let Ok(s) = val.to_str() {
-            if !s.is_empty() {
-                return Some(s.to_string());
-            }
-        }
-    }
-
-    let uri = request.uri();
-    uri.query().and_then(|q| {
-        url::form_urlencoded::parse(q.as_bytes())
-            .find(|(k, _)| k == "token" || k == "api_key")
-            .map(|(_, v)| v.to_string())
-    })
-}
-
-fn extract_bearer(request: &Request) -> Option<String> {
-    if let Some(val) = request.headers().get(header::AUTHORIZATION) {
-        if let Ok(s) = val.to_str() {
-            if let Some(token) = s.strip_prefix("Bearer ") {
-                if !token.is_empty() {
-                    return Some(token.to_string());
-                }
-            }
-        }
-    }
-
-    if let Some(val) = request.headers().get(header::COOKIE) {
-        if let Ok(s) = val.to_str() {
-            for cookie in s.split(';') {
-                let cookie = cookie.trim();
-                if let Some(token) = cookie.strip_prefix("wi_jwt=") {
-                    if !token.is_empty() {
-                        return Some(token.to_string());
-                    }
-                }
-            }
-        }
-    }
-
-    None
 }
 
 #[derive(Debug, Clone)]

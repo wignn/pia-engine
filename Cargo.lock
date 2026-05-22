@@ -130,18 +130,57 @@ dependencies = [
 [[package]]
 name = "atlsd-auth"
 version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "axum",
+ "base64",
+ "chrono",
+ "hex",
+ "jsonwebtoken",
+ "rand 0.8.6",
+ "serde",
+ "sha2",
+ "tracing",
+ "url",
+]
 
 [[package]]
 name = "atlsd-common"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "redis",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "url",
+]
 
 [[package]]
 name = "atlsd-domain"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "uuid",
+]
 
 [[package]]
 name = "atlsd-observability"
 version = "0.1.0"
+dependencies = [
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "atoi"
@@ -298,6 +337,7 @@ name = "bot"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "atlsd-observability",
  "base64",
  "chrono",
  "chrono-tz",
@@ -490,6 +530,10 @@ dependencies = [
  "aes-gcm",
  "anyhow",
  "argon2",
+ "atlsd-auth",
+ "atlsd-common",
+ "atlsd-domain",
+ "atlsd-observability",
  "axum",
  "base64",
  "chrono",
@@ -521,6 +565,10 @@ dependencies = [
  "ammonia",
  "anyhow",
  "async-trait",
+ "atlsd-auth",
+ "atlsd-common",
+ "atlsd-domain",
+ "atlsd-observability",
  "axum",
  "chrono",
  "chrono-tz",
@@ -1720,6 +1768,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "atlsd-observability",
  "chrono",
  "dotenvy",
  "futures-util",

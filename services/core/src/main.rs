@@ -25,7 +25,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tenant::registry::TenantRegistry;
 use tracing::{error, info, warn};
-use tracing_subscriber::{fmt, EnvFilter};
 
 #[tokio::main]
 async fn main() {
@@ -33,20 +32,7 @@ async fn main() {
 
     let cfg = config::Config::load();
 
-    let log_level = match cfg.log_level.to_uppercase().as_str() {
-        "DEBUG" => "debug",
-        "WARN" | "WARNING" => "warn",
-        "ERROR" => "error",
-        _ => "info",
-    };
-
-    let env_filter = EnvFilter::new(format!("core={},tower_http=debug", log_level));
-    fmt()
-        .json()
-        .with_env_filter(env_filter)
-        .with_target(true)
-        .with_thread_ids(false)
-        .init();
+    atlsd_observability::init_tracing("core", &cfg.log_level);
 
     info!(
         port = cfg.server_port,
@@ -162,6 +148,8 @@ async fn main() {
         stock_collector,
         pool.clone(),
         hub.clone(),
+        redis_client.clone(),
+        &cfg.redis_channel_prefix,
     ));
     {
         let stock_pipeline = stock_pipeline.clone();

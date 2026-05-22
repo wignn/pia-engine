@@ -6,7 +6,6 @@ mod models;
 mod sync;
 
 use tracing::info;
-use tracing_subscriber::{fmt, EnvFilter};
 
 #[tokio::main]
 async fn main() {
@@ -14,13 +13,7 @@ async fn main() {
 
     let cfg = config::Config::load();
 
-    let env_filter = EnvFilter::new(format!("control_plane={},tower_http=debug", cfg.log_level));
-    fmt()
-        .json()
-        .with_env_filter(env_filter)
-        .with_target(true)
-        .with_thread_ids(false)
-        .init();
+    atlsd_observability::init_tracing("control_plane", &cfg.log_level);
 
     info!(port = cfg.port, "control-plane starting");
 

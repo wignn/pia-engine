@@ -10,6 +10,7 @@ name = "ingestion-gateway"
 path = "src/main.rs"
 
 [dependencies]
+atlsd-observability = { path = "../../crates/atlsd-observability" }
 tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
 futures-util = { workspace = true }
