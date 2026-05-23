@@ -86,7 +86,12 @@ pub async fn set_config(
     info!(user_id = %auth.user_id, key = %config_key, "tenant config updated");
 
     // Notify core services so their tenant caches can refresh promptly.
-    sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
+    sync::publish_config_changed_for_user(
+        &state.redis,
+        &state.config.redis_channel_prefix,
+        Some(auth.user_id),
+    )
+    .await;
 
     Ok(Json(json!({
         "config": {
@@ -115,7 +120,12 @@ pub async fn delete_config(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if deleted {
-        sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
+        sync::publish_config_changed_for_user(
+            &state.redis,
+            &state.config.redis_channel_prefix,
+            Some(auth.user_id),
+        )
+        .await;
         Ok(Json(
             json!({ "message": format!("Config '{}' deleted", config_key) }),
         ))

@@ -98,7 +98,12 @@ pub async fn register(
 
     info!(user_id = %user.id, email = %email, "new user registered");
 
-    sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
+    sync::publish_config_changed_for_user(
+        &state.redis,
+        &state.config.redis_channel_prefix,
+        Some(user.id),
+    )
+    .await;
 
     let token = create_jwt(
         &user,
@@ -518,7 +523,12 @@ async fn complete_oauth_flow(
         }
     }
 
-    sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
+    sync::publish_config_changed_for_user(
+        &state.redis,
+        &state.config.redis_channel_prefix,
+        Some(user.id),
+    )
+    .await;
 
     let token = create_jwt(
         &user,

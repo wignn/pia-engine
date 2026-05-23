@@ -111,7 +111,12 @@ pub async fn set_user_plan(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
+    sync::publish_config_changed_for_user(
+        &state.redis,
+        &state.config.redis_channel_prefix,
+        Some(user_id),
+    )
+    .await;
 
     Ok(Json(
         json!({ "message": format!("User plan updated to {}", plan), "plan": plan }),
@@ -152,7 +157,12 @@ pub async fn toggle_user(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
+    sync::publish_config_changed_for_user(
+        &state.redis,
+        &state.config.redis_channel_prefix,
+        Some(user_id),
+    )
+    .await;
 
     Ok(Json(json!({
         "message": if new_status { "User activated" } else { "User deactivated" },

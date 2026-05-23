@@ -78,7 +78,12 @@ pub async fn create_key(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     info!(user_id = %auth.user_id, key_prefix = %key.key_prefix, "new API key created");
-    sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
+    sync::publish_config_changed_for_user(
+        &state.redis,
+        &state.config.redis_channel_prefix,
+        Some(auth.user_id),
+    )
+    .await;
 
     Ok(Json(json!({
         "api_key": raw,
@@ -105,7 +110,12 @@ pub async fn revoke_key(
 
     if revoked {
         info!(user_id = %auth.user_id, key_id = %key_id, "API key revoked");
-        sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
+        sync::publish_config_changed_for_user(
+            &state.redis,
+            &state.config.redis_channel_prefix,
+            Some(auth.user_id),
+        )
+        .await;
         Ok(Json(json!({ "message": "API key revoked successfully" })))
     } else {
         Err(StatusCode::NOT_FOUND)
@@ -136,7 +146,12 @@ pub async fn update_key(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if updated {
-        sync::publish_config_changed(&state.redis, &state.config.redis_channel_prefix).await;
+        sync::publish_config_changed_for_user(
+            &state.redis,
+            &state.config.redis_channel_prefix,
+            Some(auth.user_id),
+        )
+        .await;
         Ok(Json(json!({ "message": "API key updated" })))
     } else {
         Err(StatusCode::NOT_FOUND)

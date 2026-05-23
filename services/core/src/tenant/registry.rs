@@ -149,17 +149,26 @@ impl TenantRegistry {
         }
     }
 
-    /// Validate an API key and return TenantContext.
     pub async fn validate_key(&self, raw_key: &str) -> Option<TenantContext> {
         let hash = hash_key(raw_key);
-        let keys = self.keys.read().await;
-        let cached = keys.get(&hash)?;
+        let cached = {
+            let keys = self.keys.read().await;
+            keys.get(&hash).cloned()
+        };
 
+        let cached = match cached {
+            Some(cached) => cached,
+            None => self.load_key_from_db(&hash).await?,
+        };
+
+        self.context_from_cached_key(cached).await
+    }
+
+    async fn context_from_cached_key(&self, cached: CachedKey) -> Option<TenantContext> {
         if !cached.is_active || !cached.user_active {
             return None;
         }
 
-        // Check expiry
         if let Some(expires) = cached.expires_at {
             if Utc::now() > expires {
                 warn!(key_id = %cached.key_id, "API key expired");
@@ -182,6 +191,148 @@ impl TenantRegistry {
             can_scrape: cached.can_scrape,
             tv_symbols: user_cfg.tv_symbols,
         })
+    }
+
+    async fn load_key_from_db(&self, hash: &str) -> Option<CachedKey> {
+        let row: Result<Option<TenantRow>, _> = sqlx::query_as(
+            "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, \
+                    COALESCE(p.can_scrape, FALSE), \
+                    COALESCE(p.requests_per_day, 100), \
+                    COALESCE(p.ws_connections, 1), \
+                    COALESCE(p.tv_symbols_max, 3), \
+                    COALESCE(p.rate_limit_per_min, 10), \
+                    k.expires_at \
+             FROM api_keys k \
+             JOIN users u ON u.id = k.user_id \
+             LEFT JOIN plans p ON p.id = u.plan \
+             WHERE k.key_hash = $1",
+        )
+        .bind(hash)
+        .fetch_optional(&self.db)
+        .await;
+
+        let Some((hash, uid, kid, plan, kactive, uactive, scrape, rpd, wsc, tv_max, rlm, expires)) =
+            row.map_err(|e| {
+                error!(error = %e, "tenant registry: failed to load key on cache miss");
+                e
+            })
+            .ok()?
+        else {
+            return None;
+        };
+
+        self.load_config_for_user(uid).await;
+
+        let cached = CachedKey {
+            user_id: uid,
+            key_id: kid,
+            plan,
+            is_active: kactive,
+            user_active: uactive,
+            can_scrape: scrape,
+            requests_per_day: rpd,
+            ws_connections: wsc,
+            tv_symbols_max: tv_max,
+            rate_limit_per_min: rlm,
+            expires_at: expires,
+        };
+
+        self.keys.write().await.insert(hash, cached.clone());
+        info!(user_id = %uid, key_id = %kid, "tenant registry: key loaded on cache miss");
+        Some(cached)
+    }
+
+    async fn load_user_from_db(&self, user_id: Uuid) {
+        let rows: Result<Vec<TenantRow>, _> = sqlx::query_as(
+            "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, \
+                    COALESCE(p.can_scrape, FALSE), \
+                    COALESCE(p.requests_per_day, 100), \
+                    COALESCE(p.ws_connections, 1), \
+                    COALESCE(p.tv_symbols_max, 3), \
+                    COALESCE(p.rate_limit_per_min, 10), \
+                    k.expires_at \
+             FROM api_keys k \
+             JOIN users u ON u.id = k.user_id \
+             LEFT JOIN plans p ON p.id = u.plan \
+             WHERE k.user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_all(&self.db)
+        .await;
+
+        match rows {
+            Ok(rows) => {
+                let mut keys = self.keys.write().await;
+                keys.retain(|_, key| key.user_id != user_id);
+                for (
+                    hash,
+                    uid,
+                    kid,
+                    plan,
+                    kactive,
+                    uactive,
+                    scrape,
+                    rpd,
+                    wsc,
+                    tv_max,
+                    rlm,
+                    expires,
+                ) in rows
+                {
+                    keys.insert(
+                        hash,
+                        CachedKey {
+                            user_id: uid,
+                            key_id: kid,
+                            plan,
+                            is_active: kactive,
+                            user_active: uactive,
+                            can_scrape: scrape,
+                            requests_per_day: rpd,
+                            ws_connections: wsc,
+                            tv_symbols_max: tv_max,
+                            rate_limit_per_min: rlm,
+                            expires_at: expires,
+                        },
+                    );
+                }
+            }
+            Err(e) => {
+                error!(user_id = %user_id, error = %e, "tenant registry: failed to load user keys")
+            }
+        }
+
+        self.load_config_for_user(user_id).await;
+    }
+
+    async fn load_config_for_user(&self, user_id: Uuid) {
+        let cfg_rows: Result<Vec<(String, serde_json::Value)>, _> = sqlx::query_as(
+            "SELECT config_key, config_value FROM tenant_configs WHERE user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_all(&self.db)
+        .await;
+
+        match cfg_rows {
+            Ok(rows) => {
+                let mut user_cfg = UserConfig::default();
+                for (key, val) in rows {
+                    if key.as_str() == "tv_symbols" {
+                        if let Some(arr) = val.as_array() {
+                            for item in arr {
+                                if let Some(s) = item.as_str() {
+                                    user_cfg.tv_symbols.insert(s.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+                self.configs.write().await.insert(user_id, user_cfg);
+            }
+            Err(e) => {
+                error!(user_id = %user_id, error = %e, "tenant registry: failed to load user config")
+            }
+        }
     }
 
     /// Background task: listen for Redis config_changed events + periodic fallback reload.
@@ -246,9 +397,23 @@ impl TenantRegistry {
             tokio::select! {
                 msg = msg_stream.next() => {
                     match msg {
-                        Some(_) => {
-                            info!("tenant config changed event received, reloading cache");
-                            registry.reload().await;
+                        Some(msg) => {
+                            let payload: redis::RedisResult<String> = msg.get_payload();
+                            match payload
+                                .ok()
+                                .and_then(|payload| serde_json::from_str::<serde_json::Value>(&payload).ok())
+                                .and_then(|payload| payload.get("user_id").and_then(|id| id.as_str()).map(str::to_string))
+                                .and_then(|id| Uuid::parse_str(&id).ok())
+                            {
+                                Some(user_id) => {
+                                    info!(user_id = %user_id, "tenant config changed event received, reloading user cache");
+                                    registry.load_user_from_db(user_id).await;
+                                }
+                                None => {
+                                    info!("tenant config changed event received, reloading cache");
+                                    registry.reload().await;
+                                }
+                            }
                         }
                         None => {
                             warn!("tenant config subscriber stream ended");
