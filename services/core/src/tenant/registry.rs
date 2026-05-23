@@ -211,15 +211,12 @@ impl TenantRegistry {
         .fetch_optional(&self.db)
         .await;
 
-        let Some((hash, uid, kid, plan, kactive, uactive, scrape, rpd, wsc, tv_max, rlm, expires)) =
-            row.map_err(|e| {
+        let (hash, uid, kid, plan, kactive, uactive, scrape, rpd, wsc, tv_max, rlm, expires) = row
+            .map_err(|e| {
                 error!(error = %e, "tenant registry: failed to load key on cache miss");
                 e
             })
-            .ok()?
-        else {
-            return None;
-        };
+            .ok()??;
 
         self.load_config_for_user(uid).await;
 
