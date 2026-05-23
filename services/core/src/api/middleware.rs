@@ -1,7 +1,7 @@
 use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
 use std::time::Instant;
 
-use atlsd_auth::extract::extract_key;
+use atlsd_auth::extract::{extract_rest_key, extract_ws_key};
 
 use crate::api::state::AppState;
 use crate::api::usage_tracker::UsageEvent;
@@ -77,7 +77,11 @@ async fn attach_tenant_context_if_valid(
     request: &mut Request,
     allow_missing_key: bool,
 ) -> bool {
-    let raw_key = extract_key(request);
+    let raw_key = if request.uri().path().starts_with("/api/v1/ws") {
+        extract_ws_key(request)
+    } else {
+        extract_rest_key(request)
+    };
 
     match raw_key {
         Some(raw) => {
