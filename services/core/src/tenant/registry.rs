@@ -184,8 +184,38 @@ impl TenantRegistry {
         })
     }
 
-    /// Background task: periodically reload registry.
-    pub async fn run_sync(self: Arc<Self>, mut shutdown: tokio::sync::watch::Receiver<bool>) {
+    /// Background task: listen for Redis config_changed events + periodic fallback reload.
+    pub async fn run_sync(
+        self: Arc<Self>,
+        redis_client: Option<redis::Client>,
+        channel_prefix: String,
+        mut shutdown: tokio::sync::watch::Receiver<bool>,
+    ) {
+        if let Some(client) = redis_client {
+            let registry = self.clone();
+            let prefix = channel_prefix.clone();
+            let mut shutdown_redis = shutdown.clone();
+
+            tokio::spawn(async move {
+                loop {
+                    if let Err(e) =
+                        Self::redis_subscribe_loop(&registry, &client, &prefix, &mut shutdown_redis)
+                            .await
+                    {
+                        warn!(error = %e, "tenant config subscriber error, reconnecting in 5s");
+                    }
+
+                    tokio::select! {
+                        _ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {}
+                        _ = shutdown_redis.changed() => { break; }
+                    }
+                }
+            });
+
+            info!("tenant registry: Redis config subscriber started");
+        }
+
+        // Keep periodic fallback reload (60s) for consistency.
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
         loop {
             tokio::select! {
@@ -193,5 +223,42 @@ impl TenantRegistry {
                 _ = shutdown.changed() => { break; }
             }
         }
+    }
+
+    /// Subscribe to the `{prefix}:tenant:config_changed` Redis channel and
+    /// reload the in-memory cache every time the control-plane publishes an event.
+    async fn redis_subscribe_loop(
+        registry: &Arc<Self>,
+        client: &redis::Client,
+        prefix: &str,
+        shutdown: &mut tokio::sync::watch::Receiver<bool>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        use futures_util::StreamExt;
+
+        let mut pubsub = client.get_async_pubsub().await?;
+        let channel = format!("{}:tenant:config_changed", prefix);
+        pubsub.subscribe(&channel).await?;
+        info!(channel = %channel, "tenant config subscriber connected");
+
+        let mut msg_stream = pubsub.on_message();
+
+        loop {
+            tokio::select! {
+                msg = msg_stream.next() => {
+                    match msg {
+                        Some(_) => {
+                            info!("tenant config changed event received, reloading cache");
+                            registry.reload().await;
+                        }
+                        None => {
+                            warn!("tenant config subscriber stream ended");
+                            return Ok(());
+                        }
+                    }
+                }
+                _ = shutdown.changed() => { break; }
+            }
+        }
+        Ok(())
     }
 }

@@ -259,6 +259,52 @@ fn truncate_str(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_len])
+        let mut end = max_len;
+        while !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}...", &s[..end])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn truncate_str_short_string_unchanged() {
+        assert_eq!(truncate_str("hello", 10), "hello");
+    }
+
+    #[test]
+    fn truncate_str_exact_length_unchanged() {
+        assert_eq!(truncate_str("hello", 5), "hello");
+    }
+
+    #[test]
+    fn truncate_str_ascii_truncation() {
+        assert_eq!(truncate_str("hello world", 5), "hello...");
+    }
+
+    #[test]
+    fn truncate_str_respects_multibyte_char_boundary() {
+        // Curly right single quote U+2019 = 3 bytes (e2 80 99)
+        let s = "a".repeat(498) + "\u{2019}" + &"b".repeat(100);
+        let result = truncate_str(&s, 500);
+        // Should truncate before the curly quote (at byte 498), not panic
+        assert!(result.ends_with("..."));
+        assert!(!result.contains('\u{2019}'));
+    }
+
+    #[test]
+    fn truncate_str_handles_emoji_boundary() {
+        let s = "Hello 🎉 World! This is a long string";
+        let result = truncate_str(s, 7);
+        assert_eq!(result, "Hello ...");
+    }
+
+    #[test]
+    fn truncate_str_empty_string() {
+        assert_eq!(truncate_str("", 10), "");
     }
 }

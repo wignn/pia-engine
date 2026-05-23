@@ -92,10 +92,14 @@ async fn main() {
     {
         let registry = tenant_registry.clone();
         let sync_rx = shutdown_tx.subscribe();
+        let redis_for_sync = redis_client.clone();
+        let prefix_for_sync = cfg.redis_channel_prefix.clone();
         tokio::spawn(async move {
-            registry.run_sync(sync_rx).await;
+            registry
+                .run_sync(redis_for_sync, prefix_for_sync, sync_rx)
+                .await;
         });
-        info!("tenant registry sync started (60s interval)");
+        info!("tenant registry sync started (Redis events + 60s fallback)");
     }
 
     let timeout = Duration::from_secs(cfg.scraper_timeout);
