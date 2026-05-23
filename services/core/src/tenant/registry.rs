@@ -9,7 +9,6 @@ use uuid::Uuid;
 
 use super::context::TenantContext;
 
-/// Cached API key → tenant info mapping.
 #[derive(Debug, Clone)]
 struct CachedKey {
     user_id: Uuid,
@@ -20,6 +19,7 @@ struct CachedKey {
     can_scrape: bool,
     requests_per_day: i32,
     ws_connections: i32,
+    tv_symbols_max: i32,
     rate_limit_per_min: i32,
     expires_at: Option<DateTime<Utc>>,
 }
@@ -30,10 +30,9 @@ struct UserConfig {
     tv_symbols: HashSet<String>,
 }
 
-/// In-memory registry of API keys and tenant configs, synced from DB.
 pub struct TenantRegistry {
-    keys: Arc<RwLock<HashMap<String, CachedKey>>>, // key_hash → CachedKey
-    configs: Arc<RwLock<HashMap<Uuid, UserConfig>>>, // user_id → UserConfig
+    keys: Arc<RwLock<HashMap<String, CachedKey>>>, 
+    configs: Arc<RwLock<HashMap<Uuid, UserConfig>>>, 
     db: PgPool,
 }
 
@@ -45,6 +44,7 @@ type TenantRow = (
     bool,
     bool,
     bool,
+    i32,
     i32,
     i32,
     i32,
@@ -68,6 +68,7 @@ impl TenantRegistry {
                     COALESCE(p.can_scrape, FALSE), \
                     COALESCE(p.requests_per_day, 100), \
                     COALESCE(p.ws_connections, 1), \
+                    COALESCE(p.tv_symbols_max, 3), \
                     COALESCE(p.rate_limit_per_min, 10), \
                     k.expires_at \
              FROM api_keys k \
@@ -80,7 +81,20 @@ impl TenantRegistry {
         match rows {
             Ok(rows) => {
                 let mut map = HashMap::new();
-                for (hash, uid, kid, plan, kactive, uactive, scrape, rpd, wsc, rlm, expires) in rows
+                for (
+                    hash,
+                    uid,
+                    kid,
+                    plan,
+                    kactive,
+                    uactive,
+                    scrape,
+                    rpd,
+                    wsc,
+                    tv_max,
+                    rlm,
+                    expires,
+                ) in rows
                 {
                     map.insert(
                         hash,
@@ -93,6 +107,7 @@ impl TenantRegistry {
                             can_scrape: scrape,
                             requests_per_day: rpd,
                             ws_connections: wsc,
+                            tv_symbols_max: tv_max,
                             rate_limit_per_min: rlm,
                             expires_at: expires,
                         },
@@ -162,6 +177,7 @@ impl TenantRegistry {
             is_admin: false,
             requests_per_day: cached.requests_per_day,
             ws_connections: cached.ws_connections,
+            tv_symbols_max: cached.tv_symbols_max,
             rate_limit_per_min: cached.rate_limit_per_min,
             can_scrape: cached.can_scrape,
             tv_symbols: user_cfg.tv_symbols,

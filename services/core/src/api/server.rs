@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use axum::{
     extract::{State, WebSocketUpgrade},
+    http::StatusCode,
     middleware,
     response::Response,
     routing::{get, post},
@@ -119,6 +120,46 @@ pub fn build_router(state: AppState) -> Router {
         .with_state(state)
 }
 
+fn is_market_subscription(channels: &Option<HashSet<String>>) -> bool {
+    channels
+        .as_ref()
+        .map(|channels| channels.contains("all") || channels.contains("market_data"))
+        .unwrap_or(true)
+}
+
+fn normalize_symbol_set(raw: &str) -> HashSet<String> {
+    raw.split(',')
+        .map(|symbol| symbol.trim().to_uppercase())
+        .filter(|symbol| !symbol.is_empty())
+        .collect()
+}
+
+fn resolve_market_symbols(
+    allowed: &HashSet<String>,
+    requested: &HashSet<String>,
+) -> Result<HashSet<String>, &'static str> {
+    if allowed.is_empty() {
+        return Err("No market symbols configured for your plan");
+    }
+
+    if requested.is_empty() {
+        return Ok(allowed.clone());
+    }
+
+    if requested.is_subset(allowed) {
+        return Ok(requested.clone());
+    }
+
+    Err("Requested market symbol is not allowed by your plan")
+}
+
+fn text_response(status: StatusCode, body: &'static str) -> Response {
+    axum::response::Response::builder()
+        .status(status)
+        .body(axum::body::Body::from(body))
+        .unwrap()
+}
+
 async fn ws_handler_inner(
     ws: WebSocketUpgrade,
     state: AppState,
@@ -159,11 +200,7 @@ async fn ws_handler_inner(
 
     let symbols_query = params
         .get("symbols")
-        .map(|s| {
-            s.split(',')
-                .map(|s| s.trim().to_string())
-                .collect::<HashSet<_>>()
-        })
+        .map(|symbols| normalize_symbol_set(symbols))
         .unwrap_or_default();
 
     if let Some(raw_key) = &token {
@@ -183,26 +220,22 @@ async fn ws_handler_inner(
                 }
                 user_id = Some(ctx.user_id);
                 authenticated = true;
-                if !symbols_query.is_empty() {
-                    tv_symbols = ctx
-                        .tv_symbols
-                        .intersection(&symbols_query)
-                        .cloned()
-                        .collect();
-                } else {
-                    tv_symbols = ctx.tv_symbols;
+
+                if is_market_subscription(&channels_query) {
+                    match resolve_market_symbols(&ctx.tv_symbols, &symbols_query) {
+                        Ok(symbols) => tv_symbols = symbols,
+                        Err(message) => return text_response(StatusCode::FORBIDDEN, message),
+                    }
                 }
             }
         }
     }
 
     if !authenticated {
-        return axum::response::Response::builder()
-            .status(401)
-            .body(axum::body::Body::from(
-                "Valid API key required for WebSocket connection",
-            ))
-            .unwrap();
+        return text_response(
+            StatusCode::UNAUTHORIZED,
+            "Valid API key required for WebSocket connection",
+        );
     }
 
     let hub = state.hub.clone();
@@ -341,6 +374,60 @@ pub async fn start(state: AppState) -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn symbols(values: &[&str]) -> HashSet<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    #[test]
+    fn normalize_symbol_set_trims_uppercases_and_dedupes() {
+        let normalized = normalize_symbol_set(" eurusd, GBPUSD ,, eurusd ");
+
+        assert_eq!(normalized, symbols(&["EURUSD", "GBPUSD"]));
+    }
+
+    #[test]
+    fn market_symbols_default_to_allowed_symbols() {
+        let allowed = symbols(&["EURUSD", "GBPUSD"]);
+        let requested = HashSet::new();
+
+        assert_eq!(
+            resolve_market_symbols(&allowed, &requested).unwrap(),
+            allowed
+        );
+    }
+
+    #[test]
+    fn market_symbols_accept_allowed_subset() {
+        let allowed = symbols(&["EURUSD", "GBPUSD"]);
+        let requested = symbols(&["EURUSD"]);
+
+        assert_eq!(
+            resolve_market_symbols(&allowed, &requested).unwrap(),
+            requested
+        );
+    }
+
+    #[test]
+    fn market_symbols_reject_empty_allowlist() {
+        let allowed = HashSet::new();
+        let requested = HashSet::new();
+
+        assert!(resolve_market_symbols(&allowed, &requested).is_err());
+    }
+
+    #[test]
+    fn market_symbols_reject_unallowed_requested_symbol() {
+        let allowed = symbols(&["EURUSD", "GBPUSD"]);
+        let requested = symbols(&["EURUSD", "XAUUSD"]);
+
+        assert!(resolve_market_symbols(&allowed, &requested).is_err());
+    }
 }
 
 async fn shutdown_signal() {

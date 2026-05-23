@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -72,11 +74,12 @@ pub async fn set_config(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    if let Err(msg) = validate_config(&config_key, &body.value, &plan) {
-        return Ok(Json(json!({ "error": msg })));
-    }
+    let value = match normalize_config_value(&config_key, body.value, &plan) {
+        Ok(value) => value,
+        Err(msg) => return Ok(Json(json!({ "error": msg }))),
+    };
 
-    let config = TenantConfig::set(&state.db, auth.user_id, &config_key, &body.value)
+    let config = TenantConfig::set(&state.db, auth.user_id, &config_key, &value)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -121,46 +124,125 @@ pub async fn delete_config(
     }
 }
 
-fn validate_config(key: &str, value: &Value, plan: &Plan) -> Result<(), String> {
+fn normalize_config_value(key: &str, value: Value, plan: &Plan) -> Result<Value, String> {
     match key {
         "tv_symbols" => {
-            let arr = value
-                .as_array()
-                .ok_or("tv_symbols must be an array of strings")?;
-            if arr.len() > plan.tv_symbols_max as usize {
-                return Err(format!(
-                    "Your plan allows max {} TV symbols, got {}. Upgrade your plan for more.",
-                    plan.tv_symbols_max,
-                    arr.len()
-                ));
-            }
-            Ok(())
+            normalize_limited_string_array(value, plan.tv_symbols_max, "TV symbols", true)
         }
         "x_usernames" => {
-            let arr = value
-                .as_array()
-                .ok_or("x_usernames must be an array of strings")?;
-            if arr.len() > plan.x_usernames_max as usize {
-                return Err(format!(
-                    "Your plan allows max {} X usernames, got {}. Upgrade your plan for more.",
-                    plan.x_usernames_max,
-                    arr.len()
-                ));
-            }
-            for item in arr {
-                match item.as_str() {
-                    Some(s) if !s.trim().is_empty() => {}
-                    _ => return Err("Each x_username must be a non-empty string".into()),
-                }
-            }
-            Ok(())
+            normalize_limited_string_array(value, plan.x_usernames_max, "X usernames", false)
         }
         "custom_rss_feeds" => {
             if !plan.can_custom_rss {
                 return Err("Custom RSS feeds require Pro plan or higher".into());
             }
-            Ok(())
+            Ok(value)
         }
-        _ => Ok(()),
+        _ => Ok(value),
+    }
+}
+
+fn normalize_limited_string_array(
+    value: Value,
+    max_items: i32,
+    label: &str,
+    uppercase: bool,
+) -> Result<Value, String> {
+    let arr = value
+        .as_array()
+        .ok_or_else(|| format!("{} must be an array of strings", label))?;
+
+    let mut seen = HashSet::new();
+    let mut normalized = Vec::new();
+
+    for item in arr {
+        let raw = item
+            .as_str()
+            .ok_or_else(|| format!("Each {} item must be a non-empty string", label))?;
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            return Err(format!("Each {} item must be a non-empty string", label));
+        }
+
+        let value = if uppercase {
+            trimmed.to_uppercase()
+        } else {
+            trimmed.to_string()
+        };
+
+        if seen.insert(value.clone()) {
+            normalized.push(Value::String(value));
+        }
+    }
+
+    if normalized.len() > max_items as usize {
+        return Err(format!(
+            "Your plan allows max {} {}, got {}. Upgrade your plan for more.",
+            max_items,
+            label,
+            normalized.len()
+        ));
+    }
+
+    Ok(Value::Array(normalized))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn plan(tv_symbols_max: i32, x_usernames_max: i32, can_custom_rss: bool) -> Plan {
+        Plan {
+            id: "free".into(),
+            name: "Free".into(),
+            price_idr: 0,
+            requests_per_day: 100,
+            ws_connections: 1,
+            x_usernames_max,
+            tv_symbols_max,
+            news_history_days: 1,
+            rate_limit_per_min: 10,
+            can_scrape: false,
+            can_custom_rss,
+            is_active: true,
+            sort_order: 0,
+        }
+    }
+
+    #[test]
+    fn tv_symbols_are_trimmed_uppercased_and_deduped() {
+        let value = json!([" eurusd ", "GBPUSD", "eurusd"]);
+        let normalized = normalize_config_value("tv_symbols", value, &plan(3, 1, false)).unwrap();
+
+        assert_eq!(normalized, json!(["EURUSD", "GBPUSD"]));
+    }
+
+    #[test]
+    fn tv_symbols_reject_values_over_plan_limit_after_dedupe() {
+        let value = json!(["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"]);
+
+        assert!(normalize_config_value("tv_symbols", value, &plan(3, 1, false)).is_err());
+    }
+
+    #[test]
+    fn tv_symbols_reject_empty_strings() {
+        let value = json!(["EURUSD", " "]);
+
+        assert!(normalize_config_value("tv_symbols", value, &plan(3, 1, false)).is_err());
+    }
+
+    #[test]
+    fn x_usernames_are_limited_without_uppercasing() {
+        let value = json!([" wignn ", "market_bot"]);
+        let normalized = normalize_config_value("x_usernames", value, &plan(3, 2, false)).unwrap();
+
+        assert_eq!(normalized, json!(["wignn", "market_bot"]));
+    }
+
+    #[test]
+    fn custom_rss_requires_plan_permission() {
+        let value = json!(["https://example.com/feed.xml"]);
+
+        assert!(normalize_config_value("custom_rss_feeds", value, &plan(3, 1, false)).is_err());
     }
 }
