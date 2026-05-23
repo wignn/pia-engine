@@ -165,7 +165,13 @@ impl TenantRegistry {
     }
 
     async fn context_from_cached_key(&self, cached: CachedKey) -> Option<TenantContext> {
-        if !cached.is_active || !cached.user_active {
+        if !cached.is_active {
+            warn!(key_id = %cached.key_id, "API key inactive");
+            return None;
+        }
+
+        if !cached.user_active {
+            warn!(user_id = %cached.user_id, "API key user inactive");
             return None;
         }
 
@@ -211,12 +217,21 @@ impl TenantRegistry {
         .fetch_optional(&self.db)
         .await;
 
-        let (hash, uid, kid, plan, kactive, uactive, scrape, rpd, wsc, tv_max, rlm, expires) = row
+        let row = row
             .map_err(|e| {
                 error!(error = %e, "tenant registry: failed to load key on cache miss");
                 e
             })
-            .ok()??;
+            .ok()?;
+
+        let (hash, uid, kid, plan, kactive, uactive, scrape, rpd, wsc, tv_max, rlm, expires) =
+            match row {
+                Some(row) => row,
+                None => {
+                    warn!(key_hash_prefix = %&hash[..hash.len().min(12)], "tenant registry: key not found in database on cache miss");
+                    return None;
+                }
+            };
 
         self.load_config_for_user(uid).await;
 

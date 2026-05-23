@@ -77,9 +77,6 @@ pub fn build_router(state: AppState) -> Router {
             optional_api_key_auth,
         ));
 
-    // WS routes use optional auth because ws_handler_inner performs its own
-    // full authentication (env keys, tenant registry, tickets, connection
-    // limits).  The middleware only attaches TenantContext for quota tracking.
     let ws_api = Router::new()
         .route("/api/v1/ws", get(ws_general_handler))
         .route("/api/v1/ws/market", get(ws_market_handler))
