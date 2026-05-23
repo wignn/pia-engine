@@ -2,7 +2,7 @@
 name = "ingestion-gateway"
 version = "0.1.0"
 edition = "2021"
-description = "Real-time tick-level data ingestion gateway via Finnhub & Tiingo WebSocket"
+description = "Real-time market data ingestion gateway"
 license = "MIT"
 
 [[bin]]

@@ -1,11 +1,26 @@
 use std::env;
 
 #[derive(Debug, Clone)]
+pub struct MarketSymbolConfig {
+    pub provider_symbol: String,
+    pub public_symbol: String,
+    pub asset_type: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct Config {
-    pub finnhub_api_key: String,
-    pub tiingo_api_key: String,
-    pub binance_symbols: Vec<String>,
-    pub binance_enabled: bool,
+    pub primary_fx_api_key: String,
+    pub secondary_fx_api_key: String,
+    pub primary_fx_ws_url: String,
+    pub secondary_fx_ws_url: String,
+    pub crypto_feed_ws_url: String,
+    pub index_feed_http_url_template: String,
+    pub primary_fx_symbols: Vec<MarketSymbolConfig>,
+    pub secondary_fx_symbols: Vec<MarketSymbolConfig>,
+    pub index_feed_symbols: Vec<MarketSymbolConfig>,
+    pub stock_feed_symbols: Vec<MarketSymbolConfig>,
+    pub crypto_symbols: Vec<String>,
+    pub crypto_feed_enabled: bool,
     pub redis_url: String,
     pub redis_channel_prefix: String,
     pub reconnect_base_sec: u64,
@@ -16,23 +31,32 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Self {
-        let tv_symbols_raw = get_env(
-            "TV_SYMBOLS",
-            "BINANCE:BTCUSDT, BINANCE:ETHUSDT, BINANCE:SOLUSDT, BINANCE:BNBUSDT",
-        );
-        let binance_symbols: Vec<String> = tv_symbols_raw
+        let crypto_symbols_raw = get_env("CRYPTO_SYMBOLS", "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT");
+        let crypto_symbols: Vec<String> = crypto_symbols_raw
             .split(',')
             .map(|s| s.trim())
-            .filter(|s| s.to_uppercase().starts_with("BINANCE:"))
-            .map(|s| s["BINANCE:".len()..].to_lowercase())
             .filter(|s| !s.is_empty())
+            .map(|s| s.to_lowercase())
             .collect();
 
         Self {
-            finnhub_api_key: get_env("FINNHUB_API_KEY", ""),
-            tiingo_api_key: get_env("TIINGO_API_KEY", ""),
-            binance_symbols,
-            binance_enabled: get_env("BINANCE_ENABLED", "true").to_lowercase().eq("true"),
+            primary_fx_api_key: get_env("PRIMARY_FX_API_KEY", ""),
+            secondary_fx_api_key: get_env("SECONDARY_FX_API_KEY", ""),
+            primary_fx_ws_url: get_env("PRIMARY_FX_WS_URL", ""),
+            secondary_fx_ws_url: get_env("SECONDARY_FX_WS_URL", ""),
+            crypto_feed_ws_url: get_env("CRYPTO_FEED_WS_URL", ""),
+            index_feed_http_url_template: get_env("INDEX_FEED_HTTP_URL_TEMPLATE", ""),
+            primary_fx_symbols: parse_symbol_mappings(&get_env("PRIMARY_FX_SYMBOLS", ""), "forex"),
+            secondary_fx_symbols: parse_symbol_mappings(
+                &get_env("SECONDARY_FX_SYMBOLS", ""),
+                "forex",
+            ),
+            index_feed_symbols: parse_symbol_mappings(&get_env("INDEX_FEED_SYMBOLS", ""), "index"),
+            stock_feed_symbols: parse_symbol_mappings(&get_env("STOCK_FEED_SYMBOLS", ""), "stock"),
+            crypto_symbols,
+            crypto_feed_enabled: get_env("CRYPTO_FEED_ENABLED", "true")
+                .to_lowercase()
+                .eq("true"),
             redis_url: get_env("REDIS_URL", ""),
             redis_channel_prefix: get_env("REDIS_CHANNEL_PREFIX", "ingestion"),
             reconnect_base_sec: get_env_u64("RECONNECT_BASE_SEC", 5),
@@ -42,17 +66,38 @@ impl Config {
         }
     }
 
-    pub fn has_finnhub(&self) -> bool {
-        !self.finnhub_api_key.trim().is_empty()
+    pub fn has_primary_fx(&self) -> bool {
+        !self.primary_fx_api_key.trim().is_empty() && !self.primary_fx_symbols.is_empty()
     }
 
-    pub fn has_tiingo(&self) -> bool {
-        !self.tiingo_api_key.trim().is_empty()
+    pub fn has_secondary_fx(&self) -> bool {
+        !self.secondary_fx_api_key.trim().is_empty() && !self.secondary_fx_symbols.is_empty()
     }
 
     pub fn has_redis(&self) -> bool {
         !self.redis_url.trim().is_empty()
     }
+}
+
+fn parse_symbol_mappings(raw: &str, default_asset_type: &str) -> Vec<MarketSymbolConfig> {
+    raw.split(',')
+        .filter_map(|item| {
+            let mut parts = item.split('|').map(str::trim);
+            let provider_symbol = parts.next()?.to_string();
+            let public_symbol = parts.next()?.to_uppercase();
+            let asset_type = parts.next().unwrap_or(default_asset_type).to_lowercase();
+
+            if provider_symbol.is_empty() || public_symbol.is_empty() {
+                return None;
+            }
+
+            Some(MarketSymbolConfig {
+                provider_symbol,
+                public_symbol,
+                asset_type,
+            })
+        })
+        .collect()
 }
 
 fn get_env(key: &str, fallback: &str) -> String {

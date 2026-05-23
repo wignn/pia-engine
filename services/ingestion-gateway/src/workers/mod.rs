@@ -1,5 +1,5 @@
-pub mod binance;
-pub mod finnhub;
+pub mod crypto_feed;
+pub mod index_feed;
+pub mod primary_fx;
 pub mod reconnect;
-pub mod tiingo;
-pub mod yahoo;
+pub mod secondary_fx;

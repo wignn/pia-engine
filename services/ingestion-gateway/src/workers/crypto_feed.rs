@@ -13,7 +13,7 @@ use crate::config::Config;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-struct BinanceTrade {
+struct TradeEvent {
     #[serde(rename = "e")]
     event_type: String,
     #[serde(rename = "E")]
@@ -32,13 +32,15 @@ struct BinanceTrade {
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-struct BinanceStreamMessage {
+struct StreamMessage {
     stream: String,
-    data: BinanceTrade,
+    data: TradeEvent,
 }
 
-const TOPIC: &str = "binance:crypto";
-
+const WORKER: &str = "crypto_feed";
+const FEED: &str = "crypto";
+const SOURCE: &str = "market_data";
+const TOPIC: &str = "crypto:trades";
 const DEFAULT_SYMBOLS: &[&str] = &[
     "btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt", "dogeusdt", "adausdt",
 ];
@@ -46,13 +48,13 @@ const DEFAULT_SYMBOLS: &[&str] = &[
 pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
     let mut backoff = ReconnectPolicy::new(cfg.reconnect_base_sec, cfg.reconnect_max_sec);
 
-    let symbols = if cfg.binance_symbols.is_empty() {
+    let symbols = if cfg.crypto_symbols.is_empty() {
         DEFAULT_SYMBOLS
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<_>>()
     } else {
-        cfg.binance_symbols.clone()
+        cfg.crypto_symbols.clone()
     };
 
     let streams: Vec<String> = symbols
@@ -63,32 +65,27 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
     let streams_param = streams.join("/");
 
     loop {
-        let url = format!(
-            "wss://stream.binance.com:9443/stream?streams={}",
-            streams_param
-        );
+        if cfg.crypto_feed_ws_url.trim().is_empty() {
+            error!(worker = WORKER, "crypto feed websocket URL not configured");
+            tokio::time::sleep(backoff.next_delay()).await;
+            continue;
+        }
+        let url = cfg
+            .crypto_feed_ws_url
+            .trim()
+            .replace("{streams}", &streams_param);
 
-        info!(
-            worker = "binance",
-            symbols = ?symbols,
-            streams = streams.len(),
-            "connecting to binance websocket"
-        );
+        info!(worker = WORKER, symbols = ?symbols, streams = streams.len(), "connecting to market data websocket");
 
         let ws_stream = match connect_async(&url).await {
             Ok((stream, _response)) => {
-                info!(worker = "binance", "websocket connected");
+                info!(worker = WORKER, "websocket connected");
                 backoff.reset();
                 stream
             }
             Err(e) => {
                 let delay = backoff.next_delay();
-                error!(
-                    worker = "binance",
-                    error = %e,
-                    retry_secs = delay.as_secs(),
-                    "websocket connection failed"
-                );
+                error!(worker = WORKER, error = %e, retry_secs = delay.as_secs(), "websocket connection failed");
                 tokio::time::sleep(delay).await;
                 continue;
             }
@@ -103,26 +100,26 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
             match read.next().await {
                 Some(Ok(Message::Text(text))) => {
                     if let Err(e) = handle_message(&text, &*broker, &mut tick_count).await {
-                        debug!(worker = "binance", error = %e, "message handling error");
+                        debug!(worker = WORKER, error = %e, "message handling error");
                     }
                 }
                 Some(Ok(Message::Ping(data))) => {
                     if let Err(e) = write.send(Message::Pong(data)).await {
-                        warn!(worker = "binance", error = %e, "pong send failed");
+                        warn!(worker = WORKER, error = %e, "pong send failed");
                     }
                 }
                 Some(Ok(Message::Close(_))) => {
-                    info!(worker = "binance", "server sent close frame");
+                    info!(worker = WORKER, "server sent close frame");
                     disconnect_reason = "server_close";
                     break;
                 }
                 Some(Err(e)) => {
-                    error!(worker = "binance", error = %e, "websocket read error");
+                    error!(worker = WORKER, error = %e, "websocket read error");
                     disconnect_reason = "read_error";
                     break;
                 }
                 None => {
-                    info!(worker = "binance", "websocket stream ended");
+                    info!(worker = WORKER, "websocket stream ended");
                     disconnect_reason = "stream_end";
                     break;
                 }
@@ -131,7 +128,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
         }
 
         info!(
-            worker = "binance",
+            worker = WORKER,
             reason = disconnect_reason,
             ticks = tick_count,
             "disconnecting websocket"
@@ -142,7 +139,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
 
         let delay = backoff.next_delay();
         warn!(
-            worker = "binance",
+            worker = WORKER,
             retry_secs = delay.as_secs(),
             "reconnecting after disconnect"
         );
@@ -150,13 +147,12 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
     }
 }
 
-/// Parse and publish a single Binance combined stream message.
 async fn handle_message(
     text: &str,
     broker: &dyn BrokerPublisher,
     tick_count: &mut u64,
 ) -> anyhow::Result<()> {
-    let msg: BinanceStreamMessage = serde_json::from_str(text)?;
+    let msg: StreamMessage = serde_json::from_str(text)?;
 
     if msg.data.event_type != "trade" {
         return Ok(());
@@ -172,7 +168,8 @@ async fn handle_message(
     *tick_count += 1;
 
     let payload = json!({
-        "source": "binance",
+        "feed": FEED,
+        "source": SOURCE,
         "symbol": &msg.data.symbol,
         "price": price,
         "quantity": quantity,
@@ -183,12 +180,7 @@ async fn handle_message(
 
     let payload_str = payload.to_string();
     if let Err(e) = broker.publish(TOPIC, &payload_str).await {
-        warn!(
-            worker = "binance",
-            error = %e,
-            symbol = %msg.data.symbol,
-            "broker publish failed"
-        );
+        warn!(worker = WORKER, error = %e, symbol = %msg.data.symbol, "broker publish failed");
     }
 
     Ok(())

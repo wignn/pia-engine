@@ -93,8 +93,8 @@ async fn subscribe_loop(
             }
         };
 
-        let source = parsed
-            .get("source")
+        let feed = parsed
+            .get("feed")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
@@ -109,22 +109,33 @@ async fn subscribe_loop(
             continue;
         }
 
-        let symbol = normalize_symbol(source, raw_symbol);
+        let symbol = normalize_symbol(feed, raw_symbol);
         let bid = parsed.get("bid").and_then(|v| v.as_f64());
         let ask = parsed.get("ask").and_then(|v| v.as_f64());
-        let volume = parsed.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let volume = parsed
+            .get("volume")
+            .or_else(|| parsed.get("quantity"))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
         let received_at = parsed
             .get("received_at")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let asset_type = match source {
-            "binance" => "crypto",
-            "finnhub" | "tiingo" => "forex",
-            "yahoo" => "index",
-            _ => "unknown",
-        }
-        .to_string();
+        let asset_type = parsed
+            .get("asset_type")
+            .and_then(|v| v.as_str())
+            .map(|value| value.to_lowercase())
+            .unwrap_or_else(|| {
+                match feed {
+                    "crypto" => "crypto",
+                    "primary_fx" | "secondary_fx" => "forex",
+                    "index" => "index",
+                    "stock" => "stock",
+                    _ => "unknown",
+                }
+                .to_string()
+            });
 
         {
             let mut cache = PRICE_CACHE.write();
@@ -136,7 +147,7 @@ async fn subscribe_loop(
                     bid,
                     ask,
                     volume: Some(volume),
-                    source: source.to_string(),
+                    source: "market_data".to_string(),
                     asset_type: asset_type.clone(),
                     received_at: received_at.clone(),
                     updated_at: Some(Instant::now()),
@@ -216,7 +227,7 @@ async fn subscribe_loop(
                 "bid": bid,
                 "ask": ask,
                 "volume": Some(volume),
-                "source": source,
+                "source": "market_data",
                 "asset_type": &asset_type,
                 "received_at": received_at,
             },
@@ -241,17 +252,17 @@ fn truncate_to_minute(dt: chrono::DateTime<chrono::Utc>) -> chrono::DateTime<chr
         .unwrap_or(dt)
 }
 
-fn normalize_symbol(source: &str, raw: &str) -> String {
-    match source {
-        "finnhub" => {
+fn normalize_symbol(feed: &str, raw: &str) -> String {
+    match feed {
+        "primary_fx" => {
             if let Some((_venue, pair)) = raw.split_once(':') {
                 pair.replace('_', "").to_uppercase()
             } else {
                 raw.replace('_', "").to_uppercase()
             }
         }
-        "tiingo" => raw.to_uppercase(),
-        "binance" => {
+        "secondary_fx" => raw.to_uppercase(),
+        "crypto" => {
             if let Some((_prefix, pair)) = raw.to_uppercase().split_once(':') {
                 pair.to_string()
             } else {

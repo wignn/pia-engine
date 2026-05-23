@@ -6,7 +6,7 @@ The platform is built as a SaaS-ready data system: the **core data plane** inges
 
 ## Core capabilities
 
-- **Real-time market data** for forex, crypto, indices, and configured TradingView symbols.
+- **Real-time market data** for forex, crypto, indices, and configured market symbols.
 - **Financial news intelligence** from forex/global feeds, stock feeds, RSS sources, and X/Twitter via RSSHub.
 - **Economic calendar monitoring** for high-impact macro events.
 - **NLP sentiment enrichment** through a dedicated Python analyzer service using FinBERT.

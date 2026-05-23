@@ -28,7 +28,7 @@ pub async fn list_prices(_state: State<AppState>) -> Json<Value> {
                 "bid": p.bid,
                 "ask": p.ask,
                 "volume": p.volume,
-                "source": p.source,
+                "source": "market_data",
                 "asset_type": p.asset_type,
                 "received_at": p.received_at,
             })
@@ -91,17 +91,16 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
         }
     }
 
-    // 1. Binance Crypto
     if sym.ends_with("USDT") {
-        let url = format!(
-            "https://api.binance.com/api/v3/klines?symbol={}&interval=1m&limit=120",
-            sym
-        );
+        let Ok(template) = std::env::var("CRYPTO_HISTORY_URL_TEMPLATE") else {
+            return Json(json!([]));
+        };
+        let url = template.replace("{symbol}", &sym);
         match HTTP_CLIENT.get(&url).send().await {
             Ok(res) => {
                 let status = res.status();
                 if !status.is_success() {
-                    tracing::warn!("Binance history HTTP error for {}: {}", sym, status);
+                    tracing::warn!("crypto history HTTP error for {}: {}", sym, status);
                     return Json(json!([]));
                 }
                 match res.json::<Vec<Vec<Value>>>().await {
@@ -126,7 +125,7 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
                     }
                     Err(err) => {
                         tracing::warn!(
-                            "Failed to parse Binance history JSON for {}: {:?}",
+                            "Failed to parse crypto history JSON for {}: {:?}",
                             sym,
                             err
                         );
@@ -134,34 +133,32 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
                 }
             }
             Err(e) => {
-                tracing::warn!("Failed to fetch Binance history for {}: {:?}", sym, e);
+                tracing::warn!("Failed to fetch crypto history for {}: {:?}", sym, e);
             }
         }
     }
 
-    // 2. Yahoo Finance (Forex, Indices, Commodities)
-    let yahoo_symbol = match sym.as_str() {
+    let reference_symbol = match sym.as_str() {
         "XAUUSD" => "GC=F".to_string(),
         "SPX" => "^GSPC".to_string(),
         "DXY" => "DX-Y.NYB".to_string(),
         _ => format!("{}=X", sym),
     };
 
-    let yahoo_symbol_encoded = yahoo_symbol.replace('^', "%5E").replace('=', "%3D");
-
-    let url = format!(
-        "https://query1.finance.yahoo.com/v8/finance/chart/{}?interval=1m&range=1d",
-        yahoo_symbol_encoded
-    );
+    let reference_symbol_encoded = reference_symbol.replace('^', "%5E").replace('=', "%3D");
+    let Ok(template) = std::env::var("REFERENCE_HISTORY_URL_TEMPLATE") else {
+        return Json(json!([]));
+    };
+    let url = template.replace("{symbol}", &reference_symbol_encoded);
 
     match HTTP_CLIENT.get(&url).send().await {
         Ok(res) => {
             let status = res.status();
             if !status.is_success() {
                 tracing::warn!(
-                    "Yahoo history HTTP error for {} (ticker: {}): {}",
+                    "reference history HTTP error for {} (ticker: {}): {}",
                     sym,
-                    yahoo_symbol,
+                    reference_symbol,
                     status
                 );
                 return Json(json!([]));
@@ -193,16 +190,16 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
                         }
                     }
                     tracing::warn!(
-                        "Yahoo history JSON structure mismatch for {} (ticker: {})",
+                        "reference history JSON structure mismatch for {} (ticker: {})",
                         sym,
-                        yahoo_symbol
+                        reference_symbol
                     );
                 }
                 Err(err) => {
                     tracing::warn!(
-                        "Failed to parse Yahoo history JSON for {} (ticker: {}): {:?}",
+                        "Failed to parse reference history JSON for {} (ticker: {}): {:?}",
                         sym,
-                        yahoo_symbol,
+                        reference_symbol,
                         err
                     );
                 }
@@ -210,9 +207,9 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
         }
         Err(e) => {
             tracing::warn!(
-                "Failed to fetch Yahoo history for {} (ticker: {}): {:?}",
+                "Failed to fetch reference history for {} (ticker: {}): {:?}",
                 sym,
-                yahoo_symbol,
+                reference_symbol,
                 e
             );
         }
