@@ -138,7 +138,6 @@ fn resolve_market_symbols(
     allowed: &HashSet<String>,
     requested: &HashSet<String>,
 ) -> Result<HashSet<String>, &'static str> {
-
     if allowed.is_empty() {
         return Ok(requested.clone());
     }
