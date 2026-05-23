@@ -43,7 +43,6 @@ pub async fn list_config(
     })))
 }
 
-/// PUT /api/v1/config/:key
 pub async fn set_config(
     State(state): State<AppState>,
     Path(config_key): Path<String>,
@@ -55,20 +54,21 @@ pub async fn set_config(
         .cloned()
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    // Restrict writes to supported tenant-scoped configuration keys.
     let allowed_keys = ["tv_symbols", "custom_rss_feeds", "x_usernames"];
     if !allowed_keys.contains(&config_key.as_str()) {
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    // Read the request body after authentication context has been extracted.
+    if !auth.is_admin && (config_key == "tv_symbols" || config_key == "custom_rss_feeds") {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
     let body_bytes = axum::body::to_bytes(request.into_body(), 1024 * 64)
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let body: SetConfigRequest =
         serde_json::from_slice(&body_bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    // Enforce plan limits before persisting tenant configuration.
     let plan = Plan::find_by_id(&state.db, &auth.plan)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -85,7 +85,6 @@ pub async fn set_config(
 
     info!(user_id = %auth.user_id, key = %config_key, "tenant config updated");
 
-    // Notify core services so their tenant caches can refresh promptly.
     sync::publish_config_changed_for_user(
         &state.redis,
         &state.config.redis_channel_prefix,
@@ -103,7 +102,6 @@ pub async fn set_config(
     })))
 }
 
-/// DELETE /api/v1/config/:key
 pub async fn delete_config(
     State(state): State<AppState>,
     Path(config_key): Path<String>,
@@ -114,6 +112,10 @@ pub async fn delete_config(
         .get::<AuthContext>()
         .cloned()
         .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if !auth.is_admin && (config_key == "tv_symbols" || config_key == "custom_rss_feeds") {
+        return Err(StatusCode::FORBIDDEN);
+    }
 
     let deleted = TenantConfig::delete(&state.db, auth.user_id, &config_key)
         .await

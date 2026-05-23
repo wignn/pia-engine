@@ -16,10 +16,15 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Self {
-        let binance_symbols_raw = get_env("BINANCE_SYMBOLS", "btcusdt,ethusdt,solusdt,bnbusdt");
-        let binance_symbols: Vec<String> = binance_symbols_raw
+        let tv_symbols_raw = get_env(
+            "TV_SYMBOLS",
+            "BINANCE:BTCUSDT, BINANCE:ETHUSDT, BINANCE:SOLUSDT, BINANCE:BNBUSDT",
+        );
+        let binance_symbols: Vec<String> = tv_symbols_raw
             .split(',')
-            .map(|s| s.trim().to_lowercase())
+            .map(|s| s.trim())
+            .filter(|s| s.to_uppercase().starts_with("BINANCE:"))
+            .map(|s| s["BINANCE:".len()..].to_lowercase())
             .filter(|s| !s.is_empty())
             .collect();
 
