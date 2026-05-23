@@ -182,9 +182,6 @@ impl TenantRegistry {
             }
         }
 
-        let configs = self.configs.read().await;
-        let user_cfg = configs.get(&cached.user_id).cloned().unwrap_or_default();
-
         Some(TenantContext {
             user_id: cached.user_id,
             api_key_id: cached.key_id,
@@ -195,7 +192,7 @@ impl TenantRegistry {
             tv_symbols_max: cached.tv_symbols_max,
             rate_limit_per_min: cached.rate_limit_per_min,
             can_scrape: cached.can_scrape,
-            tv_symbols: user_cfg.tv_symbols,
+            tv_symbols: HashSet::new(),
         })
     }
 
