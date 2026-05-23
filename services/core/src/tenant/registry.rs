@@ -31,8 +31,8 @@ struct UserConfig {
 }
 
 pub struct TenantRegistry {
-    keys: Arc<RwLock<HashMap<String, CachedKey>>>, 
-    configs: Arc<RwLock<HashMap<Uuid, UserConfig>>>, 
+    keys: Arc<RwLock<HashMap<String, CachedKey>>>,
+    configs: Arc<RwLock<HashMap<Uuid, UserConfig>>>,
     db: PgPool,
 }
 
