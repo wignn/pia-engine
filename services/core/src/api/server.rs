@@ -438,11 +438,14 @@ mod tests {
     }
 
     #[test]
-    fn market_symbols_reject_empty_allowlist() {
+    fn market_symbols_accept_empty_allowlist() {
         let allowed = HashSet::new();
-        let requested = HashSet::new();
+        let requested = symbols(&["EURUSD"]);
 
-        assert!(resolve_market_symbols(&allowed, &requested).is_err());
+        assert_eq!(
+            resolve_market_symbols(&allowed, &requested).unwrap(),
+            requested
+        );
     }
 
     #[test]
