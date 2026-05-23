@@ -19,6 +19,7 @@ struct CachedKey {
     can_scrape: bool,
     requests_per_day: i32,
     ws_connections: i32,
+    x_usernames_max: i32,
     tv_symbols_max: i32,
     rate_limit_per_min: i32,
     expires_at: Option<DateTime<Utc>>,
@@ -27,6 +28,7 @@ struct CachedKey {
 /// Cached per-user config.
 #[derive(Debug, Clone, Default)]
 struct UserConfig {
+    x_usernames: HashSet<String>,
     tv_symbols: HashSet<String>,
 }
 
@@ -44,6 +46,7 @@ type TenantRow = (
     bool,
     bool,
     bool,
+    i32,
     i32,
     i32,
     i32,
@@ -68,6 +71,7 @@ impl TenantRegistry {
                     COALESCE(p.can_scrape, FALSE), \
                     COALESCE(p.requests_per_day, 100), \
                     COALESCE(p.ws_connections, 1), \
+                    COALESCE(p.x_usernames_max, 1), \
                     COALESCE(p.tv_symbols_max, 3), \
                     COALESCE(p.rate_limit_per_min, 10), \
                     k.expires_at \
@@ -91,6 +95,7 @@ impl TenantRegistry {
                     scrape,
                     rpd,
                     wsc,
+                    x_max,
                     tv_max,
                     rlm,
                     expires,
@@ -107,6 +112,7 @@ impl TenantRegistry {
                             can_scrape: scrape,
                             requests_per_day: rpd,
                             ws_connections: wsc,
+                            x_usernames_max: x_max,
                             tv_symbols_max: tv_max,
                             rate_limit_per_min: rlm,
                             expires_at: expires,
@@ -131,11 +137,19 @@ impl TenantRegistry {
                 let mut map: HashMap<Uuid, UserConfig> = HashMap::new();
                 for (uid, key, val) in rows {
                     let entry = map.entry(uid).or_default();
-                    if key.as_str() == "tv_symbols" {
-                        if let Some(arr) = val.as_array() {
-                            for item in arr {
-                                if let Some(s) = item.as_str() {
-                                    entry.tv_symbols.insert(s.to_string());
+                    if let Some(arr) = val.as_array() {
+                        for item in arr {
+                            if let Some(s) = item.as_str() {
+                                match key.as_str() {
+                                    "tv_symbols" => {
+                                        entry.tv_symbols.insert(s.to_uppercase());
+                                    }
+                                    "x_usernames" => {
+                                        entry
+                                            .x_usernames
+                                            .insert(s.trim_start_matches('@').to_lowercase());
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
@@ -182,6 +196,14 @@ impl TenantRegistry {
             }
         }
 
+        let config = self
+            .configs
+            .read()
+            .await
+            .get(&cached.user_id)
+            .cloned()
+            .unwrap_or_default();
+
         Some(TenantContext {
             user_id: cached.user_id,
             api_key_id: cached.key_id,
@@ -189,10 +211,12 @@ impl TenantRegistry {
             is_admin: false,
             requests_per_day: cached.requests_per_day,
             ws_connections: cached.ws_connections,
+            x_usernames_max: cached.x_usernames_max,
             tv_symbols_max: cached.tv_symbols_max,
             rate_limit_per_min: cached.rate_limit_per_min,
             can_scrape: cached.can_scrape,
-            tv_symbols: HashSet::new(),
+            x_usernames: config.x_usernames,
+            tv_symbols: config.tv_symbols,
         })
     }
 
@@ -202,6 +226,7 @@ impl TenantRegistry {
                     COALESCE(p.can_scrape, FALSE), \
                     COALESCE(p.requests_per_day, 100), \
                     COALESCE(p.ws_connections, 1), \
+                    COALESCE(p.x_usernames_max, 1), \
                     COALESCE(p.tv_symbols_max, 3), \
                     COALESCE(p.rate_limit_per_min, 10), \
                     k.expires_at \
@@ -221,7 +246,7 @@ impl TenantRegistry {
             })
             .ok()?;
 
-        let (hash, uid, kid, plan, kactive, uactive, scrape, rpd, wsc, tv_max, rlm, expires) =
+        let (hash, uid, kid, plan, kactive, uactive, scrape, rpd, wsc, x_max, tv_max, rlm, expires) =
             match row {
                 Some(row) => row,
                 None => {
@@ -241,6 +266,7 @@ impl TenantRegistry {
             can_scrape: scrape,
             requests_per_day: rpd,
             ws_connections: wsc,
+            x_usernames_max: x_max,
             tv_symbols_max: tv_max,
             rate_limit_per_min: rlm,
             expires_at: expires,
@@ -257,6 +283,7 @@ impl TenantRegistry {
                     COALESCE(p.can_scrape, FALSE), \
                     COALESCE(p.requests_per_day, 100), \
                     COALESCE(p.ws_connections, 1), \
+                    COALESCE(p.x_usernames_max, 1), \
                     COALESCE(p.tv_symbols_max, 3), \
                     COALESCE(p.rate_limit_per_min, 10), \
                     k.expires_at \
@@ -283,6 +310,7 @@ impl TenantRegistry {
                     scrape,
                     rpd,
                     wsc,
+                    x_max,
                     tv_max,
                     rlm,
                     expires,
@@ -299,6 +327,7 @@ impl TenantRegistry {
                             can_scrape: scrape,
                             requests_per_day: rpd,
                             ws_connections: wsc,
+                            x_usernames_max: x_max,
                             tv_symbols_max: tv_max,
                             rate_limit_per_min: rlm,
                             expires_at: expires,
@@ -326,11 +355,19 @@ impl TenantRegistry {
             Ok(rows) => {
                 let mut user_cfg = UserConfig::default();
                 for (key, val) in rows {
-                    if key.as_str() == "tv_symbols" {
-                        if let Some(arr) = val.as_array() {
-                            for item in arr {
-                                if let Some(s) = item.as_str() {
-                                    user_cfg.tv_symbols.insert(s.to_string());
+                    if let Some(arr) = val.as_array() {
+                        for item in arr {
+                            if let Some(s) = item.as_str() {
+                                match key.as_str() {
+                                    "tv_symbols" => {
+                                        user_cfg.tv_symbols.insert(s.to_uppercase());
+                                    }
+                                    "x_usernames" => {
+                                        user_cfg
+                                            .x_usernames
+                                            .insert(s.trim_start_matches('@').to_lowercase());
+                                    }
+                                    _ => {}
                                 }
                             }
                         }

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use atlsd_domain::tenant::TenantContext;
 use axum::{
     extract::{State, WebSocketUpgrade},
     http::StatusCode,
@@ -78,6 +79,8 @@ pub fn build_router(state: AppState) -> Router {
         ));
 
     let ws_api = Router::new()
+        .route("/ws/v1", get(ws_v1_handler))
+        .route("/api/v1/ws/v1", get(ws_v1_handler))
         .route("/api/v1/ws", get(ws_general_handler))
         .route("/api/v1/ws/market", get(ws_market_handler))
         .route("/api/v1/ws/market/{symbol}", get(ws_handler_single_symbol))
@@ -160,6 +163,44 @@ fn text_response(status: StatusCode, body: &'static str) -> Response {
         .unwrap()
 }
 
+fn string_response(status: StatusCode, body: String) -> Response {
+    axum::response::Response::builder()
+        .status(status)
+        .body(axum::body::Body::from(body))
+        .unwrap()
+}
+
+fn legacy_streams(
+    channels: &Option<HashSet<String>>,
+    symbols: &HashSet<String>,
+) -> Result<HashSet<String>, crate::ws::streams::StreamError> {
+    let channels = channels
+        .clone()
+        .unwrap_or_else(ws::client::default_channels);
+    let mut streams = HashSet::new();
+
+    for channel in channels {
+        if channel.is_empty() || channel == "__empty__" {
+            continue;
+        }
+        if channel == "market_data" {
+            if symbols.is_empty() {
+                streams.insert("market_data".to_string());
+            } else {
+                for symbol in symbols {
+                    streams.insert(crate::ws::streams::parse_stream(&format!(
+                        "market_data:{symbol}"
+                    ))?);
+                }
+            }
+        } else {
+            streams.insert(crate::ws::streams::parse_stream(&channel)?);
+        }
+    }
+
+    Ok(streams)
+}
+
 async fn ws_handler_inner(
     ws: WebSocketUpgrade,
     state: AppState,
@@ -187,7 +228,7 @@ async fn ws_handler_inner(
     }
 
     let mut user_id = None;
-    let mut tv_symbols = HashSet::new();
+    let mut tenant_context: Option<TenantContext> = None;
     let mut authenticated = false;
 
     let channels_query: Option<HashSet<String>> = channel_override
@@ -205,7 +246,6 @@ async fn ws_handler_inner(
 
     if let Some(raw_key) = &token {
         if state.config.api_keys.contains(raw_key) {
-            tv_symbols = symbols_query;
             authenticated = true;
         } else if let Some(registry) = &state.tenant_registry {
             if let Some(ctx) = registry.validate_key(raw_key).await {
@@ -222,11 +262,11 @@ async fn ws_handler_inner(
                 authenticated = true;
 
                 if is_market_subscription(&channels_query) {
-                    match resolve_market_symbols(&ctx.tv_symbols, &symbols_query) {
-                        Ok(symbols) => tv_symbols = symbols,
-                        Err(message) => return text_response(StatusCode::FORBIDDEN, message),
+                    if let Err(message) = resolve_market_symbols(&ctx.tv_symbols, &symbols_query) {
+                        return text_response(StatusCode::FORBIDDEN, message);
                     }
                 }
+                tenant_context = Some(ctx);
             }
         }
     }
@@ -238,6 +278,24 @@ async fn ws_handler_inner(
         );
     }
 
+    let initial_streams = match legacy_streams(&channels_query, &symbols_query) {
+        Ok(streams) => streams,
+        Err(error) => return string_response(StatusCode::BAD_REQUEST, error.message),
+    };
+
+    if let Some(ctx) = tenant_context.as_ref() {
+        if let Err(error) = crate::ws::streams::validate_subscription_change(
+            Some(ctx),
+            &HashSet::new(),
+            &initial_streams,
+        ) {
+            return string_response(
+                StatusCode::from_u16(error.code).unwrap_or(StatusCode::FORBIDDEN),
+                error.message,
+            );
+        }
+    }
+
     let hub = state.hub.clone();
     ws.on_upgrade(move |socket| {
         ws::client::handle_socket(
@@ -245,9 +303,8 @@ async fn ws_handler_inner(
             hub,
             bot_id,
             user_id,
-            HashSet::new(),
-            tv_symbols,
-            channels_query,
+            tenant_context,
+            initial_streams,
         )
     })
 }
@@ -287,6 +344,16 @@ async fn generate_ws_ticket(
     store.retain(|_, t| t.expires_at > now);
 
     Ok(Json(TicketResponse { ticket: ticket_id }))
+}
+
+async fn ws_v1_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let mut params = params;
+    params.insert("channels".to_string(), "".to_string());
+    ws_handler_inner(ws, state, params, Some("__empty__")).await
 }
 
 async fn ws_general_handler(

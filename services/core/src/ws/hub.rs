@@ -5,11 +5,10 @@ use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use super::client::ClientHandle;
+use super::{client::ClientHandle, streams};
 
 pub type ClientId = u64;
 
-/// Central WebSocket hub for client registration, channel fanout, and tenant-aware filtering.
 pub struct Hub {
     clients: Arc<RwLock<HashMap<ClientId, ClientHandle>>>,
     next_id: Arc<RwLock<u64>>,
@@ -27,14 +26,11 @@ impl Hub {
         })
     }
 
-    /// Register a new client and return its ID + sender channel.
     pub async fn register(
         &self,
         bot_id: String,
-        channels: HashSet<String>,
+        streams: HashSet<String>,
         user_id: Option<Uuid>,
-        x_usernames: HashSet<String>,
-        tv_symbols: HashSet<String>,
     ) -> (ClientId, mpsc::Receiver<Vec<u8>>) {
         let mut next = self.next_id.write().await;
         let id = *next;
@@ -46,9 +42,7 @@ impl Hub {
             id,
             bot_id: bot_id.clone(),
             user_id,
-            channels,
-            x_usernames,
-            tv_symbols,
+            streams,
             sender: tx,
         };
 
@@ -56,7 +50,6 @@ impl Hub {
         let count = self.clients.read().await.len();
         info!(bot_id = %bot_id, user_id = ?user_id, total = count, "ws client connected");
 
-        // Confirm the WebSocket session after the client is registered.
         let welcome = serde_json::to_vec(&json!({
             "event": "connected",
             "data": {
@@ -73,7 +66,6 @@ impl Hub {
         (id, rx)
     }
 
-    /// Unregister a client by ID.
     pub async fn unregister(&self, id: ClientId) {
         let removed = self.clients.write().await.remove(&id);
         if let Some(client) = removed {
@@ -82,19 +74,18 @@ impl Hub {
         }
     }
 
-    /// Broadcast a message to all clients subscribed to the given channel.
-    /// For "x" channel: filters by client's x_usernames set.
-    /// For "market_data" channel: filters by client's tv_symbols set.
     pub async fn broadcast(
         &self,
         event_type: &str,
         data: serde_json::Value,
         channel: &str,
     ) -> usize {
+        let stream = streams::event_stream(channel, &data);
         let msg = json!({
             "event": event_type,
             "data": data,
             "channel": channel,
+            "stream": stream,
             "timestamp": chrono::Utc::now().to_rfc3339(),
         });
 
@@ -109,34 +100,11 @@ impl Hub {
         let clients = self.clients.read().await;
         let mut count = 0;
 
+        let candidate_streams = streams::candidate_streams(channel, &data);
+
         for client in clients.values() {
-            if !client.channels.contains("all") && !client.channels.contains(channel) {
+            if candidate_streams.is_disjoint(&client.streams) {
                 continue;
-            }
-
-            // Apply tenant X username filters when a client has configured them.
-            if channel == "x" && !client.x_usernames.is_empty() {
-                let author = data
-                    .get("post")
-                    .and_then(|p| p.get("author_username"))
-                    .and_then(|a| a.as_str())
-                    .unwrap_or("")
-                    .to_lowercase();
-                if !author.is_empty() && !client.x_usernames.contains(&author) {
-                    continue;
-                }
-            }
-
-            // Apply tenant symbol filters when a client has configured them.
-            if channel == "market_data" && !client.tv_symbols.is_empty() {
-                let symbol = data
-                    .get("tick")
-                    .and_then(|t| t.get("symbol"))
-                    .and_then(|s| s.as_str())
-                    .unwrap_or("");
-                if !symbol.is_empty() && !client.tv_symbols.contains(symbol) {
-                    continue;
-                }
             }
 
             if let Ok(()) = client.sender.try_send(payload.clone()) {
@@ -166,7 +134,6 @@ impl Hub {
             }
         }
 
-        // Market ticks are high-volume, so keep them at debug level.
         if channel == "market_data" {
             debug!(
                 event = event_type,
@@ -185,13 +152,37 @@ impl Hub {
         count
     }
 
+    pub async fn subscribe(&self, id: ClientId, streams: HashSet<String>) -> bool {
+        let mut clients = self.clients.write().await;
+        let Some(client) = clients.get_mut(&id) else {
+            return false;
+        };
+        client.streams.extend(streams);
+        true
+    }
+
+    pub async fn unsubscribe(&self, id: ClientId, streams: &HashSet<String>) -> bool {
+        let mut clients = self.clients.write().await;
+        let Some(client) = clients.get_mut(&id) else {
+            return false;
+        };
+        client.streams.retain(|stream| !streams.contains(stream));
+        true
+    }
+
+    pub async fn list_subscriptions(&self, id: ClientId) -> Option<Vec<String>> {
+        let clients = self.clients.read().await;
+        let mut streams: Vec<String> = clients.get(&id)?.streams.iter().cloned().collect();
+        streams.sort();
+        Some(streams)
+    }
+
     /// Get the number of connected clients.
     #[allow(dead_code)]
     pub async fn client_count(&self) -> usize {
         self.clients.read().await.len()
     }
 
-    /// Count WS connections for a specific user.
     pub async fn user_connection_count(&self, user_id: &Uuid) -> usize {
         let clients = self.clients.read().await;
         clients
@@ -220,13 +211,7 @@ mod tests {
         let hub = Hub::new(None, "test".to_string());
         let user_id = Uuid::new_v4();
         let (_id, mut rx) = hub
-            .register(
-                "bot-1".to_string(),
-                set(&["forex_news"]),
-                Some(user_id),
-                HashSet::new(),
-                HashSet::new(),
-            )
+            .register("bot-1".to_string(), set(&["forex_news"]), Some(user_id))
             .await;
 
         assert_eq!(hub.client_count().await, 1);
@@ -242,13 +227,7 @@ mod tests {
         let hub = Hub::new(None, "test".to_string());
         let user_id = Uuid::new_v4();
         let (id, _rx) = hub
-            .register(
-                "bot-1".to_string(),
-                set(&["forex_news"]),
-                Some(user_id),
-                HashSet::new(),
-                HashSet::new(),
-            )
+            .register("bot-1".to_string(), set(&["forex_news"]), Some(user_id))
             .await;
 
         hub.unregister(id).await;
@@ -261,22 +240,10 @@ mod tests {
     async fn broadcast_respects_channel_subscriptions() {
         let hub = Hub::new(None, "test".to_string());
         let (_forex_id, mut forex_rx) = hub
-            .register(
-                "forex-bot".to_string(),
-                set(&["forex_news"]),
-                None,
-                HashSet::new(),
-                HashSet::new(),
-            )
+            .register("forex-bot".to_string(), set(&["forex_news"]), None)
             .await;
         let (_stock_id, mut stock_rx) = hub
-            .register(
-                "stock-bot".to_string(),
-                set(&["stock_news"]),
-                None,
-                HashSet::new(),
-                HashSet::new(),
-            )
+            .register("stock-bot".to_string(), set(&["stock_news"]), None)
             .await;
         recv_json(&mut forex_rx).await;
         recv_json(&mut stock_rx).await;
@@ -294,13 +261,7 @@ mod tests {
     async fn broadcast_all_subscription_receives_any_channel() {
         let hub = Hub::new(None, "test".to_string());
         let (_id, mut rx) = hub
-            .register(
-                "all-bot".to_string(),
-                set(&["all"]),
-                None,
-                HashSet::new(),
-                HashSet::new(),
-            )
+            .register("all-bot".to_string(), set(&["all"]), None)
             .await;
         recv_json(&mut rx).await;
 
@@ -316,22 +277,10 @@ mod tests {
     async fn market_data_filter_matches_symbols() {
         let hub = Hub::new(None, "test".to_string());
         let (_aapl_id, mut aapl_rx) = hub
-            .register(
-                "aapl-bot".to_string(),
-                set(&["market_data"]),
-                None,
-                HashSet::new(),
-                set(&["AAPL"]),
-            )
+            .register("aapl-bot".to_string(), set(&["market_data:AAPL"]), None)
             .await;
         let (_msft_id, mut msft_rx) = hub
-            .register(
-                "msft-bot".to_string(),
-                set(&["market_data"]),
-                None,
-                HashSet::new(),
-                set(&["MSFT"]),
-            )
+            .register("msft-bot".to_string(), set(&["market_data:MSFT"]), None)
             .await;
         recv_json(&mut aapl_rx).await;
         recv_json(&mut msft_rx).await;
@@ -353,22 +302,10 @@ mod tests {
     async fn x_filter_matches_author_username_case_insensitively() {
         let hub = Hub::new(None, "test".to_string());
         let (_matching_id, mut matching_rx) = hub
-            .register(
-                "matching-bot".to_string(),
-                set(&["x"]),
-                None,
-                set(&["federalreserve"]),
-                HashSet::new(),
-            )
+            .register("matching-bot".to_string(), set(&["x:federalreserve"]), None)
             .await;
         let (_other_id, mut other_rx) = hub
-            .register(
-                "other-bot".to_string(),
-                set(&["x"]),
-                None,
-                set(&["ecb"]),
-                HashSet::new(),
-            )
+            .register("other-bot".to_string(), set(&["x:ecb"]), None)
             .await;
         recv_json(&mut matching_rx).await;
         recv_json(&mut other_rx).await;
