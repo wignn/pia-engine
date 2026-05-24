@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use serde_json::{json, Value};
 
 use crate::api::state::AppState;
-use crate::ingestion_subscriber;
+use crate::ingestion_subscriber::{self, CachedPrice};
 
 static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
     reqwest::Client::builder()
@@ -16,24 +16,114 @@ static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
         .unwrap_or_default()
 });
 
-pub async fn list_prices(_state: State<AppState>) -> Json<Value> {
-    let prices = ingestion_subscriber::get_all_prices();
+type LatestPriceRow = (
+    String,
+    f64,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    String,
+    String,
+    Option<chrono::DateTime<chrono::Utc>>,
+);
 
-    let items: Vec<Value> = prices
-        .iter()
-        .map(|p| {
-            json!({
-                "symbol": p.symbol,
-                "price": p.price,
-                "bid": p.bid,
-                "ask": p.ask,
-                "volume": p.volume,
-                "source": "market_data",
-                "asset_type": p.asset_type,
-                "received_at": p.received_at,
-            })
-        })
-        .collect();
+fn cached_price_from_row(row: LatestPriceRow) -> CachedPrice {
+    let (symbol, price, bid, ask, volume, source, asset_type, received_at) = row;
+    CachedPrice {
+        symbol,
+        price,
+        bid,
+        ask,
+        volume,
+        source,
+        asset_type,
+        received_at: received_at.map(|dt| dt.to_rfc3339()),
+        updated_at: None,
+    }
+}
+
+fn price_json(p: &CachedPrice) -> Value {
+    json!({
+        "symbol": p.symbol,
+        "price": p.price,
+        "bid": p.bid,
+        "ask": p.ask,
+        "volume": p.volume,
+        "source": p.source,
+        "asset_type": p.asset_type,
+        "received_at": p.received_at,
+    })
+}
+
+async fn load_latest_prices(pool: &sqlx::PgPool) -> Result<Vec<CachedPrice>, sqlx::Error> {
+    let rows: Vec<LatestPriceRow> = sqlx::query_as(
+        "SELECT symbol, price, bid, ask, volume, source, asset_type, received_at \
+         FROM market.market_latest_prices \
+         ORDER BY symbol",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(cached_price_from_row).collect())
+}
+
+async fn load_latest_price(
+    pool: &sqlx::PgPool,
+    symbol: &str,
+) -> Result<Option<CachedPrice>, sqlx::Error> {
+    let row: Option<LatestPriceRow> = sqlx::query_as(
+        "SELECT symbol, price, bid, ask, volume, source, asset_type, received_at \
+         FROM market.market_latest_prices \
+         WHERE symbol = $1",
+    )
+    .bind(symbol)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.map(cached_price_from_row))
+}
+
+async fn latest_price_history_fallback(pool: &sqlx::PgPool, symbol: &str) -> Vec<Value> {
+    match load_latest_price(pool, symbol).await {
+        Ok(Some(p)) if p.price > 0.0 => {
+            let now = chrono::Utc::now().timestamp();
+            let start = now - (119 * 60);
+            (0..120)
+                .map(|i| {
+                    json!({
+                        "time": start + (i * 60),
+                        "value": p.price,
+                        "source": "last_known"
+                    })
+                })
+                .collect()
+        }
+        Ok(_) => Vec::new(),
+        Err(err) => {
+            tracing::warn!(error = %err, symbol = %symbol, "failed to load latest price for history fallback");
+            Vec::new()
+        }
+    }
+}
+
+pub async fn list_prices(State(state): State<AppState>) -> Json<Value> {
+    let mut prices = ingestion_subscriber::get_all_prices();
+
+    if prices.is_empty() {
+        match load_latest_prices(&state.db).await {
+            Ok(db_prices) => {
+                for price in &db_prices {
+                    ingestion_subscriber::set_price(price.clone());
+                }
+                prices = db_prices;
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "failed to load latest market prices from database");
+            }
+        }
+    }
+
+    let items: Vec<Value> = prices.iter().map(price_json).collect();
 
     Json(json!({
         "items": items,
@@ -41,33 +131,34 @@ pub async fn list_prices(_state: State<AppState>) -> Json<Value> {
     }))
 }
 
-/// GET /api/v1/market/prices/{symbol}
-/// Returns the cached price for a single symbol (case-insensitive).
-/// Example: /api/v1/market/prices/XAUUSD
-pub async fn get_price(_state: State<AppState>, Path(symbol): Path<String>) -> Json<Value> {
-    match ingestion_subscriber::get_price(&symbol) {
-        Some(p) => Json(json!({
-            "symbol": p.symbol,
-            "price": p.price,
-            "bid": p.bid,
-            "ask": p.ask,
-            "volume": p.volume,
-            "source": p.source,
-            "asset_type": p.asset_type,
-            "received_at": p.received_at,
+pub async fn get_price(State(state): State<AppState>, Path(symbol): Path<String>) -> Json<Value> {
+    if let Some(p) = ingestion_subscriber::get_price(&symbol) {
+        return Json(price_json(&p));
+    }
+
+    let sym = symbol.to_uppercase();
+    match load_latest_price(&state.db, &sym).await {
+        Ok(Some(p)) => {
+            ingestion_subscriber::set_price(p.clone());
+            Json(price_json(&p))
+        }
+        Ok(None) => Json(json!({
+            "error": format!("Symbol '{}' not found in price cache or latest price store. Available symbols can be retrieved from GET /api/v1/market/prices", sym),
         })),
-        None => Json(json!({
-            "error": format!("Symbol '{}' not found in price cache. Available symbols can be retrieved from GET /api/v1/market/prices", symbol.to_uppercase()),
-        })),
+        Err(err) => {
+            tracing::warn!(error = %err, symbol = %sym, "failed to load latest market price from database");
+            Json(json!({
+                "error": format!("Symbol '{}' not found in price cache. Available symbols can be retrieved from GET /api/v1/market/prices", sym),
+            }))
+        }
     }
 }
 
 pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<String>) -> Json<Value> {
     let sym = symbol.to_uppercase();
 
-    // Try reading from our separate local time-series database first
     let db_res: Result<Vec<(chrono::DateTime<chrono::Utc>, f64)>, _> = sqlx::query_as(
-        "SELECT time, close FROM ohlcv_candles \
+        "SELECT time, close FROM market.ohlcv_candles \
          WHERE symbol = $1 AND resolution = '1m' \
          ORDER BY time DESC LIMIT 120",
     )
@@ -93,7 +184,7 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
 
     if sym.ends_with("USDT") {
         let Ok(template) = std::env::var("CRYPTO_HISTORY_URL_TEMPLATE") else {
-            return Json(json!([]));
+            return Json(json!(latest_price_history_fallback(&state.db, &sym).await));
         };
         let url = template.replace("{symbol}", &sym);
         match HTTP_CLIENT.get(&url).send().await {
@@ -101,7 +192,7 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
                 let status = res.status();
                 if !status.is_success() {
                     tracing::warn!("crypto history HTTP error for {}: {}", sym, status);
-                    return Json(json!([]));
+                    return Json(json!(latest_price_history_fallback(&state.db, &sym).await));
                 }
                 match res.json::<Vec<Vec<Value>>>().await {
                     Ok(data) => {
@@ -215,5 +306,5 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
         }
     }
 
-    Json(json!([]))
+    Json(json!(latest_price_history_fallback(&state.db, &sym).await))
 }

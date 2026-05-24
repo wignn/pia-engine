@@ -35,7 +35,7 @@ pub async fn latest_stock_news(
     >(
         "SELECT content_hash, title, summary, source_name, \
          category, tickers, sentiment, impact_level, processed_at \
-         FROM stock_news \
+         FROM news.stock_news \
          WHERE is_processed = TRUE \
          ORDER BY processed_at DESC \
          LIMIT $1",

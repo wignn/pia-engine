@@ -71,6 +71,13 @@ async fn main() {
 
     let usage_tracker = Arc::new(UsageTracker::new(pool.clone(), redis_client.clone()));
 
+    let timeout = Duration::from_secs(cfg.scraper_timeout);
+    let forex_collector = Arc::new(ForexCollector::new(
+        cfg.rss_max_entries,
+        &cfg.scraper_ua,
+        timeout,
+    ));
+
     let tenant_registry = TenantRegistry::new(pool.clone());
     tenant_registry.reload().await;
     info!("tenant registry initialized");
@@ -79,6 +86,7 @@ async fn main() {
         hub: hub.clone(),
         db: pool.clone(),
         config: cfg.clone(),
+        forex_collector: forex_collector.clone(),
         tenant_registry: Some(tenant_registry.clone()),
         usage_tracker,
         ticket_store: std::sync::Arc::new(tokio::sync::RwLock::new(
@@ -102,13 +110,6 @@ async fn main() {
         info!("tenant registry sync started (Redis events + 60s fallback)");
     }
 
-    let timeout = Duration::from_secs(cfg.scraper_timeout);
-
-    let forex_collector = Arc::new(ForexCollector::new(
-        cfg.rss_max_entries,
-        &cfg.scraper_ua,
-        timeout,
-    ));
     let article_scraper = Arc::new(ArticleScraper::new(&cfg.scraper_ua, timeout));
     let forex_pipeline = Arc::new(ForexPipeline::new(
         forex_collector,

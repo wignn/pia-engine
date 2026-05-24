@@ -80,7 +80,7 @@ impl StockPipeline {
         }
 
         let is_duplicate = match sqlx::query_as::<_, (bool,)>(
-            "SELECT EXISTS(SELECT 1 FROM stock_news WHERE content_hash = $1)",
+            "SELECT EXISTS(SELECT 1 FROM news.stock_news WHERE content_hash = $1)",
         )
         .bind(&entry.content_hash)
         .fetch_one(&self.db)
@@ -112,7 +112,7 @@ impl StockPipeline {
                 .await;
 
         let res = sqlx::query(
-            "INSERT INTO stock_news \
+            "INSERT INTO news.stock_news \
              (content_hash, original_url, title, source_name, category, \
               tickers, sentiment, impact_level, is_processed, processed_at) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW()) \

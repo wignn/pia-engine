@@ -1,4 +1,4 @@
-use chrono::Timelike;
+use chrono::{DateTime, Timelike, Utc};
 use futures_util::StreamExt;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
@@ -47,7 +47,56 @@ pub fn get_price(symbol: &str) -> Option<CachedPrice> {
     PRICE_CACHE.read().get(&symbol.to_uppercase()).cloned()
 }
 
+pub fn set_price(price: CachedPrice) {
+    PRICE_CACHE.write().insert(price.symbol.clone(), price);
+}
+
+pub async fn hydrate_price_cache(pool: &sqlx::PgPool) -> anyhow::Result<usize> {
+    let rows: Vec<(
+        String,
+        f64,
+        Option<f64>,
+        Option<f64>,
+        Option<f64>,
+        String,
+        String,
+        Option<DateTime<Utc>>,
+    )> = sqlx::query_as(
+        "SELECT symbol, price, bid, ask, volume, source, asset_type, received_at \
+         FROM market.market_latest_prices \
+         ORDER BY symbol",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let count = rows.len();
+    let mut cache = PRICE_CACHE.write();
+    for (symbol, price, bid, ask, volume, source, asset_type, received_at) in rows {
+        cache.insert(
+            symbol.clone(),
+            CachedPrice {
+                symbol,
+                price,
+                bid,
+                ask,
+                volume,
+                source,
+                asset_type,
+                received_at: received_at.map(|dt| dt.to_rfc3339()),
+                updated_at: None,
+            },
+        );
+    }
+
+    Ok(count)
+}
+
 pub async fn run(redis_url: String, hub: Arc<ws::Hub>, pool: sqlx::PgPool) {
+    match hydrate_price_cache(&pool).await {
+        Ok(count) => info!(count, "hydrated market price cache from database"),
+        Err(e) => error!(error = %e, "failed to hydrate market price cache from database"),
+    }
+
     loop {
         if let Err(e) = subscribe_loop(&redis_url, &hub, &pool).await {
             error!(error = %e, "ingestion subscriber error, reconnecting in 5s");
@@ -156,6 +205,17 @@ async fn subscribe_loop(
         }
 
         let tick_time = parse_received_at(received_at.as_deref());
+        persist_latest_price(
+            pool,
+            symbol.clone(),
+            price,
+            bid,
+            ask,
+            volume,
+            asset_type.clone(),
+            tick_time,
+        );
+
         let tick_min = truncate_to_minute(tick_time);
 
         let mut completed_candle = None;
@@ -197,7 +257,7 @@ async fn subscribe_loop(
             let symbol_clone = symbol.clone();
             tokio::spawn(async move {
                 let res = sqlx::query(
-                    "INSERT INTO ohlcv_candles (symbol, resolution, time, open, high, low, close, volume) \
+                    "INSERT INTO market.ohlcv_candles (symbol, resolution, time, open, high, low, close, volume) \
                      VALUES ($1, '1m', $2, $3, $4, $5, $6, $7) \
                      ON CONFLICT (symbol, resolution, time) DO UPDATE SET \
                      high = EXCLUDED.high, low = EXCLUDED.low, close = EXCLUDED.close, volume = EXCLUDED.volume"
@@ -238,6 +298,48 @@ async fn subscribe_loop(
             .broadcast(ws::EVENT_MARKET_TRADE, tick_data, "market_data")
             .await;
     }
+}
+
+fn persist_latest_price(
+    pool: &sqlx::PgPool,
+    symbol: String,
+    price: f64,
+    bid: Option<f64>,
+    ask: Option<f64>,
+    volume: f64,
+    asset_type: String,
+    received_at: DateTime<Utc>,
+) {
+    let pool = pool.clone();
+    tokio::spawn(async move {
+        let res = sqlx::query(
+            "INSERT INTO market.market_latest_prices \
+             (symbol, price, bid, ask, volume, source, asset_type, received_at, updated_at) \
+             VALUES ($1, $2, $3, $4, $5, 'market_data', $6, $7, NOW()) \
+             ON CONFLICT (symbol) DO UPDATE SET \
+             price = EXCLUDED.price, \
+             bid = EXCLUDED.bid, \
+             ask = EXCLUDED.ask, \
+             volume = EXCLUDED.volume, \
+             source = EXCLUDED.source, \
+             asset_type = EXCLUDED.asset_type, \
+             received_at = EXCLUDED.received_at, \
+             updated_at = NOW()",
+        )
+        .bind(&symbol)
+        .bind(price)
+        .bind(bid)
+        .bind(ask)
+        .bind(volume)
+        .bind(&asset_type)
+        .bind(received_at)
+        .execute(&pool)
+        .await;
+
+        if let Err(e) = res {
+            error!(error = %e, symbol = %symbol, "failed to persist latest market price");
+        }
+    });
 }
 
 fn parse_received_at(s: Option<&str>) -> chrono::DateTime<chrono::Utc> {

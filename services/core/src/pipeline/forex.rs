@@ -10,7 +10,9 @@ use sqlx::PgPool;
 use std::sync::LazyLock;
 use tracing::{debug, error, info, warn};
 
-use crate::collector::forex::{default_forex_feeds, feed_name_by_url, ForexCollector};
+use crate::collector::forex::{
+    default_forex_feeds, feed_name_by_url, FeedSource, ForexCollector, SourceStatusSnapshot,
+};
 use crate::html;
 use crate::scraper::article::ArticleScraper;
 use crate::ws::{self, ForexNewsArticleData, Hub};
@@ -56,6 +58,68 @@ pub struct ForexIngestWorker {
     dlq: DeadLetterQueue,
 }
 
+async fn persist_feed_health(db: &PgPool, statuses: Vec<SourceStatusSnapshot>) {
+    for status in statuses {
+        let res = sqlx::query(
+            "UPDATE news.forex_news_sources SET \
+             last_success_at = $2, last_error_at = $3, blocked_until = $4, next_allowed_poll_at = $5, \
+             consecutive_403 = $6, success_count = $7, error_count = $8, forbidden_count = $9, \
+             parse_error_count = $10, last_status = $11, last_latency_ms = $12, updated_at = NOW() \
+             WHERE rss_url = $1",
+        )
+        .bind(&status.rss_url)
+        .bind(status.last_success_at)
+        .bind(status.last_error_at)
+        .bind(status.blocked_until)
+        .bind(status.next_allowed_poll_at)
+        .bind(status.consecutive_403 as i32)
+        .bind(status.success_count as i64)
+        .bind(status.error_count as i64)
+        .bind(status.forbidden_count as i64)
+        .bind(status.parse_error_count as i64)
+        .bind(status.last_status.map(i32::from))
+        .bind(status.last_latency_ms.map(|value| value.min(i64::MAX as u128) as i64))
+        .execute(db)
+        .await;
+
+        if let Err(e) = res {
+            warn!(error = %e, source = %status.name, "failed to persist feed health");
+        }
+    }
+}
+
+async fn load_active_forex_feeds(db: &PgPool) -> Vec<FeedSource> {
+    let rows: Result<Vec<(String, String, String, String, String, i32)>, _> = sqlx::query_as(
+        "SELECT id, name, url, rss_url, category, poll_interval_sec \
+         FROM news.forex_news_sources \
+         WHERE is_active = TRUE AND source_type = 'rss' AND rss_url IS NOT NULL \
+         ORDER BY priority ASC, name ASC",
+    )
+    .fetch_all(db)
+    .await;
+
+    match rows {
+        Ok(rows) if !rows.is_empty() => rows
+            .into_iter()
+            .map(
+                |(id, name, url, rss_url, category, poll_interval_sec)| FeedSource {
+                    id: Some(id),
+                    name,
+                    url,
+                    rss_url,
+                    category,
+                    poll_interval_sec: Some(poll_interval_sec.max(15) as u64),
+                },
+            )
+            .collect(),
+        Ok(_) => default_forex_feeds(),
+        Err(e) => {
+            warn!(error = %e, "failed to load forex feeds from database, using defaults");
+            default_forex_feeds()
+        }
+    }
+}
+
 impl ForexPipeline {
     pub fn new(
         collector: Arc<ForexCollector>,
@@ -86,8 +150,9 @@ impl ForexPipeline {
 
     pub async fn run(&self) {
         info!(stream_key = %self.stream_key, redis_enabled = self.redis_client.is_some(), "forex ingest producer: starting");
-        let feeds = default_forex_feeds();
+        let feeds = load_active_forex_feeds(&self.db).await;
         let results = self.collector.fetch_all_feeds(&feeds).await;
+        persist_feed_health(&self.db, self.collector.source_statuses(&feeds).await).await;
 
         let total: usize = results.values().map(|v| v.len()).sum();
         info!(
@@ -483,7 +548,7 @@ async fn process_entry(
     };
 
     let res: Result<Option<(uuid::Uuid,)>, _> = sqlx::query_as(
-        "INSERT INTO forex_news_articles \
+        "INSERT INTO news.forex_news_articles \
          (id, source_id, content_hash, original_url, original_title, original_content, \
           translated_title, summary, is_processed, processed_at, published_at) \
          VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, '', $6, TRUE, NOW(), $7::timestamptz) \
@@ -533,7 +598,7 @@ async fn process_entry(
         crate::pipeline::sentiment::analyze(&format!("{} - {}", title, summary)).await;
 
     let _ = sqlx::query(
-        "INSERT INTO forex_news_analyses (id, article_id, sentiment, impact_level) \
+        "INSERT INTO news.forex_news_analyses (id, article_id, sentiment, impact_level) \
          VALUES (gen_random_uuid(), $1, $2, 'medium')",
     )
     .bind(article_id)
@@ -587,7 +652,7 @@ async fn ensure_source(db: &PgPool, source_name: &str, feed_url: &str) -> String
     };
 
     let existing: Option<(String,)> =
-        sqlx::query_as("SELECT id FROM forex_news_sources WHERE slug = $1 LIMIT 1")
+        sqlx::query_as("SELECT id FROM news.forex_news_sources WHERE slug = $1 LIMIT 1")
             .bind(&slug)
             .fetch_optional(db)
             .await
@@ -625,7 +690,7 @@ async fn ensure_source(db: &PgPool, source_name: &str, feed_url: &str) -> String
     };
 
     let _ = sqlx::query(
-        "INSERT INTO forex_news_sources (id, name, slug, source_type, url, rss_url, is_active) \
+        "INSERT INTO news.forex_news_sources (id, name, slug, source_type, url, rss_url, is_active) \
          VALUES ($1, $2, $3, 'rss', $4, $5, TRUE) \
          ON CONFLICT (slug) DO NOTHING",
     )
@@ -638,7 +703,7 @@ async fn ensure_source(db: &PgPool, source_name: &str, feed_url: &str) -> String
     .await;
 
     let re_read: Option<(String,)> =
-        sqlx::query_as("SELECT id FROM forex_news_sources WHERE slug = $1 LIMIT 1")
+        sqlx::query_as("SELECT id FROM news.forex_news_sources WHERE slug = $1 LIMIT 1")
             .bind(&slug)
             .fetch_optional(db)
             .await

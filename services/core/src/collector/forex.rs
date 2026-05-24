@@ -5,6 +5,7 @@ use reqwest::header::{
     REFERER,
 };
 use reqwest::Client;
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -25,11 +26,34 @@ pub struct ForexNewsEntry {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct FeedSource {
+    pub id: Option<String>,
     pub name: String,
     pub url: String,
     pub rss_url: String,
     pub category: String,
+    pub poll_interval_sec: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SourceStatusSnapshot {
+    pub name: String,
+    pub url: String,
+    pub rss_url: String,
+    pub category: String,
+    pub status: String,
+    pub last_success_at: Option<DateTime<Utc>>,
+    pub last_error_at: Option<DateTime<Utc>>,
+    pub blocked_until: Option<DateTime<Utc>>,
+    pub next_allowed_poll_at: Option<DateTime<Utc>>,
+    pub consecutive_403: u32,
+    pub success_count: u64,
+    pub error_count: u64,
+    pub forbidden_count: u64,
+    pub parse_error_count: u64,
+    pub last_status: Option<u16>,
+    pub last_latency_ms: Option<u128>,
 }
 
 pub fn compute_content_hash(url: &str, title: &str) -> String {
@@ -41,46 +65,84 @@ pub fn compute_content_hash(url: &str, title: &str) -> String {
 pub fn default_forex_feeds() -> Vec<FeedSource> {
     vec![
         FeedSource {
-            name: "Thomson Reuters".into(),
-            url: "https://ir.thomsonreuters.com".into(),
-            rss_url: "https://ir.thomsonreuters.com/rss/news-releases.xml?items=15".into(),
-            category: "general".into(),
-        },
-        FeedSource {
+            id: None,
             name: "InvestingLive".into(),
             url: "https://investinglive.com".into(),
             rss_url: "https://investinglive.com/feed/news/".into(),
             category: "forex".into(),
+            poll_interval_sec: None,
         },
         FeedSource {
+            id: None,
             name: "FXStreet".into(),
-            url: "https://www.fxstreet-id.com".into(),
-            rss_url: "https://www.fxstreet-id.com/rss/news".into(),
+            url: "https://www.fxstreet.com".into(),
+            rss_url: "https://www.fxstreet.com/rss/news".into(),
             category: "forex".into(),
+            poll_interval_sec: None,
         },
         FeedSource {
+            id: None,
+            name: "MarketPulse".into(),
+            url: "https://www.marketpulse.com".into(),
+            rss_url: "https://www.marketpulse.com/feed/".into(),
+            category: "macro".into(),
+            poll_interval_sec: None,
+        },
+        FeedSource {
+            id: None,
+            name: "ActionForex".into(),
+            url: "https://www.actionforex.com".into(),
+            rss_url: "https://www.actionforex.com/feed/".into(),
+            category: "forex".into(),
+            poll_interval_sec: None,
+        },
+        FeedSource {
+            id: None,
             name: "Investing.com - Forex News".into(),
             url: "https://id.investing.com/news/forex-news".into(),
             rss_url: "https://id.investing.com/rss/news_301.rss".into(),
             category: "forex".into(),
+            poll_interval_sec: None,
         },
         FeedSource {
+            id: None,
             name: "Investing.com - Economic Indicators".into(),
             url: "https://id.investing.com/news/economic-indicators".into(),
             rss_url: "https://id.investing.com/rss/news_95.rss".into(),
             category: "economic".into(),
+            poll_interval_sec: None,
         },
         FeedSource {
+            id: None,
             name: "Federal Reserve".into(),
             url: "https://www.federalreserve.gov".into(),
             rss_url: "https://www.federalreserve.gov/feeds/press_all.xml".into(),
             category: "central_bank".into(),
+            poll_interval_sec: None,
         },
         FeedSource {
+            id: None,
             name: "ECB".into(),
             url: "https://www.ecb.europa.eu".into(),
             rss_url: "https://www.ecb.europa.eu/rss/press.html".into(),
             category: "central_bank".into(),
+            poll_interval_sec: None,
+        },
+        FeedSource {
+            id: None,
+            name: "Bank of England".into(),
+            url: "https://www.bankofengland.co.uk".into(),
+            rss_url: "https://www.bankofengland.co.uk/rss/news".into(),
+            category: "central_bank".into(),
+            poll_interval_sec: None,
+        },
+        FeedSource {
+            id: None,
+            name: "Bank of Canada".into(),
+            url: "https://www.bankofcanada.ca".into(),
+            rss_url: "https://www.bankofcanada.ca/content_type/press-releases/feed/".into(),
+            category: "central_bank".into(),
+            poll_interval_sec: None,
         },
     ]
 }
@@ -97,12 +159,18 @@ pub fn feed_name_by_url(rss_url: &str) -> String {
         "FXStreet".into()
     } else if lower.contains("investing.com") {
         "Investing.com".into()
-    } else if lower.contains("reuters") {
-        "Reuters".into()
+    } else if lower.contains("marketpulse") {
+        "MarketPulse".into()
+    } else if lower.contains("actionforex") {
+        "ActionForex".into()
     } else if lower.contains("federalreserve") {
         "Federal Reserve".into()
     } else if lower.contains("ecb.europa") {
         "ECB".into()
+    } else if lower.contains("bankofengland") {
+        "Bank of England".into()
+    } else if lower.contains("bankofcanada") {
+        "Bank of Canada".into()
     } else {
         "Unknown".into()
     }
@@ -244,6 +312,52 @@ impl ForexCollector {
     }
 
     /// Fetch all feeds concurrently and return results keyed by RSS URL.
+    pub async fn source_statuses(&self, feeds: &[FeedSource]) -> Vec<SourceStatusSnapshot> {
+        let now = Utc::now();
+        let state = self.source_state.read().await;
+
+        feeds
+            .iter()
+            .map(|feed| {
+                let source_state = state.get(&feed.name);
+                let status = match source_state {
+                    Some(s)
+                        if s.blocked_until
+                            .is_some_and(|blocked_until| blocked_until > now) =>
+                    {
+                        "blocked"
+                    }
+                    Some(s) if s.last_error_at.is_some() && s.last_error_at > s.last_success_at => {
+                        "error"
+                    }
+                    Some(s) if s.last_success_at.is_some() => "ok",
+                    _ => "pending",
+                };
+
+                SourceStatusSnapshot {
+                    name: feed.name.clone(),
+                    url: feed.url.clone(),
+                    rss_url: feed.rss_url.clone(),
+                    category: feed.category.clone(),
+                    status: status.to_string(),
+                    last_success_at: source_state.and_then(|s| s.last_success_at),
+                    last_error_at: source_state.and_then(|s| s.last_error_at),
+                    blocked_until: source_state.and_then(|s| s.blocked_until),
+                    next_allowed_poll_at: source_state.and_then(|s| s.next_allowed_poll_at),
+                    consecutive_403: source_state.map(|s| s.consecutive_403).unwrap_or_default(),
+                    success_count: source_state.map(|s| s.success_count).unwrap_or_default(),
+                    error_count: source_state.map(|s| s.error_count).unwrap_or_default(),
+                    forbidden_count: source_state.map(|s| s.forbidden_count).unwrap_or_default(),
+                    parse_error_count: source_state
+                        .map(|s| s.parse_error_count)
+                        .unwrap_or_default(),
+                    last_status: source_state.and_then(|s| s.last_status),
+                    last_latency_ms: source_state.and_then(|s| s.last_latency_ms),
+                }
+            })
+            .collect()
+    }
+
     pub async fn fetch_all_feeds(
         &self,
         feeds: &[FeedSource],
@@ -547,21 +661,19 @@ fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 }
 
 fn feed_candidate_urls(source: &FeedSource) -> Vec<String> {
-    if source.name.eq_ignore_ascii_case("Thomson Reuters") {
-        vec![
-            source.rss_url.clone(),
-            "https://ir.thomsonreuters.com/rss/news-releases.xml".to_string(),
-        ]
-    } else {
-        vec![source.rss_url.clone()]
-    }
+    vec![source.rss_url.clone()]
 }
 
 fn per_source_poll_sec(source: &FeedSource) -> u64 {
-    if source.name.eq_ignore_ascii_case("Thomson Reuters") {
-        120
-    } else {
-        45
+    if let Some(interval) = source.poll_interval_sec {
+        return interval;
+    }
+
+    match source.category.as_str() {
+        "central_bank" => 600,
+        "macro" => 300,
+        "economic" => 120,
+        _ => 45,
     }
 }
 

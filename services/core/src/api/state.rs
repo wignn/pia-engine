@@ -2,6 +2,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 use super::usage_tracker::UsageTracker;
+use crate::collector::forex::ForexCollector;
 use crate::config::Config;
 use crate::tenant::registry::TenantRegistry;
 use crate::ws::Hub;
@@ -17,6 +18,7 @@ pub struct AppState {
     pub hub: Arc<Hub>,
     pub db: PgPool,
     pub config: Config,
+    pub forex_collector: Arc<ForexCollector>,
     pub tenant_registry: Option<Arc<TenantRegistry>>,
     pub usage_tracker: Arc<UsageTracker>,
     pub ticket_store: Arc<tokio::sync::RwLock<std::collections::HashMap<String, Ticket>>>,

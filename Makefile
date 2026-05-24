@@ -1,6 +1,6 @@
 INFRA_DIR ?= infra/compose
-ENGINE ?= podman
-COMPOSE = $(ENGINE) compose -f local.yml
+ENGINE ?= docker
+COMPOSE = $(ENGINE) compose -f prod.yml
 
 .PHONY: help up down restart logs ps build pull run-podman down-podman up-docker down-docker
 

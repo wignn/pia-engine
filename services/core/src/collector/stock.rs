@@ -11,7 +11,6 @@ use tracing::{error, info};
 
 use super::forex::FeedSource;
 
-/// A stock news entry parsed from RSS feeds.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct StockNewsEntry {
@@ -27,38 +26,47 @@ pub struct StockNewsEntry {
     pub tickers: Vec<String>,
 }
 
-/// Indonesian stock market RSS feed sources.
 pub fn indonesia_stock_feeds() -> Vec<FeedSource> {
     vec![
         FeedSource {
+            id: None,
             name: "CNBC Indonesia - Market".into(),
             url: "https://www.cnbcindonesia.com/market".into(),
             rss_url: "https://www.cnbcindonesia.com/market/rss".into(),
             category: "market".into(),
+            poll_interval_sec: None,
         },
         FeedSource {
+            id: None,
             name: "Investing.com Indonesia - Market".into(),
             url: "https://id.investing.com".into(),
             rss_url: "https://id.investing.com/rss/news_25.rss".into(),
             category: "market".into(),
+            poll_interval_sec: None,
         },
         FeedSource {
+            id: None,
             name: "Tempo.co - Market".into(),
             url: "https://www.tempo.co".into(),
             rss_url: "https://rss.tempo.co/bisnis".into(),
             category: "market".into(),
+            poll_interval_sec: None,
         },
         FeedSource {
+            id: None,
             name: "Detik - Market".into(),
             url: "https://finance.detik.com".into(),
             rss_url: "https://finance.detik.com/rss".into(),
             category: "market".into(),
+            poll_interval_sec: None,
         },
         FeedSource {
+            id: None,
             name: "CNN - Market".into(),
             url: "https://www.cnnindonesia.com/ekonomi".into(),
             rss_url: "https://www.cnnindonesia.com/ekonomi/rss".into(),
             category: "market".into(),
+            poll_interval_sec: None,
         },
     ]
 }
@@ -211,7 +219,6 @@ fn is_relevant_stock(entry: &StockNewsEntry) -> bool {
     false
 }
 
-/// Collector for Indonesian stock market news from multiple RSS feeds.
 #[allow(dead_code)]
 pub struct StockCollector {
     client: Client,

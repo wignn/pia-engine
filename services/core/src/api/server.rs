@@ -56,6 +56,10 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/v1/forex/news", get(handlers::forex::list_forex_news))
         .route(
+            "/api/v1/forex/sources/status",
+            get(handlers::forex::source_statuses),
+        )
+        .route(
             "/api/v1/forex/news/latest",
             get(handlers::forex::latest_forex_news),
         )
@@ -107,6 +111,22 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/v1/content/scrape",
             post(handlers::scraping::scrape_article),
+        )
+        .route(
+            "/api/v1/admin/forex/sources",
+            get(handlers::forex::admin_list_sources).post(handlers::forex::admin_create_source),
+        )
+        .route(
+            "/api/v1/admin/forex/sources/test",
+            post(handlers::forex::admin_test_source),
+        )
+        .route(
+            "/api/v1/admin/forex/sources/{id}",
+            post(handlers::forex::admin_update_source),
+        )
+        .route(
+            "/api/v1/admin/forex/sources/{id}/toggle",
+            post(handlers::forex::admin_toggle_source),
         )
         .layer(middleware::from_fn_with_state(state.clone(), usage_logger))
         .layer(middleware::from_fn_with_state(
