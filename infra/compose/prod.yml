@@ -63,6 +63,9 @@ services:
       - postgres
       - redis
       - analyzer
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     networks:
       - private
     restart: always
