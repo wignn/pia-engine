@@ -17,6 +17,10 @@ pub struct Config {
     pub x_poll_sec: u64,
     pub redis_url: String,
     pub redis_channel_prefix: String,
+    pub clickhouse_url: String,
+    pub clickhouse_database: String,
+    pub clickhouse_user: String,
+    pub clickhouse_password: String,
 }
 
 impl Config {
@@ -56,6 +60,10 @@ impl Config {
             x_poll_sec: get_env_u64("X_POLL_SEC", 60),
             redis_url: get_env("REDIS_URL", ""),
             redis_channel_prefix: get_env("REDIS_CHANNEL_PREFIX", "world-info"),
+            clickhouse_url: get_env("CLICKHOUSE_URL", ""),
+            clickhouse_database: get_env("CLICKHOUSE_DATABASE", "market"),
+            clickhouse_user: get_env("CLICKHOUSE_USER", "default"),
+            clickhouse_password: get_env("CLICKHOUSE_PASSWORD", ""),
         }
     }
 
@@ -65,5 +73,9 @@ impl Config {
 
     pub fn has_redis(&self) -> bool {
         !self.redis_url.trim().is_empty()
+    }
+
+    pub fn has_clickhouse(&self) -> bool {
+        !self.clickhouse_url.trim().is_empty()
     }
 }

@@ -2,10 +2,8 @@ use axum::{
     extract::{Path, State},
     Json,
 };
-use futures_util::{SinkExt, StreamExt};
 use once_cell::sync::Lazy;
 use serde_json::{json, Value};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use crate::api::state::AppState;
 use crate::ingestion_subscriber::{self, CachedPrice};
@@ -256,159 +254,6 @@ fn history_is_usable(history: &[Value], now: chrono::DateTime<chrono::Utc>) -> b
     ((max - min) / latest) >= 0.00001
 }
 
-fn tv_frame(payload: &str) -> String {
-    format!("~m~{}~m~{}", payload.len(), payload)
-}
-
-fn tv_session(prefix: &str) -> String {
-    let nanos = chrono::Utc::now()
-        .timestamp_nanos_opt()
-        .unwrap_or_else(|| chrono::Utc::now().timestamp_micros());
-    format!("{prefix}_{:012}", nanos.unsigned_abs() % 1_000_000_000_000)
-}
-
-fn tv_message(method: &str, params: Value) -> String {
-    tv_frame(&json!({ "m": method, "p": params }).to_string())
-}
-
-fn parse_tv_frames(text: &str) -> Vec<Value> {
-    let mut values = Vec::new();
-    let mut rest = text;
-
-    while let Some(after_marker) = rest.strip_prefix("~m~") {
-        let Some((len_str, after_len)) = after_marker.split_once("~m~") else {
-            break;
-        };
-        let Ok(len) = len_str.parse::<usize>() else {
-            break;
-        };
-        if after_len.len() < len {
-            break;
-        }
-        let (payload, next) = after_len.split_at(len);
-        if let Ok(value) = serde_json::from_str(payload) {
-            values.push(value);
-        }
-        rest = next;
-    }
-
-    values
-}
-
-fn parse_tv_series(value: &Value) -> Vec<Value> {
-    let Some(series) = value
-        .get("p")
-        .and_then(|params| params.as_array())
-        .and_then(|params| params.get(1))
-        .and_then(|payload| payload.get("s"))
-        .and_then(|series| series.as_array())
-    else {
-        return Vec::new();
-    };
-
-    series
-        .iter()
-        .filter_map(|item| {
-            let values = item.get("v")?.as_array()?;
-            let time = values.first().and_then(as_timestamp)?;
-            let close = values.get(4).and_then(as_price)?;
-            Some(json!({ "time": time, "value": close }))
-        })
-        .collect()
-}
-
-async fn fetch_tradingview_history(symbol: &str) -> anyhow::Result<Vec<Value>> {
-    let chart_session = tv_session("cs");
-    let quote_session = tv_session("qs");
-    let (mut socket, _) = connect_async("wss://data.tradingview.com/socket.io/websocket").await?;
-    let resolved_symbol = json!({
-        "symbol": symbol,
-        "adjustment": "splits",
-        "session": "regular"
-    })
-    .to_string();
-
-    let messages = [
-        tv_message("set_auth_token", json!(["unauthorized_user_token"])),
-        tv_message("chart_create_session", json!([chart_session, ""])),
-        tv_message("quote_create_session", json!([quote_session])),
-        tv_message(
-            "quote_set_fields",
-            json!([
-                quote_session,
-                "ch",
-                "chp",
-                "current_session",
-                "description",
-                "local_description",
-                "language",
-                "exchange",
-                "fractional",
-                "is_tradable",
-                "lp",
-                "lp_time",
-                "minmov",
-                "minmove2",
-                "original_name",
-                "pricescale",
-                "pro_name",
-                "short_name",
-                "type",
-                "update_mode",
-                "volume",
-                "currency_code"
-            ]),
-        ),
-        tv_message(
-            "quote_add_symbols",
-            json!([quote_session, symbol, { "flags": ["force_permission"] }]),
-        ),
-        tv_message(
-            "resolve_symbol",
-            json!([chart_session, "symbol_1", resolved_symbol]),
-        ),
-        tv_message(
-            "create_series",
-            json!([chart_session, "s1", "s1", "symbol_1", "1", 120]),
-        ),
-    ];
-
-    for message in messages {
-        socket.send(Message::Text(message)).await?;
-    }
-
-    let deadline = tokio::time::sleep(std::time::Duration::from_secs(8));
-    tokio::pin!(deadline);
-
-    loop {
-        tokio::select! {
-            _ = &mut deadline => anyhow::bail!("TradingView history request timed out"),
-            msg = socket.next() => {
-                let Some(msg) = msg else {
-                    anyhow::bail!("TradingView history socket closed");
-                };
-                let msg = msg?;
-                let Message::Text(text) = msg else {
-                    continue;
-                };
-                if text.starts_with("~m~~h~") {
-                    socket.send(Message::Text(text)).await?;
-                    continue;
-                }
-                for frame in parse_tv_frames(&text) {
-                    if frame.get("m").and_then(|m| m.as_str()) == Some("timescale_update") {
-                        let history = parse_tv_series(&frame);
-                        if !history.is_empty() {
-                            let _ = socket.close(None).await;
-                            return Ok(history);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 pub async fn list_prices(State(state): State<AppState>) -> Json<Value> {
     let mut prices = ingestion_subscriber::get_all_prices();
 
@@ -459,6 +304,21 @@ pub async fn get_price(State(state): State<AppState>, Path(symbol): Path<String>
 
 pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<String>) -> Json<Value> {
     let sym = symbol.to_uppercase();
+
+    if let Some(clickhouse) = &state.clickhouse {
+        match clickhouse.latest_history(&sym, 120).await {
+            Ok(history) if history_is_usable(&history, chrono::Utc::now()) => {
+                return Json(json!(history));
+            }
+            Ok(history) if !history.is_empty() => {
+                tracing::warn!(symbol = %sym, points = history.len(), "ClickHouse market history is flat or stale, falling back");
+            }
+            Ok(_) => {}
+            Err(err) => {
+                tracing::warn!(error = %err, symbol = %sym, "failed to query ClickHouse market history");
+            }
+        }
+    }
 
     let db_res: Result<Vec<(chrono::DateTime<chrono::Utc>, f64)>, _> = sqlx::query_as(
         "SELECT time, close FROM market.ohlcv_candles \
@@ -540,15 +400,7 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
         .or_else(|_| std::env::var("REFERENCE_HISTORY_URL_TEMPLATE"))
         .unwrap_or_default();
     if template.trim().is_empty() {
-        match fetch_tradingview_history(&reference_symbol).await {
-            Ok(history) if !history.is_empty() => return Json(json!(history)),
-            Ok(_) => {
-                tracing::warn!(symbol = %sym, ticker = %reference_symbol, "TradingView history returned no candles")
-            }
-            Err(err) => {
-                tracing::warn!(error = %err, symbol = %sym, ticker = %reference_symbol, "failed to fetch TradingView history")
-            }
-        }
+        tracing::warn!(symbol = %sym, ticker = %reference_symbol, "reference history URL template not configured, using last known price fallback");
         return Json(json!(latest_price_history_fallback(&state.db, &sym).await));
     }
     let url = template

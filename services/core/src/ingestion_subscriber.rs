@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use tracing::{debug, error, info, warn};
 
+use crate::clickhouse::{ClickHouseClient, OhlcvCandle};
 use crate::ws;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,14 +104,19 @@ pub async fn hydrate_price_cache(pool: &sqlx::PgPool) -> anyhow::Result<usize> {
     Ok(count)
 }
 
-pub async fn run(redis_url: String, hub: Arc<ws::Hub>, pool: sqlx::PgPool) {
+pub async fn run(
+    redis_url: String,
+    hub: Arc<ws::Hub>,
+    pool: sqlx::PgPool,
+    clickhouse: Option<Arc<ClickHouseClient>>,
+) {
     match hydrate_price_cache(&pool).await {
         Ok(count) => info!(count, "hydrated market price cache from database"),
         Err(e) => error!(error = %e, "failed to hydrate market price cache from database"),
     }
 
     loop {
-        if let Err(e) = subscribe_loop(&redis_url, &hub, &pool).await {
+        if let Err(e) = subscribe_loop(&redis_url, &hub, &pool, clickhouse.as_ref()).await {
             error!(error = %e, "ingestion subscriber error, reconnecting in 5s");
         }
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
@@ -121,6 +127,7 @@ async fn subscribe_loop(
     redis_url: &str,
     hub: &Arc<ws::Hub>,
     pool: &sqlx::PgPool,
+    clickhouse: Option<&Arc<ClickHouseClient>>,
 ) -> anyhow::Result<()> {
     let client = redis::Client::open(redis_url)?;
     let mut pubsub = client.get_async_pubsub().await?;
@@ -289,31 +296,51 @@ async fn subscribe_loop(
         }
 
         if let Some(candle) = completed_candle {
-            let pool_clone = pool.clone();
-            let symbol_clone = symbol.clone();
-            tokio::spawn(async move {
-                let res = sqlx::query(
-                    "INSERT INTO market.ohlcv_candles (symbol, resolution, time, open, high, low, close, volume) \
-                     VALUES ($1, '1m', $2, $3, $4, $5, $6, $7) \
-                     ON CONFLICT (symbol, resolution, time) DO UPDATE SET \
-                     high = EXCLUDED.high, low = EXCLUDED.low, close = EXCLUDED.close, volume = EXCLUDED.volume"
-                )
-                .bind(&symbol_clone)
-                .bind(candle.minute_timestamp)
-                .bind(candle.open)
-                .bind(candle.high)
-                .bind(candle.low)
-                .bind(candle.close)
-                .bind(candle.volume)
-                .execute(&pool_clone)
-                .await;
+            if let Some(clickhouse) = clickhouse.cloned() {
+                let ch_candle = OhlcvCandle {
+                    symbol: symbol.clone(),
+                    resolution: "1m".to_string(),
+                    time: candle.minute_timestamp,
+                    open: candle.open,
+                    high: candle.high,
+                    low: candle.low,
+                    close: candle.close,
+                    volume: candle.volume,
+                };
+                tokio::spawn(async move {
+                    if let Err(e) = clickhouse.insert_candle(&ch_candle).await {
+                        error!(error = %e, symbol = %ch_candle.symbol, "failed to save candle to ClickHouse");
+                    } else {
+                        debug!(symbol = %ch_candle.symbol, time = %ch_candle.time, "saved completed 1m candle to ClickHouse");
+                    }
+                });
+            } else {
+                let pool_clone = pool.clone();
+                let symbol_clone = symbol.clone();
+                tokio::spawn(async move {
+                    let res = sqlx::query(
+                        "INSERT INTO market.ohlcv_candles (symbol, resolution, time, open, high, low, close, volume) \
+                         VALUES ($1, '1m', $2, $3, $4, $5, $6, $7) \
+                         ON CONFLICT (symbol, resolution, time) DO UPDATE SET \
+                         high = EXCLUDED.high, low = EXCLUDED.low, close = EXCLUDED.close, volume = EXCLUDED.volume"
+                    )
+                    .bind(&symbol_clone)
+                    .bind(candle.minute_timestamp)
+                    .bind(candle.open)
+                    .bind(candle.high)
+                    .bind(candle.low)
+                    .bind(candle.close)
+                    .bind(candle.volume)
+                    .execute(&pool_clone)
+                    .await;
 
-                if let Err(e) = res {
-                    error!(error = %e, symbol = %symbol_clone, "failed to save candle to database");
-                } else {
-                    debug!(symbol = %symbol_clone, time = %candle.minute_timestamp, "saved completed 1m candle to timeseries database");
-                }
-            });
+                    if let Err(e) = res {
+                        error!(error = %e, symbol = %symbol_clone, "failed to save candle to database");
+                    } else {
+                        debug!(symbol = %symbol_clone, time = %candle.minute_timestamp, "saved completed 1m candle to timeseries database");
+                    }
+                });
+            }
         }
 
         let tick_data = serde_json::json!({

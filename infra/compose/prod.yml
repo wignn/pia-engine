@@ -12,6 +12,28 @@ services:
     networks:
       - private
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    container_name: clickhouse-prod
+    restart: always
+    environment:
+      CLICKHOUSE_DB: market
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    networks:
+      - private
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping | grep -q Ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:7-alpine
     container_name: redis-prod
@@ -62,10 +84,8 @@ services:
     depends_on:
       - postgres
       - redis
+      - clickhouse
       - analyzer
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
     networks:
       - private
     restart: always
@@ -84,6 +104,8 @@ services:
       redis:
         condition: service_healthy
     restart: always
+    ports:
+      - "8081:8081"
     networks:
       - private
 
@@ -128,4 +150,5 @@ networks:
 
 volumes:
   postgres_data:
+  clickhouse_data:
   redis_data:

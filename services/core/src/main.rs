@@ -1,4 +1,5 @@
 mod api;
+mod clickhouse;
 mod collector;
 mod config;
 mod db;
@@ -69,6 +70,27 @@ async fn main() {
 
     let hub = ws::Hub::new(redis_client.clone(), cfg.redis_channel_prefix.clone());
 
+    let clickhouse = if cfg.has_clickhouse() {
+        let client = Arc::new(clickhouse::ClickHouseClient::new(
+            cfg.clickhouse_url.clone(),
+            cfg.clickhouse_database.clone(),
+            cfg.clickhouse_user.clone(),
+            cfg.clickhouse_password.clone(),
+        ));
+        match client.bootstrap().await {
+            Ok(()) => {
+                info!(url = %cfg.clickhouse_url, database = %cfg.clickhouse_database, "ClickHouse market storage initialized");
+                Some(client)
+            }
+            Err(e) => {
+                warn!(error = %e, url = %cfg.clickhouse_url, "ClickHouse initialization failed, continuing with Postgres candles only");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     let usage_tracker = Arc::new(UsageTracker::new(pool.clone(), redis_client.clone()));
 
     let timeout = Duration::from_secs(cfg.scraper_timeout);
@@ -88,6 +110,7 @@ async fn main() {
         config: cfg.clone(),
         forex_collector: forex_collector.clone(),
         tenant_registry: Some(tenant_registry.clone()),
+        clickhouse: clickhouse.clone(),
         usage_tracker,
         ticket_store: std::sync::Arc::new(tokio::sync::RwLock::new(
             std::collections::HashMap::new(),
@@ -215,8 +238,9 @@ async fn main() {
         let hub = hub.clone();
         let redis_url = cfg.redis_url.clone();
         let db_pool = pool.clone();
+        let clickhouse = clickhouse.clone();
         tokio::spawn(async move {
-            ingestion_subscriber::run(redis_url, hub, db_pool).await;
+            ingestion_subscriber::run(redis_url, hub, db_pool, clickhouse).await;
         });
         info!("ingestion subscriber started (listening on ingestion:*)");
     }
