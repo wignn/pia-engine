@@ -17,7 +17,6 @@ pub fn is_market_open() -> bool {
     is_market_open_at(Utc::now())
 }
 
-/// Testable version — checks market status at a specific UTC time.
 pub fn is_market_open_at(now: chrono::DateTime<Utc>) -> bool {
     let weekday = now.weekday();
     let hour = now.hour();
