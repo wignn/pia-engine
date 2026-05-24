@@ -36,6 +36,27 @@ struct CandleState {
     minute_timestamp: chrono::DateTime<chrono::Utc>,
 }
 
+type LatestPriceRow = (
+    String,
+    f64,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    String,
+    String,
+    Option<DateTime<Utc>>,
+);
+
+struct LatestPriceUpdate {
+    symbol: String,
+    price: f64,
+    bid: Option<f64>,
+    ask: Option<f64>,
+    volume: f64,
+    asset_type: String,
+    received_at: DateTime<Utc>,
+}
+
 pub static PRICE_CACHE: Lazy<Arc<RwLock<HashMap<String, CachedPrice>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
@@ -52,16 +73,7 @@ pub fn set_price(price: CachedPrice) {
 }
 
 pub async fn hydrate_price_cache(pool: &sqlx::PgPool) -> anyhow::Result<usize> {
-    let rows: Vec<(
-        String,
-        f64,
-        Option<f64>,
-        Option<f64>,
-        Option<f64>,
-        String,
-        String,
-        Option<DateTime<Utc>>,
-    )> = sqlx::query_as(
+    let rows: Vec<LatestPriceRow> = sqlx::query_as(
         "SELECT symbol, price, bid, ask, volume, source, asset_type, received_at \
          FROM market.market_latest_prices \
          ORDER BY symbol",
@@ -207,13 +219,15 @@ async fn subscribe_loop(
         let tick_time = parse_received_at(received_at.as_deref());
         persist_latest_price(
             pool,
-            symbol.clone(),
-            price,
-            bid,
-            ask,
-            volume,
-            asset_type.clone(),
-            tick_time,
+            LatestPriceUpdate {
+                symbol: symbol.clone(),
+                price,
+                bid,
+                ask,
+                volume,
+                asset_type: asset_type.clone(),
+                received_at: tick_time,
+            },
         );
 
         let tick_min = truncate_to_minute(tick_time);
@@ -300,16 +314,7 @@ async fn subscribe_loop(
     }
 }
 
-fn persist_latest_price(
-    pool: &sqlx::PgPool,
-    symbol: String,
-    price: f64,
-    bid: Option<f64>,
-    ask: Option<f64>,
-    volume: f64,
-    asset_type: String,
-    received_at: DateTime<Utc>,
-) {
+fn persist_latest_price(pool: &sqlx::PgPool, update: LatestPriceUpdate) {
     let pool = pool.clone();
     tokio::spawn(async move {
         let res = sqlx::query(
@@ -326,18 +331,18 @@ fn persist_latest_price(
              received_at = EXCLUDED.received_at, \
              updated_at = NOW()",
         )
-        .bind(&symbol)
-        .bind(price)
-        .bind(bid)
-        .bind(ask)
-        .bind(volume)
-        .bind(&asset_type)
-        .bind(received_at)
+        .bind(&update.symbol)
+        .bind(update.price)
+        .bind(update.bid)
+        .bind(update.ask)
+        .bind(update.volume)
+        .bind(&update.asset_type)
+        .bind(update.received_at)
         .execute(&pool)
         .await;
 
         if let Err(e) = res {
-            error!(error = %e, symbol = %symbol, "failed to persist latest market price");
+            error!(error = %e, symbol = %update.symbol, "failed to persist latest market price");
         }
     });
 }

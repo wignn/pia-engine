@@ -58,6 +58,8 @@ pub struct ForexIngestWorker {
     dlq: DeadLetterQueue,
 }
 
+type ForexFeedRow = (String, String, String, String, String, i32);
+
 async fn persist_feed_health(db: &PgPool, statuses: Vec<SourceStatusSnapshot>) {
     for status in statuses {
         let res = sqlx::query(
@@ -89,7 +91,7 @@ async fn persist_feed_health(db: &PgPool, statuses: Vec<SourceStatusSnapshot>) {
 }
 
 async fn load_active_forex_feeds(db: &PgPool) -> Vec<FeedSource> {
-    let rows: Result<Vec<(String, String, String, String, String, i32)>, _> = sqlx::query_as(
+    let rows: Result<Vec<ForexFeedRow>, _> = sqlx::query_as(
         "SELECT id, name, url, rss_url, category, poll_interval_sec \
          FROM news.forex_news_sources \
          WHERE is_active = TRUE AND source_type = 'rss' AND rss_url IS NOT NULL \
