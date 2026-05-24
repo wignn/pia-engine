@@ -6,6 +6,7 @@ use tracing::{debug, error, info};
 
 use crate::broker::BrokerPublisher;
 use crate::config::{Config, MarketSymbolConfig};
+use crate::workers::tradingview;
 
 const WORKER: &str = "index_feed";
 const SOURCE: &str = "market_data";
@@ -42,34 +43,23 @@ async fn poll_symbol(
     broker: &dyn BrokerPublisher,
     symbol: &MarketSymbolConfig,
 ) -> anyhow::Result<()> {
-    if cfg.index_feed_http_url_template.trim().is_empty() {
-        anyhow::bail!("index feed HTTP URL template not configured");
-    }
-    let url = cfg
-        .index_feed_http_url_template
-        .trim()
-        .replace("{symbol}", &symbol.provider_symbol);
+    let template = if cfg.tradingview_quote_url_template.trim().is_empty() {
+        ""
+    } else {
+        cfg.tradingview_quote_url_template.trim()
+    };
 
-    let res = client.get(&url).send().await?;
-    if !res.status().is_success() {
-        anyhow::bail!("HTTP status error: {}", res.status());
-    }
-
-    let val: serde_json::Value = res.json().await?;
-
-    let price = val
-        .get("chart")
-        .and_then(|v| v.get("result"))
-        .and_then(|arr| arr.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|res| res.get("meta"))
-        .and_then(|meta| meta.get("regularMarketPrice"))
-        .and_then(|p| p.as_f64())
-        .ok_or_else(|| anyhow::anyhow!("failed to parse regular market price from response"))?;
+    let tv_symbol = tradingview::symbol_for(
+        &symbol.provider_symbol,
+        &symbol.public_symbol,
+        &symbol.asset_type,
+    );
+    let price = tradingview::fetch_quote(client, template, &tv_symbol).await?;
 
     debug!(
         worker = WORKER,
         symbol = %symbol.public_symbol,
+        provider_symbol = %tv_symbol,
         price = price,
         "fetched price"
     );

@@ -14,7 +14,7 @@ pub struct Config {
     pub primary_fx_ws_url: String,
     pub secondary_fx_ws_url: String,
     pub crypto_feed_ws_url: String,
-    pub index_feed_http_url_template: String,
+    pub tradingview_quote_url_template: String,
     pub primary_fx_symbols: Vec<MarketSymbolConfig>,
     pub secondary_fx_symbols: Vec<MarketSymbolConfig>,
     pub index_feed_symbols: Vec<MarketSymbolConfig>,
@@ -45,7 +45,7 @@ impl Config {
             primary_fx_ws_url: get_env("PRIMARY_FX_WS_URL", ""),
             secondary_fx_ws_url: get_env("SECONDARY_FX_WS_URL", ""),
             crypto_feed_ws_url: get_env("CRYPTO_FEED_WS_URL", ""),
-            index_feed_http_url_template: get_env("INDEX_FEED_HTTP_URL_TEMPLATE", ""),
+            tradingview_quote_url_template: get_env("TRADINGVIEW_QUOTE_URL_TEMPLATE", ""),
             primary_fx_symbols: parse_symbol_mappings(&get_env("PRIMARY_FX_SYMBOLS", ""), "forex"),
             secondary_fx_symbols: parse_symbol_mappings(
                 &get_env("SECONDARY_FX_SYMBOLS", ""),

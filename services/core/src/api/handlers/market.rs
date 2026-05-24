@@ -106,6 +106,127 @@ async fn latest_price_history_fallback(pool: &sqlx::PgPool, symbol: &str) -> Vec
     }
 }
 
+fn tradingview_symbol(symbol: &str) -> String {
+    let sym = symbol.trim().to_uppercase();
+    match sym.as_str() {
+        "XAUUSD" => "OANDA:XAUUSD".to_string(),
+        "SPX" => "SP:SPX".to_string(),
+        "DXY" => "TVC:DXY".to_string(),
+        _ if sym.len() == 6 && sym.chars().all(|c| c.is_ascii_uppercase()) => format!("FX:{sym}"),
+        _ => sym,
+    }
+}
+
+fn encode_symbol(symbol: &str) -> String {
+    symbol.replace(':', "%3A")
+}
+
+fn parse_reference_history(value: &Value) -> Vec<Value> {
+    let mut history = parse_bar_array(value)
+        .or_else(|| value.get("bars").and_then(parse_bar_array))
+        .or_else(|| parse_compact_history(value))
+        .or_else(|| parse_yahoo_history(value))
+        .unwrap_or_default();
+
+    let limit = 120;
+    if history.len() > limit {
+        history = history.split_off(history.len() - limit);
+    }
+    history
+}
+
+fn parse_bar_array(value: &Value) -> Option<Vec<Value>> {
+    let bars = value.as_array()?;
+    let history: Vec<Value> = bars
+        .iter()
+        .filter_map(|bar| {
+            let time = bar
+                .get("time")
+                .or_else(|| bar.get("timestamp"))
+                .and_then(as_timestamp)?;
+            let close = bar
+                .get("close")
+                .or_else(|| bar.get("value"))
+                .and_then(as_price)?;
+            Some(json!({ "time": time, "value": close }))
+        })
+        .collect();
+
+    if history.is_empty() {
+        None
+    } else {
+        Some(history)
+    }
+}
+
+fn parse_compact_history(value: &Value) -> Option<Vec<Value>> {
+    let timestamps = value.get("t")?.as_array()?;
+    let closes = value.get("c")?.as_array()?;
+    let len = timestamps.len().min(closes.len());
+    let history: Vec<Value> = (0..len)
+        .filter_map(|i| {
+            Some(json!({
+                "time": as_timestamp(&timestamps[i])?,
+                "value": as_price(&closes[i])?,
+            }))
+        })
+        .collect();
+
+    if history.is_empty() {
+        None
+    } else {
+        Some(history)
+    }
+}
+
+fn parse_yahoo_history(value: &Value) -> Option<Vec<Value>> {
+    let result = value.get("chart")?.get("result")?.get(0)?;
+    let timestamps = result.get("timestamp")?.as_array()?;
+    let closes = result
+        .get("indicators")?
+        .get("quote")?
+        .get(0)?
+        .get("close")?
+        .as_array()?;
+    let len = timestamps.len().min(closes.len());
+    let history: Vec<Value> = (0..len)
+        .filter_map(|i| {
+            Some(json!({
+                "time": as_timestamp(&timestamps[i])?,
+                "value": as_price(&closes[i])?,
+            }))
+        })
+        .collect();
+
+    if history.is_empty() {
+        None
+    } else {
+        Some(history)
+    }
+}
+
+fn as_timestamp(value: &Value) -> Option<i64> {
+    match value {
+        Value::Number(n) => n
+            .as_i64()
+            .map(|ts| if ts > 10_000_000_000 { ts / 1000 } else { ts }),
+        Value::String(s) => {
+            s.parse::<i64>()
+                .ok()
+                .map(|ts| if ts > 10_000_000_000 { ts / 1000 } else { ts })
+        }
+        _ => None,
+    }
+}
+
+fn as_price(value: &Value) -> Option<f64> {
+    match value {
+        Value::Number(n) => n.as_f64().filter(|price| *price > 0.0),
+        Value::String(s) => s.parse::<f64>().ok().filter(|price| *price > 0.0),
+        _ => None,
+    }
+}
+
 pub async fn list_prices(State(state): State<AppState>) -> Json<Value> {
     let mut prices = ingestion_subscriber::get_all_prices();
 
@@ -229,18 +350,16 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
         }
     }
 
-    let reference_symbol = match sym.as_str() {
-        "XAUUSD" => "GC=F".to_string(),
-        "SPX" => "^GSPC".to_string(),
-        "DXY" => "DX-Y.NYB".to_string(),
-        _ => format!("{}=X", sym),
-    };
-
-    let reference_symbol_encoded = reference_symbol.replace('^', "%5E").replace('=', "%3D");
-    let Ok(template) = std::env::var("REFERENCE_HISTORY_URL_TEMPLATE") else {
-        return Json(json!([]));
-    };
-    let url = template.replace("{symbol}", &reference_symbol_encoded);
+    let reference_symbol = tradingview_symbol(&sym);
+    let template = std::env::var("TRADINGVIEW_HISTORY_URL_TEMPLATE")
+        .or_else(|_| std::env::var("REFERENCE_HISTORY_URL_TEMPLATE"))
+        .unwrap_or_default();
+    if template.trim().is_empty() {
+        return Json(json!(latest_price_history_fallback(&state.db, &sym).await));
+    }
+    let url = template
+        .trim()
+        .replace("{symbol}", &encode_symbol(&reference_symbol));
 
     match HTTP_CLIENT.get(&url).send().await {
         Ok(res) => {
@@ -252,33 +371,13 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
                     reference_symbol,
                     status
                 );
-                return Json(json!([]));
+                return Json(json!(latest_price_history_fallback(&state.db, &sym).await));
             }
             match res.json::<Value>().await {
                 Ok(json_data) => {
-                    if let Some(result) = json_data["chart"]["result"].get(0) {
-                        if let (Some(timestamps), Some(closes)) = (
-                            result["timestamp"].as_array(),
-                            result["indicators"]["quote"][0]["close"].as_array(),
-                        ) {
-                            let mut history = Vec::new();
-                            let len = std::cmp::min(timestamps.len(), closes.len());
-                            for i in 0..len {
-                                if let (Some(t), Some(c)) =
-                                    (timestamps[i].as_i64(), closes[i].as_f64())
-                                {
-                                    history.push(json!({
-                                        "time": t,
-                                        "value": c
-                                    }));
-                                }
-                            }
-                            let limit = 120;
-                            if history.len() > limit {
-                                history = history.split_off(history.len() - limit);
-                            }
-                            return Json(json!(history));
-                        }
+                    let history = parse_reference_history(&json_data);
+                    if !history.is_empty() {
+                        return Json(json!(history));
                     }
                     tracing::warn!(
                         "reference history JSON structure mismatch for {} (ticker: {})",
@@ -307,4 +406,36 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
     }
 
     Json(json!(latest_price_history_fallback(&state.db, &sym).await))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn maps_symbols_to_tradingview() {
+        assert_eq!(tradingview_symbol("XAUUSD"), "OANDA:XAUUSD");
+        assert_eq!(tradingview_symbol("SPX"), "SP:SPX");
+        assert_eq!(tradingview_symbol("DXY"), "TVC:DXY");
+        assert_eq!(tradingview_symbol("EURUSD"), "FX:EURUSD");
+    }
+
+    #[test]
+    fn parses_history_shapes() {
+        let bars = parse_reference_history(&json!([
+            { "time": 1_700_000_000, "close": 2000.5 },
+            { "timestamp": 1_700_000_060_000i64, "value": "2001.5" }
+        ]));
+        assert_eq!(bars.len(), 2);
+        assert_eq!(bars[1]["time"], 1_700_000_060);
+        assert_eq!(bars[1]["value"], 2001.5);
+
+        let compact = parse_reference_history(&json!({
+            "t": [1_700_000_000, 1_700_000_060],
+            "c": [1.08, 1.09]
+        }));
+        assert_eq!(compact.len(), 2);
+        assert_eq!(compact[0]["value"], 1.08);
+    }
 }
