@@ -229,6 +229,33 @@ fn as_price(value: &Value) -> Option<f64> {
     }
 }
 
+fn history_is_usable(history: &[Value], now: chrono::DateTime<chrono::Utc>) -> bool {
+    if history.len() < 5 {
+        return false;
+    }
+
+    let last_time = history
+        .last()
+        .and_then(|point| point.get("time"))
+        .and_then(as_timestamp);
+    if last_time.is_some_and(|ts| now.timestamp() - ts > 6 * 60 * 60) {
+        return false;
+    }
+
+    let prices: Vec<f64> = history
+        .iter()
+        .filter_map(|point| point.get("value").and_then(as_price))
+        .collect();
+    if prices.len() < 5 {
+        return false;
+    }
+
+    let min = prices.iter().copied().fold(f64::INFINITY, f64::min);
+    let max = prices.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let latest = prices.last().copied().unwrap_or(0.0).abs().max(1.0);
+    ((max - min) / latest) >= 0.00001
+}
+
 fn tv_frame(payload: &str) -> String {
     format!("~m~{}~m~{}", payload.len(), payload)
 }
@@ -454,7 +481,10 @@ pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<Strin
                 })
                 .collect();
             history.reverse();
-            return Json(json!(history));
+            if history_is_usable(&history, chrono::Utc::now()) {
+                return Json(json!(history));
+            }
+            tracing::warn!(symbol = %sym, points = history.len(), "market history DB candles are flat or stale, falling back to reference history");
         }
     }
 
@@ -601,5 +631,24 @@ mod tests {
         }));
         assert_eq!(compact.len(), 2);
         assert_eq!(compact[0]["value"], 1.08);
+    }
+
+    #[test]
+    fn rejects_flat_or_stale_history() {
+        let now = chrono::Utc::now();
+        let start = now.timestamp() - 4 * 60;
+        let flat: Vec<Value> = (0..5)
+            .map(|i| json!({ "time": start + i * 60, "value": 100.0 }))
+            .collect();
+        let moving: Vec<Value> = (0..5)
+            .map(|i| json!({ "time": start + i * 60, "value": 100.0 + i as f64 * 0.1 }))
+            .collect();
+        let stale: Vec<Value> = (0..5)
+            .map(|i| json!({ "time": start - 7 * 60 * 60 + i * 60, "value": 100.0 + i as f64 * 0.1 }))
+            .collect();
+
+        assert!(!history_is_usable(&flat, now));
+        assert!(history_is_usable(&moving, now));
+        assert!(!history_is_usable(&stale, now));
     }
 }

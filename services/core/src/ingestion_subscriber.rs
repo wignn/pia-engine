@@ -1,4 +1,4 @@
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use futures_util::StreamExt;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
@@ -230,6 +230,28 @@ async fn subscribe_loop(
             },
         );
 
+        if should_skip_candle_for_weekend(&asset_type, tick_time) {
+            debug!(symbol = %symbol, asset_type = %asset_type, "skipping weekend candle update");
+            let tick_data = serde_json::json!({
+                "tick": {
+                    "symbol": &symbol,
+                    "price": price,
+                    "bid": bid,
+                    "ask": ask,
+                    "volume": Some(volume),
+                    "source": "market_data",
+                    "asset_type": &asset_type,
+                    "received_at": received_at,
+                },
+                "asset_type": &asset_type,
+            });
+
+            let _ = hub
+                .broadcast(ws::EVENT_MARKET_TRADE, tick_data, "market_data")
+                .await;
+            continue;
+        }
+
         let tick_min = truncate_to_minute(tick_time);
 
         let mut completed_candle = None;
@@ -359,6 +381,20 @@ fn truncate_to_minute(dt: chrono::DateTime<chrono::Utc>) -> chrono::DateTime<chr
         .unwrap_or(dt)
 }
 
+fn should_skip_candle_for_weekend(
+    asset_type: &str,
+    tick_time: chrono::DateTime<chrono::Utc>,
+) -> bool {
+    if asset_type.eq_ignore_ascii_case("crypto") {
+        return false;
+    }
+
+    matches!(
+        tick_time.weekday(),
+        chrono::Weekday::Sat | chrono::Weekday::Sun
+    )
+}
+
 fn normalize_symbol(feed: &str, raw: &str) -> String {
     match feed {
         "primary_fx" => {
@@ -377,5 +413,23 @@ fn normalize_symbol(feed: &str, raw: &str) -> String {
             }
         }
         _ => raw.to_uppercase(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn skips_non_crypto_weekend_candles() {
+        let saturday = Utc.with_ymd_and_hms(2026, 5, 23, 12, 0, 0).unwrap();
+        let monday = Utc.with_ymd_and_hms(2026, 5, 25, 12, 0, 0).unwrap();
+
+        assert!(should_skip_candle_for_weekend("forex", saturday));
+        assert!(should_skip_candle_for_weekend("index", saturday));
+        assert!(should_skip_candle_for_weekend("stock", saturday));
+        assert!(!should_skip_candle_for_weekend("crypto", saturday));
+        assert!(!should_skip_candle_for_weekend("forex", monday));
     }
 }
