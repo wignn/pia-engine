@@ -104,8 +104,6 @@ services:
       redis:
         condition: service_healthy
     restart: always
-    ports:
-      - "8081:8080"
     networks:
       - private
 
