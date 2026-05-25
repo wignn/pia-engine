@@ -1,8 +1,9 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     Json,
 };
 use once_cell::sync::Lazy;
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::api::state::AppState;
@@ -302,11 +303,115 @@ pub async fn get_price(State(state): State<AppState>, Path(symbol): Path<String>
     }
 }
 
-pub async fn get_history(State(state): State<AppState>, Path(symbol): Path<String>) -> Json<Value> {
+pub async fn data_quality(State(state): State<AppState>) -> Json<Value> {
+    let latest_prices = match load_latest_prices(&state.db).await {
+        Ok(prices) => prices,
+        Err(err) => {
+            tracing::warn!(error = %err, "failed to load latest prices for data quality");
+            Vec::new()
+        }
+    };
+
+    let tick_stats = if let Some(clickhouse) = &state.clickhouse {
+        match clickhouse.tick_stats().await {
+            Ok(rows) => rows,
+            Err(err) => {
+                tracing::warn!(error = %err, "failed to load ClickHouse tick stats for data quality");
+                Vec::new()
+            }
+        }
+    } else {
+        Vec::new()
+    };
+
+    let stats_by_symbol: std::collections::HashMap<String, Value> = tick_stats
+        .into_iter()
+        .filter_map(|row| {
+            let symbol = row.get("symbol").and_then(|v| v.as_str())?.to_string();
+            Some((symbol, row))
+        })
+        .collect();
+    let now = chrono::Utc::now().timestamp();
+    let items: Vec<Value> = latest_prices
+        .into_iter()
+        .map(|price| {
+            let stats = stats_by_symbol.get(&price.symbol);
+            let last_tick_time = stats
+                .and_then(|row| row.get("last_tick_time"))
+                .and_then(|v| v.as_i64());
+            let latest_received_at = price
+                .received_at
+                .as_deref()
+                .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+                .map(|dt| dt.timestamp());
+            let last_seen = last_tick_time.or(latest_received_at);
+            let age_sec = last_seen.map(|ts| (now - ts).max(0));
+            let ticks_5m = stats
+                .and_then(|row| row.get("ticks_5m"))
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let unique_prices_1h = stats
+                .and_then(|row| row.get("unique_prices_1h"))
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let status = if age_sec.is_none() {
+                "unknown"
+            } else if age_sec.is_some_and(|age| age > 15 * 60) {
+                "stale"
+            } else if ticks_5m == 0 {
+                "quiet"
+            } else if unique_prices_1h <= 1 && !price.asset_type.eq_ignore_ascii_case("crypto") {
+                "flat"
+            } else {
+                "ok"
+            };
+
+            json!({
+                "symbol": price.symbol,
+                "asset_type": price.asset_type,
+                "latest_price": price.price,
+                "source": price.source,
+                "received_at": price.received_at,
+                "age_sec": age_sec,
+                "ticks_5m": ticks_5m,
+                "ticks_1h": stats.and_then(|row| row.get("ticks_1h")).and_then(|v| v.as_u64()).unwrap_or(0),
+                "unique_prices_1h": unique_prices_1h,
+                "status": status,
+            })
+        })
+        .collect();
+
+    Json(json!({
+        "items": items,
+        "total": items.len(),
+        "generated_at": chrono::Utc::now().to_rfc3339(),
+    }))
+}
+
+#[derive(Deserialize)]
+pub struct HistoryQuery {
+    pub resolution: Option<String>,
+}
+
+fn normalize_history_resolution(resolution: Option<&str>) -> &'static str {
+    match resolution.unwrap_or("1m") {
+        "5m" => "5m",
+        "15m" => "15m",
+        "1h" => "1h",
+        _ => "1m",
+    }
+}
+
+pub async fn get_history(
+    State(state): State<AppState>,
+    Path(symbol): Path<String>,
+    Query(query): Query<HistoryQuery>,
+) -> Json<Value> {
     let sym = symbol.to_uppercase();
+    let resolution = normalize_history_resolution(query.resolution.as_deref());
 
     if let Some(clickhouse) = &state.clickhouse {
-        match clickhouse.latest_history(&sym, 120).await {
+        match clickhouse.latest_history(&sym, resolution, 120).await {
             Ok(history) if history_is_usable(&history, chrono::Utc::now()) => {
                 return Json(json!(history));
             }
@@ -502,5 +607,15 @@ mod tests {
         assert!(!history_is_usable(&flat, now));
         assert!(history_is_usable(&moving, now));
         assert!(!history_is_usable(&stale, now));
+    }
+
+    #[test]
+    fn normalizes_history_resolution() {
+        assert_eq!(normalize_history_resolution(None), "1m");
+        assert_eq!(normalize_history_resolution(Some("1m")), "1m");
+        assert_eq!(normalize_history_resolution(Some("5m")), "5m");
+        assert_eq!(normalize_history_resolution(Some("15m")), "15m");
+        assert_eq!(normalize_history_resolution(Some("1h")), "1h");
+        assert_eq!(normalize_history_resolution(Some("1d")), "1m");
     }
 }

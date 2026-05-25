@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use tracing::{debug, error, info, warn};
 
-use crate::clickhouse::{ClickHouseClient, OhlcvCandle};
+use crate::clickhouse::{ClickHouseClient, OhlcvCandle, PriceTick};
 use crate::ws;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -236,6 +236,24 @@ async fn subscribe_loop(
                 received_at: tick_time,
             },
         );
+
+        if let Some(clickhouse) = clickhouse.cloned() {
+            let tick = PriceTick {
+                symbol: symbol.clone(),
+                asset_type: asset_type.clone(),
+                source: "market_data".to_string(),
+                time: tick_time,
+                price,
+                bid,
+                ask,
+                volume,
+            };
+            tokio::spawn(async move {
+                if let Err(e) = clickhouse.insert_tick(&tick).await {
+                    error!(error = %e, symbol = %tick.symbol, "failed to save tick to ClickHouse");
+                }
+            });
+        }
 
         if should_skip_candle_for_weekend(&asset_type, tick_time) {
             debug!(symbol = %symbol, asset_type = %asset_type, "skipping weekend candle update");

@@ -54,6 +54,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/market/history/{symbol}",
             get(handlers::market::get_history),
         )
+        .route(
+            "/api/v1/market/data-quality",
+            get(handlers::market::data_quality),
+        )
         .route("/api/v1/forex/news", get(handlers::forex::list_forex_news))
         .route(
             "/api/v1/forex/sources/status",
