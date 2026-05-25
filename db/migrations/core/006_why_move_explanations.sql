@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS market.why_move_explanations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     symbol TEXT NOT NULL,
-    window TEXT NOT NULL,
+    time_window TEXT NOT NULL,
     evidence_hash TEXT NOT NULL UNIQUE,
     move_latest_at TIMESTAMPTZ,
     move_pct DOUBLE PRECISION,
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS market.why_move_explanations (
 );
 
 CREATE INDEX IF NOT EXISTS idx_why_move_explanations_symbol_window
-ON market.why_move_explanations(symbol, window, created_at DESC);
+ON market.why_move_explanations(symbol, time_window, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_why_move_explanations_expires_at
 ON market.why_move_explanations(expires_at);

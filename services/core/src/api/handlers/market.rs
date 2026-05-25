@@ -822,7 +822,7 @@ async fn store_why_cache(db: &sqlx::PgPool, entry: WhyCacheWrite<'_>) {
 
     if let Err(err) = sqlx::query(
         "INSERT INTO market.why_move_explanations \
-         (symbol, window, evidence_hash, move_latest_at, move_pct, engine_version, provider, model, status, response, evidence, expires_at) \
+         (symbol, time_window, evidence_hash, move_latest_at, move_pct, engine_version, provider, model, status, response, evidence, expires_at) \
          VALUES ($1, $2, $3, $4, $5, 'why-engine-v1', $6, $7, $8, $9, $10, $11) \
          ON CONFLICT (evidence_hash) DO UPDATE SET response = EXCLUDED.response, evidence = EXCLUDED.evidence, status = EXCLUDED.status, expires_at = EXCLUDED.expires_at",
     )
