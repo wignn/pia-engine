@@ -472,6 +472,28 @@ struct NewsCause {
     searchable: String,
 }
 
+type ForexCauseRow = (
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<chrono::DateTime<chrono::Utc>>,
+    Option<chrono::DateTime<chrono::Utc>>,
+    Option<String>,
+    Option<String>,
+    String,
+);
+
+type StockCauseRow = (
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<chrono::DateTime<chrono::Utc>>,
+);
+
 fn normalize_market_symbol(symbol: &str) -> String {
     symbol
         .trim()
@@ -618,17 +640,7 @@ async fn load_news_causes(
     since: chrono::DateTime<chrono::Utc>,
     until: chrono::DateTime<chrono::Utc>,
 ) -> Result<Vec<NewsCause>, sqlx::Error> {
-    let forex_rows: Vec<(
-        String,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<chrono::DateTime<chrono::Utc>>,
-        Option<chrono::DateTime<chrono::Utc>>,
-        Option<String>,
-        Option<String>,
-        String,
-    )> = sqlx::query_as(
+    let forex_rows: Vec<ForexCauseRow> = sqlx::query_as(
         "SELECT a.original_title, a.summary, COALESCE(s.name, 'Unknown') AS source_name, a.original_url, \
          a.published_at, a.processed_at, an.sentiment, an.impact_level, COALESCE(an.currency_pairs, '') \
          FROM news.forex_news_articles a \
@@ -643,15 +655,7 @@ async fn load_news_causes(
     .fetch_all(db)
     .await?;
 
-    let stock_rows: Vec<(
-        String,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<chrono::DateTime<chrono::Utc>>,
-    )> = sqlx::query_as(
+    let stock_rows: Vec<StockCauseRow> = sqlx::query_as(
         "SELECT title, summary, source_name, tickers, sentiment, impact_level, processed_at \
          FROM news.stock_news \
          WHERE is_processed = TRUE AND COALESCE(processed_at, created_at) BETWEEN $1 AND $2 \
