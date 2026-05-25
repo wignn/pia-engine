@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use serde_json::Value;
 
 #[derive(Clone, Debug)]
@@ -31,6 +32,18 @@ pub struct PriceTick {
     pub bid: Option<f64>,
     pub ask: Option<f64>,
     pub volume: f64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct LatestPriceTick {
+    pub symbol: String,
+    pub price: f64,
+    pub bid: Option<f64>,
+    pub ask: Option<f64>,
+    pub volume: f64,
+    pub source: String,
+    pub asset_type: String,
+    pub received_at: String,
 }
 
 struct RollupSpec {
@@ -237,6 +250,37 @@ impl ClickHouseClient {
         Ok(rows)
     }
 
+    pub async fn latest_prices(&self) -> anyhow::Result<Vec<LatestPriceTick>> {
+        let sql = format!(
+            "SELECT symbol, \
+             argMax(price, time) AS price, \
+             argMax(bid, time) AS bid, \
+             argMax(ask, time) AS ask, \
+             argMax(volume, time) AS volume, \
+             argMax(source, time) AS source, \
+             argMax(asset_type, time) AS asset_type, \
+             formatDateTime(max(time), '%Y-%m-%dT%H:%i:%SZ') AS received_at \
+             FROM {}.price_ticks \
+             GROUP BY symbol \
+             ORDER BY symbol \
+             FORMAT JSONEachRow",
+            ident(&self.database)
+        );
+        let text = self.query(&sql).await?;
+        Ok(text
+            .lines()
+            .filter_map(|line| serde_json::from_str::<LatestPriceTick>(line).ok())
+            .collect())
+    }
+
+    pub async fn latest_price(&self, symbol: &str) -> anyhow::Result<Option<LatestPriceTick>> {
+        Ok(self
+            .latest_prices()
+            .await?
+            .into_iter()
+            .find(|price| price.symbol.eq_ignore_ascii_case(symbol)))
+    }
+
     pub async fn tick_stats(&self) -> anyhow::Result<Vec<Value>> {
         let sql = format!(
             "SELECT symbol, asset_type, source, \
@@ -317,5 +361,17 @@ mod tests {
         assert_eq!(rollup_table("15m"), Some("ohlcv_candles_15m"));
         assert_eq!(rollup_table("1h"), Some("ohlcv_candles_1h"));
         assert_eq!(rollup_table("1d"), None);
+    }
+
+    #[test]
+    fn parses_latest_price_tick_row() {
+        let row: LatestPriceTick = serde_json::from_str(
+            r#"{"symbol":"XAUUSD","price":4500.5,"bid":4500.1,"ask":4500.9,"volume":0,"source":"market_data","asset_type":"forex","received_at":"2026-05-24T12:00:00Z"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(row.symbol, "XAUUSD");
+        assert_eq!(row.price, 4500.5);
+        assert_eq!(row.asset_type, "forex");
     }
 }

@@ -7,6 +7,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::api::state::AppState;
+use crate::clickhouse::LatestPriceTick;
 use crate::ingestion_subscriber::{self, CachedPrice};
 
 static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
@@ -54,6 +55,46 @@ fn price_json(p: &CachedPrice) -> Value {
         "asset_type": p.asset_type,
         "received_at": p.received_at,
     })
+}
+
+fn cached_price_from_clickhouse(row: LatestPriceTick) -> CachedPrice {
+    CachedPrice {
+        symbol: row.symbol,
+        price: row.price,
+        bid: row.bid,
+        ask: row.ask,
+        volume: Some(row.volume),
+        source: row.source,
+        asset_type: row.asset_type,
+        received_at: Some(row.received_at),
+        updated_at: None,
+    }
+}
+
+async fn load_clickhouse_latest_prices(state: &AppState) -> Vec<CachedPrice> {
+    let Some(clickhouse) = &state.clickhouse else {
+        return Vec::new();
+    };
+
+    match clickhouse.latest_prices().await {
+        Ok(rows) => rows.into_iter().map(cached_price_from_clickhouse).collect(),
+        Err(err) => {
+            tracing::warn!(error = %err, "failed to load latest market prices from ClickHouse");
+            Vec::new()
+        }
+    }
+}
+
+async fn load_clickhouse_latest_price(state: &AppState, symbol: &str) -> Option<CachedPrice> {
+    let clickhouse = state.clickhouse.as_ref()?;
+    match clickhouse.latest_price(symbol).await {
+        Ok(Some(row)) => Some(cached_price_from_clickhouse(row)),
+        Ok(None) => None,
+        Err(err) => {
+            tracing::warn!(error = %err, symbol = %symbol, "failed to load latest market price from ClickHouse");
+            None
+        }
+    }
 }
 
 async fn load_latest_prices(pool: &sqlx::PgPool) -> Result<Vec<CachedPrice>, sqlx::Error> {
@@ -272,6 +313,14 @@ pub async fn list_prices(State(state): State<AppState>) -> Json<Value> {
         }
     }
 
+    if prices.is_empty() {
+        let clickhouse_prices = load_clickhouse_latest_prices(&state).await;
+        for price in &clickhouse_prices {
+            ingestion_subscriber::set_price(price.clone());
+        }
+        prices = clickhouse_prices;
+    }
+
     let items: Vec<Value> = prices.iter().map(price_json).collect();
 
     Json(json!({
@@ -291,14 +340,26 @@ pub async fn get_price(State(state): State<AppState>, Path(symbol): Path<String>
             ingestion_subscriber::set_price(p.clone());
             Json(price_json(&p))
         }
-        Ok(None) => Json(json!({
-            "error": format!("Symbol '{}' not found in price cache or latest price store. Available symbols can be retrieved from GET /api/v1/market/prices", sym),
-        })),
+        Ok(None) => {
+            if let Some(p) = load_clickhouse_latest_price(&state, &sym).await {
+                ingestion_subscriber::set_price(p.clone());
+                Json(price_json(&p))
+            } else {
+                Json(json!({
+                    "error": format!("Symbol '{}' not found in price cache or latest price store. Available symbols can be retrieved from GET /api/v1/market/prices", sym),
+                }))
+            }
+        }
         Err(err) => {
             tracing::warn!(error = %err, symbol = %sym, "failed to load latest market price from database");
-            Json(json!({
-                "error": format!("Symbol '{}' not found in price cache. Available symbols can be retrieved from GET /api/v1/market/prices", sym),
-            }))
+            if let Some(p) = load_clickhouse_latest_price(&state, &sym).await {
+                ingestion_subscriber::set_price(p.clone());
+                Json(price_json(&p))
+            } else {
+                Json(json!({
+                    "error": format!("Symbol '{}' not found in price cache. Available symbols can be retrieved from GET /api/v1/market/prices", sym),
+                }))
+            }
         }
     }
 }
