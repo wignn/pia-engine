@@ -5,6 +5,7 @@ use axum::{
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 use crate::api::state::AppState;
 use crate::clickhouse::{LatestPriceTick, SpikeCandidate};
@@ -457,6 +458,7 @@ pub async fn volatility_spikes(
 pub struct WhyQuery {
     pub window: Option<String>,
     pub lookback_minutes: Option<u32>,
+    pub refresh: Option<bool>,
 }
 
 struct NewsCause {
@@ -555,6 +557,47 @@ fn matched_terms(searchable: &str, terms: &[String]) -> Vec<String> {
         .filter(|term| haystack.contains(term.as_str()))
         .cloned()
         .collect()
+}
+
+fn symbol_driver_terms(symbol: &str) -> Vec<&'static str> {
+    match normalize_market_symbol(symbol).as_str() {
+        "XAUUSD" => vec![
+            "USD",
+            "real yields",
+            "Fed policy",
+            "inflation",
+            "safe haven",
+        ],
+        "DXY" => vec!["USD", "Fed policy", "Treasury yields", "inflation"],
+        "SPX" => vec!["risk sentiment", "earnings", "Fed policy", "inflation"],
+        "BTCUSDT" | "ETHUSDT" => vec![
+            "crypto risk appetite",
+            "USD liquidity",
+            "ETF flow",
+            "macro risk",
+        ],
+        _ => vec!["symbol news", "sentiment", "macro risk", "USD liquidity"],
+    }
+}
+
+fn cross_asset_relationship(symbol: &str, other_symbol: &str, other_move_pct: f64) -> &'static str {
+    let symbol = normalize_market_symbol(symbol);
+    let other = normalize_market_symbol(other_symbol);
+    match (
+        symbol.as_str(),
+        other.as_str(),
+        other_move_pct.is_sign_positive(),
+    ) {
+        ("XAUUSD", "DXY", false) => "DXY weakness supports gold strength",
+        ("XAUUSD", "DXY", true) => "DXY strength conflicts with gold strength",
+        ("DXY", "XAUUSD", false) => "Gold weakness can align with USD strength",
+        ("DXY", "XAUUSD", true) => "Gold strength may signal USD pressure",
+        (_, "SPX", false) => "Equity weakness suggests risk-off pressure",
+        (_, "SPX", true) => "Equity strength suggests risk-on tone",
+        (_, "BTCUSDT", true) | (_, "ETHUSDT", true) => "Crypto strength suggests risk appetite",
+        (_, "BTCUSDT", false) | (_, "ETHUSDT", false) => "Crypto weakness suggests risk caution",
+        _ => "Same-window market movement",
+    }
 }
 
 fn sentiment_aligns(sentiment: Option<&str>, direction: &str) -> bool {
@@ -707,6 +750,118 @@ async fn load_news_causes(
     Ok(causes)
 }
 
+fn evidence_hash(evidence: &Value) -> String {
+    let serialized = serde_json::to_string(evidence).unwrap_or_default();
+    let mut hasher = Sha256::new();
+    hasher.update(serialized.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+fn with_cache_metadata(mut response: Value, cache_status: &str, engine_status: &str) -> Value {
+    if let Some(obj) = response.as_object_mut() {
+        obj.insert("cache".to_string(), json!({ "status": cache_status }));
+        obj.insert(
+            "engine".to_string(),
+            json!({ "status": engine_status, "version": "why-engine-v1" }),
+        );
+        obj.insert(
+            "generated_at".to_string(),
+            json!(chrono::Utc::now().to_rfc3339()),
+        );
+    }
+    response
+}
+
+async fn load_why_cache(db: &sqlx::PgPool, evidence_hash: &str) -> Option<Value> {
+    let row: Result<Option<(Value,)>, sqlx::Error> = sqlx::query_as(
+        "SELECT response FROM market.why_move_explanations WHERE evidence_hash = $1 AND expires_at > NOW()",
+    )
+    .bind(evidence_hash)
+    .fetch_optional(db)
+    .await;
+
+    match row {
+        Ok(Some((response,))) => Some(response),
+        Ok(None) => None,
+        Err(err) => {
+            tracing::warn!(error = %err, "failed to load why-move cache");
+            None
+        }
+    }
+}
+
+struct WhyCacheWrite<'a> {
+    symbol: &'a str,
+    window: &'a str,
+    evidence_hash: &'a str,
+    move_latest_at: Option<chrono::DateTime<chrono::Utc>>,
+    move_pct: Option<f64>,
+    response: &'a Value,
+    evidence: &'a Value,
+}
+
+async fn store_why_cache(db: &sqlx::PgPool, entry: WhyCacheWrite<'_>) {
+    let provider = entry
+        .response
+        .get("llm")
+        .and_then(|llm| llm.get("provider"))
+        .and_then(Value::as_str)
+        .unwrap_or("deterministic");
+    let model = entry
+        .response
+        .get("llm")
+        .and_then(|llm| llm.get("model"))
+        .and_then(Value::as_str);
+    let status = entry
+        .response
+        .get("llm")
+        .and_then(|llm| llm.get("status"))
+        .and_then(Value::as_str)
+        .unwrap_or("generated");
+    let expires_at = chrono::Utc::now() + chrono::Duration::minutes(30);
+
+    if let Err(err) = sqlx::query(
+        "INSERT INTO market.why_move_explanations \
+         (symbol, window, evidence_hash, move_latest_at, move_pct, engine_version, provider, model, status, response, evidence, expires_at) \
+         VALUES ($1, $2, $3, $4, $5, 'why-engine-v1', $6, $7, $8, $9, $10, $11) \
+         ON CONFLICT (evidence_hash) DO UPDATE SET response = EXCLUDED.response, evidence = EXCLUDED.evidence, status = EXCLUDED.status, expires_at = EXCLUDED.expires_at",
+    )
+    .bind(entry.symbol)
+    .bind(entry.window)
+    .bind(entry.evidence_hash)
+    .bind(entry.move_latest_at)
+    .bind(entry.move_pct)
+    .bind(provider)
+    .bind(model)
+    .bind(status)
+    .bind(entry.response)
+    .bind(entry.evidence)
+    .bind(expires_at)
+    .execute(db)
+    .await
+    {
+        tracing::warn!(error = %err, symbol = %entry.symbol, "failed to store why-move cache");
+    }
+}
+
+async fn call_why_analyzer(evidence: &Value) -> anyhow::Result<Value> {
+    let base =
+        std::env::var("AI_SERVICE_URL").unwrap_or_else(|_| "http://localhost:5000".to_string());
+    let url = format!("{}/why-did-it-move", base.trim_end_matches('/'));
+    let res = HTTP_CLIENT
+        .post(url)
+        .json(evidence)
+        .timeout(std::time::Duration::from_secs(15))
+        .send()
+        .await?;
+    let status = res.status();
+    let text = res.text().await?;
+    if !status.is_success() {
+        anyhow::bail!("why analyzer HTTP error {status}: {text}");
+    }
+    Ok(serde_json::from_str(&text)?)
+}
+
 pub async fn why_did_it_move(
     State(state): State<AppState>,
     Path(symbol): Path<String>,
@@ -722,19 +877,20 @@ pub async fn why_did_it_move(
     let lookback_minutes = query.lookback_minutes.unwrap_or(180).clamp(30, 1440);
     let terms = symbol_terms(&symbol);
 
-    let candidate = if let Some(clickhouse) = &state.clickhouse {
+    let spike_rows = if let Some(clickhouse) = &state.clickhouse {
         match clickhouse.spike_candidates(window_minutes).await {
-            Ok(rows) => rows
-                .into_iter()
-                .find(|candidate| candidate.symbol.eq_ignore_ascii_case(&symbol)),
+            Ok(rows) => rows,
             Err(err) => {
                 tracing::warn!(error = %err, symbol = %symbol, "failed to load why-did-it-move spike context");
-                None
+                Vec::new()
             }
         }
     } else {
-        None
+        Vec::new()
     };
+    let candidate = spike_rows
+        .iter()
+        .find(|candidate| candidate.symbol.eq_ignore_ascii_case(&symbol));
 
     let latest_at = candidate
         .as_ref()
@@ -780,6 +936,24 @@ pub async fn why_did_it_move(
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
         .collect();
+    let cross_assets: Vec<Value> = spike_rows
+        .iter()
+        .filter(|row| !row.symbol.eq_ignore_ascii_case(&symbol))
+        .take(8)
+        .map(|row| {
+            json!({
+                "symbol": row.symbol,
+                "asset_type": row.asset_type,
+                "move_pct": row.move_pct,
+                "direction": if row.move_pct >= 0.0 { "up" } else { "down" },
+                "latest_price": row.latest_price,
+                "tick_count": row.tick_count,
+                "latest_at": row.latest_at,
+                "relationship": cross_asset_relationship(&symbol, &row.symbol, row.move_pct),
+            })
+        })
+        .collect();
+    let drivers = symbol_driver_terms(&symbol);
     let causes: Vec<Value> = scored
         .into_iter()
         .map(|(score, matches, cause)| {
@@ -800,10 +974,9 @@ pub async fn why_did_it_move(
         })
         .collect();
 
-    let threshold = candidate
-        .as_ref()
-        .map(|candidate| spike_threshold(&candidate.symbol, &candidate.asset_type));
-    let move_json = candidate.as_ref().map(|candidate| {
+    let threshold =
+        candidate.map(|candidate| spike_threshold(&candidate.symbol, &candidate.asset_type));
+    let move_json = candidate.map(|candidate| {
         json!({
             "latest_price": candidate.latest_price,
             "baseline_price": candidate.baseline_price,
@@ -816,21 +989,74 @@ pub async fn why_did_it_move(
             "is_active_spike": threshold.is_some_and(|value| candidate.move_pct.abs() >= value),
         })
     });
-
-    Json(json!({
+    let summary = why_summary(&symbol, candidate, causes.len(), confidence);
+    let evidence = json!({
         "symbol": symbol,
         "window": window,
         "lookback_minutes": lookback_minutes,
         "move": move_json,
-        "summary": why_summary(&symbol, candidate.as_ref(), causes.len(), confidence),
+        "summary": summary,
         "confidence": confidence,
         "matched_terms": matched,
+        "drivers": drivers,
+        "cross_assets": cross_assets,
         "causes": {
             "news": causes,
             "calendar": [],
         },
-        "generated_at": chrono::Utc::now().to_rfc3339(),
-    }))
+    });
+    let evidence_hash = evidence_hash(&evidence);
+    if !query.refresh.unwrap_or(false) {
+        if let Some(cached) = load_why_cache(&state.db, &evidence_hash).await {
+            return Json(with_cache_metadata(cached, "hit", "cache"));
+        }
+    }
+
+    match call_why_analyzer(&evidence).await {
+        Ok(response) => {
+            let response = with_cache_metadata(response, "miss", "analyzer");
+            store_why_cache(
+                &state.db,
+                WhyCacheWrite {
+                    symbol: &symbol,
+                    window: &window,
+                    evidence_hash: &evidence_hash,
+                    move_latest_at: candidate
+                        .and_then(|candidate| {
+                            chrono::DateTime::parse_from_rfc3339(&candidate.latest_at).ok()
+                        })
+                        .map(|dt| dt.with_timezone(&chrono::Utc)),
+                    move_pct: candidate.map(|candidate| candidate.move_pct),
+                    response: &response,
+                    evidence: &evidence,
+                },
+            )
+            .await;
+            Json(response)
+        }
+        Err(err) => {
+            tracing::warn!(error = %err, symbol = %symbol, "why analyzer unavailable, using fallback response");
+            Json(json!({
+                "symbol": evidence["symbol"].clone(),
+                "window": evidence["window"].clone(),
+                "lookback_minutes": lookback_minutes,
+                "move": evidence["move"].clone(),
+                "summary": summary,
+                "headline": format!("{} move context", symbol),
+                "explanation": summary,
+                "confidence": { "label": confidence, "score": top_score, "breakdown": {} },
+                "matched_terms": evidence["matched_terms"].clone(),
+                "drivers": evidence["drivers"].clone(),
+                "cross_assets": evidence["cross_assets"].clone(),
+                "causes": evidence["causes"].clone(),
+                "llm": { "provider": "gemini", "model": null, "status": "fallback", "narrative": null },
+                "engine": { "status": "fallback", "version": "rust-fallback-v1" },
+                "cache": { "status": "bypass", "evidence_hash": evidence_hash },
+                "evidence": evidence,
+                "generated_at": chrono::Utc::now().to_rfc3339(),
+            }))
+        }
+    }
 }
 
 pub async fn data_quality(State(state): State<AppState>) -> Json<Value> {

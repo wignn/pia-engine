@@ -7,8 +7,9 @@ from analyzer import AdvancedSentimentAnalyzer
 from event_extractor import extract_event
 from language import detect_language
 from rule_engine import interpret_market
-from schemas import AnalysisRequest, AnalysisResponse
+from schemas import AnalysisRequest, AnalysisResponse, WhyMoveRequest, WhyMoveResponse
 from translator import build_translation_payload, maybe_trim_translated_text, translate_to_english
+from why_engine import explain_why
 
 
 logging.basicConfig(
@@ -43,6 +44,11 @@ def health():
         "status": "ready" if analyzer.pipeline is not None else "initializing",
         "model": analyzer.model_name,
     }
+
+
+@app.post("/why-did-it-move", response_model=WhyMoveResponse)
+async def why_did_it_move(request: WhyMoveRequest):
+    return await explain_why(request)
 
 
 @app.post("/analyze", response_model=AnalysisResponse)
