@@ -7,7 +7,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::api::state::AppState;
-use crate::clickhouse::LatestPriceTick;
+use crate::clickhouse::{LatestPriceTick, SpikeCandidate};
 use crate::ingestion_subscriber::{self, CachedPrice};
 
 static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
@@ -364,6 +364,471 @@ pub async fn get_price(State(state): State<AppState>, Path(symbol): Path<String>
     }
 }
 
+#[derive(Deserialize)]
+pub struct SpikesQuery {
+    pub window: Option<String>,
+}
+
+fn spike_window_minutes(window: Option<&str>) -> u32 {
+    match window.unwrap_or("5m") {
+        "15m" => 15,
+        "30m" => 30,
+        "1h" => 60,
+        _ => 5,
+    }
+}
+
+fn spike_threshold(symbol: &str, asset_type: &str) -> f64 {
+    let symbol = symbol.to_uppercase();
+    if symbol == "DXY" {
+        0.12
+    } else if symbol == "XAUUSD" {
+        0.25
+    } else if symbol == "SPX" || asset_type.eq_ignore_ascii_case("index") {
+        0.30
+    } else if symbol.ends_with("USDT") || asset_type.eq_ignore_ascii_case("crypto") {
+        0.80
+    } else if asset_type.eq_ignore_ascii_case("forex") || symbol.len() == 6 {
+        0.15
+    } else {
+        0.50
+    }
+}
+
+fn spike_severity(move_pct: f64, threshold: f64) -> &'static str {
+    if move_pct.abs() >= threshold * 2.0 {
+        "high"
+    } else {
+        "medium"
+    }
+}
+
+fn spike_json(candidate: SpikeCandidate, window: &str) -> Option<Value> {
+    let threshold = spike_threshold(&candidate.symbol, &candidate.asset_type);
+    if candidate.move_pct.abs() < threshold {
+        return None;
+    }
+
+    Some(json!({
+        "symbol": candidate.symbol,
+        "asset_type": candidate.asset_type,
+        "window": window,
+        "latest_price": candidate.latest_price,
+        "baseline_price": candidate.baseline_price,
+        "move_pct": candidate.move_pct,
+        "direction": if candidate.move_pct >= 0.0 { "up" } else { "down" },
+        "severity": spike_severity(candidate.move_pct, threshold),
+        "threshold_pct": threshold,
+        "tick_count": candidate.tick_count,
+        "latest_at": candidate.latest_at,
+    }))
+}
+
+pub async fn volatility_spikes(
+    State(state): State<AppState>,
+    Query(query): Query<SpikesQuery>,
+) -> Json<Value> {
+    let window_minutes = spike_window_minutes(query.window.as_deref());
+    let window = format!("{window_minutes}m");
+    let items: Vec<Value> = if let Some(clickhouse) = &state.clickhouse {
+        match clickhouse.spike_candidates(window_minutes).await {
+            Ok(rows) => rows
+                .into_iter()
+                .filter_map(|candidate| spike_json(candidate, &window))
+                .collect(),
+            Err(err) => {
+                tracing::warn!(error = %err, window = %window, "failed to load volatility spike candidates");
+                Vec::new()
+            }
+        }
+    } else {
+        Vec::new()
+    };
+
+    Json(json!({
+        "items": items,
+        "total": items.len(),
+        "window": window,
+        "generated_at": chrono::Utc::now().to_rfc3339(),
+    }))
+}
+
+#[derive(Deserialize)]
+pub struct WhyQuery {
+    pub window: Option<String>,
+    pub lookback_minutes: Option<u32>,
+}
+
+struct NewsCause {
+    kind: &'static str,
+    title: String,
+    summary: Option<String>,
+    source_name: Option<String>,
+    url: Option<String>,
+    published_at: Option<chrono::DateTime<chrono::Utc>>,
+    processed_at: Option<chrono::DateTime<chrono::Utc>>,
+    sentiment: Option<String>,
+    impact_level: Option<String>,
+    searchable: String,
+}
+
+fn normalize_market_symbol(symbol: &str) -> String {
+    symbol
+        .trim()
+        .to_uppercase()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect()
+}
+
+fn symbol_terms(symbol: &str) -> Vec<String> {
+    let symbol = normalize_market_symbol(symbol);
+    let mut terms = vec![symbol.clone()];
+
+    match symbol.as_str() {
+        "XAUUSD" => terms.extend(
+            ["XAU", "GOLD", "EMAS", "USD", "FED", "INFLATION", "YIELD"].map(str::to_string),
+        ),
+        "DXY" => terms
+            .extend(["DOLLAR", "USD", "GREENBACK", "FED", "TREASURY", "YIELD"].map(str::to_string)),
+        "SPX" => terms.extend(
+            [
+                "SPX",
+                "S&P 500",
+                "S&P500",
+                "US500",
+                "STOCK",
+                "EQUITY",
+                "FED",
+                "INFLATION",
+            ]
+            .map(str::to_string),
+        ),
+        "BTCUSDT" => {
+            terms.extend(["BTC", "BITCOIN", "CRYPTO", "KRIPTO", "USDT"].map(str::to_string))
+        }
+        "ETHUSDT" => {
+            terms.extend(["ETH", "ETHEREUM", "CRYPTO", "KRIPTO", "USDT"].map(str::to_string))
+        }
+        _ => {
+            if symbol.ends_with("USDT") {
+                terms.extend(["CRYPTO", "KRIPTO", "USDT"].map(str::to_string));
+                terms.push(symbol.trim_end_matches("USDT").to_string());
+            } else if symbol.len() == 6 {
+                terms.push(symbol[0..3].to_string());
+                terms.push(symbol[3..6].to_string());
+            }
+        }
+    }
+
+    terms.sort();
+    terms.dedup();
+    terms
+}
+
+fn matched_terms(searchable: &str, terms: &[String]) -> Vec<String> {
+    let haystack = searchable.to_uppercase();
+    terms
+        .iter()
+        .filter(|term| haystack.contains(term.as_str()))
+        .cloned()
+        .collect()
+}
+
+fn sentiment_aligns(sentiment: Option<&str>, direction: &str) -> bool {
+    matches!(
+        (sentiment.map(str::to_lowercase).as_deref(), direction),
+        (Some("positive" | "bullish"), "up") | (Some("negative" | "bearish"), "down")
+    )
+}
+
+fn score_cause(
+    cause: &NewsCause,
+    terms: &[String],
+    direction: &str,
+    latest_at: chrono::DateTime<chrono::Utc>,
+) -> (f64, Vec<String>) {
+    let matches = matched_terms(&cause.searchable, terms);
+    if matches.is_empty() {
+        return (0.0, matches);
+    }
+
+    let mut score = 10.0 + matches.len() as f64 * 6.0;
+    if matches.iter().any(|term| term.len() >= 6) {
+        score += 12.0;
+    }
+    if cause
+        .impact_level
+        .as_deref()
+        .is_some_and(|impact| impact.eq_ignore_ascii_case("high"))
+    {
+        score += 10.0;
+    }
+    if sentiment_aligns(cause.sentiment.as_deref(), direction) {
+        score += 8.0;
+    }
+
+    let event_at = cause
+        .processed_at
+        .or(cause.published_at)
+        .unwrap_or(latest_at);
+    let minutes = (latest_at - event_at).num_minutes().unsigned_abs();
+    if minutes <= 30 {
+        score += 10.0;
+    } else if minutes <= 120 {
+        score += 5.0;
+    }
+
+    (score, matches)
+}
+
+fn confidence_for(top_score: f64, cause_count: usize) -> &'static str {
+    if top_score >= 45.0 && cause_count >= 2 {
+        "high"
+    } else if top_score >= 25.0 {
+        "medium"
+    } else {
+        "low"
+    }
+}
+
+fn why_summary(
+    symbol: &str,
+    candidate: Option<&SpikeCandidate>,
+    cause_count: usize,
+    confidence: &str,
+) -> String {
+    match candidate {
+        Some(candidate) if cause_count > 0 => format!(
+            "{symbol} moved {} {:.2}% over the selected window with {cause_count} relevant news catalyst(s) nearby. Confidence is {confidence}.",
+            if candidate.move_pct >= 0.0 { "up" } else { "down" },
+            candidate.move_pct.abs()
+        ),
+        Some(candidate) => format!(
+            "{symbol} moved {} {:.2}% over the selected window, but no matching news catalyst was found in the lookback window.",
+            if candidate.move_pct >= 0.0 { "up" } else { "down" },
+            candidate.move_pct.abs()
+        ),
+        None => format!("No recent market move context is available for {symbol}."),
+    }
+}
+
+async fn load_news_causes(
+    db: &sqlx::PgPool,
+    since: chrono::DateTime<chrono::Utc>,
+    until: chrono::DateTime<chrono::Utc>,
+) -> Result<Vec<NewsCause>, sqlx::Error> {
+    let forex_rows: Vec<(
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<chrono::DateTime<chrono::Utc>>,
+        Option<chrono::DateTime<chrono::Utc>>,
+        Option<String>,
+        Option<String>,
+        String,
+    )> = sqlx::query_as(
+        "SELECT a.original_title, a.summary, COALESCE(s.name, 'Unknown') AS source_name, a.original_url, \
+         a.published_at, a.processed_at, an.sentiment, an.impact_level, COALESCE(an.currency_pairs, '') \
+         FROM news.forex_news_articles a \
+         LEFT JOIN news.forex_news_sources s ON a.source_id = s.id \
+         LEFT JOIN news.forex_news_analyses an ON a.id = an.article_id \
+         WHERE a.is_processed = TRUE AND COALESCE(a.processed_at, a.published_at, a.created_at) BETWEEN $1 AND $2 \
+         ORDER BY COALESCE(a.processed_at, a.published_at, a.created_at) DESC \
+         LIMIT 100",
+    )
+    .bind(since)
+    .bind(until)
+    .fetch_all(db)
+    .await?;
+
+    let stock_rows: Vec<(
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<chrono::DateTime<chrono::Utc>>,
+    )> = sqlx::query_as(
+        "SELECT title, summary, source_name, tickers, sentiment, impact_level, processed_at \
+         FROM news.stock_news \
+         WHERE is_processed = TRUE AND COALESCE(processed_at, created_at) BETWEEN $1 AND $2 \
+         ORDER BY COALESCE(processed_at, created_at) DESC \
+         LIMIT 100",
+    )
+    .bind(since)
+    .bind(until)
+    .fetch_all(db)
+    .await?;
+
+    let mut causes = Vec::with_capacity(forex_rows.len() + stock_rows.len());
+    for row in forex_rows {
+        let searchable = format!("{} {} {}", row.0, row.1.clone().unwrap_or_default(), row.8);
+        causes.push(NewsCause {
+            kind: "forex_news",
+            title: row.0,
+            summary: row.1,
+            source_name: row.2,
+            url: row.3,
+            published_at: row.4,
+            processed_at: row.5,
+            sentiment: row.6,
+            impact_level: row.7,
+            searchable,
+        });
+    }
+    for row in stock_rows {
+        let searchable = format!(
+            "{} {} {}",
+            row.0,
+            row.1.clone().unwrap_or_default(),
+            row.3.clone().unwrap_or_default()
+        );
+        causes.push(NewsCause {
+            kind: "stock_news",
+            title: row.0,
+            summary: row.1,
+            source_name: row.2,
+            url: None,
+            published_at: row.6,
+            processed_at: row.6,
+            sentiment: row.4,
+            impact_level: row.5,
+            searchable,
+        });
+    }
+
+    Ok(causes)
+}
+
+pub async fn why_did_it_move(
+    State(state): State<AppState>,
+    Path(symbol): Path<String>,
+    Query(query): Query<WhyQuery>,
+) -> Json<Value> {
+    let symbol = normalize_market_symbol(&symbol);
+    if symbol.is_empty() {
+        return Json(json!({ "error": "symbol is required" }));
+    }
+
+    let window_minutes = spike_window_minutes(query.window.as_deref());
+    let window = format!("{window_minutes}m");
+    let lookback_minutes = query.lookback_minutes.unwrap_or(180).clamp(30, 1440);
+    let terms = symbol_terms(&symbol);
+
+    let candidate = if let Some(clickhouse) = &state.clickhouse {
+        match clickhouse.spike_candidates(window_minutes).await {
+            Ok(rows) => rows
+                .into_iter()
+                .find(|candidate| candidate.symbol.eq_ignore_ascii_case(&symbol)),
+            Err(err) => {
+                tracing::warn!(error = %err, symbol = %symbol, "failed to load why-did-it-move spike context");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    let latest_at = candidate
+        .as_ref()
+        .and_then(|candidate| chrono::DateTime::parse_from_rfc3339(&candidate.latest_at).ok())
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .unwrap_or_else(chrono::Utc::now);
+    let direction = candidate
+        .as_ref()
+        .map(|candidate| {
+            if candidate.move_pct >= 0.0 {
+                "up"
+            } else {
+                "down"
+            }
+        })
+        .unwrap_or("none");
+    let since = latest_at - chrono::Duration::minutes(lookback_minutes as i64);
+    let until = latest_at + chrono::Duration::minutes(30);
+
+    let news = match load_news_causes(&state.db, since, until).await {
+        Ok(rows) => rows,
+        Err(err) => {
+            tracing::warn!(error = %err, symbol = %symbol, "failed to load why-did-it-move news causes");
+            Vec::new()
+        }
+    };
+
+    let mut scored: Vec<(f64, Vec<String>, NewsCause)> = news
+        .into_iter()
+        .filter_map(|cause| {
+            let (score, matches) = score_cause(&cause, &terms, direction, latest_at);
+            (score > 0.0).then_some((score, matches, cause))
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    scored.truncate(10);
+
+    let top_score = scored.first().map(|row| row.0).unwrap_or(0.0);
+    let confidence = confidence_for(top_score, scored.len());
+    let matched: Vec<String> = scored
+        .iter()
+        .flat_map(|(_, terms, _)| terms.iter().cloned())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let causes: Vec<Value> = scored
+        .into_iter()
+        .map(|(score, matches, cause)| {
+            json!({
+                "kind": cause.kind,
+                "title": cause.title,
+                "summary": cause.summary,
+                "source_name": cause.source_name,
+                "url": cause.url,
+                "published_at": cause.published_at,
+                "processed_at": cause.processed_at,
+                "sentiment": cause.sentiment,
+                "impact_level": cause.impact_level,
+                "matched_terms": matches,
+                "score": (score * 10.0).round() / 10.0,
+                "reason": "Matched symbol context near the market move",
+            })
+        })
+        .collect();
+
+    let threshold = candidate
+        .as_ref()
+        .map(|candidate| spike_threshold(&candidate.symbol, &candidate.asset_type));
+    let move_json = candidate.as_ref().map(|candidate| {
+        json!({
+            "latest_price": candidate.latest_price,
+            "baseline_price": candidate.baseline_price,
+            "move_pct": candidate.move_pct,
+            "direction": direction,
+            "severity": threshold.map(|value| spike_severity(candidate.move_pct, value)),
+            "threshold_pct": threshold,
+            "tick_count": candidate.tick_count,
+            "latest_at": candidate.latest_at,
+            "is_active_spike": threshold.is_some_and(|value| candidate.move_pct.abs() >= value),
+        })
+    });
+
+    Json(json!({
+        "symbol": symbol,
+        "window": window,
+        "lookback_minutes": lookback_minutes,
+        "move": move_json,
+        "summary": why_summary(&symbol, candidate.as_ref(), causes.len(), confidence),
+        "confidence": confidence,
+        "matched_terms": matched,
+        "causes": {
+            "news": causes,
+            "calendar": [],
+        },
+        "generated_at": chrono::Utc::now().to_rfc3339(),
+    }))
+}
+
 pub async fn data_quality(State(state): State<AppState>) -> Json<Value> {
     let latest_prices = match load_latest_prices(&state.db).await {
         Ok(prices) => prices,
@@ -678,5 +1143,75 @@ mod tests {
         assert_eq!(normalize_history_resolution(Some("15m")), "15m");
         assert_eq!(normalize_history_resolution(Some("1h")), "1h");
         assert_eq!(normalize_history_resolution(Some("1d")), "1m");
+    }
+
+    #[test]
+    fn classifies_spike_thresholds() {
+        assert_eq!(spike_window_minutes(None), 5);
+        assert_eq!(spike_window_minutes(Some("15m")), 15);
+        assert_eq!(spike_window_minutes(Some("bad")), 5);
+        assert_eq!(spike_threshold("DXY", "index"), 0.12);
+        assert_eq!(spike_threshold("XAUUSD", "forex"), 0.25);
+        assert_eq!(spike_threshold("BTCUSDT", "crypto"), 0.80);
+        assert_eq!(spike_threshold("EURUSD", "forex"), 0.15);
+        assert_eq!(spike_severity(0.24, 0.12), "high");
+        assert_eq!(spike_severity(0.13, 0.12), "medium");
+    }
+
+    #[test]
+    fn builds_symbol_terms_for_why_explanations() {
+        assert_eq!(normalize_market_symbol(" xau/usd "), "XAUUSD");
+        let gold_terms = symbol_terms("XAUUSD");
+        assert!(gold_terms.contains(&"GOLD".to_string()));
+        assert!(gold_terms.contains(&"USD".to_string()));
+
+        let fx_terms = symbol_terms("eurusd");
+        assert!(fx_terms.contains(&"EUR".to_string()));
+        assert!(fx_terms.contains(&"USD".to_string()));
+    }
+
+    #[test]
+    fn scores_relevant_aligned_news_higher() {
+        let latest_at = chrono::Utc::now();
+        let cause = NewsCause {
+            kind: "forex_news",
+            title: "Gold rallies as Fed inflation worries hit USD".to_string(),
+            summary: Some("XAU jumps after yields fall".to_string()),
+            source_name: Some("Test".to_string()),
+            url: None,
+            published_at: Some(latest_at - chrono::Duration::minutes(10)),
+            processed_at: Some(latest_at - chrono::Duration::minutes(10)),
+            sentiment: Some("positive".to_string()),
+            impact_level: Some("high".to_string()),
+            searchable: "Gold rallies as Fed inflation worries hit USD XAU jumps".to_string(),
+        };
+
+        let (score, matches) = score_cause(&cause, &symbol_terms("XAUUSD"), "up", latest_at);
+
+        assert!(score >= 45.0);
+        assert!(matches.contains(&"GOLD".to_string()));
+        assert_eq!(confidence_for(score, 2), "high");
+    }
+
+    #[test]
+    fn ignores_unrelated_news_for_why_explanations() {
+        let latest_at = chrono::Utc::now();
+        let cause = NewsCause {
+            kind: "stock_news",
+            title: "Unrelated earnings update".to_string(),
+            summary: None,
+            source_name: None,
+            url: None,
+            published_at: Some(latest_at),
+            processed_at: Some(latest_at),
+            sentiment: Some("neutral".to_string()),
+            impact_level: None,
+            searchable: "Unrelated earnings update".to_string(),
+        };
+
+        let (score, matches) = score_cause(&cause, &symbol_terms("XAUUSD"), "up", latest_at);
+
+        assert_eq!(score, 0.0);
+        assert!(matches.is_empty());
     }
 }

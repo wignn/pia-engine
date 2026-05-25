@@ -46,6 +46,17 @@ pub struct LatestPriceTick {
     pub received_at: String,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct SpikeCandidate {
+    pub symbol: String,
+    pub asset_type: String,
+    pub latest_price: f64,
+    pub baseline_price: f64,
+    pub move_pct: f64,
+    pub tick_count: u64,
+    pub latest_at: String,
+}
+
 struct RollupSpec {
     resolution: &'static str,
     table: &'static str,
@@ -279,6 +290,36 @@ impl ClickHouseClient {
             .await?
             .into_iter()
             .find(|price| price.symbol.eq_ignore_ascii_case(symbol)))
+    }
+
+    pub async fn spike_candidates(
+        &self,
+        window_minutes: u32,
+    ) -> anyhow::Result<Vec<SpikeCandidate>> {
+        let window_minutes = window_minutes.clamp(1, 240);
+        let sql = format!(
+            "SELECT symbol, \
+             argMax(asset_type, time) AS asset_type, \
+             argMax(price, time) AS latest_price, \
+             argMin(price, time) AS baseline_price, \
+             if(baseline_price = 0, 0, ((latest_price - baseline_price) / baseline_price) * 100) AS move_pct, \
+             count() AS tick_count, \
+             formatDateTime(max(time), '%Y-%m-%dT%H:%i:%SZ') AS latest_at \
+             FROM {}.price_ticks \
+             WHERE time >= now() - INTERVAL {} MINUTE \
+             GROUP BY symbol \
+             HAVING tick_count >= 2 AND baseline_price > 0 \
+             ORDER BY abs(move_pct) DESC \
+             LIMIT 200 \
+             FORMAT JSONEachRow",
+            ident(&self.database),
+            window_minutes
+        );
+        let text = self.query(&sql).await?;
+        Ok(text
+            .lines()
+            .filter_map(|line| serde_json::from_str::<SpikeCandidate>(line).ok())
+            .collect())
     }
 
     pub async fn tick_stats(&self) -> anyhow::Result<Vec<Value>> {
