@@ -9,10 +9,10 @@ The platform is built as a SaaS-ready data system: the **core data plane** inges
 - **Real-time market data** for forex, crypto, indices, and configured market symbols.
 - **Financial news intelligence** from forex/global feeds, stock feeds, RSS sources, and X/Twitter via RSSHub.
 - **Economic calendar monitoring** for high-impact macro events.
-- **NLP sentiment enrichment** through a dedicated Python analyzer service using FinBERT.
+- **NLP sentiment enrichment and catalyst reasoning** through a dedicated Python analyzer service using FinBERT plus a Why Did It Move engine.
 - **Provider-style WebSocket API** at `/ws/v1` with dynamic `SUBSCRIBE`, `UNSUBSCRIBE`, `LIST_SUBSCRIPTIONS`, and `PING` commands.
 - **Multi-tenant SaaS enforcement** with API keys, JWT sessions, plan limits, usage tracking, WebSocket connection caps, symbol limits, and tenant allowlists.
-- **Public dashboard and portal integration** through SvelteKit apps.
+- **Public dashboard and portal integration** through SvelteKit apps, including chart views backed by ClickHouse and admin Why Did It Move investigation tooling.
 - **Discord bot delivery** for market alerts, news alerts, calendar reminders, volatility events, and configured X/Twitter feeds.
 
 ## Architecture
@@ -20,14 +20,14 @@ The platform is built as a SaaS-ready data system: the **core data plane** inges
 ```mermaid
 flowchart LR
     subgraph Clients[Clients]
-        PublicWeb[Public Web Dashboard]
-        Portal[Admin Portal]
+        PublicWeb[Public Web Dashboard\nCharts + Why Did It Move]
+        AdminWeb[Admin Portal\nOps + Investigation]
         Bot[Discord Bot]
-        APIClients[External API / WS Clients]
+        APIClients[External REST / WS Clients]
     end
 
     subgraph Sources[Data Sources]
-        Market[Market Data Feeds]
+        Market[Market Data Feeds\nForex / Crypto / Indices]
         ForexNews[Forex / Global News]
         StockNews[Stock News]
         Calendar[Economic Calendar]
@@ -35,37 +35,44 @@ flowchart LR
     end
 
     subgraph Services[Application Services]
-        Core[Core Service\nAxum + Tokio]
+        Core[Core Service\nAxum REST + WebSocket]
         Control[Control Plane\nUsers, Plans, API Keys]
         Ingestion[Ingestion Gateway\nTick WebSocket Adapters]
-        Analyzer[NLP Analyzer\nFastAPI + FinBERT]
+        Analyzer[Analyzer Service\nFastAPI + FinBERT + Why Engine]
+        Gemini[Gemini API\nOptional Narrative Generation]
         BotSvc[Bot Service\nDiscord Delivery]
     end
 
-    subgraph Data[Persistence and Event Backbone]
-        Postgres[(PostgreSQL)]
-        Redis[(Redis Streams / PubSub / Counters)]
+    subgraph Data[Data Stores and Event Backbone]
+        ClickHouse[(ClickHouse\nTicks, chart history, volatility scans)]
+        Postgres[(PostgreSQL\nTenants, news, sentiment, why cache)]
+        Redis[(Redis\nStreams, Pub/Sub, counters, tenant sync)]
     end
 
-    Market --> Ingestion --> Redis
+    Market --> Ingestion
+    Ingestion --> Redis
+    Ingestion --> ClickHouse
+
     ForexNews --> Core
     StockNews --> Core
     Calendar --> Core
     XFeeds --> Core
 
-    Core --> Analyzer
-    Analyzer --> Core
     Core --> Postgres
     Core --> Redis
+    Core --> ClickHouse
     Redis --> Core
+
+    Core -- sentiment text / why evidence --> Analyzer
+    Analyzer -- sentiment + explanation --> Core
+    Analyzer -. optional LLM call .-> Gemini
 
     Control --> Postgres
     Control --> Redis
-    Core --> Postgres
-    Core --> Redis
 
-    PublicWeb --> Core
-    Portal --> Control
+    PublicWeb -- charts, market API, WS --> Core
+    AdminWeb -- ops and investigation --> Core
+    AdminWeb -- SaaS admin --> Control
     APIClients --> Core
     BotSvc --> Core
     BotSvc --> Bot
@@ -73,7 +80,9 @@ flowchart LR
 
 ### Data plane
 
-`services/core` is the primary runtime gateway. It handles ingestion pipelines, REST APIs, WebSocket sessions, Redis fan-out, tenant validation, API key validation, plan enforcement, and event persistence.
+`services/core` is the primary runtime gateway. It handles REST APIs, WebSocket sessions, Redis fan-out, tenant validation, API key validation, plan enforcement, news/calendar ingestion, and analyzer orchestration.
+
+Market chart and volatility endpoints read tick/history data from **ClickHouse**. Redis is used for stream fan-out, pub/sub, counters, and tenant sync notifications. PostgreSQL stores SaaS state, news/articles, sentiment metadata, and cached Why Did It Move explanations.
 
 ### Control plane
 
@@ -81,7 +90,7 @@ flowchart LR
 
 ### Analyzer
 
-`services/analyzer` is isolated from the Rust data plane so NLP inference can be scaled independently. Core sends normalized text to the analyzer and stores sentiment labels, confidence scores, probabilities, highlights, and entities.
+`services/analyzer` is isolated from the Rust data plane so NLP and catalyst reasoning can be scaled independently. Core sends normalized text for sentiment enrichment and bounded market evidence for `Why Did It Move`; the analyzer returns deterministic driver scoring and can optionally call Gemini for narrative generation.
 
 ### Frontends
 
@@ -291,6 +300,19 @@ python main.py
 | `RSSHUB_URL` | RSSHub base URL for X/Twitter feeds. |
 | `X_USERNAMES` | Global X/Twitter usernames. |
 | `REDIS_CHANNEL_PREFIX` | Redis pub/sub namespace. |
+| `CLICKHOUSE_URL` | ClickHouse HTTP endpoint for market tick/history reads. |
+| `CLICKHOUSE_DATABASE` | ClickHouse database name, defaults to `market`. |
+| `CLICKHOUSE_USER` | ClickHouse user, defaults to `default`. |
+| `CLICKHOUSE_PASSWORD` | ClickHouse password. |
+| `AI_SERVICE_URL` | Analyzer service base URL for sentiment and Why Did It Move reasoning. |
+
+### Analyzer
+
+| Variable | Purpose |
+| --- | --- |
+| `WHY_LLM_ENABLED` | Gemini narrative mode for Why Did It Move: `auto`, `true`, or `false`. |
+| `GEMINI_API_KEY` | Optional Gemini API key for generated analyst narratives. |
+| `GEMINI_MODEL` | Gemini model name, defaults to the configured analyzer fallback. |
 
 ### Control plane
 
@@ -337,8 +359,9 @@ Manual WebSocket smoke test:
 ## Production notes
 
 - Run Core replicas behind a load balancer that supports WebSocket upgrades.
-- Use managed PostgreSQL with backups and point-in-time recovery.
+- Use managed PostgreSQL with backups and point-in-time recovery for SaaS state, news, sentiment metadata, and Why Did It Move cache rows.
+- Use managed ClickHouse or an equivalent columnar store for tick history, chart reads, and volatility scans.
 - Use managed Redis or a Redis-compatible service for pub/sub, stream fan-out, tenant sync, and counters.
-- Keep analyzer capacity independent from Core so NLP latency does not block the real-time data plane.
-- Monitor active WebSocket connections, rejected subscriptions, tenant quota errors, Redis stream lag, ingestion failures, and NLP inference latency.
+- Keep analyzer capacity independent from Core so NLP and Why Did It Move latency do not block the real-time data plane.
+- Monitor active WebSocket connections, rejected subscriptions, tenant quota errors, Redis stream lag, ClickHouse ingest/query latency, ingestion failures, analyzer latency, and optional Gemini error rates.
 - Treat API keys as secrets; raw keys are shown once and stored only as hashes.
