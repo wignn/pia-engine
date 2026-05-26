@@ -17,66 +17,7 @@ The platform is built as a SaaS-ready data system: the **core data plane** inges
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Clients[Clients]
-        PublicWeb[Public Web Dashboard\nCharts + Why Did It Move]
-        AdminWeb[Admin Portal\nOps + Investigation]
-        Bot[Discord Bot]
-        APIClients[External REST / WS Clients]
-    end
-
-    subgraph Sources[Data Sources]
-        Market[Market Data Feeds\nForex / Crypto / Indices]
-        ForexNews[Forex / Global News]
-        StockNews[Stock News]
-        Calendar[Economic Calendar]
-        XFeeds[X / Twitter via RSSHub]
-    end
-
-    subgraph Services[Application Services]
-        Core[Core Service\nAxum REST + WebSocket]
-        Control[Control Plane\nUsers, Plans, API Keys]
-        Ingestion[Ingestion Gateway\nTick WebSocket Adapters]
-        Analyzer[Analyzer Service\nFastAPI + FinBERT + Why Engine]
-        Gemini[Gemini API\nOptional Narrative Generation]
-        BotSvc[Bot Service\nDiscord Delivery]
-    end
-
-    subgraph Data[Data Stores and Event Backbone]
-        ClickHouse[(ClickHouse\nTicks, chart history, volatility scans)]
-        Postgres[(PostgreSQL\nTenants, news, sentiment, why cache)]
-        Redis[(Redis\nStreams, Pub/Sub, counters, tenant sync)]
-    end
-
-    Market --> Ingestion
-    Ingestion --> Redis
-    Ingestion --> ClickHouse
-
-    ForexNews --> Core
-    StockNews --> Core
-    Calendar --> Core
-    XFeeds --> Core
-
-    Core --> Postgres
-    Core --> Redis
-    Core --> ClickHouse
-    Redis --> Core
-
-    Core -- sentiment text / why evidence --> Analyzer
-    Analyzer -- sentiment + explanation --> Core
-    Analyzer -. optional LLM call .-> Gemini
-
-    Control --> Postgres
-    Control --> Redis
-
-    PublicWeb -- charts, market API, WS --> Core
-    AdminWeb -- ops and investigation --> Core
-    AdminWeb -- SaaS admin --> Control
-    APIClients --> Core
-    BotSvc --> Core
-    BotSvc --> Bot
-```
+![alt text](./docs/architecture/image/atlsd.png)
 
 ### Data plane
 
