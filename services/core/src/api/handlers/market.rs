@@ -1181,14 +1181,35 @@ pub async fn get_history(
         }
     }
 
-    let db_res: Result<Vec<(chrono::DateTime<chrono::Utc>, f64)>, _> = sqlx::query_as(
-        "SELECT time, close FROM market.ohlcv_candles \
-         WHERE symbol = $1 AND resolution = '1m' \
-         ORDER BY time DESC LIMIT 120",
-    )
-    .bind(&sym)
-    .fetch_all(&state.db)
-    .await;
+    let db_res: Result<Vec<(chrono::DateTime<chrono::Utc>, f64)>, _> = if resolution == "1m" {
+        sqlx::query_as(
+            "SELECT time, close FROM market.ohlcv_candles \
+             WHERE symbol = $1 AND resolution = '1m' \
+             ORDER BY time DESC LIMIT 120",
+        )
+        .bind(&sym)
+        .fetch_all(&state.db)
+        .await
+    } else {
+        let bucket = match resolution {
+            "5m" => "5 minutes",
+            "15m" => "15 minutes",
+            "1h" => "1 hour",
+            _ => "1 minute",
+        };
+        sqlx::query_as(
+            "SELECT date_bin($2::interval, time, TIMESTAMPTZ '1970-01-01') AS bucket, \
+                    (array_agg(close ORDER BY time DESC))[1] AS close \
+             FROM market.ohlcv_candles \
+             WHERE symbol = $1 AND resolution = '1m' \
+             GROUP BY bucket \
+             ORDER BY bucket DESC LIMIT 120",
+        )
+        .bind(&sym)
+        .bind(bucket)
+        .fetch_all(&state.db)
+        .await
+    };
 
     if let Ok(candles) = db_res {
         if !candles.is_empty() {
