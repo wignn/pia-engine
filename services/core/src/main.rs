@@ -6,6 +6,7 @@ mod db;
 mod error;
 mod html;
 mod ingestion_subscriber;
+mod market_session;
 mod pipeline;
 mod scraper;
 mod tenant;

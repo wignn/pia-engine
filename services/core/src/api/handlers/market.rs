@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 use crate::api::state::AppState;
 use crate::clickhouse::{LatestPriceTick, SpikeCandidate};
 use crate::ingestion_subscriber::{self, CachedPrice};
+use crate::market_session;
 
 static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
     reqwest::Client::builder()
@@ -46,6 +47,7 @@ fn cached_price_from_row(row: LatestPriceRow) -> CachedPrice {
 }
 
 fn price_json(p: &CachedPrice) -> Value {
+    let session = market_session::session_status(&p.symbol, &p.asset_type, chrono::Utc::now());
     json!({
         "symbol": p.symbol,
         "price": p.price,
@@ -55,6 +57,7 @@ fn price_json(p: &CachedPrice) -> Value {
         "source": p.source,
         "asset_type": p.asset_type,
         "received_at": p.received_at,
+        "session": session,
     })
 }
 
