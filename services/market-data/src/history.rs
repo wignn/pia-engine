@@ -37,10 +37,10 @@ pub async fn get_history(
 
     let history = match postgres_history(&state.db, &symbol, &resolution, limit).await {
         Ok(history) if !history.is_empty() => history,
-        Ok(_) => latest_price_history_fallback(&state, &symbol).await,
+        Ok(_) => latest_price_history_fallback(&state, &symbol, &resolution).await,
         Err(err) => {
             tracing::warn!(error = %err, symbol = %symbol, "failed to load Postgres history");
-            latest_price_history_fallback(&state, &symbol).await
+            latest_price_history_fallback(&state, &symbol, &resolution).await
         }
     };
     Json(json!(history))
@@ -106,7 +106,15 @@ async fn postgres_history(
         .collect())
 }
 
-async fn latest_price_history_fallback(state: &AppState, symbol: &str) -> Vec<Value> {
+async fn latest_price_history_fallback(
+    state: &AppState,
+    symbol: &str,
+    resolution: &str,
+) -> Vec<Value> {
+    if resolution != "1m" {
+        return Vec::new();
+    }
+
     match load_latest_price(&state.db, symbol).await {
         Ok(Some(price)) if should_emit_last_known_fallback(&price, &state.calendar) => {
             let now = chrono::Utc::now().timestamp();
