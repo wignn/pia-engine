@@ -88,15 +88,27 @@ AS
 SELECT
     symbol,
     '5m' AS resolution,
-    toStartOfInterval(time, INTERVAL 5 MINUTE) AS time,
-    argMinState(open, time) AS open_state,
+    bucket_time AS time,
+    argMinState(open, source_time) AS open_state,
     maxState(high) AS high_state,
     minState(low) AS low_state,
-    argMaxState(close, time) AS close_state,
+    argMaxState(close, source_time) AS close_state,
     sumState(volume) AS volume_state
-FROM market.ohlcv_candles
-WHERE resolution = '1m'
-GROUP BY symbol, time;
+FROM
+(
+    SELECT
+        symbol,
+        time AS source_time,
+        toDateTime64(toStartOfInterval(time, INTERVAL 5 MINUTE), 3, 'UTC') AS bucket_time,
+        open,
+        high,
+        low,
+        close,
+        volume
+    FROM market.ohlcv_candles
+    WHERE resolution = '1m'
+)
+GROUP BY symbol, bucket_time;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS market.ohlcv_candles_15m_mv
 TO market.ohlcv_candles_15m
@@ -104,15 +116,27 @@ AS
 SELECT
     symbol,
     '15m' AS resolution,
-    toStartOfInterval(time, INTERVAL 15 MINUTE) AS time,
-    argMinState(open, time) AS open_state,
+    bucket_time AS time,
+    argMinState(open, source_time) AS open_state,
     maxState(high) AS high_state,
     minState(low) AS low_state,
-    argMaxState(close, time) AS close_state,
+    argMaxState(close, source_time) AS close_state,
     sumState(volume) AS volume_state
-FROM market.ohlcv_candles
-WHERE resolution = '1m'
-GROUP BY symbol, time;
+FROM
+(
+    SELECT
+        symbol,
+        time AS source_time,
+        toDateTime64(toStartOfInterval(time, INTERVAL 15 MINUTE), 3, 'UTC') AS bucket_time,
+        open,
+        high,
+        low,
+        close,
+        volume
+    FROM market.ohlcv_candles
+    WHERE resolution = '1m'
+)
+GROUP BY symbol, bucket_time;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS market.ohlcv_candles_1h_mv
 TO market.ohlcv_candles_1h
@@ -120,12 +144,24 @@ AS
 SELECT
     symbol,
     '1h' AS resolution,
-    toStartOfInterval(time, INTERVAL 1 HOUR) AS time,
-    argMinState(open, time) AS open_state,
+    bucket_time AS time,
+    argMinState(open, source_time) AS open_state,
     maxState(high) AS high_state,
     minState(low) AS low_state,
-    argMaxState(close, time) AS close_state,
+    argMaxState(close, source_time) AS close_state,
     sumState(volume) AS volume_state
-FROM market.ohlcv_candles
-WHERE resolution = '1m'
-GROUP BY symbol, time;
+FROM
+(
+    SELECT
+        symbol,
+        time AS source_time,
+        toDateTime64(toStartOfInterval(time, INTERVAL 1 HOUR), 3, 'UTC') AS bucket_time,
+        open,
+        high,
+        low,
+        close,
+        volume
+    FROM market.ohlcv_candles
+    WHERE resolution = '1m'
+)
+GROUP BY symbol, bucket_time;
