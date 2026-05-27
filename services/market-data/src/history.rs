@@ -135,22 +135,25 @@ fn should_emit_last_known_fallback(
     price: &CachedPrice,
     calendar: &crate::calendar::CalendarCache,
 ) -> bool {
+    should_emit_last_known_fallback_at(price, calendar, chrono::Utc::now())
+}
+
+fn should_emit_last_known_fallback_at(
+    price: &CachedPrice,
+    calendar: &crate::calendar::CalendarCache,
+    now: chrono::DateTime<chrono::Utc>,
+) -> bool {
     if price.price <= 0.0 {
         return false;
     }
 
-    crate::session::session_status(
-        &price.symbol,
-        &price.asset_type,
-        chrono::Utc::now(),
-        Some(calendar),
-    )
-    .is_open
+    crate::session::session_status(&price.symbol, &price.asset_type, now, Some(calendar)).is_open
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
 
     #[test]
     fn normalizes_supported_resolutions() {
@@ -177,7 +180,13 @@ mod tests {
             received_at: None,
         };
 
-        assert!(!should_emit_last_known_fallback(&price, &calendar));
+        let after_close = chrono::Utc.with_ymd_and_hms(2026, 5, 27, 22, 0, 0).unwrap();
+
+        assert!(!should_emit_last_known_fallback_at(
+            &price,
+            &calendar,
+            after_close
+        ));
     }
 
     #[test]
