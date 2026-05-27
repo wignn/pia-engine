@@ -1,13 +1,14 @@
 mod config;
 mod http;
 mod news;
+mod pipeline;
 mod realtime;
 mod state;
 
 use axum::Json;
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use crate::config::Config;
 use crate::state::AppState;
@@ -32,7 +33,11 @@ async fn main() {
     };
 
     if cfg.run_pipelines {
-        warn!("NEWS_SERVICE_RUN_PIPELINES is enabled, but pipeline ownership is intentionally deferred in this pass");
+        let pipeline_cfg = cfg.clone();
+        let pipeline_pool = pool.clone();
+        tokio::spawn(async move {
+            pipeline::run(pipeline_cfg, pipeline_pool).await;
+        });
     }
 
     let realtime_cfg = cfg.clone();

@@ -9,6 +9,8 @@ pub struct Config {
     pub eventbus_mode: String,
     pub nats_url: String,
     pub realtime_poll_sec: u64,
+    pub rss_fetch_sec: u64,
+    pub stock_fetch_sec: u64,
 }
 
 impl Config {
@@ -36,6 +38,8 @@ impl Config {
             eventbus_mode: get_env("EVENTBUS_MODE", "redis"),
             nats_url: get_env("NATS_URL", "nats://localhost:4222"),
             realtime_poll_sec: get_env_u64("NEWS_REALTIME_POLL_SEC", 10).max(1),
+            rss_fetch_sec: get_env_u64("RSS_FETCH_SEC", 60).max(15),
+            stock_fetch_sec: get_env_u64("STOCK_FETCH_SEC", 300).max(60),
         }
     }
 }
