@@ -71,6 +71,29 @@ services:
     networks:
       - private
 
+  db-migrate:
+    image: postgres:16-alpine
+    container_name: db-migrate
+    restart: "no"
+    env_file:
+      - ../env/.env.db
+    volumes:
+      - ../../db/migrations/core:/migrations:ro
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        for migration in /migrations/*.sql; do
+          echo "Applying $$migration"
+          psql -v ON_ERROR_STOP=1 -h postgres -U "$${POSTGRES_USER:-atlsd}" -d "$${POSTGRES_DB:-core}" -f "$$migration"
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - private
+
   api-gateway:
     container_name: api-gateway
     image: wign/atlsd-api-gateway
@@ -86,6 +109,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       market-data:
@@ -111,6 +136,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       clickhouse:
@@ -136,6 +163,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       nats:
@@ -157,6 +186,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       nats:
         condition: service_started
     restart: always
@@ -176,6 +207,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       clickhouse:
         condition: service_healthy
       analyzer:
@@ -197,6 +230,10 @@ services:
     ports:
       - "8081:8080"
     depends_on:
+      postgres:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     restart: always
