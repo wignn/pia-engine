@@ -197,6 +197,7 @@ pub async fn why_did_it_move(
 
     match call_why_analyzer(&state, &evidence).await {
         Ok(response) => {
+            let response = preserve_canonical_context(response, &evidence);
             let response = with_cache_metadata(response, "miss", "analyzer");
             store_why_cache(
                 &state.db,
@@ -455,6 +456,18 @@ fn evidence_hash(evidence: &Value) -> String {
     hex::encode(hasher.finalize())
 }
 
+fn preserve_canonical_context(mut response: Value, evidence: &Value) -> Value {
+    if let Some(obj) = response.as_object_mut() {
+        if obj.get("move").is_none_or(Value::is_null) {
+            obj.insert("move".to_string(), evidence["move"].clone());
+        }
+        if obj.get("evidence").is_none_or(Value::is_null) {
+            obj.insert("evidence".to_string(), evidence.clone());
+        }
+    }
+    response
+}
+
 fn with_cache_metadata(mut response: Value, cache_status: &str, engine_status: &str) -> Value {
     if let Some(obj) = response.as_object_mut() {
         obj.insert("cache".to_string(), json!({ "status": cache_status }));
@@ -559,5 +572,34 @@ mod tests {
         assert_eq!(confidence_for(50.0, 2), "high");
         assert_eq!(confidence_for(30.0, 1), "medium");
         assert_eq!(confidence_for(10.0, 3), "low");
+    }
+
+    #[test]
+    fn analyzer_response_preserves_canonical_move_context() {
+        let response = json!({
+            "symbol": "XAUUSD",
+            "move": null,
+            "evidence": null,
+            "llm": { "status": "generated", "narrative": { "headline": "Gold moved", "explanation": "Macro context", "drivers": [], "confidence": "medium", "caveats": [] } }
+        });
+        let evidence = json!({
+            "symbol": "XAUUSD",
+            "window": "5m",
+            "move": {
+                "latest_price": 4450.02,
+                "baseline_price": 4449.0,
+                "move_pct": 0.0229,
+                "direction": "up",
+                "tick_count": 15,
+                "latest_at": "2026-05-27 14:19:54.305"
+            },
+            "causes": { "news": [], "calendar": [] },
+            "cross_assets": []
+        });
+
+        let merged = preserve_canonical_context(response, &evidence);
+
+        assert_eq!(merged["move"], evidence["move"]);
+        assert_eq!(merged["evidence"], evidence);
     }
 }
