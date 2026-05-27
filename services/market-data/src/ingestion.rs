@@ -152,6 +152,7 @@ async fn handle_payload(payload: &str, state: &AppState) {
     if let Some(current) = current {
         let received_at = parse_received_at(current.received_at.as_deref());
         persist_latest_price(&state.db, &current, received_at).await;
+        persist_clickhouse_price_tick(state, &current, received_at).await;
         let session = crate::session::session_status(
             &current.symbol,
             &current.asset_type,
@@ -160,11 +161,43 @@ async fn handle_payload(payload: &str, state: &AppState) {
         );
         if session.is_open {
             persist_ohlcv_candle(&state.db, &current, received_at).await;
+            persist_clickhouse_ohlcv_candle(state, &current, received_at).await;
         } else {
             debug!(symbol = %current.symbol, state = %session.state, reason = %session.reason, "skipped ohlcv candle outside open session");
         }
     }
     debug!(symbol = %symbol, "updated market-data price cache");
+}
+
+async fn persist_clickhouse_price_tick(
+    state: &AppState,
+    price: &CachedPrice,
+    received_at: DateTime<Utc>,
+) {
+    let Some(clickhouse) = &state.clickhouse else {
+        return;
+    };
+
+    if let Err(err) = clickhouse.insert_price_tick(price, received_at).await {
+        warn!(error = %err, symbol = %price.symbol, "failed to persist ClickHouse price tick");
+    }
+}
+
+async fn persist_clickhouse_ohlcv_candle(
+    state: &AppState,
+    price: &CachedPrice,
+    received_at: DateTime<Utc>,
+) {
+    let Some(clickhouse) = &state.clickhouse else {
+        return;
+    };
+    let Some(minute) = minute_bucket(received_at) else {
+        return;
+    };
+
+    if let Err(err) = clickhouse.insert_ohlcv_candle(price, minute).await {
+        warn!(error = %err, symbol = %price.symbol, "failed to persist ClickHouse ohlcv candle");
+    }
 }
 
 async fn persist_latest_price(
@@ -195,10 +228,7 @@ async fn persist_ohlcv_candle(
     price: &CachedPrice,
     received_at: DateTime<Utc>,
 ) {
-    let Some(minute) = Utc
-        .timestamp_opt((received_at.timestamp() / 60) * 60, 0)
-        .single()
-    else {
+    let Some(minute) = minute_bucket(received_at) else {
         return;
     };
 
@@ -214,6 +244,11 @@ async fn persist_ohlcv_candle(
     {
         warn!(error = %err, symbol = %price.symbol, "failed to persist ohlcv candle");
     }
+}
+
+fn minute_bucket(received_at: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    Utc.timestamp_opt((received_at.timestamp() / 60) * 60, 0)
+        .single()
 }
 
 fn parse_received_at(value: Option<&str>) -> DateTime<Utc> {

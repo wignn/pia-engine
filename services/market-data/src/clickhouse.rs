@@ -1,5 +1,8 @@
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
+
+use crate::prices::CachedPrice;
 
 #[derive(Clone, Debug)]
 pub struct ClickHouseClient {
@@ -49,6 +52,48 @@ impl ClickHouseClient {
             user,
             password,
         }
+    }
+
+    pub async fn insert_price_tick(
+        &self,
+        price: &CachedPrice,
+        received_at: DateTime<Utc>,
+    ) -> anyhow::Result<()> {
+        let sql = format!(
+            "INSERT INTO {}.price_ticks (symbol, time, price, bid, ask, volume, source, asset_type) VALUES ({}, {}, {}, {}, {}, {}, {}, {})",
+            ident(&self.database),
+            string_literal(&price.symbol),
+            datetime_literal(received_at),
+            price.price,
+            nullable_f64(price.bid),
+            nullable_f64(price.ask),
+            price.volume.unwrap_or(0.0),
+            string_literal(&price.source),
+            string_literal(&price.asset_type),
+        );
+        self.query(&sql).await?;
+        Ok(())
+    }
+
+    pub async fn insert_ohlcv_candle(
+        &self,
+        price: &CachedPrice,
+        minute: DateTime<Utc>,
+    ) -> anyhow::Result<()> {
+        let volume = price.volume.unwrap_or(0.0);
+        let sql = format!(
+            "INSERT INTO {}.ohlcv_candles (symbol, resolution, time, open, high, low, close, volume, updated_at) VALUES ({}, '1m', {}, {}, {}, {}, {}, {}, now64(3))",
+            ident(&self.database),
+            string_literal(&price.symbol),
+            datetime_literal(minute),
+            price.price,
+            price.price,
+            price.price,
+            price.price,
+            volume,
+        );
+        self.query(&sql).await?;
+        Ok(())
     }
 
     pub async fn latest_prices(&self) -> anyhow::Result<Vec<LatestPriceTick>> {
@@ -171,6 +216,19 @@ fn ident(value: &str) -> String {
 
 fn string_literal(value: &str) -> String {
     format!("'{}'", value.replace('\\', "\\\\").replace('\'', "\\''"))
+}
+
+fn datetime_literal(value: DateTime<Utc>) -> String {
+    format!(
+        "toDateTime64('{}', 3, 'UTC')",
+        value.format("%Y-%m-%d %H:%M:%S%.3f")
+    )
+}
+
+fn nullable_f64(value: Option<f64>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "NULL".to_string())
 }
 
 #[cfg(test)]

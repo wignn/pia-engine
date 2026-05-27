@@ -95,6 +95,27 @@ services:
     networks:
       - private
 
+  clickhouse-migrate:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    container_name: clickhouse-migrate
+    restart: "no"
+    volumes:
+      - ../../db/migrations/clickhouse:/migrations:ro
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        for migration in $$(ls /migrations/*.sql | sort); do
+          echo "Applying $$migration"
+          clickhouse-client --host clickhouse --multiquery < "$$migration"
+        done
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - private
+
   api-gateway:
     container_name: api-gateway
     image: wign/atlsd-api-gateway
@@ -143,6 +164,8 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
+      clickhouse-migrate:
+        condition: service_completed_successfully
       nats:
         condition: service_started
     restart: always
@@ -212,6 +235,8 @@ services:
         condition: service_completed_successfully
       clickhouse:
         condition: service_healthy
+      clickhouse-migrate:
+        condition: service_completed_successfully
       analyzer:
         condition: service_started
     restart: always

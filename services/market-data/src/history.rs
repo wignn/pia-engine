@@ -83,7 +83,7 @@ async fn postgres_history(
         let bucket_seconds = resolution_bucket_seconds(resolution);
         sqlx::query_as(
             "WITH bucketed AS (
-                SELECT to_timestamp(floor(extract(epoch from time) / $2) * $2) AT TIME ZONE 'UTC' AS bucket_time, time, close
+                SELECT to_timestamp(floor(extract(epoch from time) / $2) * $2) AS bucket_time, time, close
                 FROM market.ohlcv_candles
                 WHERE symbol = $1 AND resolution = '1m'
             ), ranked AS (
