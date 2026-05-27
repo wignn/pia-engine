@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 #[derive(Clone, Debug)]
 pub struct ClickHouseClient {
@@ -16,6 +16,7 @@ pub struct SpikeCandidate {
     pub latest_price: f64,
     pub baseline_price: f64,
     pub move_pct: f64,
+    #[serde(deserialize_with = "deserialize_u64")]
     pub tick_count: u64,
     pub latest_at: String,
 }
@@ -68,9 +69,38 @@ impl ClickHouseClient {
     }
 }
 
+fn deserialize_u64<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::Number(number) => number
+            .as_u64()
+            .ok_or_else(|| serde::de::Error::custom("invalid u64 number")),
+        serde_json::Value::String(value) => value.parse().map_err(serde::de::Error::custom),
+        _ => Err(serde::de::Error::custom("expected u64 number or string")),
+    }
+}
+
 fn ident(value: &str) -> String {
     value
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
         .collect::<String>()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn spike_candidate_accepts_clickhouse_uint64_string_fields() {
+        let row = serde_json::from_str::<SpikeCandidate>(
+            r#"{"symbol":"XAUUSD","asset_type":"forex","latest_price":4450.02,"baseline_price":4449,"move_pct":0.0229,"tick_count":"15","latest_at":"2026-05-27 14:19:54.305"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(row.tick_count, 15);
+    }
 }
