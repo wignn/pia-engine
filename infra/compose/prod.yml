@@ -84,7 +84,8 @@ services:
       - -c
       - |
         set -eu
-        for migration in /migrations/*.sql; do
+        export PGPASSWORD="$${POSTGRES_PASSWORD:-}"
+        for migration in $$(ls /migrations/*.sql | sort); do
           echo "Applying $$migration"
           psql -v ON_ERROR_STOP=1 -h postgres -U "$${POSTGRES_USER:-atlsd}" -d "$${POSTGRES_DB:-core}" -f "$$migration"
         done
