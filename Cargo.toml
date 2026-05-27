@@ -1,8 +1,11 @@
 [workspace]
-members = [
-    "services/core",
-    "services/control-plane",
+members = [    "services/control-plane",
+    "services/api-gateway",
     "services/ingestion-gateway",
+    "services/market-data",
+    "services/realtime-gateway",
+    "services/news-service",
+    "services/intelligence-service",
     "services/bot",
     "crates/*"
 ]
@@ -43,3 +46,9 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+
+
+
+
+
+

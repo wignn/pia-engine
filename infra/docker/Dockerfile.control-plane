@@ -5,19 +5,24 @@ WORKDIR /app
 FROM chef AS planner
 
 COPY Cargo.toml Cargo.lock ./
-COPY services/core/Cargo.toml services/core/Cargo.toml
 COPY services/control-plane/Cargo.toml services/control-plane/Cargo.toml
 COPY services/ingestion-gateway/Cargo.toml services/ingestion-gateway/Cargo.toml
 COPY services/bot/Cargo.toml services/bot/Cargo.toml
-COPY crates/atlsd-common/Cargo.toml crates/atlsd-common/Cargo.toml
-COPY crates/atlsd-domain/Cargo.toml crates/atlsd-domain/Cargo.toml
-COPY crates/atlsd-auth/Cargo.toml crates/atlsd-auth/Cargo.toml
-COPY crates/atlsd-observability/Cargo.toml crates/atlsd-observability/Cargo.toml
+COPY services/api-gateway/Cargo.toml services/api-gateway/Cargo.toml
+COPY services/market-data/Cargo.toml services/market-data/Cargo.toml
+COPY services/realtime-gateway/Cargo.toml services/realtime-gateway/Cargo.toml
+COPY services/news-service/Cargo.toml services/news-service/Cargo.toml
+COPY services/intelligence-service/Cargo.toml services/intelligence-service/Cargo.toml
+COPY crates/ crates/
 
-RUN mkdir -p services/core/src && echo "fn main(){}" > services/core/src/main.rs && \
-    mkdir -p services/control-plane/src && echo "fn main(){}" > services/control-plane/src/main.rs && \
+RUN mkdir -p services/control-plane/src && echo "fn main(){}" > services/control-plane/src/main.rs && \
     mkdir -p services/ingestion-gateway/src && echo "fn main(){}" > services/ingestion-gateway/src/main.rs && \
     mkdir -p services/bot/src && echo "fn main(){}" > services/bot/src/main.rs && \
+    mkdir -p services/api-gateway/src && echo "fn main(){}" > services/api-gateway/src/main.rs && \
+    mkdir -p services/market-data/src && echo "fn main(){}" > services/market-data/src/main.rs && \
+    mkdir -p services/realtime-gateway/src && echo "fn main(){}" > services/realtime-gateway/src/main.rs && \
+    mkdir -p services/news-service/src && echo "fn main(){}" > services/news-service/src/main.rs && \
+    mkdir -p services/intelligence-service/src && echo "fn main(){}" > services/intelligence-service/src/main.rs && \
     mkdir -p crates/atlsd-common/src && echo "" > crates/atlsd-common/src/lib.rs && \
     mkdir -p crates/atlsd-domain/src && echo "" > crates/atlsd-domain/src/lib.rs && \
     mkdir -p crates/atlsd-auth/src && echo "" > crates/atlsd-auth/src/lib.rs && \
@@ -32,49 +37,35 @@ ARG DOCKER_BUILD_TYPE=release
 ENV SQLX_OFFLINE=true
 COPY --from=planner /app/recipe.json recipe.json
 
-RUN <<EOF
-  if [ "$DOCKER_BUILD_TYPE" = "release" ]; then
-    cargo chef cook --release --recipe-path recipe.json;
-  else
-    cargo chef cook --recipe-path recipe.json;
-  fi
-EOF
+RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cargo chef cook --release --recipe-path recipe.json; else cargo chef cook --recipe-path recipe.json; fi
 
 COPY Cargo.toml Cargo.lock ./
 COPY services/control-plane/ services/control-plane/
-COPY services/core/Cargo.toml services/core/Cargo.toml
 COPY services/ingestion-gateway/Cargo.toml services/ingestion-gateway/Cargo.toml
 COPY services/bot/Cargo.toml services/bot/Cargo.toml
+COPY services/api-gateway/Cargo.toml services/api-gateway/Cargo.toml
+COPY services/market-data/Cargo.toml services/market-data/Cargo.toml
+COPY services/realtime-gateway/Cargo.toml services/realtime-gateway/Cargo.toml
+COPY services/news-service/Cargo.toml services/news-service/Cargo.toml
+COPY services/intelligence-service/Cargo.toml services/intelligence-service/Cargo.toml
 COPY crates/ crates/
 
-RUN mkdir -p services/core/src && echo "fn main(){}" > services/core/src/main.rs && \
-    mkdir -p services/ingestion-gateway/src && echo "fn main(){}" > services/ingestion-gateway/src/main.rs && \
-    mkdir -p services/bot/src && echo "fn main(){}" > services/bot/src/main.rs
+RUN mkdir -p services/ingestion-gateway/src && echo "fn main(){}" > services/ingestion-gateway/src/main.rs && \
+    mkdir -p services/bot/src && echo "fn main(){}" > services/bot/src/main.rs && \
+    mkdir -p services/api-gateway/src && echo "fn main(){}" > services/api-gateway/src/main.rs && \
+    mkdir -p services/market-data/src && echo "fn main(){}" > services/market-data/src/main.rs && \
+    mkdir -p services/realtime-gateway/src && echo "fn main(){}" > services/realtime-gateway/src/main.rs && \
+    mkdir -p services/news-service/src && echo "fn main(){}" > services/news-service/src/main.rs && \
+    mkdir -p services/intelligence-service/src && echo "fn main(){}" > services/intelligence-service/src/main.rs
 
-RUN <<EOF
-  if [ "$DOCKER_BUILD_TYPE" = "release" ]; then
-    cargo build --release -p control-plane;
-  else
-    cargo build -p control-plane;
-  fi
-EOF
-RUN <<EOF
-  if [ "$DOCKER_BUILD_TYPE" = "release" ]; then
-    cp /app/target/release/control-plane /app/target/control-plane;
-  else
-    cp /app/target/debug/control-plane /app/target/control-plane;
-  fi
-EOF
+RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cargo build --release -p control-plane; else cargo build -p control-plane; fi
+RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cp /app/target/release/control-plane /app/target/control-plane; else cp /app/target/debug/control-plane /app/target/control-plane; fi
 
 FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
 
-RUN <<EOF
-  apt-get update
-  apt-get install -y ca-certificates
-  rm -rf /var/lib/apt/lists/*
-EOF
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/control-plane /usr/local/bin/control-plane
 

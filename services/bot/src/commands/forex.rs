@@ -129,8 +129,11 @@ pub async fn forex_news_status(ctx: Context<'_>) -> Result<(), Error> {
 pub async fn forex_calendar(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
 
-    let core_url = ctx.data().core_http_url.clone();
-    let url = format!("{}/api/v1/forex/calendar?impact=high&limit=10", core_url);
+    let realtime_url = ctx.data().api_http_url.clone();
+    let url = format!(
+        "{}/api/v1/forex/calendar?impact=high&limit=10",
+        realtime_url
+    );
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))

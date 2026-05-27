@@ -1,3 +1,4 @@
+use atlsd_eventbus::subjects;
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -40,7 +41,7 @@ struct StreamMessage {
 const WORKER: &str = "crypto_feed";
 const FEED: &str = "crypto";
 const SOURCE: &str = "market_data";
-const TOPIC: &str = "crypto:trades";
+const TOPIC: &str = subjects::MD_RAW_CRYPTO_TRADES_V1;
 const DEFAULT_SYMBOLS: &[&str] = &[
     "btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt", "dogeusdt", "adausdt",
 ];

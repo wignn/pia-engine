@@ -1,6 +1,3 @@
--- =============================================================================
--- Migration: Add URL Analysis Cache Table
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS url_analysis_cache (
     url          TEXT PRIMARY KEY,

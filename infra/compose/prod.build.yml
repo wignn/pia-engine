@@ -1,0 +1,24 @@
+services:
+  api-gateway:
+    pull_policy: build
+
+  market-data:
+    pull_policy: build
+
+  realtime-gateway:
+    pull_policy: build
+
+  news-service:
+    pull_policy: build
+
+  intelligence-service:
+    pull_policy: build
+
+  control-plane:
+    pull_policy: build
+
+  ingestion-gateway:
+    pull_policy: build
+
+  analyzer:
+    pull_policy: build

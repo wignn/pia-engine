@@ -1,0 +1,69 @@
+use atlsd_common::config::{get_env, get_env_u64, sanitize_database_url};
+
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub bind_addr: String,
+    pub database_url: String,
+    pub log_level: String,
+    pub redis_url: String,
+    pub eventbus_mode: String,
+    pub nats_url: String,
+    pub clickhouse_url: String,
+    pub clickhouse_database: String,
+    pub clickhouse_user: String,
+    pub clickhouse_password: String,
+    pub write_latest: bool,
+    pub calendar_refresh_sec: u64,
+}
+
+impl Config {
+    pub fn load() -> Self {
+        let mut database_url = get_env(
+            "DATABASE_URL",
+            "postgres://postgres:postgres@localhost:5432/forex",
+        );
+        database_url = database_url.replace("postgresql+asyncpg://", "postgres://");
+        database_url = database_url.replace("postgresql://", "postgres://");
+        database_url = sanitize_database_url(&database_url);
+
+        let bind_addr = get_env("MARKET_DATA_BIND_ADDR", "");
+        let bind_addr = if bind_addr.trim().is_empty() {
+            format!("0.0.0.0:{}", get_env_u64("MARKET_DATA_PORT", 8010))
+        } else {
+            bind_addr
+        };
+
+        Self {
+            bind_addr,
+            database_url,
+            log_level: get_env("LOG_LEVEL", "INFO"),
+            redis_url: get_env("REDIS_URL", ""),
+            eventbus_mode: get_env("EVENTBUS_MODE", "redis"),
+            nats_url: get_env("NATS_URL", "nats://localhost:4222"),
+            clickhouse_url: get_env("CLICKHOUSE_URL", ""),
+            clickhouse_database: get_env("CLICKHOUSE_DATABASE", "market"),
+            clickhouse_user: get_env("CLICKHOUSE_USER", "default"),
+            clickhouse_password: get_env("CLICKHOUSE_PASSWORD", ""),
+            write_latest: get_env_bool("MARKET_DATA_WRITE_LATEST", false),
+            calendar_refresh_sec: get_env_u64("MARKET_CALENDAR_REFRESH_SEC", 300).max(60),
+        }
+    }
+
+    pub fn has_redis(&self) -> bool {
+        !self.redis_url.trim().is_empty()
+    }
+
+    pub fn has_clickhouse(&self) -> bool {
+        !self.clickhouse_url.trim().is_empty()
+    }
+}
+
+fn get_env_bool(key: &str, default: bool) -> bool {
+    match std::env::var(key) {
+        Ok(value) => matches!(
+            value.trim().to_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        ),
+        Err(_) => default,
+    }
+}

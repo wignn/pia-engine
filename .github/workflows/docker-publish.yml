@@ -59,13 +59,6 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            core:
-              - 'services/core/**'
-              - 'crates/**'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-              - '.dockerignore'
-              - 'infra/docker/Dockerfile.core'
             control_plane:
               - 'services/control-plane/**'
               - 'crates/**'
@@ -91,17 +84,56 @@ jobs:
               - 'services/analyzer/**'
               - '.dockerignore'
               - 'infra/docker/Dockerfile.analyzer'
+            api_gateway:
+              - 'services/api-gateway/**'
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.dockerignore'
+              - 'infra/docker/Dockerfile.api-gateway'
+            market_data:
+              - 'services/market-data/**'
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.dockerignore'
+              - 'infra/docker/Dockerfile.market-data'
+            realtime_gateway:
+              - 'services/realtime-gateway/**'
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.dockerignore'
+              - 'infra/docker/Dockerfile.realtime-gateway'
+            news_service:
+              - 'services/news-service/**'
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.dockerignore'
+              - 'infra/docker/Dockerfile.news-service'
+            intelligence_service:
+              - 'services/intelligence-service/**'
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.dockerignore'
+              - 'infra/docker/Dockerfile.intelligence-service'
 
       - name: Build Docker matrix
         id: matrix
         shell: bash
         env:
           BUILD_ALL: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
-          CORE_CHANGED: ${{ steps.filter.outputs.core }}
           CONTROL_PLANE_CHANGED: ${{ steps.filter.outputs.control_plane }}
           INGESTION_CHANGED: ${{ steps.filter.outputs.ingestion }}
           BOT_CHANGED: ${{ steps.filter.outputs.bot }}
           ANALYZER_CHANGED: ${{ steps.filter.outputs.analyzer }}
+          API_GATEWAY_CHANGED: ${{ steps.filter.outputs.api_gateway }}
+          MARKET_DATA_CHANGED: ${{ steps.filter.outputs.market_data }}
+          REALTIME_GATEWAY_CHANGED: ${{ steps.filter.outputs.realtime_gateway }}
+          NEWS_SERVICE_CHANGED: ${{ steps.filter.outputs.news_service }}
+          INTELLIGENCE_SERVICE_CHANGED: ${{ steps.filter.outputs.intelligence_service }}
         run: |
           json='{"include":['
           sep=''
@@ -110,10 +142,6 @@ jobs:
             json="${json}${sep}$1"
             sep=','
           }
-
-          if [[ "$BUILD_ALL" == "true" || "$CORE_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-core","dockerfile":"infra/docker/Dockerfile.core"}'
-          fi
 
           if [[ "$BUILD_ALL" == "true" || "$CONTROL_PLANE_CHANGED" == "true" ]]; then
             add '{"image":"atlsd-control-plane","dockerfile":"infra/docker/Dockerfile.control-plane"}'
@@ -131,6 +159,25 @@ jobs:
             add '{"image":"atlsd-analyzer","dockerfile":"infra/docker/Dockerfile.analyzer"}'
           fi
 
+          if [[ "$BUILD_ALL" == "true" || "$API_GATEWAY_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-api-gateway","dockerfile":"infra/docker/Dockerfile.api-gateway"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$MARKET_DATA_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-market-data","dockerfile":"infra/docker/Dockerfile.market-data"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$REALTIME_GATEWAY_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-realtime-gateway","dockerfile":"infra/docker/Dockerfile.realtime-gateway"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$NEWS_SERVICE_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-news-service","dockerfile":"infra/docker/Dockerfile.news-service"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$INTELLIGENCE_SERVICE_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-intelligence-service","dockerfile":"infra/docker/Dockerfile.intelligence-service"}'
+          fi
           json="${json}]}";
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
 
@@ -207,3 +254,7 @@ jobs:
             docker compose -f prod.yml pull
             docker compose -f prod.yml up -d --remove-orphans
             docker compose -f prod.yml ps
+
+
+
+

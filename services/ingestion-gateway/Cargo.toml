@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 atlsd-observability = { path = "../../crates/atlsd-observability" }
+atlsd-eventbus = { path = "../../crates/atlsd-eventbus" }
 tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
 futures-util = { workspace = true }
@@ -26,3 +27,4 @@ url = { workspace = true }
 async-trait = { workspace = true }
 rustls = { version = "0.23", features = ["ring"] }
 reqwest = { workspace = true }
+

@@ -1,0 +1,14 @@
+[package]
+name = "atlsd-eventbus"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+atlsd-contracts = { path = "../atlsd-contracts" }
+anyhow = { workspace = true }
+async-nats = "0.42"
+async-trait = { workspace = true }
+redis = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }

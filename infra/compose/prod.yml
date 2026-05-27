@@ -11,6 +11,11 @@ services:
       - "5432:5432"
     networks:
       - private
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlsd -d core"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.8-alpine
@@ -29,10 +34,11 @@ services:
     networks:
       - private
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping | grep -q Ok"]
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
@@ -54,6 +60,130 @@ services:
       timeout: 5s
       retries: 5
   
+  nats:
+    image: nats:2.10-alpine
+    container_name: nats
+    restart: unless-stopped
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - private
+
+  api-gateway:
+    container_name: api-gateway
+    image: wign/atlsd-api-gateway
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api-gateway
+      args:
+        - DOCKER_BUILD_TYPE=release
+    env_file:
+      - ../env/.env.api-gateway
+    ports:
+      - "${API_GATEWAY_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      market-data:
+        condition: service_started
+      news-service:
+        condition: service_started
+      intelligence-service:
+        condition: service_started
+    restart: always
+    networks:
+      - private
+
+  market-data:
+    container_name: market-data
+    image: wign/atlsd-market-data
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.market-data
+      args:
+        - DOCKER_BUILD_TYPE=release
+    env_file:
+      - ../env/.env.market-data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    restart: always
+    networks:
+      - private
+
+  realtime-gateway:
+    container_name: realtime-gateway
+    image: wign/atlsd-realtime-gateway
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.realtime-gateway
+      args:
+        - DOCKER_BUILD_TYPE=release
+    env_file:
+      - ../env/.env.realtime-gateway
+    ports:
+      - "${REALTIME_GATEWAY_PORT:-8020}:8020"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    restart: always
+    networks:
+      - private
+
+  news-service:
+    container_name: news-service
+    image: wign/atlsd-news-service
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.news-service
+      args:
+        - DOCKER_BUILD_TYPE=release
+    env_file:
+      - ../env/.env.news-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    restart: always
+    networks:
+      - private
+
+  intelligence-service:
+    container_name: intelligence-service
+    image: wign/atlsd-intelligence-service
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.intelligence-service
+      args:
+        - DOCKER_BUILD_TYPE=release
+    env_file:
+      - ../env/.env.intelligence-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      analyzer:
+        condition: service_started
+    restart: always
+    networks:
+      - private
+      
   control-plane:
     container_name: world-control-plane
     image: wign/atlsd-control-plane
@@ -74,22 +204,6 @@ services:
       - private
 
 
-  core:
-    container_name: world-core-prod
-    image: wign/atlsd-core:latest
-    env_file:
-      - ../env/.env.core
-    ports:
-      - "8090:8090"
-    depends_on:
-      - postgres
-      - redis
-      - clickhouse
-      - analyzer
-    networks:
-      - private
-    restart: always
-
   ingestion-gateway:
     container_name: ingestion-gateway
     image: wign/atlsd-ingestion
@@ -103,6 +217,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      nats:
+        condition: service_started
     restart: always
     networks:
       - private
@@ -152,3 +268,6 @@ volumes:
   postgres_data:
   clickhouse_data:
   redis_data:
+
+
+

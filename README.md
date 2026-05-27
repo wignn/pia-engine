@@ -1,170 +1,229 @@
-# ATLSD — Real-time Market Intelligence Platform
+# ATLSD — Event-Driven Market Intelligence Platform
 
-ATLSD is a multi-tenant market intelligence platform for real-time prices, financial news, economic calendar events, X/Twitter feeds, NLP sentiment enrichment, REST APIs, provider-style WebSocket streams, dashboards, and Discord delivery.
+ATLSD is a multi-tenant market intelligence platform for market data, financial news, economic calendar context, sentiment enrichment, real-time streams, dashboards, and bot delivery.
 
-The platform is built as a SaaS-ready data system: the **core data plane** ingests and distributes market events, while the **control plane** manages users, plans, API keys, quotas, tenant configuration, and runtime entitlements.
+The current architecture has moved away from a single `services/core` runtime. Public REST traffic now enters through `services/api-gateway`, real-time delivery is handled by `services/realtime-gateway`, and domain ownership is split across market data, news, intelligence, ingestion, and control-plane services.
 
 ## Core capabilities
 
-- **Real-time market data** for forex, crypto, indices, and configured market symbols.
-- **Financial news intelligence** from forex/global feeds, stock feeds, RSS sources, and X/Twitter via RSSHub.
-- **Economic calendar monitoring** for high-impact macro events.
-- **NLP sentiment enrichment and catalyst reasoning** through a dedicated Python analyzer service using FinBERT plus a Why Did It Move engine.
-- **Provider-style WebSocket API** at `/ws/v1` with dynamic `SUBSCRIBE`, `UNSUBSCRIBE`, `LIST_SUBSCRIPTIONS`, and `PING` commands.
-- **Multi-tenant SaaS enforcement** with API keys, JWT sessions, plan limits, usage tracking, WebSocket connection caps, symbol limits, and tenant allowlists.
-- **Public dashboard and portal integration** through SvelteKit apps, including chart views backed by ClickHouse and admin Why Did It Move investigation tooling.
-- **Discord bot delivery** for market alerts, news alerts, calendar reminders, volatility events, and configured X/Twitter feeds.
+- **Market data** for forex, crypto, indices, and configured symbols.
+- **Financial news intelligence** from RSS/vendor sources, stock feeds, economic calendar data, and social/X-compatible ingestion paths.
+- **NLP and catalyst analysis** through a Python analyzer runtime and Rust intelligence service.
+- **Real-time client delivery** through a dedicated WebSocket gateway.
+- **Multi-tenant SaaS controls** through users, plans, API keys, quotas, tenant configuration, and runtime entitlement checks.
+- **Operational delivery** through public/admin web apps and a Discord bot.
+- **Institutional target architecture** based on domain services, versioned event contracts, replayability, observability, and NATS JetStream as the durable event backbone.
 
-## Architecture
+## Current runtime topology
 
-![alt text](./docs/architecture/image/atlsd.png)
+```mermaid
+flowchart TB
+    sources[External sources<br/>Market feeds · RSS/news · Calendar · RSSHub/social · Analyzer/LLM providers]
 
-### Data plane
+    ingest[services/ingestion-gateway<br/>Vendor sessions · normalization · event publishing]
+    nats[(NATS JetStream<br/>Durable domain events)]
+    redis[(Redis<br/>Cache · counters · compatibility pub/sub)]
 
-`services/core` is the primary runtime gateway. It handles REST APIs, WebSocket sessions, Redis fan-out, tenant validation, API key validation, plan enforcement, news/calendar ingestion, and analyzer orchestration.
+    market[services/market-data<br/>Prices · history · quality · spikes]
+    news[services/news-service<br/>Forex/news · stock/news · calendar · source status]
+    intel[services/intelligence-service<br/>Analyze · sentiment · Why Did It Move · factors]
 
-Market chart and volatility endpoints read tick/history data from **ClickHouse**. Redis is used for stream fan-out, pub/sub, counters, and tenant sync notifications. PostgreSQL stores SaaS state, news/articles, sentiment metadata, and cached Why Did It Move explanations.
+    pg[(PostgreSQL<br/>SaaS state · news · cache rows)]
+    ch[(ClickHouse<br/>Ticks · history · OHLC reads)]
+    analyzer[services/analyzer<br/>FinBERT · language · optional LLM hooks]
 
-### Control plane
+    api[services/api-gateway<br/>REST entrypoint · API keys · quota · proxy]
+    realtime[services/realtime-gateway<br/>WebSocket fanout · subscriptions · tickets]
 
-`services/control-plane` manages SaaS state: users, OAuth, JWT sessions, API keys, plans, tenant configs, usage, and cache sync events. Core reads this state through PostgreSQL and Redis-backed refresh notifications.
+    clients[Public web · Admin web · Desktop trader · Discord bot · Public API clients]
 
-### Analyzer
+    sources --> ingest
+    ingest --> nats
+    ingest --> redis
 
-`services/analyzer` is isolated from the Rust data plane so NLP and catalyst reasoning can be scaled independently. Core sends normalized text for sentiment enrichment and bounded market evidence for `Why Did It Move`; the analyzer returns deterministic driver scoring and can optionally call Gemini for narrative generation.
+    nats --> market
+    nats --> news
+    nats --> intel
+    redis -. transitional pub/sub .-> realtime
 
-### Frontends
+    market --> pg
+    market --> ch
+    news --> pg
+    intel --> pg
+    intel --> ch
+    intel --> analyzer
 
-- `apps/public-web` — public product site, live market dashboard, documentation, and portal entry points.
-- `apps/admin-web` — tenant/admin portal for API keys, usage, plans, and configuration.
+    api --> market
+    api --> news
+    api --> intel
+    realtime --> clients
+    api --> clients
+```
 
-## Provider-style WebSocket API
+## Target event architecture
 
-New integrations should connect to a single endpoint:
+ATLSD uses versioned event contracts for durable domain communication. The preferred event backbone is **NATS JetStream**. Redis remains useful for cache, counters, hot state, and compatibility pub/sub during migration.
+
+```mermaid
+flowchart LR
+    connector[Source connector]
+    envelope[atlsd_contracts::EventEnvelope<T>]
+    subject[NATS subject<br/>&lt;domain&gt;.&lt;category&gt;.&lt;name&gt;.v&lt;major&gt;]
+
+    market[md.raw.finnhub.trades.v1<br/>md.canonical.ticks.v1]
+    news[news.enriched.article.v1]
+    intelligence[intelligence.why_move.generated.v1]
+    platform[tenant.entitlement.changed.v1<br/>usage.api.requested.v1]
+
+    consumers[Domain consumers<br/>Validate version · process idempotently · materialize views]
+    dlq[Domain DLQ<br/>md/news/intelligence/platform deadletter events]
+
+    connector --> envelope --> subject
+    subject --> market
+    subject --> news
+    subject --> intelligence
+    subject --> platform
+    market --> consumers
+    news --> consumers
+    intelligence --> consumers
+    platform --> consumers
+    consumers -->|invalid or unprocessable| dlq
+```
+
+See:
+
+- `docs/architecture/events.md` — event envelope, naming, versioning, replay, DLQ policy.
+- `docs/architecture/target-institutional-platform.md` — long-term institutional platform topology and migration roadmap.
+
+## Service map
 
 ```text
-GET /ws/v1?api_key=YOUR_API_KEY
-```
-
-Supported auth options:
-
-- `api_key` — tenant API key.
-- `token` — JWT session token.
-- `ticket` — short-lived WebSocket ticket.
-
-After the socket opens, clients send JSON commands.
-
-### Subscribe
-
-```json
-{ "method": "SUBSCRIBE", "params": ["market_data:XAUUSD", "forex_news"], "id": 1 }
-```
-
-Success response:
-
-```json
-{ "result": null, "id": 1 }
-```
-
-### Unsubscribe
-
-```json
-{ "method": "UNSUBSCRIBE", "params": ["market_data:XAUUSD"], "id": 2 }
-```
-
-### List active streams
-
-```json
-{ "method": "LIST_SUBSCRIPTIONS", "id": 3 }
-```
-
-Example response:
-
-```json
-{ "result": ["forex_news"], "id": 3 }
-```
-
-### Ping
-
-```json
-{ "method": "PING", "id": 4 }
-```
-
-Example response:
-
-```json
-{ "result": "pong", "id": 4 }
-```
-
-### Canonical stream names
-
-| Stream | Description |
-| --- | --- |
-| `market_data` | All market ticks allowed by the tenant plan. |
-| `market_data:XAUUSD` | One market symbol. Counts toward `tv_symbols_max`. |
-| `forex_news` | Forex and global market news. |
-| `stock_news` | Stock/equity news, subject to plan access. |
-| `calendar` | Economic calendar reminders, subject to plan access. |
-| `high_impact` | High-impact news or macro alerts. |
-| `volatility` | Volatility spike alerts. |
-| `x` | All configured X/Twitter feed events allowed by the tenant plan. |
-| `x:federalreserve` | One X/Twitter username. Counts toward `x_usernames_max`. |
-| `system` | Operational/system status events. |
-| `all` | Compatibility stream for internal/bot clients. |
-
-
-## SaaS plan enforcement
-
-Runtime checks are enforced by Core using tenant context loaded from the control plane.
-
-| Limit | Enforced at | Source |
-| --- | --- | --- |
-| REST request quota | HTTP request middleware | `plans.requests_per_day` |
-| Rate limit per minute | HTTP request middleware | `plans.rate_limit_per_min` |
-| WebSocket connection count | WebSocket connect | `plans.ws_connections` |
-| Market symbol subscription count | WebSocket subscribe | `plans.tv_symbols_max` |
-| X username subscription count | WebSocket subscribe | `plans.x_usernames_max` |
-| Market symbol allowlist | WebSocket subscribe | `tenant_configs.tv_symbols` |
-| X username allowlist | WebSocket subscribe | `tenant_configs.x_usernames` |
-| Premium stream access | WebSocket subscribe | tenant plan |
-
-## Repository structure
-
-```text
-apps/
-  public-web/              Public SvelteKit dashboard and documentation
-  admin-web/               Tenant/admin portal
+services/
+  api-gateway/            Public REST gateway and quota/auth middleware
+  realtime-gateway/       WebSocket gateway and real-time fanout
+  market-data/            Prices, history, data quality, spikes, market sessions
+  news-service/           Forex/news, stock news, calendar compatibility APIs
+  intelligence-service/   Sentiment, analysis, Why Did It Move, factor outputs
+  ingestion-gateway/      Vendor feed ingestion and event publishing
+  control-plane/          Users, auth, plans, API keys, tenant config, usage
+  analyzer/               Python FastAPI model runtime
+  bot/                    Discord bot integration
 
 crates/
-  atlsd-auth/              JWT, API keys, encryption, auth extractors
-  atlsd-common/            Config, errors, DB helpers, shared utilities
-  atlsd-domain/            Shared tenant, plan, and usage models
-  atlsd-observability/     Tracing/logging setup
+  atlsd-auth/             JWT, API key hashing, encryption, auth helpers
+  atlsd-common/           Config, errors, DB helpers, HTTP utilities
+  atlsd-contracts/        Versioned event envelope and domain payload contracts
+  atlsd-domain/           Shared tenant, plan, and usage domain models
+  atlsd-eventbus/         NATS/Redis/dual-publisher event bus abstraction
+  atlsd-observability/    Tracing/logging setup
+```
 
-services/
-  core/                    Main data plane: ingestion, REST, WebSocket, tenants
-  control-plane/           SaaS management: users, plans, keys, configs, usage
-  ingestion-gateway/       Tick-level market data ingestion adapters
-  analyzer/                Python FastAPI NLP analyzer
-  bot/                     Discord bot integration
+## Public API routing
 
-db/
-  migrations/core/         PostgreSQL schema and migrations
+`services/api-gateway` is the public REST entrypoint. It keeps legacy `/api/v1/*` route compatibility while forwarding to domain services.
 
-infra/
-  compose/                 Local compose environments
-  docker/                  Service Dockerfiles
-  env/                     Environment templates
+| Public route group | Owner service |
+| --- | --- |
+| `/health` | `api-gateway` |
+| `/api/v1/market/prices` | `market-data` |
+| `/api/v1/market/prices/{symbol}` | `market-data` |
+| `/api/v1/market/history/{symbol}` | `market-data` |
+| `/api/v1/market/session/{symbol}` | `market-data` |
+| `/api/v1/market/data-quality` | `market-data` |
+| `/api/v1/market/spikes` | `market-data` |
+| `/api/v1/forex/news*` | `news-service` |
+| `/api/v1/forex/calendar` | `news-service` |
+| `/api/v1/forex/sources/status` | `news-service` |
+| `/api/v1/stock/news` | `news-service` |
+| `/api/v1/analyze` | `intelligence-service` |
+| `/api/v1/market/why/{symbol}` | `intelligence-service` |
+
+`services/realtime-gateway` is separate from the REST gateway. WebSocket clients should connect to realtime-gateway directly.
+
+## Realtime gateway
+
+Realtime gateway supports the current compatibility route surface:
+
+```text
+/api/v1/ws/v1
+/api/v1/ws
+/api/v1/ws/market
+/api/v1/ws/market/{symbol}
+/api/v1/ws/forex-news
+/api/v1/ws/stock
+/api/v1/ws/calendar
+/api/v1/ws/x
+/api/v1/ws/x/{username}
+/api/v1/ws/ticket
+```
+
+Realtime gateway consumes market and news events from NATS subjects and broadcasts compatibility events such as `market.trade`, `forex_news.new`, and `stock.news.new` to subscribed clients. Redis remains available for hot state, compatibility, and operational counters.
+
+## Market sessions and candle gating
+
+`services/market-data` owns market session resolution. It hydrates a local in-memory cache from PostgreSQL calendar tables and refreshes it periodically with `MARKET_CALENDAR_REFRESH_SEC`.
+
+Calendar tables:
+
+- `market.exchanges` — exchange code, timezone, regular trading hours, working days.
+- `market.exchange_holidays` — manual holiday and full-close overrides.
+- `market.symbol_exchange_map` — symbol-to-exchange mapping for indices and equities.
+
+The current seed covers US exchanges, Bursa Indonesia (`IDX`), major Asian exchanges, Australia, India, FX, and crypto. Configured major symbols include `SPX`, `DXY`, `N225`, `HSI`, `SSEC`, `KOSPI`, `STI`, `JCI`, `ASX200`, `NIFTY50`, `SENSEX`, large US equities such as `AAPL`, `MSFT`, `NVDA`, and configured IDX equities.
+
+Latest prices may still update while a market is closed, but OHLCV candles are written only when the resolved session is open. This prevents after-hours/reference quotes from polluting chart history.
+
+## Data stores
+
+```mermaid
+flowchart TB
+    pg[(PostgreSQL)]
+    ch[(ClickHouse)]
+    redis[(Redis)]
+    nats[(NATS JetStream)]
+
+    pg --> pg1[Tenants · users · plans · API keys]
+    pg --> pg2[Tenant config · usage logs]
+    pg --> pg3[News · articles · source metadata]
+    pg --> pg4[URL and intelligence cache rows]
+
+    ch --> ch1[Market ticks]
+    ch --> ch2[Market history]
+    ch --> ch3[OHLC/time-series reads]
+    ch --> ch4[Volatility/query workloads]
+
+    redis --> r1[Cache and counters]
+    redis --> r2[Quota state]
+    redis --> r3[Tenant sync notifications]
+    redis --> r4[Transitional realtime pub/sub]
+
+    nats --> n1[Durable domain events]
+    nats --> n2[Replayable streams]
+    nats --> n3[DLQ workflows]
+    nats --> n4[Schema-governed service communication]
 ```
 
 ## Local development
 
-### Infrastructure
+### Start infrastructure and services
 
 ```bash
 make up
 # or
 make up ENGINE=docker
+```
+
+Compose files live in `infra/compose/`:
+
+```bash
+docker compose -f infra/compose/local.yml up -d
+```
+
+For production-shaped local builds, use the production compose file with the local build override:
+
+```bash
+docker compose -f infra/compose/prod.yml -f infra/compose/prod.build.yml build
+docker compose -f infra/compose/prod.yml -f infra/compose/prod.build.yml up -d
 ```
 
 Stop the stack:
@@ -179,7 +238,7 @@ Tail logs:
 make logs
 ```
 
-### Rust backend
+### Rust workspace
 
 Run from the repository root:
 
@@ -190,14 +249,28 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-Run one service crate:
+Run one service:
 
 ```bash
-cargo run -p core
+cargo run -p api-gateway
+cargo run -p realtime-gateway
+cargo run -p market-data
+cargo run -p news-service
+cargo run -p intelligence-service
 cargo run -p control-plane
+cargo run -p ingestion-gateway
+cargo run -p bot
 ```
 
-### Public web app
+### Python analyzer
+
+```bash
+cd services/analyzer
+pip install -r requirements.txt
+python main.py
+```
+
+### Frontend apps
 
 ```bash
 cd apps/public-web
@@ -207,8 +280,6 @@ bun run check
 bun run lint
 ```
 
-### Admin web app
-
 ```bash
 cd apps/admin-web
 bun install
@@ -217,57 +288,57 @@ bun run check
 bun run lint
 ```
 
-### NLP analyzer
+## Environment files
 
-```bash
-cd services/analyzer
-pip install -r requirements.txt
-python main.py
+Compose reads env files from `infra/env/`. Local env files are intentionally not committed when ignored by git.
+
+| File | Used by |
+| --- | --- |
+| `.env.db` | PostgreSQL |
+| `.env.api-gateway` | REST gateway |
+| `.env.market-data` | Market data service |
+| `.env.realtime-gateway` | WebSocket gateway |
+| `.env.news-service` | News/calendar service |
+| `.env.intelligence-service` | Intelligence service |
+| `.env.control-plane` | SaaS control plane |
+| `.env.ingestion` | Ingestion gateway |
+| `.env.bot` | Discord bot |
+| `.env.portal` | Public/admin frontend image build/runtime |
+| `.env.rsshub` | RSSHub |
+| `.env.analyze` | Python analyzer |
+
+Important shared variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string. |
+| `REDIS_URL` | Redis connection string for cache/counters/compatibility pub-sub. |
+| `NATS_URL` | NATS server URL, usually `nats://nats:4222` in compose. |
+| `EVENTBUS_MODE` | Event bus mode: `redis`, `nats`, or dual mode where supported. |
+| `API_KEYS` | Static bootstrap API keys for gateway/realtime compatibility. |
+| `JWT_SECRET` | Control-plane JWT signing secret. |
+| `ADMIN_API_KEY` | Bootstrap admin key. |
+| `AI_SERVICE_URL` | Analyzer base URL for intelligence service. |
+| `CLICKHOUSE_URL` | ClickHouse HTTP endpoint for market/intelligence reads. |
+| `MARKET_CALENDAR_REFRESH_SEC` | Market-data calendar cache refresh interval, default 300 seconds. |
+| `INDEX_FEED_SYMBOLS` | Comma-separated `provider|public|asset_type` mappings for index/reference quote polling. |
+| `STOCK_FEED_SYMBOLS` | Comma-separated `provider|public|asset_type` mappings for equity polling, including US and IDX symbols. |
+
+## Deployment
+
+GitHub Actions checks formatting, clippy, and tests, then builds and pushes changed Docker images. Production deploy pulls images on the VPS and starts `infra/compose/prod.yml`.
+
+The VPS deploy path intentionally uses pull-based deployment so heavy image builds happen outside the VPS:
+
+```text
+git pull --ff-only
+cd infra/compose
+docker compose -f prod.yml pull
+docker compose -f prod.yml up -d --remove-orphans
+docker compose -f prod.yml ps
 ```
 
-## Important environment variables
-
-### Core
-
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string. |
-| `REDIS_URL` | Redis connection string. |
-| `API_KEYS` | Bootstrap/static API keys if configured. |
-| `PORT` | Core HTTP port. |
-| `RSS_FETCH_SEC` | Forex/global news polling interval. |
-| `STOCK_FETCH_SEC` | Stock news polling interval. |
-| `CALENDAR_CHECK_SEC` | Economic calendar polling interval. |
-| `RSSHUB_URL` | RSSHub base URL for X/Twitter feeds. |
-| `X_USERNAMES` | Global X/Twitter usernames. |
-| `REDIS_CHANNEL_PREFIX` | Redis pub/sub namespace. |
-| `CLICKHOUSE_URL` | ClickHouse HTTP endpoint for market tick/history reads. |
-| `CLICKHOUSE_DATABASE` | ClickHouse database name, defaults to `market`. |
-| `CLICKHOUSE_USER` | ClickHouse user, defaults to `default`. |
-| `CLICKHOUSE_PASSWORD` | ClickHouse password. |
-| `AI_SERVICE_URL` | Analyzer service base URL for sentiment and Why Did It Move reasoning. |
-
-### Analyzer
-
-| Variable | Purpose |
-| --- | --- |
-| `WHY_LLM_ENABLED` | Gemini narrative mode for Why Did It Move: `auto`, `true`, or `false`. |
-| `GEMINI_API_KEY` | Optional Gemini API key for generated analyst narratives. |
-| `GEMINI_MODEL` | Gemini model name, defaults to the configured analyzer fallback. |
-
-### Control plane
-
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string. |
-| `REDIS_URL` | Redis connection string. |
-| `JWT_SECRET` | JWT signing secret. |
-| `JWT_EXPIRY_DAYS` | Session lifetime. |
-| `ADMIN_API_KEY` | Bootstrap admin key. |
-| `FRONTEND_URL` | Portal/public frontend origin. |
-| `ENCRYPTION_KEY` | Encryption key for stored secrets. |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth. |
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth. |
+For local production-shaped builds, use `prod.build.yml` as an override.
 
 ## Verification checklist
 
@@ -279,7 +350,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-Before shipping public-web changes:
+Before shipping frontend changes:
 
 ```bash
 cd apps/public-web
@@ -287,22 +358,36 @@ bun run check
 bun run lint
 ```
 
-Manual WebSocket smoke test:
+```bash
+cd apps/admin-web
+bun run check
+bun run lint
+```
 
-1. Connect to `/ws/v1?api_key=...`.
-2. Send `SUBSCRIBE` for `market_data:XAUUSD` and `forex_news`.
-3. Confirm `{ "result": null, "id": ... }`.
-4. Confirm incoming events include `stream`.
-5. Send `LIST_SUBSCRIPTIONS`.
-6. Send `UNSUBSCRIBE` and confirm future matching events stop.
-7. Check legacy `/api/v1/ws/*` clients still connect if compatibility is required.
+Manual smoke checks with services running:
+
+```bash
+curl http://localhost:8000/health
+curl http://localhost:8000/api/v1/market/prices
+curl http://localhost:8000/api/v1/market/session/SPX
+curl http://localhost:8000/api/v1/market/session/BBCA
+curl http://localhost:8000/api/v1/forex/news/latest
+curl http://localhost:8000/api/v1/stock/news
+curl http://localhost:8000/api/v1/market/why/XAUUSD
+```
+
+Realtime smoke test:
+
+```text
+ws://localhost:8020/api/v1/ws?api_key=<key>&channels=all
+```
 
 ## Production notes
 
-- Run Core replicas behind a load balancer that supports WebSocket upgrades.
-- Use managed PostgreSQL with backups and point-in-time recovery for SaaS state, news, sentiment metadata, and Why Did It Move cache rows.
-- Use managed ClickHouse or an equivalent columnar store for tick history, chart reads, and volatility scans.
-- Use managed Redis or a Redis-compatible service for pub/sub, stream fan-out, tenant sync, and counters.
-- Keep analyzer capacity independent from Core so NLP and Why Did It Move latency do not block the real-time data plane.
-- Monitor active WebSocket connections, rejected subscriptions, tenant quota errors, Redis stream lag, ClickHouse ingest/query latency, ingestion failures, analyzer latency, and optional Gemini error rates.
-- Treat API keys as secrets; raw keys are shown once and stored only as hashes.
+- Keep `api-gateway` and `realtime-gateway` independently scalable.
+- Keep market hot-path processing separate from NLP, LLM, scraping, and analytical workloads.
+- Use NATS JetStream for durable domain events and replayable workflows.
+- Keep Redis focused on cache, counters, hot state, and transitional compatibility pub/sub.
+- Use ClickHouse for market time-series and chart/history reads.
+- Treat API keys, JWT secrets, OAuth credentials, provider keys, and LLM keys as secrets.
+- Monitor ingestion lag, event bus consumer lag, tick-to-client latency, WebSocket drops, API p95/p99, analyzer latency, data quality events, and tenant quota denials.

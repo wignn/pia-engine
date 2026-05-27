@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use atlsd_eventbus::subjects;
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
@@ -34,7 +35,7 @@ struct ProviderMessage {
 const WORKER: &str = "primary_fx";
 const FEED: &str = "primary_fx";
 const SOURCE: &str = "market_data";
-const TOPIC: &str = "primary_fx:prices";
+const TOPIC: &str = subjects::MD_RAW_PRIMARY_FX_QUOTES_V1;
 
 pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
     let mut backoff = ReconnectPolicy::new(cfg.reconnect_base_sec, cfg.reconnect_max_sec);

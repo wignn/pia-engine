@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use atlsd_eventbus::subjects;
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
@@ -17,7 +18,7 @@ use crate::market_hours;
 const WORKER: &str = "secondary_fx";
 const FEED: &str = "secondary_fx";
 const SOURCE: &str = "market_data";
-const TOPIC: &str = "secondary_fx:forex";
+const TOPIC: &str = subjects::MD_RAW_SECONDARY_FX_QUOTES_V1;
 
 pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
     let mut backoff = ReconnectPolicy::new(cfg.reconnect_base_sec, cfg.reconnect_max_sec);

@@ -19,7 +19,7 @@ pub struct Data {
     pub owners: HashSet<UserId>,
     pub db: DbPool,
     /// Base HTTP URL for Core REST API (e.g. http://localhost:4000)
-    pub core_http_url: String,
+    pub api_http_url: String,
 }
 
 impl std::fmt::Debug for Data {
@@ -27,7 +27,7 @@ impl std::fmt::Debug for Data {
         f.debug_struct("Data")
             .field("owners", &self.owners)
             .field("db", &"Arc<SqlitePool>")
-            .field("core_http_url", &self.core_http_url)
+            .field("api_http_url", &self.api_http_url)
             .finish()
     }
 }

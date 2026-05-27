@@ -13,6 +13,7 @@ atlsd-auth = { path = "../../crates/atlsd-auth" }
 atlsd-common = { path = "../../crates/atlsd-common" }
 atlsd-domain = { path = "../../crates/atlsd-domain" }
 atlsd-observability = { path = "../../crates/atlsd-observability" }
+atlsd-eventbus = { path = "../../crates/atlsd-eventbus" }
 tokio = { workspace = true }
 axum = { workspace = true }
 tower = { workspace = true }
@@ -38,3 +39,4 @@ reqwest = { workspace = true }
 urlencoding = "2"
 aes-gcm = { workspace = true }
 base64 = { workspace = true }
+

@@ -126,8 +126,8 @@ pub async fn latest(
     ctx.defer().await?;
 
     let limit = limit.unwrap_or(5).clamp(1, 10);
-    let core_url = ctx.data().core_http_url.clone();
-    let url = format!("{}/api/v1/equity/news?limit={}", core_url, limit);
+    let realtime_url = ctx.data().api_http_url.clone();
+    let url = format!("{}/api/v1/equity/news?limit={}", realtime_url, limit);
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))

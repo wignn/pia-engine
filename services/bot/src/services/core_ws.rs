@@ -97,38 +97,41 @@ pub struct TweetData {
     pub media_urls: Vec<String>,
 }
 
-pub struct CoreWsService {
+pub struct RealtimeWsService {
     db: DbPool,
     http: Arc<Http>,
-    core_url: String,
+    realtime_url: String,
     bot_id: String,
 }
 
-impl CoreWsService {
-    pub fn new(db: DbPool, http: Arc<Http>, core_url: String, bot_id: String) -> Self {
+impl RealtimeWsService {
+    pub fn new(db: DbPool, http: Arc<Http>, realtime_url: String, bot_id: String) -> Self {
         Self {
             db,
             http,
-            core_url,
+            realtime_url,
             bot_id,
         }
     }
 
     pub async fn start(self: Arc<Self>) {
-        println!("[CORE-WS] Starting unified WebSocket service...");
+        println!("[REALTIME-WS] Starting unified WebSocket service...");
         let mut reconnect_delay = RECONNECT_DELAY_BASE;
 
         loop {
             match self.connect_and_listen().await {
                 Ok(_) => {
-                    println!("[CORE-WS] Connection closed normally");
+                    println!("[REALTIME-WS] Connection closed normally");
                     reconnect_delay = RECONNECT_DELAY_BASE;
                 }
                 Err(e) => {
-                    println!("[CORE-WS] Connection error: {}", e);
+                    println!("[REALTIME-WS] Connection error: {}", e);
                 }
             }
-            println!("[CORE-WS] Reconnecting in {} seconds...", reconnect_delay);
+            println!(
+                "[REALTIME-WS] Reconnecting in {} seconds...",
+                reconnect_delay
+            );
             tokio::time::sleep(Duration::from_secs(reconnect_delay)).await;
             reconnect_delay = (reconnect_delay * 2).min(RECONNECT_DELAY_MAX);
         }
@@ -137,13 +140,13 @@ impl CoreWsService {
     async fn connect_and_listen(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let url = format!(
             "{}/api/v1/ws?bot_id={}&channels=all",
-            self.core_url, self.bot_id
+            self.realtime_url, self.bot_id
         );
-        println!("[CORE-WS] Connecting to: {}", url);
+        println!("[REALTIME-WS] Connecting to: {}", url);
 
         let (ws_stream, _) = connect_async(&url).await?;
         let (mut write, mut read) = ws_stream.split();
-        println!("[OK] Core WebSocket connected!");
+        println!("[OK] Realtime WebSocket connected!");
 
         let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(30));
 
@@ -157,11 +160,11 @@ impl CoreWsService {
                     match msg {
                         Some(Ok(Message::Text(text))) => {
                             if let Err(e) = self.handle_message(&text).await {
-                                println!("[CORE-WS] Error handling message: {}", e);
+                                println!("[REALTIME-WS] Error handling message: {}", e);
                             }
                         }
                         Some(Ok(Message::Close(_))) => {
-                            println!("[CORE-WS] Server closed connection");
+                            println!("[REALTIME-WS] Server closed connection");
                             break;
                         }
                         Some(Ok(Message::Ping(data))) => {
@@ -204,7 +207,7 @@ impl CoreWsService {
             }
             "connected" | "subscribed" | "heartbeat" => {}
             _ => {
-                println!("[CORE-WS] Unknown event: {}", event.event);
+                println!("[REALTIME-WS] Unknown event: {}", event.event);
             }
         }
         Ok(())
@@ -261,14 +264,14 @@ impl CoreWsService {
             }
             if let Err(e) = channel_id.send_message(&self.http, message).await {
                 println!(
-                    "[CORE-WS] Failed to send news to {}: {}",
+                    "[REALTIME-WS] Failed to send news to {}: {}",
                     channel.channel_id, e
                 );
             }
         }
         ForexRepository::insert_news(&self.db, &article.id, &article.source_name).await?;
         println!(
-            "[CORE-WS] Sent forex news to {} channels: {}",
+            "[REALTIME-WS] Sent forex news to {} channels: {}",
             channels.len(),
             article.title
         );
@@ -304,14 +307,14 @@ impl CoreWsService {
             }
             if let Err(e) = channel_id.send_message(&self.http, message).await {
                 println!(
-                    "[CORE-WS] Failed to send stock news to {}: {}",
+                    "[REALTIME-WS] Failed to send stock news to {}: {}",
                     channel.channel_id, e
                 );
             }
         }
         StockRepository::insert_stock_news(&self.db, &article.id, &article.source_name).await?;
         println!(
-            "[CORE-WS] Sent stock news to {} channels: {}",
+            "[REALTIME-WS] Sent stock news to {} channels: {}",
             channels.len(),
             article.title
         );
@@ -363,14 +366,14 @@ impl CoreWsService {
             }
             if let Err(e) = channel_id.send_message(&self.http, message).await {
                 println!(
-                    "[CORE-WS] Failed to send calendar to {}: {}",
+                    "[REALTIME-WS] Failed to send calendar to {}: {}",
                     channel.channel_id, e
                 );
             }
         }
         CalendarRepository::insert_event(&self.db, &cal.event_id, &cal.title).await?;
         println!(
-            "[CORE-WS] Sent calendar reminder to {} channels: {}",
+            "[REALTIME-WS] Sent calendar reminder to {} channels: {}",
             channels.len(),
             cal.title
         );
@@ -400,13 +403,13 @@ impl CoreWsService {
                 .embed(embed.clone());
             if let Err(e) = channel_id.send_message(&self.http, message).await {
                 println!(
-                    "[CORE-WS] Failed to send volatility to {}: {}",
+                    "[REALTIME-WS] Failed to send volatility to {}: {}",
                     channel.channel_id, e
                 );
             }
         }
         println!(
-            "[CORE-WS] Sent gold volatility alert to {} channels",
+            "[REALTIME-WS] Sent gold volatility alert to {} channels",
             channels.len()
         );
         Ok(())
@@ -442,14 +445,14 @@ impl CoreWsService {
             let message = CreateMessage::new().embed(embed.clone());
             if let Err(e) = channel_id.send_message(&self.http, message).await {
                 println!(
-                    "[CORE-WS] Failed to send tweet to {}: {}",
+                    "[REALTIME-WS] Failed to send tweet to {}: {}",
                     channel.channel_id, e
                 );
             }
         }
         TwitterRepository::insert_tweet(&self.db, &tweet.id, &tweet.author_username).await?;
         println!(
-            "[CORE-WS] Sent tweet to {} channels: @{}",
+            "[REALTIME-WS] Sent tweet to {} channels: @{}",
             channels.len(),
             tweet.author_username
         );
@@ -489,8 +492,13 @@ impl CoreWsService {
     }
 }
 
-pub fn start_core_ws_service(db: DbPool, http: Arc<Http>, core_url: String, bot_id: String) {
-    let service = Arc::new(CoreWsService::new(db, http, core_url, bot_id));
+pub fn start_realtime_ws_service(
+    db: DbPool,
+    http: Arc<Http>,
+    realtime_url: String,
+    bot_id: String,
+) {
+    let service = Arc::new(RealtimeWsService::new(db, http, realtime_url, bot_id));
     tokio::spawn(async move {
         service.start().await;
     });

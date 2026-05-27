@@ -6,7 +6,7 @@ use bot::config::Config;
 use bot::error::BotError;
 use bot::handlers::{handle_event, on_error};
 use bot::repository::create_pool;
-use bot::services::core_ws::start_core_ws_service;
+use bot::services::core_ws::start_realtime_ws_service;
 use dotenvy::dotenv;
 use poise::serenity_prelude::UserId;
 use serenity::all::{ActivityData, GatewayIntents, OnlineStatus};
@@ -104,7 +104,7 @@ async fn main() -> Result<(), BotError> {
         .setup(move |ctx, ready, framework| {
             let inner_db = db_for_setup.clone();
             let owners_inner = owners_clone.clone();
-            let core_http_inner = config.core_http_url.clone();
+            let core_http_inner = config.api_http_url.clone();
             Box::pin(async move {
                 println!("[OK] Logged in as {}", ready.user.name);
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
@@ -112,7 +112,7 @@ async fn main() -> Result<(), BotError> {
                 Ok(Data {
                     owners: owners_inner,
                     db: inner_db,
-                    core_http_url: core_http_inner,
+                    api_http_url: core_http_inner,
                 })
             })
         })
@@ -153,10 +153,15 @@ async fn main() -> Result<(), BotError> {
 
     // Maintain one WebSocket connection for all core event channels.
     let bot_id = config.client_id.clone();
-    start_core_ws_service(db_for_ws, http.clone(), config.core_ws_url.clone(), bot_id);
+    start_realtime_ws_service(
+        db_for_ws,
+        http.clone(),
+        config.realtime_ws_url.clone(),
+        bot_id,
+    );
     println!(
-        "[OK] Core WebSocket service started (connecting to {})",
-        config.core_ws_url
+        "[OK] Realtime WebSocket service started (connecting to {})",
+        config.realtime_ws_url
     );
 
     client

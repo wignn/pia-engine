@@ -1,0 +1,72 @@
+FROM lukemathwalker/cargo-chef:latest-rust-1.95-bookworm AS chef
+
+WORKDIR /app
+
+FROM chef AS planner
+
+COPY Cargo.toml Cargo.lock ./
+COPY services/api-gateway/Cargo.toml services/api-gateway/Cargo.toml
+COPY services/control-plane/Cargo.toml services/control-plane/Cargo.toml
+COPY services/ingestion-gateway/Cargo.toml services/ingestion-gateway/Cargo.toml
+COPY services/market-data/Cargo.toml services/market-data/Cargo.toml
+COPY services/realtime-gateway/Cargo.toml services/realtime-gateway/Cargo.toml
+COPY services/news-service/Cargo.toml services/news-service/Cargo.toml
+COPY services/intelligence-service/Cargo.toml services/intelligence-service/Cargo.toml
+COPY services/bot/Cargo.toml services/bot/Cargo.toml
+COPY crates/ crates/
+
+RUN mkdir -p services/api-gateway/src services/control-plane/src services/ingestion-gateway/src services/market-data/src services/realtime-gateway/src services/news-service/src services/intelligence-service/src services/bot/src && \
+    echo "fn main(){}" > services/api-gateway/src/main.rs && \
+    echo "fn main(){}" > services/control-plane/src/main.rs && \
+    echo "fn main(){}" > services/ingestion-gateway/src/main.rs && \
+    echo "fn main(){}" > services/market-data/src/main.rs && \
+    echo "fn main(){}" > services/realtime-gateway/src/main.rs && \
+    echo "fn main(){}" > services/news-service/src/main.rs && \
+    echo "fn main(){}" > services/intelligence-service/src/main.rs && \
+    echo "fn main(){}" > services/bot/src/main.rs
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+
+ARG DOCKER_BUILD_TYPE=release
+
+ENV SQLX_OFFLINE=true
+COPY --from=planner /app/recipe.json recipe.json
+
+RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cargo chef cook --release --recipe-path recipe.json; else cargo chef cook --recipe-path recipe.json; fi
+
+COPY Cargo.toml Cargo.lock ./
+COPY services/market-data/ services/market-data/
+COPY services/api-gateway/Cargo.toml services/api-gateway/Cargo.toml
+COPY services/control-plane/Cargo.toml services/control-plane/Cargo.toml
+COPY services/ingestion-gateway/Cargo.toml services/ingestion-gateway/Cargo.toml
+COPY services/realtime-gateway/Cargo.toml services/realtime-gateway/Cargo.toml
+COPY services/news-service/Cargo.toml services/news-service/Cargo.toml
+COPY services/intelligence-service/Cargo.toml services/intelligence-service/Cargo.toml
+COPY services/bot/Cargo.toml services/bot/Cargo.toml
+COPY crates/ crates/
+
+RUN mkdir -p services/api-gateway/src services/control-plane/src services/ingestion-gateway/src services/realtime-gateway/src services/news-service/src services/intelligence-service/src services/bot/src && \
+    echo "fn main(){}" > services/api-gateway/src/main.rs && \
+    echo "fn main(){}" > services/control-plane/src/main.rs && \
+    echo "fn main(){}" > services/ingestion-gateway/src/main.rs && \
+    echo "fn main(){}" > services/realtime-gateway/src/main.rs && \
+    echo "fn main(){}" > services/news-service/src/main.rs && \
+    echo "fn main(){}" > services/intelligence-service/src/main.rs && \
+    echo "fn main(){}" > services/bot/src/main.rs
+
+RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cargo build --release -p market-data; else cargo build -p market-data; fi
+RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cp /app/target/release/market-data /app/target/market-data; else cp /app/target/debug/market-data /app/target/market-data; fi
+
+FROM debian:bookworm-slim AS runtime
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/target/market-data /usr/local/bin/market-data
+
+EXPOSE 8010
+
+ENTRYPOINT ["/usr/local/bin/market-data"]

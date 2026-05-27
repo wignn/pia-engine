@@ -1,3 +1,4 @@
+use atlsd_eventbus::subjects;
 use chrono::Utc;
 use serde_json::json;
 use std::sync::Arc;
@@ -11,7 +12,7 @@ use crate::workers::tradingview;
 const WORKER: &str = "index_feed";
 const SOURCE: &str = "market_data";
 const POLL_INTERVAL_SEC: u64 = 10;
-const TOPIC: &str = "index:prices";
+const TOPIC: &str = subjects::MD_RAW_INDEX_QUOTES_V1;
 
 pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
     info!(worker = WORKER, "starting reference price poller");

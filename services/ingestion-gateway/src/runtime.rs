@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tracing::{error, info, warn};
 
-use crate::broker::{BrokerPublisher, NoopBrokerPublisher, RedisBrokerPublisher};
+use crate::broker::{self, BrokerPublisher};
 use crate::config::Config;
 use crate::market_hours;
 use crate::workers;
@@ -17,27 +17,7 @@ pub async fn run(cfg: Config) {
         "ingestion-gateway starting"
     );
 
-    let broker: Arc<dyn BrokerPublisher> = if cfg.has_redis() {
-        match redis::Client::open(cfg.redis_url.clone()) {
-            Ok(client) => {
-                info!(
-                    prefix = %cfg.redis_channel_prefix,
-                    "redis broker publisher initialized"
-                );
-                Arc::new(RedisBrokerPublisher::new(
-                    client,
-                    cfg.redis_channel_prefix.clone(),
-                ))
-            }
-            Err(e) => {
-                warn!(error = %e, "invalid broker URL, falling back to noop broker");
-                Arc::new(NoopBrokerPublisher)
-            }
-        }
-    } else {
-        warn!("no broker URL configured, using noop broker (data will only be logged)");
-        Arc::new(NoopBrokerPublisher)
-    };
+    let broker: Arc<dyn BrokerPublisher> = broker::build_broker(&cfg).await;
 
     let cfg = Arc::new(cfg);
     let mut worker_handles = Vec::new();
