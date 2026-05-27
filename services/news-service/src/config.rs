@@ -11,6 +11,7 @@ pub struct Config {
     pub realtime_poll_sec: u64,
     pub rss_fetch_sec: u64,
     pub stock_fetch_sec: u64,
+    pub ai_service_url: Option<String>,
 }
 
 impl Config {
@@ -40,8 +41,16 @@ impl Config {
             realtime_poll_sec: get_env_u64("NEWS_REALTIME_POLL_SEC", 10).max(1),
             rss_fetch_sec: get_env_u64("RSS_FETCH_SEC", 60).max(15),
             stock_fetch_sec: get_env_u64("STOCK_FETCH_SEC", 300).max(60),
+            ai_service_url: optional_env("AI_SERVICE_URL"),
         }
     }
+}
+
+fn optional_env(key: &str) -> Option<String> {
+    std::env::var(key)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn env_bool(key: &str, default: bool) -> bool {

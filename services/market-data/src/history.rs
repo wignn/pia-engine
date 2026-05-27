@@ -5,7 +5,7 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::prices::load_latest_price;
+use crate::prices::{load_latest_price, CachedPrice};
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -37,10 +37,10 @@ pub async fn get_history(
 
     let history = match postgres_history(&state.db, &symbol, &resolution, limit).await {
         Ok(history) if !history.is_empty() => history,
-        Ok(_) => latest_price_history_fallback(&state.db, &symbol).await,
+        Ok(_) => latest_price_history_fallback(&state, &symbol).await,
         Err(err) => {
             tracing::warn!(error = %err, symbol = %symbol, "failed to load Postgres history");
-            latest_price_history_fallback(&state.db, &symbol).await
+            latest_price_history_fallback(&state, &symbol).await
         }
     };
     Json(json!(history))
@@ -78,9 +78,9 @@ async fn postgres_history(
         .collect())
 }
 
-async fn latest_price_history_fallback(pool: &sqlx::PgPool, symbol: &str) -> Vec<Value> {
-    match load_latest_price(pool, symbol).await {
-        Ok(Some(price)) if price.price > 0.0 => {
+async fn latest_price_history_fallback(state: &AppState, symbol: &str) -> Vec<Value> {
+    match load_latest_price(&state.db, symbol).await {
+        Ok(Some(price)) if should_emit_last_known_fallback(&price, &state.calendar) => {
             let now = chrono::Utc::now().timestamp();
             let start = now - (119 * 60);
             (0..120)
@@ -95,6 +95,23 @@ async fn latest_price_history_fallback(pool: &sqlx::PgPool, symbol: &str) -> Vec
     }
 }
 
+fn should_emit_last_known_fallback(
+    price: &CachedPrice,
+    calendar: &crate::calendar::CalendarCache,
+) -> bool {
+    if price.price <= 0.0 {
+        return false;
+    }
+
+    crate::session::session_status(
+        &price.symbol,
+        &price.asset_type,
+        chrono::Utc::now(),
+        Some(calendar),
+    )
+    .is_open
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,5 +122,39 @@ mod tests {
         assert_eq!(normalize_resolution("5"), "5m");
         assert_eq!(normalize_resolution("h1"), "1h");
         assert_eq!(normalize_resolution("bad"), "1m");
+    }
+
+    #[test]
+    fn suppresses_last_known_fallback_for_closed_sessions() {
+        let calendar = crate::calendar::CalendarCache::default();
+        let price = CachedPrice {
+            symbol: "SPX".to_string(),
+            price: 7519.11,
+            bid: None,
+            ask: None,
+            volume: None,
+            source: "market_data".to_string(),
+            asset_type: "index".to_string(),
+            received_at: None,
+        };
+
+        assert!(!should_emit_last_known_fallback(&price, &calendar));
+    }
+
+    #[test]
+    fn allows_last_known_fallback_for_crypto_sessions() {
+        let calendar = crate::calendar::CalendarCache::default();
+        let price = CachedPrice {
+            symbol: "BTCUSDT".to_string(),
+            price: 100_000.0,
+            bid: None,
+            ask: None,
+            volume: None,
+            source: "market_data".to_string(),
+            asset_type: "crypto".to_string(),
+            received_at: None,
+        };
+
+        assert!(should_emit_last_known_fallback(&price, &calendar));
     }
 }
