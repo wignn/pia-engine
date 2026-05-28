@@ -1,4 +1,4 @@
-use std::collections::{HashSet, hash_map::DefaultHasher};
+use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
 
 use axum::{
@@ -149,7 +149,10 @@ async fn ws_handler_inner(
         .try_acquire_api_key_slot(&api_key_id, connection_limit)
         .await
     {
-        return text_response(StatusCode::TOO_MANY_REQUESTS, "WebSocket connection limit reached");
+        return text_response(
+            StatusCode::TOO_MANY_REQUESTS,
+            "WebSocket connection limit reached",
+        );
     }
 
     let channels_query: Option<HashSet<String>> = channel_override

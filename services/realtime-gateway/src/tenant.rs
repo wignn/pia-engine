@@ -124,7 +124,9 @@ impl TenantRegistry {
         let cached = self.keys.read().await.get(&hash).cloned()?;
         if !cached.is_active
             || !cached.user_active
-            || cached.expires_at.is_some_and(|expires| Utc::now() > expires)
+            || cached
+                .expires_at
+                .is_some_and(|expires| Utc::now() > expires)
         {
             warn!(key_id = %cached.key_id, "realtime rejected inactive/expired API key");
             return None;

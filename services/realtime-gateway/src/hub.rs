@@ -177,7 +177,10 @@ impl Hub {
     }
 
     fn api_key_connection_key(&self, api_key_id: &str) -> String {
-        format!("{}:ws-connections:{}", self.redis_channel_prefix, api_key_id)
+        format!(
+            "{}:ws-connections:{}",
+            self.redis_channel_prefix, api_key_id
+        )
     }
 
     pub async fn unregister(&self, id: ClientId) {
@@ -343,8 +346,13 @@ mod tests {
         streams: HashSet<String>,
         user_id: Option<Uuid>,
     ) -> (ClientId, mpsc::Receiver<Vec<u8>>) {
-        hub.register_api_key(bot_id.to_string(), streams, user_id, Uuid::new_v4().to_string())
-            .await
+        hub.register_api_key(
+            bot_id.to_string(),
+            streams,
+            user_id,
+            Uuid::new_v4().to_string(),
+        )
+        .await
     }
 
     #[tokio::test]

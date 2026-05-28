@@ -146,14 +146,10 @@ pub async fn update_key(
     let label_updated = ApiKey::update_label(&state.db, key_id, auth.user_id, &label)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let limit_updated = ApiKey::update_max_ws_connections(
-        &state.db,
-        key_id,
-        auth.user_id,
-        max_ws_connections,
-    )
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let limit_updated =
+        ApiKey::update_max_ws_connections(&state.db, key_id, auth.user_id, max_ws_connections)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let updated = label_updated || limit_updated;
 
     if updated {
@@ -220,10 +216,8 @@ mod tests {
 
     #[test]
     fn update_key_request_accepts_ws_limit_payload() {
-        let body: UpdateKeyRequest = serde_json::from_str(
-            r#"{"label":"browser key","max_ws_connections":2}"#,
-        )
-        .unwrap();
+        let body: UpdateKeyRequest =
+            serde_json::from_str(r#"{"label":"browser key","max_ws_connections":2}"#).unwrap();
 
         assert_eq!(body.label, "browser key");
         assert_eq!(body.max_ws_connections, Some(2));

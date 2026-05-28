@@ -32,7 +32,10 @@ impl Config {
         Self {
             bind_addr,
             api_keys,
-            api_key_connection_limits: parse_key_limits(&get_env("API_KEY_WS_CONNECTION_LIMITS", "")),
+            api_key_connection_limits: parse_key_limits(&get_env(
+                "API_KEY_WS_CONNECTION_LIMITS",
+                "",
+            )),
             log_level: get_env("LOG_LEVEL", "INFO"),
             database_url: get_env("DATABASE_URL", ""),
             redis_url: get_env("REDIS_URL", ""),
