@@ -12,5 +12,5 @@ Thumbs.db
 /spec
 /plan
 .claude
-/docs/plan
+/docs/**
 CLAUDE.*

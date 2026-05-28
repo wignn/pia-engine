@@ -1,3 +1,4 @@
+mod batcher;
 mod calendar;
 mod clickhouse;
 mod config;
@@ -12,8 +13,8 @@ mod state;
 
 use axum::Json;
 use serde_json::{json, Value};
-use std::sync::Arc;
-use tokio::net::TcpListener;
+use std::{sync::Arc, time::Duration};
+use tokio::{net::TcpListener, sync::mpsc};
 use tracing::{error, info};
 
 use crate::clickhouse::ClickHouseClient;
@@ -50,7 +51,54 @@ async fn main() {
         None
     };
 
-    let state = AppState::new(cfg.clone(), pool, clickhouse);
+    let (tick_tx, tick_rx) = if clickhouse.is_some() {
+        let (tx, rx) = mpsc::channel(10_000);
+        (Some(tx), Some(rx))
+    } else {
+        (None, None)
+    };
+    let (candle_tx, candle_rx) = if clickhouse.is_some() {
+        let (tx, rx) = mpsc::channel(5_000);
+        (Some(tx), Some(rx))
+    } else {
+        (None, None)
+    };
+
+    if let (Some(ch), Some(rx)) = (clickhouse.clone(), tick_rx) {
+        tokio::spawn(async move {
+            batcher::run_batcher(
+                rx,
+                batcher::BatcherConfig {
+                    max_batch_size: 1000,
+                    max_delay: Duration::from_secs(1),
+                },
+                move |batch| {
+                    let client = ch.clone();
+                    async move { client.insert_price_ticks_batch(&batch).await }
+                },
+            )
+            .await;
+        });
+    }
+
+    if let (Some(ch), Some(rx)) = (clickhouse.clone(), candle_rx) {
+        tokio::spawn(async move {
+            batcher::run_batcher(
+                rx,
+                batcher::BatcherConfig {
+                    max_batch_size: 500,
+                    max_delay: Duration::from_secs(2),
+                },
+                move |batch| {
+                    let client = ch.clone();
+                    async move { client.insert_ohlcv_candles_batch(&batch).await }
+                },
+            )
+            .await;
+        });
+    }
+
+    let state = AppState::new(cfg.clone(), pool, clickhouse, tick_tx, candle_tx);
     calendar::hydrate(&state.db, &state.calendar).await;
     let calendar_pool = state.db.clone();
     let calendar_cache = state.calendar.clone();

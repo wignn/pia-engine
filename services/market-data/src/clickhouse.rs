@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::prices::CachedPrice;
@@ -41,6 +41,30 @@ pub struct TickStats {
     pub symbol: String,
     pub ticks_5m: u64,
     pub latest_at: String,
+}
+
+#[derive(Serialize)]
+struct PriceTickRow<'a> {
+    symbol: &'a str,
+    time: String,
+    price: f64,
+    bid: Option<f64>,
+    ask: Option<f64>,
+    volume: f64,
+    source: &'a str,
+    asset_type: &'a str,
+}
+
+#[derive(Serialize)]
+struct OhlcvCandleRow<'a> {
+    symbol: &'a str,
+    resolution: &'static str,
+    time: String,
+    open: f64,
+    high: f64,
+    low: f64,
+    close: f64,
+    volume: f64,
 }
 
 impl ClickHouseClient {
@@ -94,6 +118,70 @@ impl ClickHouseClient {
         );
         self.query(&sql).await?;
         Ok(())
+    }
+
+    pub async fn insert_price_ticks_batch(
+        &self,
+        batch: &[(CachedPrice, DateTime<Utc>)],
+    ) -> anyhow::Result<()> {
+        if batch.is_empty() {
+            return Ok(());
+        }
+
+        let mut body = String::new();
+        for (price, received_at) in batch {
+            let row = PriceTickRow {
+                symbol: &price.symbol,
+                time: received_at.format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
+                price: price.price,
+                bid: price.bid,
+                ask: price.ask,
+                volume: price.volume.unwrap_or(0.0),
+                source: &price.source,
+                asset_type: &price.asset_type,
+            };
+            body.push_str(&serde_json::to_string(&row)?);
+            body.push('\n');
+        }
+
+        let sql = format!(
+            "INSERT INTO {}.price_ticks FORMAT JSONEachRow",
+            ident(&self.database)
+        );
+        self.insert_json_each_row(&sql, body, "ClickHouse price tick batch insert")
+            .await
+    }
+
+    pub async fn insert_ohlcv_candles_batch(
+        &self,
+        batch: &[(CachedPrice, DateTime<Utc>)],
+    ) -> anyhow::Result<()> {
+        if batch.is_empty() {
+            return Ok(());
+        }
+
+        let mut body = String::new();
+        for (price, minute) in batch {
+            let row = OhlcvCandleRow {
+                symbol: &price.symbol,
+                resolution: "1m",
+                time: minute.format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
+                open: price.price,
+                high: price.price,
+                low: price.price,
+                close: price.price,
+                volume: price.volume.unwrap_or(0.0),
+            };
+            body.push_str(&serde_json::to_string(&row)?);
+            body.push('\n');
+        }
+
+        let sql = format!(
+            "INSERT INTO {}.ohlcv_candles FORMAT JSONEachRow",
+            ident(&self.database)
+        );
+        self.insert_json_each_row(&sql, body, "ClickHouse ohlcv candle batch insert")
+            .await
     }
 
     pub async fn latest_prices(&self) -> anyhow::Result<Vec<LatestPriceTick>> {
@@ -196,6 +284,28 @@ impl ClickHouseClient {
         }
         Ok(text)
     }
+
+    async fn insert_json_each_row(
+        &self,
+        sql: &str,
+        body: String,
+        operation: &str,
+    ) -> anyhow::Result<()> {
+        let response = self
+            .client
+            .post(&self.url)
+            .basic_auth(&self.user, Some(&self.password))
+            .query(&[("database", self.database.as_str()), ("query", sql)])
+            .body(body)
+            .send()
+            .await?;
+        let status = response.status();
+        let text = response.text().await?;
+        if !status.is_success() {
+            anyhow::bail!("{operation} failed with {status}: {text}");
+        }
+        Ok(())
+    }
 }
 
 fn rollup_table(resolution: &str) -> Option<&'static str> {
@@ -240,5 +350,35 @@ mod tests {
         assert_eq!(rollup_table("5m"), Some("ohlcv_candles_5m"));
         assert_eq!(rollup_table("1h"), Some("ohlcv_candles_1h"));
         assert_eq!(rollup_table("1d"), None);
+    }
+
+    #[test]
+    fn test_jsoneachrow_serialization() {
+        let price = CachedPrice {
+            symbol: "BTCUSDT".to_string(),
+            price: 50000.0,
+            bid: Some(49990.0),
+            ask: Some(50010.0),
+            volume: Some(1.5),
+            source: "test".to_string(),
+            asset_type: "crypto".to_string(),
+            received_at: Some("2026-05-28T12:00:00Z".to_string()),
+        };
+
+        let received_at = chrono::Utc::now();
+        let payload = serde_json::json!({
+            "symbol": price.symbol,
+            "time": received_at.format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
+            "price": price.price,
+            "bid": price.bid,
+            "ask": price.ask,
+            "volume": price.volume.unwrap_or(0.0),
+            "source": price.source,
+            "asset_type": price.asset_type,
+        });
+
+        let serialized = serde_json::to_string(&payload).unwrap();
+        assert!(serialized.contains("\"symbol\":\"BTCUSDT\""));
+        assert!(serialized.contains("\"price\":50000.0"));
     }
 }

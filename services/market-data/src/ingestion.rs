@@ -174,12 +174,12 @@ async fn persist_clickhouse_price_tick(
     price: &CachedPrice,
     received_at: DateTime<Utc>,
 ) {
-    let Some(clickhouse) = &state.clickhouse else {
+    let Some(tx) = &state.tick_tx else {
         return;
     };
 
-    if let Err(err) = clickhouse.insert_price_tick(price, received_at).await {
-        warn!(error = %err, symbol = %price.symbol, "failed to persist ClickHouse price tick");
+    if let Err(err) = tx.send((price.clone(), received_at)).await {
+        warn!(error = %err, symbol = %price.symbol, "failed to enqueue ClickHouse price tick");
     }
 }
 
@@ -188,15 +188,15 @@ async fn persist_clickhouse_ohlcv_candle(
     price: &CachedPrice,
     received_at: DateTime<Utc>,
 ) {
-    let Some(clickhouse) = &state.clickhouse else {
+    let Some(tx) = &state.candle_tx else {
         return;
     };
     let Some(minute) = minute_bucket(received_at) else {
         return;
     };
 
-    if let Err(err) = clickhouse.insert_ohlcv_candle(price, minute).await {
-        warn!(error = %err, symbol = %price.symbol, "failed to persist ClickHouse ohlcv candle");
+    if let Err(err) = tx.send((price.clone(), minute)).await {
+        warn!(error = %err, symbol = %price.symbol, "failed to enqueue ClickHouse ohlcv candle");
     }
 }
 
