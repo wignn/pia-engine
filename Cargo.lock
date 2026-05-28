@@ -2451,6 +2451,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-nats",
+ "atlsd-auth",
  "atlsd-common",
  "atlsd-domain",
  "atlsd-eventbus",

@@ -33,4 +33,17 @@ impl Plan {
             .fetch_optional(db)
             .await
     }
+
+    pub async fn update_ws_connections(
+        db: &PgPool,
+        plan_id: &str,
+        ws_connections: i32,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query("UPDATE plans SET ws_connections = $1 WHERE id = $2")
+            .bind(ws_connections)
+            .bind(plan_id)
+            .execute(db)
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
 }

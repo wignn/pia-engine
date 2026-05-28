@@ -3,6 +3,7 @@ use serde_json::{json, Value};
 
 use crate::api::server::AuthContext;
 use crate::api::AppState;
+use crate::models::api_key::{ApiKey, ApiKeyInfo};
 use crate::sync;
 
 /// GET /api/v1/admin/users — list all users (admin only)
@@ -70,6 +71,33 @@ pub async fn list_users(
     Ok(Json(json!({
         "users": users,
         "total": users.len(),
+    })))
+}
+
+/// GET /api/v1/admin/users/:id/keys — list a user's API keys (admin only)
+pub async fn list_user_keys(
+    State(state): State<AppState>,
+    axum::extract::Path(user_id): axum::extract::Path<uuid::Uuid>,
+    request: axum::extract::Request,
+) -> Result<Json<Value>, StatusCode> {
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if !auth.is_admin {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let keys = ApiKey::list_by_user(&state.db, user_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let infos: Vec<ApiKeyInfo> = keys.into_iter().map(ApiKeyInfo::from).collect();
+
+    Ok(Json(json!({
+        "keys": infos,
+        "total": infos.len(),
     })))
 }
 

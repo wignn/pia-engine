@@ -12,6 +12,7 @@ pub struct ApiKey {
     pub key_prefix: String,
     pub label: String,
     pub permissions: Vec<String>,
+    pub max_ws_connections: Option<i32>,
     pub is_active: bool,
     pub last_used_at: Option<DateTime<Utc>>,
     pub expires_at: Option<DateTime<Utc>>,
@@ -43,6 +44,7 @@ pub struct ApiKeyInfo {
     pub key_prefix: String,
     pub label: String,
     pub permissions: Vec<String>,
+    pub max_ws_connections: Option<i32>,
     pub is_active: bool,
     pub last_used_at: Option<DateTime<Utc>>,
     pub expires_at: Option<DateTime<Utc>>,
@@ -56,6 +58,7 @@ impl From<ApiKey> for ApiKeyInfo {
             key_prefix: k.key_prefix,
             label: k.label,
             permissions: k.permissions,
+            max_ws_connections: k.max_ws_connections,
             is_active: k.is_active,
             last_used_at: k.last_used_at,
             expires_at: k.expires_at,
@@ -142,6 +145,23 @@ impl ApiKey {
             .bind(user_id)
             .execute(db)
             .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn update_max_ws_connections(
+        db: &PgPool,
+        key_id: Uuid,
+        user_id: Uuid,
+        max_ws_connections: Option<i32>,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE api_keys SET max_ws_connections = $1 WHERE id = $2 AND user_id = $3",
+        )
+        .bind(max_ws_connections)
+        .bind(key_id)
+        .bind(user_id)
+        .execute(db)
+        .await?;
         Ok(result.rows_affected() > 0)
     }
 

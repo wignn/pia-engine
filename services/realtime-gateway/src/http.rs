@@ -1,6 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, hash_map::DefaultHasher};
+use std::hash::{Hash, Hasher};
 
-use atlsd_domain::tenant::TenantContext;
 use axum::{
     extract::{Path, State, WebSocketUpgrade},
     http::StatusCode,
@@ -114,15 +114,42 @@ async fn ws_handler_inner(
         }
     }
 
-    let authenticated = token
-        .as_ref()
-        .is_some_and(|raw_key| state.config.api_keys.contains(raw_key));
-
+    let Some(raw_key) = token.as_ref() else {
+        return text_response(
+            StatusCode::UNAUTHORIZED,
+            "Valid API key required for WebSocket connection",
+        );
+    };
+    let tenant_context = match &state.tenant_registry {
+        Some(registry) => registry.validate_key(raw_key).await,
+        None => None,
+    };
+    let authenticated = tenant_context.is_some() || state.config.api_keys.contains(raw_key);
     if !authenticated {
         return text_response(
             StatusCode::UNAUTHORIZED,
             "Valid API key required for WebSocket connection",
         );
+    }
+    let api_key_id = tenant_context
+        .as_ref()
+        .map(|tenant| tenant.api_key_id.to_string())
+        .unwrap_or_else(|| {
+            let mut hasher = DefaultHasher::new();
+            raw_key.hash(&mut hasher);
+            hasher.finish().to_string()
+        });
+    let connection_limit = tenant_context
+        .as_ref()
+        .map(|tenant| tenant.ws_connections)
+        .or_else(|| state.config.api_key_connection_limits.get(raw_key).copied())
+        .unwrap_or(i32::MAX);
+    if !state
+        .hub
+        .try_acquire_api_key_slot(&api_key_id, connection_limit)
+        .await
+    {
+        return text_response(StatusCode::TOO_MANY_REQUESTS, "WebSocket connection limit reached");
     }
 
     let channels_query: Option<HashSet<String>> = channel_override
@@ -143,18 +170,13 @@ async fn ws_handler_inner(
         Err(error) => return string_response(StatusCode::BAD_REQUEST, error.message),
     };
 
-    let tenant_context: Option<TenantContext> = None;
-    let user_id: Option<Uuid> = None;
+    let user_id: Option<Uuid> = tenant_context.as_ref().map(|tenant| tenant.user_id);
     let hub = state.hub.clone();
-    ws.on_upgrade(move |socket| {
-        crate::client::handle_socket(
-            socket,
-            hub,
-            bot_id,
-            user_id,
-            tenant_context,
-            initial_streams,
-        )
+    ws.on_upgrade(move |socket| async move {
+        let (client_id, rx) = hub
+            .register_api_key(bot_id.clone(), initial_streams, user_id, api_key_id)
+            .await;
+        crate::client::handle_registered_socket(socket, hub, client_id, rx, tenant_context).await;
     })
 }
 
@@ -175,7 +197,11 @@ async fn generate_ws_ticket(
         .map(|s| s.strip_prefix("Bearer ").unwrap_or(s).to_string())
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    if !state.config.api_keys.contains(&api_key) {
+    let valid = match &state.tenant_registry {
+        Some(registry) => registry.validate_key(&api_key).await.is_some(),
+        None => false,
+    } || state.config.api_keys.contains(&api_key);
+    if !valid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 

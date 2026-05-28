@@ -6,6 +6,7 @@ mod nats_subscriber;
 mod redis_subscriber;
 mod state;
 mod streams;
+mod tenant;
 
 use axum::Json;
 use serde_json::{json, Value};
@@ -16,6 +17,7 @@ use tracing::{error, info, warn};
 use crate::config::Config;
 use crate::hub::Hub;
 use crate::state::AppState;
+use crate::tenant::TenantRegistry;
 
 #[tokio::main]
 async fn main() {
@@ -25,9 +27,33 @@ async fn main() {
     atlsd_observability::init_tracing("realtime-gateway", &cfg.log_level);
 
     let hub = Hub::new(None, cfg.redis_channel_prefix.clone());
+    let tenant_registry = if cfg.database_url.trim().is_empty() {
+        None
+    } else {
+        match sqlx::postgres::PgPoolOptions::new()
+            .max_connections(5)
+            .connect(&cfg.database_url)
+            .await
+        {
+            Ok(pool) => {
+                let registry = TenantRegistry::new(pool);
+                registry.reload().await;
+                let reload_registry = registry.clone();
+                tokio::spawn(async move {
+                    reload_registry.run_reload_loop().await;
+                });
+                Some(registry)
+            }
+            Err(err) => {
+                warn!(error = %err, "realtime tenant registry disabled; database connection failed");
+                None
+            }
+        }
+    };
     let state = AppState {
         config: cfg.clone(),
         hub: hub.clone(),
+        tenant_registry,
         ticket_store: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
     };
 

@@ -146,6 +146,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/auth/verify", post(super::auth::verify_email))
         .route("/api/v1/plans", get(super::plans::list_plans))
         .route(
+            "/api/v1/admin/plans/{id}/ws-connections",
+            post(super::plans::update_plan_ws_connections),
+        )
+        .route(
             "/api/v1/auth/oauth/{provider}/url",
             get(super::auth::oauth_url),
         )
@@ -171,6 +175,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/usage/history", get(super::usage::history))
         .route("/api/v1/plans/upgrade", post(super::plans::upgrade))
         .route("/api/v1/admin/users", get(super::admin::list_users))
+        .route(
+            "/api/v1/admin/users/{id}/keys",
+            get(super::admin::list_user_keys),
+        )
         .route(
             "/api/v1/admin/users/{id}/plan",
             post(super::admin::set_user_plan),

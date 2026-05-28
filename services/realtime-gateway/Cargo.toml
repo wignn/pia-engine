@@ -10,6 +10,7 @@ name = "realtime-gateway"
 path = "src/main.rs"
 
 [dependencies]
+atlsd-auth = { path = "../../crates/atlsd-auth" }
 atlsd-common = { path = "../../crates/atlsd-common" }
 atlsd-domain = { path = "../../crates/atlsd-domain" }
 atlsd-eventbus = { path = "../../crates/atlsd-eventbus" }

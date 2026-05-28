@@ -23,6 +23,7 @@ pub struct ClientHandle {
     pub id: crate::hub::ClientId,
     pub bot_id: String,
     pub user_id: Option<Uuid>,
+    pub api_key_id: Option<String>,
     pub streams: HashSet<String>,
     pub sender: mpsc::Sender<Vec<u8>>,
 }
@@ -44,27 +45,26 @@ pub fn default_channels() -> HashSet<String> {
     .collect()
 }
 
-pub async fn handle_socket(
+pub async fn handle_registered_socket(
     socket: axum::extract::ws::WebSocket,
     hub: Arc<crate::hub::Hub>,
-    bot_id: String,
-    user_id: Option<Uuid>,
+    client_id: crate::hub::ClientId,
+    mut rx: mpsc::Receiver<Vec<u8>>,
     tenant_context: Option<TenantContext>,
-    initial_streams: HashSet<String>,
 ) {
     use axum::extract::ws::Message;
     use futures_util::{SinkExt, StreamExt};
     use std::time::Duration;
     use tracing::{debug, warn};
 
-    let (client_id, mut rx) = hub.register(bot_id.clone(), initial_streams, user_id).await;
-
     let (control_tx, mut control_rx) = mpsc::channel::<Vec<u8>>(64);
     let (mut ws_tx, mut ws_rx) = socket.split();
 
     let write_hub = hub.clone();
     let write_task = tokio::spawn(async move {
-        let mut ping_interval = tokio::time::interval(Duration::from_secs(30));
+        let mut ping_interval = tokio::time::interval(Duration::from_secs(
+            crate::hub::Hub::connection_counter_refresh_sec(),
+        ));
 
         loop {
             tokio::select! {
@@ -81,6 +81,9 @@ pub async fn handle_socket(
                     }
                 }
                 _ = ping_interval.tick() => {
+                    if let Some(api_key_id) = write_hub.client_api_key_id(client_id).await {
+                        write_hub.refresh_api_key_slot(&api_key_id).await;
+                    }
                     if ws_tx.send(Message::Ping(vec![].into())).await.is_err() {
                         break;
                     }
@@ -93,7 +96,6 @@ pub async fn handle_socket(
         write_hub.unregister(client_id).await;
     });
 
-    // Read pump: consume incoming messages and handle subscription commands.
     let read_hub = hub.clone();
     let read_task = tokio::spawn(async move {
         let timeout = Duration::from_secs(120);
@@ -122,7 +124,6 @@ pub async fn handle_socket(
         }
     });
 
-    // Wait for either task to finish, then abort the other
     tokio::select! {
         _ = write_task => {}
         _ = read_task => {}

@@ -4,7 +4,9 @@ use atlsd_common::config::{get_env, get_env_u64};
 pub struct Config {
     pub bind_addr: String,
     pub api_keys: Vec<String>,
+    pub api_key_connection_limits: std::collections::HashMap<String, i32>,
     pub log_level: String,
+    pub database_url: String,
     pub redis_url: String,
     pub redis_channel_prefix: String,
     pub redis_subscribe_enabled: bool,
@@ -30,7 +32,9 @@ impl Config {
         Self {
             bind_addr,
             api_keys,
+            api_key_connection_limits: parse_key_limits(&get_env("API_KEY_WS_CONNECTION_LIMITS", "")),
             log_level: get_env("LOG_LEVEL", "INFO"),
+            database_url: get_env("DATABASE_URL", ""),
             redis_url: get_env("REDIS_URL", ""),
             redis_channel_prefix: get_env("REDIS_CHANNEL_PREFIX", "world-info"),
             redis_subscribe_enabled: env_bool("REALTIME_REDIS_SUBSCRIBE_ENABLED", true),
@@ -44,6 +48,20 @@ impl Config {
     }
 }
 
+fn parse_key_limits(raw: &str) -> std::collections::HashMap<String, i32> {
+    raw.split(',')
+        .filter_map(|entry| {
+            let (key, limit) = entry.split_once('=')?;
+            let key = key.trim();
+            let limit = limit.trim().parse::<i32>().ok()?;
+            if key.is_empty() || limit < 1 {
+                return None;
+            }
+            Some((key.to_string(), limit))
+        })
+        .collect()
+}
+
 fn env_bool(key: &str, default: bool) -> bool {
     match std::env::var(key) {
         Ok(value) => matches!(
@@ -51,5 +69,20 @@ fn env_bool(key: &str, default: bool) -> bool {
             "1" | "true" | "yes" | "on"
         ),
         Err(_) => default,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_key_limits;
+
+    #[test]
+    fn parse_key_limits_accepts_comma_separated_key_limits() {
+        let limits = parse_key_limits("primary=2, admin = 5, bad, zero=0");
+
+        assert_eq!(limits.get("primary"), Some(&2));
+        assert_eq!(limits.get("admin"), Some(&5));
+        assert!(!limits.contains_key("bad"));
+        assert!(!limits.contains_key("zero"));
     }
 }

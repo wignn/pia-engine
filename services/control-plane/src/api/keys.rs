@@ -14,6 +14,7 @@ use crate::sync;
 #[derive(serde::Deserialize)]
 pub struct UpdateKeyRequest {
     pub label: String,
+    pub max_ws_connections: Option<i32>,
 }
 
 /// GET /api/v1/keys
@@ -140,10 +141,20 @@ pub async fn update_key(
     let body: UpdateKeyRequest =
         serde_json::from_slice(&body_bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
     let label = normalize_label(Some(&body.label), false)?;
+    let max_ws_connections = normalize_ws_limit(body.max_ws_connections)?;
 
-    let updated = ApiKey::update_label(&state.db, key_id, auth.user_id, &label)
+    let label_updated = ApiKey::update_label(&state.db, key_id, auth.user_id, &label)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let limit_updated = ApiKey::update_max_ws_connections(
+        &state.db,
+        key_id,
+        auth.user_id,
+        max_ws_connections,
+    )
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let updated = label_updated || limit_updated;
 
     if updated {
         sync::publish_config_changed_for_user(
@@ -173,9 +184,16 @@ fn normalize_label(label: Option<&str>, allow_default: bool) -> Result<String, S
     Ok(label.to_string())
 }
 
+fn normalize_ws_limit(value: Option<i32>) -> Result<Option<i32>, StatusCode> {
+    match value {
+        Some(limit) if limit < 1 || limit > 1000 => Err(StatusCode::BAD_REQUEST),
+        other => Ok(other),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::normalize_label;
+    use super::{normalize_label, normalize_ws_limit, UpdateKeyRequest};
 
     #[test]
     fn normalize_label_defaults_only_when_allowed() {
@@ -190,5 +208,24 @@ mod tests {
             "trading bot"
         );
         assert!(normalize_label(Some(&"x".repeat(81)), true).is_err());
+    }
+
+    #[test]
+    fn normalize_ws_limit_accepts_null_or_positive_limit() {
+        assert_eq!(normalize_ws_limit(None).unwrap(), None);
+        assert_eq!(normalize_ws_limit(Some(2)).unwrap(), Some(2));
+        assert!(normalize_ws_limit(Some(0)).is_err());
+        assert!(normalize_ws_limit(Some(1001)).is_err());
+    }
+
+    #[test]
+    fn update_key_request_accepts_ws_limit_payload() {
+        let body: UpdateKeyRequest = serde_json::from_str(
+            r#"{"label":"browser key","max_ws_connections":2}"#,
+        )
+        .unwrap();
+
+        assert_eq!(body.label, "browser key");
+        assert_eq!(body.max_ws_connections, Some(2));
     }
 }
