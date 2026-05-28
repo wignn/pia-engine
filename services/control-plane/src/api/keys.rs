@@ -182,7 +182,7 @@ fn normalize_label(label: Option<&str>, allow_default: bool) -> Result<String, S
 
 fn normalize_ws_limit(value: Option<i32>) -> Result<Option<i32>, StatusCode> {
     match value {
-        Some(limit) if limit < 1 || limit > 1000 => Err(StatusCode::BAD_REQUEST),
+        Some(limit) if !(1..=1000).contains(&limit) => Err(StatusCode::BAD_REQUEST),
         other => Ok(other),
     }
 }

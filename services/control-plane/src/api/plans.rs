@@ -60,19 +60,6 @@ fn normalize_ws_connections(value: i32) -> Result<i32, StatusCode> {
     Ok(value)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::normalize_ws_connections;
-
-    #[test]
-    fn normalize_ws_connections_accepts_safe_admin_limits() {
-        assert_eq!(normalize_ws_connections(1).unwrap(), 1);
-        assert_eq!(normalize_ws_connections(1000).unwrap(), 1000);
-        assert!(normalize_ws_connections(0).is_err());
-        assert!(normalize_ws_connections(1001).is_err());
-    }
-}
-
 /// POST /api/v1/plans/upgrade
 pub async fn upgrade(
     State(_state): State<AppState>,
@@ -87,4 +74,17 @@ pub async fn upgrade(
         "status": "not_available",
         "message": "Plan upgrades via payment coming soon. Contact admin for manual upgrades.",
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_ws_connections;
+
+    #[test]
+    fn normalize_ws_connections_accepts_safe_admin_limits() {
+        assert_eq!(normalize_ws_connections(1).unwrap(), 1);
+        assert_eq!(normalize_ws_connections(1000).unwrap(), 1000);
+        assert!(normalize_ws_connections(0).is_err());
+        assert!(normalize_ws_connections(1001).is_err());
+    }
 }
