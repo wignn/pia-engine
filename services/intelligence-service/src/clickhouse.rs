@@ -36,14 +36,7 @@ impl ClickHouseClient {
         &self,
         window_minutes: u32,
     ) -> anyhow::Result<Vec<SpikeCandidate>> {
-        let threshold = 0.0;
-        let sql = format!(
-            "WITH latest AS (SELECT symbol, argMax(asset_type, time) AS asset_type, argMax(price, time) AS latest_price, max(time) AS latest_at FROM {}.price_ticks GROUP BY symbol), baseline AS (SELECT symbol, argMin(price, time) AS baseline_price, count() AS tick_count FROM {}.price_ticks WHERE time >= now() - INTERVAL {} MINUTE GROUP BY symbol) SELECT latest.symbol, latest.asset_type, latest.latest_price, baseline.baseline_price, ((latest.latest_price - baseline.baseline_price) / baseline.baseline_price) * 100 AS move_pct, baseline.tick_count, toString(latest.latest_at) AS latest_at FROM latest INNER JOIN baseline ON latest.symbol = baseline.symbol WHERE baseline.baseline_price > 0 AND abs(move_pct) >= {} ORDER BY abs(move_pct) DESC LIMIT 100 FORMAT JSONEachRow",
-            ident(&self.database),
-            ident(&self.database),
-            window_minutes.clamp(1, 240),
-            threshold,
-        );
+        let sql = spike_candidates_sql(&self.database, window_minutes);
         let text = self.query(&sql).await?;
         Ok(text
             .lines()
@@ -90,9 +83,38 @@ fn ident(value: &str) -> String {
         .collect::<String>()
 }
 
+fn spike_candidates_sql(database: &str, window_minutes: u32) -> String {
+    let threshold = 0.0;
+    let bounded_minutes = window_minutes.clamp(1, 240).max(60);
+    format!(
+        "WITH recent AS (SELECT symbol, asset_type, price, time FROM {}.price_ticks WHERE time >= now() - INTERVAL {} MINUTE), latest AS (SELECT symbol, argMax(asset_type, time) AS asset_type, argMax(price, time) AS latest_price, max(time) AS latest_at FROM recent GROUP BY symbol), baseline AS (SELECT symbol, argMin(price, time) AS baseline_price, count() AS tick_count FROM recent GROUP BY symbol) SELECT latest.symbol, latest.asset_type, latest.latest_price, baseline.baseline_price, ((latest.latest_price - baseline.baseline_price) / baseline.baseline_price) * 100 AS move_pct, baseline.tick_count, toString(latest.latest_at) AS latest_at FROM latest INNER JOIN baseline ON latest.symbol = baseline.symbol WHERE baseline.baseline_price > 0 AND abs(move_pct) >= {} ORDER BY abs(move_pct) DESC LIMIT 100 FORMAT JSONEachRow",
+        ident(database),
+        bounded_minutes,
+        threshold,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spike_candidates_query_uses_bounded_context_window() {
+        let sql = spike_candidates_sql("market", 5);
+
+        assert!(sql.contains("WITH recent AS"));
+        assert!(sql.contains("WHERE time >= now() - INTERVAL 60 MINUTE"));
+        assert!(sql.contains("FROM recent GROUP BY symbol"));
+        assert!(!sql.contains("FROM market.price_ticks GROUP BY symbol"));
+    }
+
+    #[test]
+    fn spike_candidates_query_clamps_large_context_windows() {
+        let sql = spike_candidates_sql("market", 240);
+
+        assert!(sql.contains("WHERE time >= now() - INTERVAL 240 MINUTE"));
+        assert!(sql.contains("LIMIT 100"));
+    }
 
     #[test]
     fn spike_candidate_accepts_clickhouse_uint64_string_fields() {

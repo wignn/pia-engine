@@ -38,6 +38,22 @@ struct StreamMessage {
     data: TradeEvent,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum BinanceTradeMessage {
+    Combined(StreamMessage),
+    Raw(TradeEvent),
+}
+
+impl BinanceTradeMessage {
+    fn into_trade(self) -> TradeEvent {
+        match self {
+            Self::Combined(message) => message.data,
+            Self::Raw(event) => event,
+        }
+    }
+}
+
 const WORKER: &str = "crypto_feed";
 const FEED: &str = "crypto";
 const SOURCE: &str = "market_data";
@@ -153,14 +169,14 @@ async fn handle_message(
     broker: &dyn BrokerPublisher,
     tick_count: &mut u64,
 ) -> anyhow::Result<()> {
-    let msg: StreamMessage = serde_json::from_str(text)?;
+    let event = parse_trade_message(text)?;
 
-    if msg.data.event_type != "trade" {
+    if event.event_type != "trade" {
         return Ok(());
     }
 
-    let price: f64 = msg.data.price.parse().unwrap_or(0.0);
-    let quantity: f64 = msg.data.quantity.parse().unwrap_or(0.0);
+    let price: f64 = event.price.parse().unwrap_or(0.0);
+    let quantity: f64 = event.quantity.parse().unwrap_or(0.0);
 
     if price <= 0.0 {
         return Ok(());
@@ -171,18 +187,70 @@ async fn handle_message(
     let payload = json!({
         "feed": FEED,
         "source": SOURCE,
-        "symbol": &msg.data.symbol,
+        "symbol": &event.symbol,
         "price": price,
         "quantity": quantity,
-        "trade_time_ms": msg.data.trade_time,
-        "is_buyer_maker": msg.data.is_buyer_maker,
+        "trade_time_ms": event.trade_time,
+        "is_buyer_maker": event.is_buyer_maker,
         "received_at": Utc::now().to_rfc3339(),
     });
 
     let payload_str = payload.to_string();
     if let Err(e) = broker.publish(TOPIC, &payload_str).await {
-        warn!(worker = WORKER, error = %e, symbol = %msg.data.symbol, "broker publish failed");
+        warn!(worker = WORKER, error = %e, symbol = %event.symbol, "broker publish failed");
     }
 
     Ok(())
+}
+
+fn parse_trade_message(text: &str) -> anyhow::Result<TradeEvent> {
+    Ok(serde_json::from_str::<BinanceTradeMessage>(text)?.into_trade())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_combined_stream_trade_payload() {
+        let trade = parse_trade_message(
+            r#"{"stream":"btcusdt@trade","data":{"e":"trade","E":1779940191742,"s":"BTCUSDT","t":6328956968,"p":"73409.99000000","q":"0.00007000","T":1779940191742,"m":true,"M":true}}"#,
+        )
+        .unwrap();
+
+        assert_eq!(trade.symbol, "BTCUSDT");
+        assert_eq!(trade.price, "73409.99000000");
+        assert_eq!(trade.quantity, "0.00007000");
+    }
+
+    #[test]
+    fn parses_multiple_combined_stream_symbols() {
+        let eth = parse_trade_message(
+            r#"{"stream":"ethusdt@trade","data":{"e":"trade","E":1779941620916,"s":"ETHUSDT","t":4049338705,"p":"1979.94000000","q":"0.00510000","T":1779941620915,"m":true,"M":true}}"#,
+        )
+        .unwrap();
+        let btc = parse_trade_message(
+            r#"{"stream":"btcusdt@trade","data":{"e":"trade","E":1779941620961,"s":"BTCUSDT","t":6329162610,"p":"73109.38000000","q":"0.00040000","T":1779941620961,"m":false,"M":true}}"#,
+        )
+        .unwrap();
+
+        assert_eq!(eth.symbol, "ETHUSDT");
+        assert_eq!(eth.price, "1979.94000000");
+        assert_eq!(eth.quantity, "0.00510000");
+        assert_eq!(btc.symbol, "BTCUSDT");
+        assert_eq!(btc.price, "73109.38000000");
+        assert_eq!(btc.quantity, "0.00040000");
+    }
+
+    #[test]
+    fn parses_raw_trade_payload() {
+        let trade = parse_trade_message(
+            r#"{"e":"trade","E":1779940191742,"s":"BTCUSDT","t":6328956968,"p":"73409.99000000","q":"0.00007000","T":1779940191742,"m":true,"M":true}"#,
+        )
+        .unwrap();
+
+        assert_eq!(trade.symbol, "BTCUSDT");
+        assert_eq!(trade.price, "73409.99000000");
+        assert_eq!(trade.quantity, "0.00007000");
+    }
 }

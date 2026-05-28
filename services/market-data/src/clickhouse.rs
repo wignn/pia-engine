@@ -196,22 +196,12 @@ impl ClickHouseClient {
         threshold_pct: f64,
         limit: usize,
     ) -> anyhow::Result<Vec<SpikeCandidate>> {
-        let sql = format!(
-            "WITH latest AS (SELECT symbol, argMax(asset_type, time) AS asset_type, argMax(price, time) AS latest_price, max(time) AS latest_at FROM {}.price_ticks GROUP BY symbol), baseline AS (SELECT symbol, argMin(price, time) AS baseline_price, count() AS tick_count FROM {}.price_ticks WHERE time >= now() - INTERVAL {} MINUTE GROUP BY symbol) SELECT latest.symbol, latest.asset_type, latest.latest_price, baseline.baseline_price, ((latest.latest_price - baseline.baseline_price) / baseline.baseline_price) * 100 AS move_pct, baseline.tick_count, toString(latest.latest_at) AS latest_at FROM latest INNER JOIN baseline ON latest.symbol = baseline.symbol WHERE baseline.baseline_price > 0 AND abs(move_pct) >= {} ORDER BY abs(move_pct) DESC LIMIT {} FORMAT JSONEachRow",
-            ident(&self.database),
-            ident(&self.database),
-            window_minutes.clamp(1, 240),
-            threshold_pct,
-            limit.clamp(1, 100)
-        );
+        let sql = spike_candidates_sql(&self.database, window_minutes, threshold_pct, limit);
         self.query_json_each_row(&sql).await
     }
 
     pub async fn tick_stats(&self) -> anyhow::Result<Vec<TickStats>> {
-        let sql = format!(
-            "SELECT symbol, countIf(time >= now() - INTERVAL 5 MINUTE) AS ticks_5m, toString(max(time)) AS latest_at FROM {}.price_ticks GROUP BY symbol FORMAT JSONEachRow",
-            ident(&self.database)
-        );
+        let sql = tick_stats_sql(&self.database);
         self.query_json_each_row(&sql).await
     }
 
@@ -286,6 +276,29 @@ fn string_literal(value: &str) -> String {
     format!("'{}'", value.replace('\\', "\\\\").replace('\'', "\\''"))
 }
 
+fn spike_candidates_sql(
+    database: &str,
+    window_minutes: u32,
+    threshold_pct: f64,
+    limit: usize,
+) -> String {
+    let bounded_minutes = window_minutes.clamp(1, 240).max(60);
+    format!(
+        "WITH recent AS (SELECT symbol, asset_type, price, time FROM {}.price_ticks WHERE time >= now() - INTERVAL {} MINUTE), latest AS (SELECT symbol, argMax(asset_type, time) AS asset_type, argMax(price, time) AS latest_price, max(time) AS latest_at FROM recent GROUP BY symbol), baseline AS (SELECT symbol, argMin(price, time) AS baseline_price, count() AS tick_count FROM recent GROUP BY symbol) SELECT latest.symbol, latest.asset_type, latest.latest_price, baseline.baseline_price, ((latest.latest_price - baseline.baseline_price) / baseline.baseline_price) * 100 AS move_pct, baseline.tick_count, toString(latest.latest_at) AS latest_at FROM latest INNER JOIN baseline ON latest.symbol = baseline.symbol WHERE baseline.baseline_price > 0 AND abs(move_pct) >= {} ORDER BY abs(move_pct) DESC LIMIT {} FORMAT JSONEachRow",
+        ident(database),
+        bounded_minutes,
+        threshold_pct,
+        limit.clamp(1, 100)
+    )
+}
+
+fn tick_stats_sql(database: &str) -> String {
+    format!(
+        "SELECT symbol, count() AS ticks_5m, toString(max(time)) AS latest_at FROM {}.price_ticks WHERE time >= now() - INTERVAL 5 MINUTE GROUP BY symbol FORMAT JSONEachRow",
+        ident(database)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -295,6 +308,32 @@ mod tests {
         assert_eq!(rollup_table("5m"), Some("ohlcv_candles_5m"));
         assert_eq!(rollup_table("1h"), Some("ohlcv_candles_1h"));
         assert_eq!(rollup_table("1d"), None);
+    }
+
+    #[test]
+    fn spike_candidates_query_uses_bounded_recent_window() {
+        let sql = spike_candidates_sql("market", 5, 0.1, 25);
+
+        assert!(sql.contains("WITH recent AS"));
+        assert!(sql.contains("WHERE time >= now() - INTERVAL 60 MINUTE"));
+        assert!(sql.contains("FROM recent GROUP BY symbol"));
+        assert!(!sql.contains("FROM market.price_ticks GROUP BY symbol"));
+    }
+
+    #[test]
+    fn spike_candidates_query_clamps_large_windows_without_full_scan() {
+        let sql = spike_candidates_sql("market", 240, 0.35, 100);
+
+        assert!(sql.contains("WHERE time >= now() - INTERVAL 240 MINUTE"));
+        assert!(sql.contains("LIMIT 100"));
+    }
+
+    #[test]
+    fn tick_stats_query_only_reads_recent_ticks() {
+        let sql = tick_stats_sql("market");
+
+        assert!(sql.contains("WHERE time >= now() - INTERVAL 5 MINUTE"));
+        assert!(sql.contains("GROUP BY symbol"));
     }
 
     #[test]
