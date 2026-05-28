@@ -16,7 +16,9 @@ pub fn build_router(state: AppState) -> Router {
 
     let public = Router::new()
         .route("/health", get(health))
-        .route("/", get(root))
+        .route("/", get(root));
+
+    let protected = Router::new()
         .route("/api/v1/market/prices", any(crate::proxy::proxy_request))
         .route(
             "/api/v1/market/prices/{symbol}",
@@ -58,10 +60,14 @@ pub fn build_router(state: AppState) -> Router {
         ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            crate::auth::optional_api_key_auth,
+            crate::auth::require_api_key_auth,
         ));
 
-    Router::new().merge(public).layer(cors).with_state(state)
+    Router::new()
+        .merge(public)
+        .merge(protected)
+        .layer(cors)
+        .with_state(state)
 }
 
 async fn health() -> Json<Value> {

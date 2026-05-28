@@ -10,23 +10,22 @@ use std::time::Instant;
 use crate::state::AppState;
 use crate::usage::UsageEvent;
 
-pub async fn optional_api_key_auth(
+pub async fn require_api_key_auth(
     State(state): State<AppState>,
     mut request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    if let Some(raw_key) = extract_api_key(&request) {
-        if state.config.api_keys.contains(&raw_key) {
-            return Ok(next.run(request).await);
+    let raw_key = require_api_key(&request)?;
+    if state.config.api_keys.contains(&raw_key) {
+        return Ok(next.run(request).await);
+    }
+    if let Some(ctx) = state.tenant_registry.validate_key(&raw_key).await {
+        if !state.usage_tracker.try_consume_daily_quota(&ctx).await {
+            return Err(StatusCode::TOO_MANY_REQUESTS);
         }
-        if let Some(ctx) = state.tenant_registry.validate_key(&raw_key).await {
-            if !state.usage_tracker.try_consume_daily_quota(&ctx).await {
-                return Err(StatusCode::TOO_MANY_REQUESTS);
-            }
-            request.extensions_mut().insert(ctx);
-        } else {
-            return Err(StatusCode::UNAUTHORIZED);
-        }
+        request.extensions_mut().insert(ctx);
+    } else {
+        return Err(StatusCode::UNAUTHORIZED);
     }
     Ok(next.run(request).await)
 }
@@ -53,6 +52,10 @@ pub async fn usage_logger(State(state): State<AppState>, request: Request, next:
     response
 }
 
+fn require_api_key(request: &Request) -> Result<String, StatusCode> {
+    extract_api_key(request).ok_or(StatusCode::UNAUTHORIZED)
+}
+
 fn extract_api_key(request: &Request) -> Option<String> {
     request
         .headers()
@@ -69,4 +72,31 @@ fn extract_api_key(request: &Request) -> Option<String> {
                 })
             })
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+
+    #[test]
+    fn protected_requests_without_api_key_are_unauthorized() {
+        let request = Request::builder()
+            .uri("/api/v1/market/prices")
+            .body(Body::empty())
+            .unwrap();
+
+        assert_eq!(require_api_key(&request), Err(StatusCode::UNAUTHORIZED));
+    }
+
+    #[test]
+    fn protected_requests_accept_bearer_api_key() {
+        let request = Request::builder()
+            .uri("/api/v1/market/prices")
+            .header(axum::http::header::AUTHORIZATION, "Bearer tenant-key")
+            .body(Body::empty())
+            .unwrap();
+
+        assert_eq!(require_api_key(&request), Ok("tenant-key".to_string()));
+    }
 }
