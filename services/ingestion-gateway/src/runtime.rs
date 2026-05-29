@@ -4,6 +4,7 @@ use tracing::{error, info, warn};
 
 use crate::broker::{self, BrokerPublisher};
 use crate::config::Config;
+use crate::health::HealthRegistry;
 use crate::market_hours;
 use crate::workers;
 
@@ -17,6 +18,18 @@ pub async fn run(cfg: Config) {
         "ingestion-gateway starting"
     );
 
+    let health = HealthRegistry::new((cfg.health_stale_after_sec * 1_000) as i64);
+    health.register("primary_fx", cfg.has_primary_fx()).await;
+    health
+        .register("secondary_fx", cfg.has_secondary_fx())
+        .await;
+    health
+        .register("crypto_feed", cfg.crypto_feed_enabled)
+        .await;
+
+    let health_bind_addr = cfg.health_bind_addr.clone();
+    let health_server = tokio::spawn(crate::health::serve(health_bind_addr, health.clone()));
+
     let broker: Arc<dyn BrokerPublisher> = broker::build_broker(&cfg).await;
 
     let cfg = Arc::new(cfg);
@@ -25,8 +38,9 @@ pub async fn run(cfg: Config) {
     if cfg.has_primary_fx() {
         let cfg = cfg.clone();
         let broker = broker.clone();
+        let health = health.clone();
         let handle = tokio::spawn(async move {
-            workers::primary_fx::run(cfg, broker).await;
+            workers::primary_fx::run(cfg, broker, health).await;
         });
         worker_handles.push(("primary_fx", handle));
         info!(worker = "primary_fx", "worker spawned");
@@ -37,8 +51,9 @@ pub async fn run(cfg: Config) {
     if cfg.has_secondary_fx() {
         let cfg = cfg.clone();
         let broker = broker.clone();
+        let health = health.clone();
         let handle = tokio::spawn(async move {
-            workers::secondary_fx::run(cfg, broker).await;
+            workers::secondary_fx::run(cfg, broker, health).await;
         });
         worker_handles.push(("secondary_fx", handle));
         info!(worker = "secondary_fx", "worker spawned");
@@ -50,8 +65,9 @@ pub async fn run(cfg: Config) {
         let symbols = cfg.crypto_symbols.clone();
         let cfg = cfg.clone();
         let broker = broker.clone();
+        let health = health.clone();
         let handle = tokio::spawn(async move {
-            workers::crypto_feed::run(cfg, broker).await;
+            workers::crypto_feed::run(cfg, broker, health).await;
         });
         worker_handles.push(("crypto_feed", handle));
         info!(symbols = ?symbols, worker = "crypto_feed", "worker spawned");
@@ -83,6 +99,8 @@ pub async fn run(cfg: Config) {
         info!(worker = name, "aborting worker");
         handle.abort();
     }
+
+    health_server.abort();
 
     info!("ingestion-gateway stopped");
 }

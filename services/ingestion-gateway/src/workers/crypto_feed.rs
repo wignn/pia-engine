@@ -1,5 +1,5 @@
 use atlsd_eventbus::subjects;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
@@ -8,9 +8,13 @@ use serde_json::json;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
 
-use super::reconnect::ReconnectPolicy;
+use super::{
+    publish_queue::{PublishEvent, PublishQueue, enqueue_or_drop, spawn_publisher},
+    reconnect::ReconnectPolicy,
+};
 use crate::broker::BrokerPublisher;
 use crate::config::Config;
+use crate::health::HealthRegistry;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -58,12 +62,24 @@ const WORKER: &str = "crypto_feed";
 const FEED: &str = "crypto";
 const SOURCE: &str = "market_data";
 const TOPIC: &str = subjects::MD_RAW_CRYPTO_TRADES_V1;
+const PUBLISH_TIMEOUT: Duration = Duration::from_secs(5);
+const READ_IDLE_TIMEOUT: Duration = Duration::from_secs(90);
+const PUBLISH_QUEUE_CAPACITY: usize = 50_000;
+const PROGRESS_LOG_INTERVAL: u64 = 10_000;
 const DEFAULT_SYMBOLS: &[&str] = &[
     "btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt", "dogeusdt", "adausdt",
 ];
 
-pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
+pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: HealthRegistry) {
     let mut backoff = ReconnectPolicy::new(cfg.reconnect_base_sec, cfg.reconnect_max_sec);
+    let publish_queue = spawn_publisher(
+        WORKER,
+        broker,
+        health.clone(),
+        PUBLISH_QUEUE_CAPACITY,
+        PUBLISH_TIMEOUT,
+        PROGRESS_LOG_INTERVAL,
+    );
 
     let symbols = if cfg.crypto_symbols.is_empty() {
         DEFAULT_SYMBOLS
@@ -97,6 +113,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
         let ws_stream = match connect_async(&url).await {
             Ok((stream, _response)) => {
                 info!(worker = WORKER, "websocket connected");
+                health.set_connected(WORKER, true).await;
                 backoff.reset();
                 stream
             }
@@ -110,37 +127,54 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
 
         let (mut write, mut read) = ws_stream.split();
         let mut tick_count: u64 = 0;
+        let mut queued_count: u64 = 0;
 
         let disconnect_reason: &str;
 
         loop {
-            match read.next().await {
-                Some(Ok(Message::Text(text))) => {
-                    if let Err(e) = handle_message(&text, &*broker, &mut tick_count).await {
+            match tokio::time::timeout(READ_IDLE_TIMEOUT, read.next()).await {
+                Ok(Some(Ok(Message::Text(text)))) => {
+                    if let Err(e) = handle_message(
+                        &text,
+                        &publish_queue,
+                        &health,
+                        &mut tick_count,
+                        &mut queued_count,
+                    ) {
                         debug!(worker = WORKER, error = %e, "message handling error");
                     }
                 }
-                Some(Ok(Message::Ping(data))) => {
+                Ok(Some(Ok(Message::Ping(data)))) => {
                     if let Err(e) = write.send(Message::Pong(data)).await {
                         warn!(worker = WORKER, error = %e, "pong send failed");
                     }
                 }
-                Some(Ok(Message::Close(_))) => {
+                Ok(Some(Ok(Message::Close(_)))) => {
                     info!(worker = WORKER, "server sent close frame");
                     disconnect_reason = "server_close";
                     break;
                 }
-                Some(Err(e)) => {
+                Ok(Some(Err(e))) => {
                     error!(worker = WORKER, error = %e, "websocket read error");
                     disconnect_reason = "read_error";
                     break;
                 }
-                None => {
+                Ok(None) => {
                     info!(worker = WORKER, "websocket stream ended");
                     disconnect_reason = "stream_end";
                     break;
                 }
-                _ => {}
+                Ok(Some(Ok(_))) => {}
+                Err(_) => {
+                    warn!(
+                        worker = WORKER,
+                        idle_secs = READ_IDLE_TIMEOUT.as_secs(),
+                        ticks = tick_count,
+                        "websocket read idle timeout"
+                    );
+                    disconnect_reason = "read_idle_timeout";
+                    break;
+                }
             }
         }
 
@@ -148,8 +182,10 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
             worker = WORKER,
             reason = disconnect_reason,
             ticks = tick_count,
+            queued = queued_count,
             "disconnecting websocket"
         );
+        health.record_disconnect(WORKER, disconnect_reason).await;
 
         let _ = write.send(Message::Close(None)).await;
         let _ = write.close().await;
@@ -164,10 +200,12 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
     }
 }
 
-async fn handle_message(
+fn handle_message(
     text: &str,
-    broker: &dyn BrokerPublisher,
+    publish_queue: &PublishQueue,
+    health: &HealthRegistry,
     tick_count: &mut u64,
+    queued_count: &mut u64,
 ) -> anyhow::Result<()> {
     let event = parse_trade_message(text)?;
 
@@ -183,6 +221,7 @@ async fn handle_message(
     }
 
     *tick_count += 1;
+    let health = health.clone();
 
     let payload = json!({
         "feed": FEED,
@@ -195,10 +234,26 @@ async fn handle_message(
         "received_at": Utc::now().to_rfc3339(),
     });
 
-    let payload_str = payload.to_string();
-    if let Err(e) = broker.publish(TOPIC, &payload_str).await {
-        warn!(worker = WORKER, error = %e, symbol = %event.symbol, "broker publish failed");
-    }
+    let queued = enqueue_or_drop(
+        WORKER,
+        publish_queue,
+        PublishEvent {
+            subject: TOPIC,
+            payload: payload.to_string(),
+            symbol: event.symbol,
+        },
+        queued_count,
+    );
+    let queue_depth = PUBLISH_QUEUE_CAPACITY.saturating_sub(publish_queue.capacity());
+
+    tokio::spawn(async move {
+        health.record_tick(WORKER).await;
+        if queued {
+            health.record_queued(WORKER, queue_depth).await;
+        } else {
+            health.record_drop(WORKER, queue_depth).await;
+        }
+    });
 
     Ok(())
 }

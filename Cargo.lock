@@ -1578,6 +1578,7 @@ dependencies = [
  "async-trait",
  "atlsd-eventbus",
  "atlsd-observability",
+ "axum",
  "chrono",
  "dotenvy",
  "futures-util",

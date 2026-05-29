@@ -1,5 +1,6 @@
 mod broker;
 mod config;
+mod health;
 mod market_hours;
 mod runtime;
 mod workers;
