@@ -5,13 +5,13 @@ use std::time::Duration;
 use atlsd_eventbus::subjects;
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
-use serde_json::{Value, json};
-use tokio::time::{MissedTickBehavior, interval};
+use serde_json::{json, Value};
+use tokio::time::{interval, MissedTickBehavior};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
 
 use super::{
-    publish_queue::{PublishEvent, PublishQueue, enqueue_or_drop, spawn_publisher},
+    publish_queue::{enqueue_or_drop, spawn_publisher, PublishEvent, PublishQueue},
     reconnect::ReconnectPolicy,
 };
 use crate::broker::BrokerPublisher;

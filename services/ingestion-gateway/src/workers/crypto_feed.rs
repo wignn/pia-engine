@@ -9,7 +9,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
 
 use super::{
-    publish_queue::{PublishEvent, PublishQueue, enqueue_or_drop, spawn_publisher},
+    publish_queue::{enqueue_or_drop, spawn_publisher, PublishEvent, PublishQueue},
     reconnect::ReconnectPolicy,
 };
 use crate::broker::BrokerPublisher;

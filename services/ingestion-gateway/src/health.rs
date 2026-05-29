@@ -4,7 +4,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::get};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use serde::Serialize;
 use tokio::{net::TcpListener, sync::RwLock};
 use tracing::{error, info};
@@ -153,7 +153,11 @@ impl HealthRegistry {
                         .unwrap_or(true))
         });
 
-        if unhealthy { "degraded" } else { "healthy" }
+        if unhealthy {
+            "degraded"
+        } else {
+            "healthy"
+        }
     }
 }
 
