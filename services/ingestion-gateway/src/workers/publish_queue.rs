@@ -43,7 +43,7 @@ pub fn spawn_publisher(
                 Ok(Ok(())) => {
                     published_count += 1;
                     health.record_published(worker, rx.len()).await;
-                    if published_count % progress_log_interval == 0 {
+                    if published_count.is_multiple_of(progress_log_interval) {
                         info!(
                             worker,
                             subject = event.subject,
