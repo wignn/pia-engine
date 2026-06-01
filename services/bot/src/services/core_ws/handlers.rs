@@ -1,215 +1,32 @@
 use crate::repository::{
-    CalendarRepository, DbPool, ForexRepository, StockRepository, TwitterRepository,
-    VolatilityRepository,
+    CalendarRepository, ForexRepository, StockRepository, TwitterRepository, VolatilityRepository,
 };
-use futures_util::{SinkExt, StreamExt};
-use poise::serenity_prelude::{ChannelId, CreateEmbed, CreateEmbedFooter, CreateMessage, Http};
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use poise::serenity_prelude::{ChannelId, CreateEmbed, CreateEmbedFooter, CreateMessage};
 
-const RECONNECT_DELAY_BASE: u64 = 5;
-const RECONNECT_DELAY_MAX: u64 = 300;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CoreEvent {
-    pub event: String,
-    pub data: Option<serde_json::Value>,
-    pub channel: Option<String>,
-    pub timestamp: Option<String>,
-    pub message: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ArticleData {
-    pub id: String,
-    #[serde(alias = "original_title")]
-    pub title: String,
-    #[serde(alias = "translated_title")]
-    pub title_id: Option<String>,
-    pub summary: Option<String>,
-    pub summary_id: Option<String>,
-    pub source_name: String,
-    #[serde(alias = "url")]
-    pub original_url: String,
-    pub sentiment: Option<String>,
-    pub impact_level: Option<String>,
-    #[serde(default)]
-    pub currency_pairs: Vec<String>,
-    pub published_at: Option<String>,
-    pub processed_at: Option<String>,
-    pub image_url: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct DiscordEmbed {
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub url: Option<String>,
-    pub color: Option<u32>,
-    pub fields: Option<Vec<EmbedField>>,
-    pub thumbnail: Option<EmbedMedia>,
-    pub image: Option<EmbedMedia>,
-    pub footer: Option<EmbedFooter>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct EmbedField {
-    pub name: String,
-    pub value: String,
-    #[serde(default)]
-    pub inline: bool,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct EmbedMedia {
-    pub url: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct EmbedFooter {
-    pub text: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct CalendarEventData {
-    pub event_id: String,
-    pub title: String,
-    pub currency: String,
-    pub date_wib: String,
-    pub impact: String,
-    pub forecast: String,
-    pub previous: String,
-    pub minutes_until: i32,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct TweetData {
-    pub id: String,
-    pub text: String,
-    pub author_username: String,
-    pub author_name: String,
-    pub author_avatar: Option<String>,
-    pub created_at: Option<String>,
-    pub url: String,
-    #[serde(default)]
-    pub media_urls: Vec<String>,
-}
-
-pub struct RealtimeWsService {
-    db: DbPool,
-    http: Arc<Http>,
-    realtime_url: String,
-    bot_id: String,
-}
+use super::RealtimeWsService;
+use super::embed::build_embed;
+use super::types::{ArticleData, CalendarEventData, CoreEvent, DiscordEmbed, TweetData};
 
 impl RealtimeWsService {
-    pub fn new(db: DbPool, http: Arc<Http>, realtime_url: String, bot_id: String) -> Self {
-        Self {
-            db,
-            http,
-            realtime_url,
-            bot_id,
-        }
-    }
-
-    pub async fn start(self: Arc<Self>) {
-        println!("[REALTIME-WS] Starting unified WebSocket service...");
-        let mut reconnect_delay = RECONNECT_DELAY_BASE;
-
-        loop {
-            match self.connect_and_listen().await {
-                Ok(_) => {
-                    println!("[REALTIME-WS] Connection closed normally");
-                    reconnect_delay = RECONNECT_DELAY_BASE;
-                }
-                Err(e) => {
-                    println!("[REALTIME-WS] Connection error: {}", e);
-                }
-            }
-            println!(
-                "[REALTIME-WS] Reconnecting in {} seconds...",
-                reconnect_delay
-            );
-            tokio::time::sleep(Duration::from_secs(reconnect_delay)).await;
-            reconnect_delay = (reconnect_delay * 2).min(RECONNECT_DELAY_MAX);
-        }
-    }
-
-    async fn connect_and_listen(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let url = format!(
-            "{}/api/v1/ws?bot_id={}&channels=all",
-            self.realtime_url, self.bot_id
-        );
-        println!("[REALTIME-WS] Connecting to: {}", url);
-
-        let (ws_stream, _) = connect_async(&url).await?;
-        let (mut write, mut read) = ws_stream.split();
-        println!("[OK] Realtime WebSocket connected!");
-
-        let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(30));
-
-        loop {
-            tokio::select! {
-                _ = heartbeat_interval.tick() => {
-                    let hb = serde_json::json!({"event": "heartbeat", "data": {}});
-                    write.send(Message::Text(hb.to_string())).await?;
-                }
-                msg = read.next() => {
-                    match msg {
-                        Some(Ok(Message::Text(text))) => {
-                            if let Err(e) = self.handle_message(&text).await {
-                                println!("[REALTIME-WS] Error handling message: {}", e);
-                            }
-                        }
-                        Some(Ok(Message::Close(_))) => {
-                            println!("[REALTIME-WS] Server closed connection");
-                            break;
-                        }
-                        Some(Ok(Message::Ping(data))) => {
-                            write.send(Message::Pong(data)).await?;
-                        }
-                        Some(Err(e)) => return Err(Box::new(e)),
-                        None => break,
-                        _ => {}
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    async fn handle_message(
+    pub(super) async fn handle_message(
         &self,
         text: &str,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let event: CoreEvent = serde_json::from_str(text)?;
 
         match event.event.as_str() {
-            "news.new" | "news.high_impact" => {
-                self.handle_news_event(&event).await?;
-            }
+            "news.new" | "news.high_impact" => self.handle_news_event(&event).await?,
             "stock.news.new" | "stock.news.high_impact" | "equity.news.new" => {
                 self.handle_stock_news_event(&event).await?;
             }
-            "calendar.reminder" => {
-                self.handle_calendar_event(&event).await?;
-            }
-            "gold.volatility_spike" => {
-                self.handle_volatility_spike(&event).await?;
-            }
-            "twitter.new" | "x.new" => {
-                self.handle_twitter_event(&event).await?;
-            }
-            "market.trade" => {
-                self.handle_market_trade(text).await;
-            }
+            "calendar.reminder" => self.handle_calendar_event(&event).await?,
+            "gold.volatility_spike" => self.handle_volatility_spike(&event).await?,
+            "twitter.new" | "x.new" => self.handle_twitter_event(&event).await?,
+            "market.trade" => self.handle_market_trade(text).await,
             "connected" | "subscribed" | "heartbeat" => {}
-            _ => {
-                println!("[REALTIME-WS] Unknown event: {}", event.event);
-            }
+            _ => println!("[REALTIME-WS] Unknown event: {}", event.event),
         }
+
         Ok(())
     }
 
@@ -249,7 +66,7 @@ impl RealtimeWsService {
             return Ok(());
         }
 
-        let embed = self.build_embed(&discord_embed);
+        let embed = build_embed(&discord_embed);
         let is_high_impact = event.event == "news.high_impact";
         let mention = data
             .get("mention_everyone")
@@ -269,6 +86,7 @@ impl RealtimeWsService {
                 );
             }
         }
+
         ForexRepository::insert_news(&self.db, &article.id, &article.source_name).await?;
         println!(
             "[REALTIME-WS] Sent forex news to {} channels: {}",
@@ -296,7 +114,7 @@ impl RealtimeWsService {
             return Ok(());
         }
 
-        let embed = self.build_embed(&discord_embed);
+        let embed = build_embed(&discord_embed);
         let is_high_impact = event.event == "stock.news.high_impact";
 
         for channel in &channels {
@@ -312,6 +130,7 @@ impl RealtimeWsService {
                 );
             }
         }
+
         StockRepository::insert_stock_news(&self.db, &article.id, &article.source_name).await?;
         println!(
             "[REALTIME-WS] Sent stock news to {} channels: {}",
@@ -371,6 +190,7 @@ impl RealtimeWsService {
                 );
             }
         }
+
         CalendarRepository::insert_event(&self.db, &cal.event_id, &cal.title).await?;
         println!(
             "[REALTIME-WS] Sent calendar reminder to {} channels: {}",
@@ -393,8 +213,8 @@ impl RealtimeWsService {
             return Ok(());
         }
 
-        let mut embed = self.build_embed(&discord_embed);
-        embed = embed.timestamp(poise::serenity_prelude::Timestamp::now());
+        let embed =
+            build_embed(&discord_embed).timestamp(poise::serenity_prelude::Timestamp::now());
 
         for channel in &channels {
             let channel_id = ChannelId::new(channel.channel_id as u64);
@@ -408,6 +228,7 @@ impl RealtimeWsService {
                 );
             }
         }
+
         println!(
             "[REALTIME-WS] Sent gold volatility alert to {} channels",
             channels.len()
@@ -437,8 +258,8 @@ impl RealtimeWsService {
             return Ok(());
         }
 
-        let mut embed = self.build_embed(&discord_embed);
-        embed = embed.timestamp(poise::serenity_prelude::Timestamp::now());
+        let embed =
+            build_embed(&discord_embed).timestamp(poise::serenity_prelude::Timestamp::now());
 
         for channel in &channels {
             let channel_id = ChannelId::new(channel.channel_id as u64);
@@ -450,6 +271,7 @@ impl RealtimeWsService {
                 );
             }
         }
+
         TwitterRepository::insert_tweet(&self.db, &tweet.id, &tweet.author_username).await?;
         println!(
             "[REALTIME-WS] Sent tweet to {} channels: @{}",
@@ -458,48 +280,4 @@ impl RealtimeWsService {
         );
         Ok(())
     }
-
-    /// Converts the core service's Discord embed payload into a Serenity embed.
-    fn build_embed(&self, de: &DiscordEmbed) -> CreateEmbed {
-        let mut embed = CreateEmbed::new();
-        if let Some(t) = &de.title {
-            embed = embed.title(t);
-        }
-        if let Some(d) = &de.description {
-            embed = embed.description(d);
-        }
-        if let Some(u) = &de.url {
-            embed = embed.url(u);
-        }
-        if let Some(c) = de.color {
-            embed = embed.color(c);
-        }
-        if let Some(fields) = &de.fields {
-            for f in fields {
-                embed = embed.field(&f.name, &f.value, f.inline);
-            }
-        }
-        if let Some(th) = &de.thumbnail {
-            embed = embed.thumbnail(&th.url);
-        }
-        if let Some(img) = &de.image {
-            embed = embed.image(&img.url);
-        }
-        if let Some(ft) = &de.footer {
-            embed = embed.footer(CreateEmbedFooter::new(&ft.text));
-        }
-        embed
-    }
-}
-
-pub fn start_realtime_ws_service(
-    db: DbPool,
-    http: Arc<Http>,
-    realtime_url: String,
-    bot_id: String,
-) {
-    let service = Arc::new(RealtimeWsService::new(db, http, realtime_url, bot_id));
-    tokio::spawn(async move {
-        service.start().await;
-    });
 }

@@ -1,3 +1,4 @@
+use super::{feed_channel, sent_item};
 use sqlx::SqlitePool;
 
 #[derive(Debug, Clone)]
@@ -16,35 +17,15 @@ impl ForexRepository {
         guild_id: u64,
         channel_id: u64,
     ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "INSERT INTO forex_channels (guild_id, channel_id, is_active)
-             VALUES (?, ?, 1)
-             ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id, is_active = 1",
-        )
-        .bind(guild_id as i64)
-        .bind(channel_id as i64)
-        .execute(pool)
-        .await?;
-
-        Ok(())
+        feed_channel::upsert_by_guild(pool, "forex_channels", guild_id, channel_id).await
     }
 
     pub async fn disable_channel(pool: &SqlitePool, guild_id: u64) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE forex_channels SET is_active = 0 WHERE guild_id = ?")
-            .bind(guild_id as i64)
-            .execute(pool)
-            .await?;
-
-        Ok(())
+        feed_channel::set_active_by_guild(pool, "forex_channels", guild_id, false).await
     }
 
     pub async fn enable_channel(pool: &SqlitePool, guild_id: u64) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE forex_channels SET is_active = 1 WHERE guild_id = ?")
-            .bind(guild_id as i64)
-            .execute(pool)
-            .await?;
-
-        Ok(())
+        feed_channel::set_active_by_guild(pool, "forex_channels", guild_id, true).await
     }
 
     pub async fn get_active_channels(pool: &SqlitePool) -> Result<Vec<ForexChannel>, sqlx::Error> {
@@ -87,14 +68,7 @@ impl ForexRepository {
     }
 
     pub async fn is_news_sent(pool: &SqlitePool, news_id: &str) -> Result<bool, sqlx::Error> {
-        let count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM sent_items WHERE item_id = ? AND item_type = 'news'",
-        )
-        .bind(news_id)
-        .fetch_one(pool)
-        .await?;
-
-        Ok(count.0 > 0)
+        sent_item::exists_with_type(pool, news_id, "news").await
     }
 
     pub async fn insert_news(
@@ -102,26 +76,10 @@ impl ForexRepository {
         news_id: &str,
         source: &str,
     ) -> Result<(), sqlx::Error> {
-        let now = chrono::Utc::now().timestamp();
-        sqlx::query(
-            "INSERT INTO sent_items (item_id, item_type, source, sent_at) VALUES (?, 'news', ?, ?) ON CONFLICT(item_id) DO NOTHING",
-        )
-        .bind(news_id)
-        .bind(source)
-        .bind(now)
-        .execute(pool)
-        .await?;
-
-        Ok(())
+        sent_item::insert(pool, news_id, "news", source).await
     }
 
     pub async fn cleanup_old_news(pool: &SqlitePool, days: i64) -> Result<u64, sqlx::Error> {
-        let cutoff = chrono::Utc::now().timestamp() - (days * 86400);
-        let result = sqlx::query("DELETE FROM sent_items WHERE item_type = 'news' AND sent_at < ?")
-            .bind(cutoff)
-            .execute(pool)
-            .await?;
-
-        Ok(result.rows_affected())
+        sent_item::cleanup(pool, "news", days).await
     }
 }

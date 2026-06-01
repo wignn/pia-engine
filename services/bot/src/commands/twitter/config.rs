@@ -1,11 +1,10 @@
+use super::TWITTER_COLOR;
+use crate::commands::feed_embed;
+use crate::commands::{Context, Error};
 use crate::repository::TwitterRepository;
 use poise::serenity_prelude as serenity;
 use serenity::{CreateEmbed, CreateEmbedFooter, Timestamp};
 
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, super::Data, Error>;
-
-/// Setup X/Twitter feed channel
 #[poise::command(
     slash_command,
     prefix_command,
@@ -32,7 +31,7 @@ pub async fn twitter_setup(
             Accounts to follow are configured server-side via `X_USERNAMES` env var.",
             channel_id
         ))
-        .color(serenity::Colour::from_rgb(29, 161, 242))
+        .color(TWITTER_COLOR)
         .footer(CreateEmbedFooter::new("X/Twitter Feed"))
         .timestamp(Timestamp::now());
 
@@ -53,13 +52,11 @@ pub async fn twitter_disable(ctx: Context<'_>) -> Result<(), Error> {
     let pool = ctx.data().db.as_ref();
     TwitterRepository::disable_channel(pool, guild_id).await?;
 
-    let embed = CreateEmbed::default()
-        .title("X/Twitter Feed Disabled")
-        .description(
-            "X/Twitter feed notifications have been disabled.\n\nUse `/twitter_setup` to enable again.",
-        )
-        .color(serenity::Colour::from_rgb(158, 158, 158))
-        .timestamp(Timestamp::now());
+    let embed = feed_embed::disabled(
+        "X/Twitter Feed Disabled",
+        "/twitter_setup",
+        "X/Twitter feed",
+    );
 
     ctx.send(poise::CreateReply::default().embed(embed)).await?;
     Ok(())
@@ -78,11 +75,11 @@ pub async fn twitter_enable(ctx: Context<'_>) -> Result<(), Error> {
     let pool = ctx.data().db.as_ref();
     TwitterRepository::enable_channel(pool, guild_id).await?;
 
-    let embed = CreateEmbed::default()
-        .title("X/Twitter Feed Enabled")
-        .description("X/Twitter feed notifications have been re-enabled.")
-        .color(serenity::Colour::from_rgb(29, 161, 242))
-        .timestamp(Timestamp::now());
+    let embed = feed_embed::enabled(
+        "X/Twitter Feed Enabled",
+        "X/Twitter feed notifications have been re-enabled.",
+        TWITTER_COLOR,
+    );
 
     ctx.send(poise::CreateReply::default().embed(embed)).await?;
     Ok(())
@@ -96,28 +93,13 @@ pub async fn twitter_status(ctx: Context<'_>) -> Result<(), Error> {
     let pool = ctx.data().db.as_ref();
     let channel = TwitterRepository::get_channel(pool, guild_id).await?;
 
-    let embed = match channel {
-        Some(ch) => {
-            let status = if ch.is_active { "Active" } else { "Disabled" };
-            let color = if ch.is_active {
-                serenity::Colour::from_rgb(29, 161, 242)
-            } else {
-                serenity::Colour::from_rgb(158, 158, 158)
-            };
-
-            CreateEmbed::default()
-                .title("X/Twitter Feed Status")
-                .field("Status", status, true)
-                .field("Channel", format!("<#{}>", ch.channel_id), true)
-                .color(color)
-                .timestamp(Timestamp::now())
-        }
-        None => CreateEmbed::default()
-            .title("X/Twitter Feed Status")
-            .description("Not configured. Use `/twitter_setup` to enable.")
-            .color(serenity::Colour::from_rgb(158, 158, 158))
-            .timestamp(Timestamp::now()),
-    };
+    let embed = feed_embed::status(
+        "X/Twitter Feed Status",
+        "/twitter_setup",
+        channel.map(|ch| (ch.channel_id, ch.is_active)),
+        TWITTER_COLOR,
+        &[],
+    );
 
     ctx.send(poise::CreateReply::default().embed(embed)).await?;
     Ok(())

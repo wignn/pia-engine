@@ -1,8 +1,7 @@
 use chrono::{Duration, Utc};
 use poise::serenity_prelude::{self as serenity, GetMessages};
 
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, super::Data, Error>;
+use super::{Context, Error};
 
 #[poise::command(prefix_command, guild_only)]
 pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {

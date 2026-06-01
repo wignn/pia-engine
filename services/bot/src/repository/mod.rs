@@ -1,8 +1,10 @@
 pub mod calendar;
 pub mod connection;
+mod feed_channel;
 pub mod forex;
 pub mod moderation;
 pub mod price_alert;
+mod sent_item;
 pub mod stock;
 pub mod twitter;
 pub mod volatility;

@@ -1,3 +1,4 @@
+use super::sent_item;
 use sqlx::SqlitePool;
 
 #[derive(Debug, Clone)]
@@ -117,12 +118,7 @@ impl StockRepository {
 
     pub async fn is_stock_news_sent(pool: &SqlitePool, news_id: &str) -> Result<bool, sqlx::Error> {
         let prefixed_id = format!("stock_{}", news_id);
-        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM sent_items WHERE item_id = ?")
-            .bind(&prefixed_id)
-            .fetch_one(pool)
-            .await?;
-
-        Ok(count.0 > 0)
+        sent_item::exists(pool, &prefixed_id).await
     }
 
     pub async fn insert_stock_news(
@@ -131,16 +127,6 @@ impl StockRepository {
         source: &str,
     ) -> Result<(), sqlx::Error> {
         let prefixed_id = format!("stock_{}", news_id);
-        let now = chrono::Utc::now().timestamp();
-        sqlx::query(
-            "INSERT INTO sent_items (item_id, item_type, source, sent_at) VALUES (?, 'stock', ?, ?) ON CONFLICT(item_id) DO NOTHING",
-        )
-        .bind(&prefixed_id)
-        .bind(source)
-        .bind(now)
-        .execute(pool)
-        .await?;
-
-        Ok(())
+        sent_item::insert(pool, &prefixed_id, "stock", source).await
     }
 }

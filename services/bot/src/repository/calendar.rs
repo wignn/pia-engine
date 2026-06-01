@@ -1,3 +1,4 @@
+use super::sent_item;
 use sqlx::SqlitePool;
 
 #[derive(Debug, Clone)]
@@ -109,12 +110,7 @@ impl CalendarRepository {
 
     pub async fn is_event_sent(pool: &SqlitePool, event_id: &str) -> Result<bool, sqlx::Error> {
         let prefixed_id = format!("cal_{}", event_id);
-        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM sent_items WHERE item_id = ?")
-            .bind(&prefixed_id)
-            .fetch_one(pool)
-            .await?;
-
-        Ok(count.0 > 0)
+        sent_item::exists(pool, &prefixed_id).await
     }
 
     pub async fn insert_event(
@@ -123,27 +119,10 @@ impl CalendarRepository {
         event_title: &str,
     ) -> Result<(), sqlx::Error> {
         let prefixed_id = format!("cal_{}", event_id);
-        let now = chrono::Utc::now().timestamp();
-        sqlx::query(
-            "INSERT INTO sent_items (item_id, item_type, source, sent_at) VALUES (?, 'calendar', ?, ?) ON CONFLICT(item_id) DO NOTHING",
-        )
-        .bind(&prefixed_id)
-        .bind(event_title)
-        .bind(now)
-        .execute(pool)
-        .await?;
-
-        Ok(())
+        sent_item::insert(pool, &prefixed_id, "calendar", event_title).await
     }
 
     pub async fn cleanup_old_events(pool: &SqlitePool, days: i64) -> Result<u64, sqlx::Error> {
-        let cutoff = chrono::Utc::now().timestamp() - (days * 86400);
-        let result =
-            sqlx::query("DELETE FROM sent_items WHERE item_type = 'calendar' AND sent_at < ?")
-                .bind(cutoff)
-                .execute(pool)
-                .await?;
-
-        Ok(result.rows_affected())
+        sent_item::cleanup(pool, "calendar", days).await
     }
 }

@@ -1,3 +1,4 @@
+use super::feed_channel;
 use sqlx::SqlitePool;
 
 #[derive(Debug, Clone)]
@@ -16,24 +17,11 @@ impl VolatilityRepository {
         guild_id: u64,
         channel_id: u64,
     ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "INSERT INTO volatility_channels (guild_id, channel_id, is_active)
-             VALUES (?, ?, 1)
-             ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id, is_active = 1",
-        )
-        .bind(guild_id as i64)
-        .bind(channel_id as i64)
-        .execute(pool)
-        .await?;
-        Ok(())
+        feed_channel::upsert_by_guild(pool, "volatility_channels", guild_id, channel_id).await
     }
 
     pub async fn disable_channel(pool: &SqlitePool, guild_id: u64) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE volatility_channels SET is_active = 0 WHERE guild_id = ?")
-            .bind(guild_id as i64)
-            .execute(pool)
-            .await?;
-        Ok(())
+        feed_channel::set_active_by_guild(pool, "volatility_channels", guild_id, false).await
     }
 
     pub async fn get_active_channels(

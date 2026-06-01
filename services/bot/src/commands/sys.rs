@@ -1,8 +1,7 @@
 use crate::utils::sys::SysInfo;
 use poise::serenity_prelude as serenity;
 
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, super::Data, Error>;
+use super::{Context, Error};
 
 #[poise::command(slash_command, prefix_command, owners_only)]
 pub async fn sys(ctx: Context<'_>) -> Result<(), Error> {

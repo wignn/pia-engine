@@ -1,9 +1,9 @@
+use super::VOLATILITY_COLOR;
+use crate::commands::feed_embed;
+use crate::commands::{Context, Error};
 use crate::repository::VolatilityRepository;
 use poise::serenity_prelude as serenity;
 use serenity::{CreateEmbed, CreateEmbedFooter, Timestamp};
-
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, super::Data, Error>;
 
 #[poise::command(
     slash_command,
@@ -33,7 +33,7 @@ pub async fn volatility_setup(
             Detect sudden gold volatility spikes before they hit the news.",
             channel_id
         ))
-        .color(serenity::Colour::from_rgb(255, 215, 0))
+        .color(VOLATILITY_COLOR)
         .footer(CreateEmbedFooter::new("Fio Volatility Detector"))
         .timestamp(Timestamp::now());
 
@@ -53,13 +53,11 @@ pub async fn volatility_disable(ctx: Context<'_>) -> Result<(), Error> {
     let pool = ctx.data().db.as_ref();
     VolatilityRepository::disable_channel(pool, guild_id).await?;
 
-    let embed = CreateEmbed::default()
-        .title("Volatility Alerts Disabled")
-        .description(
-            "Gold volatility spike alerts have been disabled.\n\nUse `/volatility_setup` to enable again.",
-        )
-        .color(serenity::Colour::from_rgb(158, 158, 158))
-        .timestamp(Timestamp::now());
+    let embed = feed_embed::disabled(
+        "Volatility Alerts Disabled",
+        "/volatility_setup",
+        "Gold volatility spike alerts",
+    );
 
     ctx.send(poise::CreateReply::default().embed(embed)).await?;
     Ok(())
@@ -72,30 +70,16 @@ pub async fn volatility_status(ctx: Context<'_>) -> Result<(), Error> {
     let pool = ctx.data().db.as_ref();
     let channel = VolatilityRepository::get_channel(pool, guild_id).await?;
 
-    let embed = match channel {
-        Some(ch) => {
-            let status = if ch.is_active { "Active" } else { "Disabled" };
-            let color = if ch.is_active {
-                serenity::Colour::from_rgb(255, 215, 0)
-            } else {
-                serenity::Colour::from_rgb(158, 158, 158)
-            };
-
-            CreateEmbed::default()
-                .title("Gold Volatility Alert Status")
-                .field("Status", status, true)
-                .field("Channel", format!("<#{}>", ch.channel_id), true)
-                .field("Symbol", "XAUUSD", true)
-                .field("Threshold", "ATR > 2x Average", true)
-                .color(color)
-                .timestamp(Timestamp::now())
-        }
-        None => CreateEmbed::default()
-            .title("Gold Volatility Alert Status")
-            .description("Not configured. Use `/volatility_setup` to enable.")
-            .color(serenity::Colour::from_rgb(158, 158, 158))
-            .timestamp(Timestamp::now()),
-    };
+    let embed = feed_embed::status(
+        "Gold Volatility Alert Status",
+        "/volatility_setup",
+        channel.map(|ch| (ch.channel_id, ch.is_active)),
+        VOLATILITY_COLOR,
+        &[
+            ("Symbol", "XAUUSD", true),
+            ("Threshold", "ATR > 2x Average", true),
+        ],
+    );
 
     ctx.send(poise::CreateReply::default().embed(embed)).await?;
     Ok(())
