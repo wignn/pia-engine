@@ -1,0 +1,45 @@
+# ATLSD Monitoring Runbook
+
+Production-ready monitoring stack for ATLSD services. The compose file binds Grafana, Prometheus, Alertmanager, and Loki to `127.0.0.1` by default so they are not exposed publicly. Use an SSH tunnel or a protected reverse proxy to access Grafana.
+
+## Files
+
+- `infra/compose/monitoring.yml` - monitoring Docker Compose stack
+- `infra/env/monitoring.env.example` - copy to `.env.monitoring` before deploy
+- `infra/monitoring/prometheus/prometheus.yml` - scrape config
+- `infra/monitoring/prometheus/alerts.yml` - host/container/service alert rules
+- `infra/monitoring/grafana/provisioning` - datasource and dashboard provisioning
+- `infra/monitoring/loki` and `infra/monitoring/promtail` - Docker log collection
+
+## First Deploy
+
+```bash
+cd /home/wign/atlsd
+cp infra/env/monitoring.env.example infra/env/.env.monitoring
+# edit GF_SECURITY_ADMIN_PASSWORD before starting
+docker compose -f infra/compose/prod.yml -f infra/compose/monitoring.yml up -d prometheus alertmanager grafana node-exporter cadvisor blackbox-exporter loki promtail
+```
+
+## Access Grafana Safely
+
+Default bind is localhost-only on the VPS. From your local machine:
+
+```bash
+ssh -p 16134 -L 3000:127.0.0.1:3000 wign@203.175.125.130
+```
+
+Then open `http://127.0.0.1:3000`.
+
+## Production Notes
+
+- Do not change `GRAFANA_BIND`, `PROMETHEUS_BIND`, `ALERTMANAGER_BIND`, or `LOKI_BIND` to `0.0.0.0` unless a firewall and authentication are already configured.
+- Alertmanager currently uses a placeholder webhook. Replace it with an internal alert bridge or configure Grafana contact points for Discord/Telegram.
+- The first phase monitors host resources, Docker containers, HTTP health checks, and Docker logs. App-level `/metrics` can be added later per service.
+
+## Smoke Checks
+
+```bash
+docker ps --format 'table {{.Names}}	{{.Status}}' | grep -E 'grafana|prometheus|alertmanager|node-exporter|cadvisor|loki|promtail|blackbox'
+curl -fsS http://127.0.0.1:9090/-/healthy
+curl -fsS http://127.0.0.1:3000/api/health
+```
