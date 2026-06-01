@@ -1,3 +1,5 @@
+mod alert_notifier;
+mod alerts;
 mod batcher;
 mod calendar;
 mod clickhouse;
@@ -113,6 +115,11 @@ async fn main() {
         ingestion::run(ingestion_state).await;
     });
     info!(mode = %cfg.eventbus_mode, "market-data ingestion subscriber started");
+
+    let alert_state = state.clone();
+    tokio::spawn(async move {
+        alert_notifier::run(alert_state).await;
+    });
 
     let listener = match TcpListener::bind(&cfg.bind_addr).await {
         Ok(listener) => listener,

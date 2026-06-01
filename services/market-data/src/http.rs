@@ -29,6 +29,8 @@ pub fn build_router(state: AppState) -> Router {
             get(crate::data_quality::data_quality),
         )
         .route("/api/v1/market/spikes", get(crate::spikes::spikes))
+        .route("/api/v1/market/alerts", get(crate::alerts::alerts))
+        .route("/api/v1/market/smart-alerts", get(crate::alerts::alerts))
         .layer(cors)
         .with_state(state)
 }

@@ -37,6 +37,11 @@ pub fn build_router(state: AppState) -> Router {
             any(crate::proxy::proxy_request),
         )
         .route("/api/v1/market/spikes", any(crate::proxy::proxy_request))
+        .route("/api/v1/market/alerts", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/market/smart-alerts",
+            any(crate::proxy::proxy_request),
+        )
         .route(
             "/api/v1/market/why/{symbol}",
             any(crate::proxy::proxy_request),

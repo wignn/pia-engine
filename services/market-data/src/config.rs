@@ -14,6 +14,9 @@ pub struct Config {
     pub clickhouse_password: String,
     pub write_latest: bool,
     pub calendar_refresh_sec: u64,
+    pub alert_notifications_enabled: bool,
+    pub alert_scan_sec: u64,
+    pub alert_cooldown_sec: u64,
 }
 
 impl Config {
@@ -46,6 +49,9 @@ impl Config {
             clickhouse_password: get_env("CLICKHOUSE_PASSWORD", ""),
             write_latest: get_env_bool("MARKET_DATA_WRITE_LATEST", false),
             calendar_refresh_sec: get_env_u64("MARKET_CALENDAR_REFRESH_SEC", 300).max(60),
+            alert_notifications_enabled: get_env_bool("ALERT_NOTIFICATIONS_ENABLED", false),
+            alert_scan_sec: get_env_u64("ALERT_SCAN_SEC", 30).max(10),
+            alert_cooldown_sec: get_env_u64("ALERT_COOLDOWN_SEC", 900).max(60),
         }
     }
 

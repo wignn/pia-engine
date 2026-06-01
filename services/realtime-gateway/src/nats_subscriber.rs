@@ -11,6 +11,7 @@ const SUBJECTS: &[&str] = &[
     subjects::MD_RAW_SECONDARY_FX_QUOTES_V1,
     subjects::MD_RAW_CRYPTO_TRADES_V1,
     subjects::MD_RAW_INDEX_QUOTES_V1,
+    subjects::MARKET_ALERTS_V1,
     subjects::NEWS_FOREX_PROCESSED_V1,
     subjects::NEWS_STOCK_PROCESSED_V1,
 ];
@@ -48,6 +49,9 @@ async fn subscribe_loop(nats_url: &str, hub: &Arc<Hub>) -> anyhow::Result<()> {
             }
             subjects::NEWS_STOCK_PROCESSED_V1 => {
                 broadcast_news(hub, "stock.news.new", payload, "stock_news").await
+            }
+            subjects::MARKET_ALERTS_V1 => {
+                broadcast_news(hub, "market.alert", payload, "market_alerts").await
             }
             _ => match market_tick(payload) {
                 Ok(Some(tick)) => {

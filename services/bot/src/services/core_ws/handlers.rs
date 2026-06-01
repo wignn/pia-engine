@@ -21,6 +21,7 @@ impl RealtimeWsService {
             }
             "calendar.reminder" => self.handle_calendar_event(&event).await?,
             "gold.volatility_spike" => self.handle_volatility_spike(&event).await?,
+            "market.alert" => self.handle_alert(&event).await?,
             "twitter.new" | "x.new" => self.handle_twitter_event(&event).await?,
             "market.trade" => self.handle_market_trade(text).await,
             "connected" | "subscribed" | "heartbeat" => {}
@@ -231,6 +232,41 @@ impl RealtimeWsService {
 
         println!(
             "[REALTIME-WS] Sent gold volatility alert to {} channels",
+            channels.len()
+        );
+        Ok(())
+    }
+
+    async fn handle_alert(
+        &self,
+        event: &CoreEvent,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let data = event.data.as_ref().ok_or("No data")?;
+        let discord_embed: DiscordEmbed =
+            serde_json::from_value(data.get("discord_embed").cloned().ok_or("No embed")?)?;
+
+        let channels = VolatilityRepository::get_active_channels(&self.db).await?;
+        if channels.is_empty() {
+            return Ok(());
+        }
+
+        let embed =
+            build_embed(&discord_embed).timestamp(poise::serenity_prelude::Timestamp::now());
+        for channel in &channels {
+            let channel_id = ChannelId::new(channel.channel_id as u64);
+            let message = CreateMessage::new()
+                .content("@everyone **MARKET ALERT**")
+                .embed(embed.clone());
+            if let Err(e) = channel_id.send_message(&self.http, message).await {
+                println!(
+                    "[REALTIME-WS] Failed to send alert to {}: {}",
+                    channel.channel_id, e
+                );
+            }
+        }
+
+        println!(
+            "[REALTIME-WS] Sent market alert to {} channels",
             channels.len()
         );
         Ok(())
