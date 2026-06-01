@@ -31,7 +31,7 @@ groups:
   - name: containers
     rules:
       - alert: ContainerDown
-        expr: absent(container_last_seen{name=~"api-gateway|market-data|realtime-gateway|ingestion-gateway|bot|news-service|intelligence-service|postgres-prod|clickhouse-prod|redis-prod|nats"})
+        expr: absent(container_last_seen{image!="",name=~"api-gateway|market-data|realtime-gateway|ingestion-gateway|bot|news-service|intelligence-service|postgres-prod|clickhouse-prod|redis-prod|nats"})
         for: 2m
         labels:
           severity: critical
@@ -40,7 +40,7 @@ groups:
           description: "One of the required ATLSD containers is not visible to cAdvisor."
 
       - alert: ContainerHighMemory
-        expr: (container_memory_working_set_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100 > 90
+        expr: (container_memory_working_set_bytes{image!="",name!=""} / container_spec_memory_limit_bytes{image!="",name!=""}) * 100 > 90
         for: 10m
         labels:
           severity: warning
