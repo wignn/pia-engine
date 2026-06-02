@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1.7
+
+FROM oven/bun:1.1-alpine AS deps
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY apps/public-web/package.json apps/public-web/bun.lock ./
+RUN bun install --frozen-lockfile
+
+FROM oven/bun:1.1-alpine AS builder
+WORKDIR /app
+
+ARG VITE_API_BASE=/api/v1
+ARG VITE_CORE_API_BASE=http://localhost:8090
+ARG VITE_CORE_WS_BASE=ws://localhost:8090
+ENV VITE_API_BASE=$VITE_API_BASE \
+    VITE_CORE_API_BASE=$VITE_CORE_API_BASE \
+    VITE_CORE_WS_BASE=$VITE_CORE_WS_BASE
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY apps/public-web/ ./
+RUN bun run build
+
+FROM oven/bun:1.1-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=3000
+
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/package.json ./package.json
+
+EXPOSE 3000
+CMD ["bun", "build/index.js"]

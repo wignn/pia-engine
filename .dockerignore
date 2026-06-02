@@ -11,3 +11,11 @@ target
 Thumbs.db
 portal/node_modules
 portal/dist
+**/node_modules
+**/.svelte-kit
+**/build
+**/dist
+**/.vite
+**/.env
+**/.env.*
+**/*.log
