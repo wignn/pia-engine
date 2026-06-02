@@ -140,7 +140,10 @@ async fn ws_handler_inner(
         Some(registry) => registry.validate_key(raw_key).await,
         None => None,
     };
-    let authenticated = tenant_context.is_some() || state.config.api_keys.contains(raw_key);
+    let admin_authenticated =
+        !state.config.admin_api_key.is_empty() && raw_key == &state.config.admin_api_key;
+    let authenticated =
+        admin_authenticated || tenant_context.is_some() || state.config.api_keys.contains(raw_key);
     if !authenticated {
         return reject_ws(
             &state,
@@ -148,19 +151,27 @@ async fn ws_handler_inner(
             "Valid API key required for WebSocket connection",
         );
     }
-    let api_key_id = tenant_context
-        .as_ref()
-        .map(|tenant| tenant.api_key_id.to_string())
-        .unwrap_or_else(|| {
-            let mut hasher = DefaultHasher::new();
-            raw_key.hash(&mut hasher);
-            hasher.finish().to_string()
-        });
-    let connection_limit = tenant_context
-        .as_ref()
-        .map(|tenant| tenant.ws_connections)
-        .or_else(|| state.config.api_key_connection_limits.get(raw_key).copied())
-        .unwrap_or(i32::MAX);
+    let api_key_id = if admin_authenticated {
+        "admin".to_string()
+    } else {
+        tenant_context
+            .as_ref()
+            .map(|tenant| tenant.api_key_id.to_string())
+            .unwrap_or_else(|| {
+                let mut hasher = DefaultHasher::new();
+                raw_key.hash(&mut hasher);
+                hasher.finish().to_string()
+            })
+    };
+    let connection_limit = if admin_authenticated {
+        i32::MAX
+    } else {
+        tenant_context
+            .as_ref()
+            .map(|tenant| tenant.ws_connections)
+            .or_else(|| state.config.api_key_connection_limits.get(raw_key).copied())
+            .unwrap_or(i32::MAX)
+    };
     if !state
         .hub
         .try_acquire_api_key_slot(&api_key_id, connection_limit)
@@ -218,10 +229,14 @@ async fn generate_ws_ticket(
         .map(|s| s.strip_prefix("Bearer ").unwrap_or(s).to_string())
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    let valid = match &state.tenant_registry {
-        Some(registry) => registry.validate_key(&api_key).await.is_some(),
-        None => false,
-    } || state.config.api_keys.contains(&api_key);
+    let admin_authenticated =
+        !state.config.admin_api_key.is_empty() && api_key == state.config.admin_api_key;
+    let valid = admin_authenticated
+        || match &state.tenant_registry {
+            Some(registry) => registry.validate_key(&api_key).await.is_some(),
+            None => false,
+        }
+        || state.config.api_keys.contains(&api_key);
     if !valid {
         return Err(StatusCode::UNAUTHORIZED);
     }

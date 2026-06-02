@@ -37,7 +37,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -108,7 +108,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success{group=\"atlsd-services\",service=\"api-gateway\"}",
@@ -122,7 +122,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -193,7 +193,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success{group=\"atlsd-services\",service=\"market-data\"}",
@@ -207,7 +207,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -278,7 +278,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success{group=\"atlsd-services\",service=\"realtime-gateway\"}",
@@ -292,7 +292,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -363,7 +363,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success{group=\"atlsd-services\",service=\"news-service\"}",
@@ -377,7 +377,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -448,7 +448,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success{group=\"atlsd-services\",service=\"intelligence-service\"}",
@@ -462,7 +462,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -533,7 +533,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success{group=\"atlsd-services\",service=\"world-control-plane\"}",
@@ -547,7 +547,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -618,7 +618,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success{group=\"atlsd-services\",service=\"ingestion-gateway\"}",
@@ -632,7 +632,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -691,7 +691,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "sum(probe_success{group=\"atlsd-services\"} == 0)",
@@ -705,7 +705,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 5,
@@ -775,16 +775,19 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success{group=\"atlsd-services\"}",
           "instant": false,
           "legendFormat": "{{service}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "2m"
         }
-      ]
+      ],
+      "maxDataPoints": 80,
+      "interval": "2m"
     },
     {
       "collapsed": false,
@@ -802,7 +805,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -873,7 +876,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success{group=\"atlsd-services\",service=\"realtime-gateway\"}",
@@ -887,7 +890,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -946,7 +949,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "atlsd_realtime_ws_active_connections",
@@ -960,7 +963,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -1019,7 +1022,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(atlsd_realtime_ws_messages_out_total[1m])",
@@ -1033,7 +1036,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -1092,7 +1095,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(atlsd_realtime_ws_send_failures_total[1m])",
@@ -1106,7 +1109,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -1165,7 +1168,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
@@ -1179,7 +1182,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 3,
@@ -1238,7 +1241,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
@@ -1265,7 +1268,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 6,
@@ -1347,45 +1350,50 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(atlsd_realtime_ws_messages_out_total[1m])",
           "instant": false,
           "legendFormat": "out /s",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "30s"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(atlsd_realtime_ws_messages_in_total[1m])",
           "instant": false,
           "legendFormat": "in /s",
           "range": true,
-          "refId": "B"
+          "refId": "B",
+          "interval": "30s"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(atlsd_realtime_ws_commands_total[1m])",
           "instant": false,
           "legendFormat": "commands /s",
           "range": true,
-          "refId": "C"
+          "refId": "C",
+          "interval": "30s"
         }
-      ]
+      ],
+      "maxDataPoints": 300,
+      "interval": "30s"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 6,
@@ -1467,45 +1475,50 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(atlsd_realtime_ws_broadcast_recipients_total[1m])",
           "instant": false,
           "legendFormat": "fanout /s",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "30s"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(atlsd_realtime_ws_send_failures_total[1m])",
           "instant": false,
           "legendFormat": "send failures /s",
           "range": true,
-          "refId": "B"
+          "refId": "B",
+          "interval": "30s"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(atlsd_realtime_ws_connection_rejections_total[1m])",
           "instant": false,
           "legendFormat": "rejects /s",
           "range": true,
-          "refId": "C"
+          "refId": "C",
+          "interval": "30s"
         }
-      ]
+      ],
+      "maxDataPoints": 300,
+      "interval": "30s"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 6,
@@ -1587,28 +1600,32 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(atlsd_realtime_ws_pings_total[1m])",
           "instant": false,
           "legendFormat": "ping /s",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "30s"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(atlsd_realtime_ws_pongs_total[1m])",
           "instant": false,
           "legendFormat": "pong /s",
           "range": true,
-          "refId": "B"
+          "refId": "B",
+          "interval": "30s"
         }
-      ]
+      ],
+      "maxDataPoints": 300,
+      "interval": "30s"
     },
     {
       "collapsed": false,
@@ -1626,7 +1643,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 5,
@@ -1687,21 +1704,22 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_duration_seconds{group=\"atlsd-services\"}",
-          "instant": false,
+          "instant": true,
           "legendFormat": "{{service}}",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
-      ]
+      ],
+      "maxDataPoints": 100
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 5,
@@ -1783,16 +1801,19 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_duration_seconds{group=\"atlsd-services\",service=\"realtime-gateway\"}",
           "instant": false,
           "legendFormat": "realtime-gateway",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "30s"
         }
-      ]
+      ],
+      "maxDataPoints": 300,
+      "interval": "30s"
     },
     {
       "collapsed": false,
@@ -1810,7 +1831,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 6,
@@ -1892,21 +1913,24 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
           "instant": false,
           "legendFormat": "CPU %",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "30s"
         }
-      ]
+      ],
+      "maxDataPoints": 300,
+      "interval": "30s"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 6,
@@ -1988,21 +2012,24 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
           "instant": false,
           "legendFormat": "Memory %",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "30s"
         }
-      ]
+      ],
+      "maxDataPoints": 300,
+      "interval": "30s"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 6,
@@ -2084,21 +2111,24 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "100 - ((node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|ramfs\"} * 100) / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|ramfs\"})",
           "instant": false,
           "legendFormat": "{{mountpoint}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "30s"
         }
-      ]
+      ],
+      "maxDataPoints": 300,
+      "interval": "30s"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 6,
@@ -2159,21 +2189,22 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "topk(12, atlsd_docker_container_cpu_percent)",
-          "instant": false,
+          "instant": true,
           "legendFormat": "{{container}}",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
-      ]
+      ],
+      "maxDataPoints": 100
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 6,
@@ -2226,16 +2257,17 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "topk(12, atlsd_docker_container_memory_usage_bytes)",
-          "instant": false,
+          "instant": true,
           "legendFormat": "{{container}}",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
-      ]
+      ],
+      "maxDataPoints": 100
     },
     {
       "collapsed": false,
@@ -2253,7 +2285,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 6,
@@ -2335,16 +2367,19 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "sum by(container) (rate(loki_log_messages_total{level=~\"error|ERROR\"}[5m]))",
           "instant": false,
           "legendFormat": "{{container}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "30s"
         }
-      ]
+      ],
+      "maxDataPoints": 300,
+      "interval": "30s"
     }
   ]
 }

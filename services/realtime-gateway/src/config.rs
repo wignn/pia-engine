@@ -4,6 +4,7 @@ use atlsd_common::config::{get_env, get_env_u64};
 pub struct Config {
     pub bind_addr: String,
     pub api_keys: Vec<String>,
+    pub admin_api_key: String,
     pub api_key_connection_limits: std::collections::HashMap<String, i32>,
     pub log_level: String,
     pub database_url: String,
@@ -32,6 +33,7 @@ impl Config {
         Self {
             bind_addr,
             api_keys,
+            admin_api_key: get_env("ADMIN_API_KEY", ""),
             api_key_connection_limits: parse_key_limits(&get_env(
                 "API_KEY_WS_CONNECTION_LIMITS",
                 "",
