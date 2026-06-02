@@ -15,7 +15,7 @@ export const wsConnects = new Counter('ws_connects');
 export const wsMessages = new Counter('ws_messages');
 export const wsErrors = new Counter('ws_errors');
 export const wsConnected = new Rate('ws_connected');
-export const wsSessionDuration = new Trend('ws_session_duration');
+export const atlsdWsSessionDuration = new Trend('atlsd_ws_session_duration');
 
 export const options = {
   scenarios: {
@@ -53,18 +53,21 @@ function ticket() {
   return res.json('ticket');
 }
 
-function connectionUrl() {
-  const url = new URL(joinUrl(WS_URL, '/ws/v1'));
-  url.searchParams.set('bot_id', `${BOT_ID}_${__VU}_${__ITER}`);
-  url.searchParams.set('symbols', SYMBOL);
+function query(params) {
+  return Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    .join('&');
+}
 
+function connectionUrl() {
   const t = ticket();
-  if (t) {
-    url.searchParams.set('ticket', t);
-  } else if (API_KEY) {
-    url.searchParams.set('api_key', API_KEY);
-  }
-  return url.toString();
+  const auth = t ? { ticket: t } : { api_key: API_KEY };
+  return `${joinUrl(WS_URL, '/ws/v1')}?${query({
+    bot_id: `${BOT_ID}_${__VU}_${__ITER}`,
+    symbols: SYMBOL,
+    ...auth,
+  })}`;
 }
 
 export default function () {
@@ -101,6 +104,6 @@ export default function () {
     wsErrors.add(1);
     wsConnected.add(0);
   }
-  wsSessionDuration.add(Date.now() - startedAt);
+  atlsdWsSessionDuration.add(Date.now() - startedAt);
   sleep(1);
 }
