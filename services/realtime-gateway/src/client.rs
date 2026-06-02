@@ -70,12 +70,14 @@ pub async fn handle_registered_socket(
             tokio::select! {
                 Some(msg) = rx.recv() => {
                     let text = String::from_utf8_lossy(&msg).into_owned();
+                    write_hub.metrics().message_out();
                     if ws_tx.send(Message::Text(text.into())).await.is_err() {
                         break;
                     }
                 }
                 Some(msg) = control_rx.recv() => {
                     let text = String::from_utf8_lossy(&msg).into_owned();
+                    write_hub.metrics().message_out();
                     if ws_tx.send(Message::Text(text.into())).await.is_err() {
                         break;
                     }
@@ -84,6 +86,7 @@ pub async fn handle_registered_socket(
                     if let Some(api_key_id) = write_hub.client_api_key_id(client_id).await {
                         write_hub.refresh_api_key_slot(&api_key_id).await;
                     }
+                    write_hub.metrics().ping();
                     if ws_tx.send(Message::Ping(vec![].into())).await.is_err() {
                         break;
                     }
@@ -102,9 +105,11 @@ pub async fn handle_registered_socket(
         loop {
             match tokio::time::timeout(timeout, ws_rx.next()).await {
                 Ok(Some(Ok(Message::Pong(_)))) => {
+                    read_hub.metrics().pong();
                     debug!(client_id, "pong received");
                 }
                 Ok(Some(Ok(Message::Text(text)))) => {
+                    read_hub.metrics().message_in();
                     handle_command(
                         client_id,
                         &read_hub,
@@ -139,6 +144,7 @@ async fn handle_command(
     tenant_context: Option<&TenantContext>,
     text: &str,
 ) {
+    hub.metrics().command();
     let command = match serde_json::from_str::<ClientCommand>(text) {
         Ok(command) => command,
         Err(_) => {

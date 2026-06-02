@@ -67,3 +67,51 @@ groups:
         annotations:
           summary: "Service healthcheck is slow"
           description: "{{ $labels.instance }} healthcheck is slower than 2 seconds."
+
+  - name: realtime-gateway-ws
+    rules:
+      - alert: RealtimeGatewayMetricsMissing
+        expr: absent(up{job="realtime-gateway"} == 1)
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Realtime gateway metrics are missing"
+          description: "Prometheus cannot scrape realtime-gateway /metrics."
+
+      - alert: RealtimeGatewayHighWsConnections
+        expr: atlsd_realtime_ws_active_connections > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Realtime gateway has many active WebSocket connections"
+          description: "Active WebSocket connections are above 500 for 5 minutes."
+
+      - alert: RealtimeGatewayWsRejectedConnections
+        expr: rate(atlsd_realtime_ws_connection_rejections_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Realtime gateway is rejecting WebSocket connections"
+          description: "WebSocket connection rejections have been non-zero for 5 minutes."
+
+      - alert: RealtimeGatewayWsBackpressure
+        expr: rate(atlsd_realtime_ws_send_failures_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Realtime gateway WebSocket send failures detected"
+          description: "Outbound WebSocket send failures/backpressure are non-zero."
+
+      - alert: RealtimeGatewayPongMissing
+        expr: rate(atlsd_realtime_ws_pings_total[5m]) > 0 and rate(atlsd_realtime_ws_pongs_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Realtime gateway is not receiving WebSocket pong frames"
+          description: "Ping frames are sent, but pong frames are not observed."
+

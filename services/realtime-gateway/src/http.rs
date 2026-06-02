@@ -21,6 +21,7 @@ pub fn build_router(state: AppState) -> Router {
 
     Router::new()
         .route("/health", get(crate::health))
+        .route("/metrics", get(metrics_handler))
         .route("/ws/v1", get(ws_v1_handler))
         .route("/api/v1/ws/v1", get(ws_v1_handler))
         .route("/api/v1/ws", get(ws_general_handler))
@@ -55,6 +56,20 @@ fn string_response(status: StatusCode, body: String) -> Response {
         .status(status)
         .body(axum::body::Body::from(body))
         .unwrap()
+}
+
+async fn metrics_handler(State(state): State<AppState>) -> Response {
+    axum::response::Response::builder()
+        .header("content-type", "text/plain; version=0.0.4; charset=utf-8")
+        .body(axum::body::Body::from(
+            state.hub.metrics().render_prometheus(),
+        ))
+        .unwrap()
+}
+
+fn reject_ws(state: &AppState, status: StatusCode, body: &'static str) -> Response {
+    state.hub.metrics().connection_rejected();
+    text_response(status, body)
 }
 
 fn legacy_streams(
@@ -115,7 +130,8 @@ async fn ws_handler_inner(
     }
 
     let Some(raw_key) = token.as_ref() else {
-        return text_response(
+        return reject_ws(
+            &state,
             StatusCode::UNAUTHORIZED,
             "Valid API key required for WebSocket connection",
         );
@@ -126,7 +142,8 @@ async fn ws_handler_inner(
     };
     let authenticated = tenant_context.is_some() || state.config.api_keys.contains(raw_key);
     if !authenticated {
-        return text_response(
+        return reject_ws(
+            &state,
             StatusCode::UNAUTHORIZED,
             "Valid API key required for WebSocket connection",
         );
@@ -149,7 +166,8 @@ async fn ws_handler_inner(
         .try_acquire_api_key_slot(&api_key_id, connection_limit)
         .await
     {
-        return text_response(
+        return reject_ws(
+            &state,
             StatusCode::TOO_MANY_REQUESTS,
             "WebSocket connection limit reached",
         );

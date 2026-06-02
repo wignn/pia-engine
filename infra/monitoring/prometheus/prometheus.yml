@@ -25,6 +25,11 @@ scrape_configs:
     static_configs:
       - targets: ["nats:8222"]
 
+  - job_name: realtime-gateway
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["realtime-gateway:8020"]
+
   - job_name: service-health
     metrics_path: /probe
     params:

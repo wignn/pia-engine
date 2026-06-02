@@ -2,6 +2,7 @@ mod client;
 mod config;
 mod http;
 mod hub;
+mod metrics;
 mod nats_subscriber;
 mod redis_subscriber;
 mod state;

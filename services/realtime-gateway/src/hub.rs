@@ -1,6 +1,8 @@
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+
+use crate::metrics::Metrics;
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
@@ -14,6 +16,7 @@ pub struct Hub {
     next_id: Arc<RwLock<u64>>,
     redis_client: Option<redis::Client>,
     redis_channel_prefix: String,
+    metrics: Arc<Metrics>,
 }
 
 impl Hub {
@@ -31,7 +34,12 @@ impl Hub {
             next_id: Arc::new(RwLock::new(1)),
             redis_client,
             redis_channel_prefix,
+            metrics: Arc::new(Metrics::default()),
         })
+    }
+
+    pub fn metrics(&self) -> Arc<Metrics> {
+        self.metrics.clone()
     }
 
     pub async fn register_api_key(
@@ -68,6 +76,7 @@ impl Hub {
         };
 
         self.clients.write().await.insert(id, handle);
+        self.metrics.connection_opened();
         let count = self.clients.read().await.len();
         info!(bot_id = %bot_id, user_id = ?user_id, total = count, "ws client connected");
 
@@ -186,6 +195,7 @@ impl Hub {
     pub async fn unregister(&self, id: ClientId) {
         let removed = self.clients.write().await.remove(&id);
         if let Some(client) = removed {
+            self.metrics.connection_closed();
             if let Some(api_key_id) = &client.api_key_id {
                 self.release_api_key_slot(api_key_id).await;
             }
@@ -229,8 +239,11 @@ impl Hub {
 
             if let Ok(()) = client.sender.try_send(payload.clone()) {
                 count += 1;
+            } else {
+                self.metrics.send_failure();
             }
         }
+        self.metrics.broadcast(count);
 
         if let Some(redis_client) = &self.redis_client {
             let payload_text = String::from_utf8_lossy(&payload).to_string();
