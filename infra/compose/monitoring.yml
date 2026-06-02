@@ -59,43 +59,11 @@ services:
     command:
       - --path.rootfs=/host
       - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+      - --collector.textfile.directory=/textfile
     pid: host
     volumes:
       - /:/host:ro,rslave
-    networks:
-      - monitoring
-
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.52.1
-    container_name: cadvisor
-    restart: unless-stopped
-    command:
-      - --docker_only=true
-      - --housekeeping_interval=15s
-    privileged: true
-    devices:
-      - /dev/kmsg:/dev/kmsg
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /var/lib/docker/:/rootfs/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    networks:
-      - monitoring
-
-  telegraf:
-    image: telegraf:1.33-alpine
-    container_name: telegraf
-    restart: unless-stopped
-    user: "0:0"
-    group_add:
-      - "${DOCKER_GID:-999}"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ../monitoring/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - ../monitoring/textfile:/textfile:ro
     networks:
       - monitoring
 
