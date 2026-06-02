@@ -334,9 +334,9 @@ services:
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
-      PORT: 3000
+      PORT: 5173
     ports:
-      - "${PUBLIC_WEB_PORT:-3000}:3000"
+      - "${PUBLIC_WEB_PORT:-5173}:5173"
     restart: unless-stopped
 
 
