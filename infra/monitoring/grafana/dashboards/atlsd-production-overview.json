@@ -281,7 +281,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "min_over_time(probe_success{group=\"atlsd-services\",service=\"realtime-gateway\"}[1m])",
+          "expr": "min_over_time(probe_success{group=\"atlsd-services\",service=\"realtime-gateway\",job=\"service-health\"}[1m])",
           "instant": false,
           "legendFormat": "",
           "range": true,
@@ -879,7 +879,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "min_over_time(probe_success{group=\"atlsd-services\",service=\"realtime-gateway\"}[1m])",
+          "expr": "min_over_time(probe_success{group=\"atlsd-services\",service=\"realtime-gateway\",job=\"service-health\"}[1m])",
           "instant": false,
           "legendFormat": "",
           "range": true,
@@ -1804,7 +1804,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg_over_time(probe_duration_seconds{group=\"atlsd-services\",service=\"realtime-gateway\"}[1m])",
+          "expr": "avg_over_time(probe_duration_seconds{group=\"atlsd-services\",service=\"realtime-gateway\",job=\"service-health\"}[1m])",
           "instant": false,
           "legendFormat": "realtime-gateway",
           "range": true,
