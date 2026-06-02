@@ -1,12 +1,12 @@
 
-FROM oven/bun:1.1-alpine AS deps
+FROM oven/bun:1.4.0-alpine AS deps
 WORKDIR /app
 ENV NODE_ENV=production
 
 COPY apps/public-web/package.json apps/public-web/bun.lock ./
 RUN bun install --frozen-lockfile
 
-FROM oven/bun:1.1-alpine AS builder
+FROM oven/bun:1.4.0-alpine AS builder
 WORKDIR /app
 
 ARG VITE_API_BASE=/api/v1
@@ -20,7 +20,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY apps/public-web/ ./
 RUN bun run build
 
-FROM oven/bun:1.1-alpine AS runner
+FROM oven/bun:1.4.0-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
