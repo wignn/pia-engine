@@ -89,12 +89,11 @@ export default function () {
       wsConnected.add(0);
     });
 
-    const interval = socket.setInterval(() => {
+    socket.setInterval(() => {
       socket.send(JSON.stringify({ type: 'ping', ts: Date.now() }));
     }, MESSAGE_INTERVAL_SECONDS * 1000);
 
     socket.setTimeout(() => {
-      socket.clearInterval(interval);
       socket.close();
     }, HOLD_SECONDS * 1000);
   });

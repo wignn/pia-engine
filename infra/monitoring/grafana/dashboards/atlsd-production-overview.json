@@ -281,7 +281,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_success{group=\"atlsd-services\",service=\"realtime-gateway\"}",
+          "expr": "min_over_time(probe_success{group=\"atlsd-services\",service=\"realtime-gateway\"}[1m])",
           "instant": false,
           "legendFormat": "",
           "range": true,
@@ -694,7 +694,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(probe_success{group=\"atlsd-services\"} == 0)",
+          "expr": "sum(min_over_time(probe_success{group=\"atlsd-services\",job=\"service-health\"}[1m]) == 0)",
           "instant": false,
           "legendFormat": "",
           "range": true,
@@ -778,7 +778,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_success{group=\"atlsd-services\"}",
+          "expr": "min_over_time(probe_success{group=\"atlsd-services\",job=\"service-health\"}[1m])",
           "instant": false,
           "legendFormat": "{{service}}",
           "range": true,
@@ -879,7 +879,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_success{group=\"atlsd-services\",service=\"realtime-gateway\"}",
+          "expr": "min_over_time(probe_success{group=\"atlsd-services\",service=\"realtime-gateway\"}[1m])",
           "instant": false,
           "legendFormat": "",
           "range": true,
@@ -1707,7 +1707,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_duration_seconds{group=\"atlsd-services\"}",
+          "expr": "avg_over_time(probe_duration_seconds{group=\"atlsd-services\",job=\"service-health\"}[1m])",
           "instant": true,
           "legendFormat": "{{service}}",
           "range": false,
@@ -1804,7 +1804,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_duration_seconds{group=\"atlsd-services\",service=\"realtime-gateway\"}",
+          "expr": "avg_over_time(probe_duration_seconds{group=\"atlsd-services\",service=\"realtime-gateway\"}[1m])",
           "instant": false,
           "legendFormat": "realtime-gateway",
           "range": true,
