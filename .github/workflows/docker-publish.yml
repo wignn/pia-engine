@@ -249,7 +249,7 @@ jobs:
           script: |
             set -euo pipefail
             cd ${{ secrets.PROD_APP_DIR }}
-            git pull --ff-only
+            git pull origin main --ff-only
             cd infra/compose
             docker compose -f prod.yml pull
             docker compose -f prod.yml up -d --remove-orphans
