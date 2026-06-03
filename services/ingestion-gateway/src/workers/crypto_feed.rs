@@ -30,6 +30,7 @@ struct OkxTrade {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OkxArg {
     #[serde(rename = "instId")]
     inst_id: String,
@@ -37,6 +38,7 @@ struct OkxArg {
 
 #[derive(Debug, Deserialize)]
 struct OkxPush {
+    #[allow(dead_code)]
     arg: OkxArg,
     data: Vec<OkxTrade>,
 }
@@ -162,7 +164,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: Hea
 
         // Send subscribe message
         if let Err(e) = write
-            .send(Message::Text(subscribe_msg.clone().into()))
+            .send(Message::Text(subscribe_msg.clone()))
             .await
         {
             error!(worker = WORKER, error = %e, "failed to send subscribe message");
@@ -396,6 +398,6 @@ mod tests {
         // side=sell means seller is maker → is_buyer_maker=true
         assert!(("sell" == "sell"));
         // side=buy means buyer is taker → is_buyer_maker=false
-        assert!(!("buy" == "sell"));
+        assert!("buy" != "sell");
     }
 }
