@@ -163,10 +163,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: Hea
         let (mut write, mut read) = ws_stream.split();
 
         // Send subscribe message
-        if let Err(e) = write
-            .send(Message::Text(subscribe_msg.clone()))
-            .await
-        {
+        if let Err(e) = write.send(Message::Text(subscribe_msg.clone())).await {
             error!(worker = WORKER, error = %e, "failed to send subscribe message");
             let delay = backoff.next_delay();
             tokio::time::sleep(delay).await;
