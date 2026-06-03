@@ -29,7 +29,6 @@ struct TradeEvent {
     price: String,
     #[serde(rename = "q")]
     quantity: String,
-    /// Aggregate trade ID (fstream aggTrade uses "a")
     #[serde(rename = "a")]
     agg_trade_id: i64,
     #[serde(rename = "T")]
@@ -212,7 +211,7 @@ fn handle_message(
 ) -> anyhow::Result<()> {
     let event = parse_trade_message(text)?;
 
-    if event.event_type != "aggTrade" {
+    if event.event_type != "trade" {
         return Ok(());
     }
 
@@ -272,7 +271,7 @@ mod tests {
     #[test]
     fn parses_combined_stream_trade_payload() {
         let trade = parse_trade_message(
-            r#"{"stream":"btcusdt@aggTrade","data":{"e":"aggTrade","E":1779940191742,"s":"BTCUSDT","a":123456789,"p":"73409.99000000","q":"0.00007000","T":1779940191742,"m":true}}"#,
+            r#"{"stream":"btcusdt@trade","data":{"e":"trade","E":1779940191742,"s":"BTCUSDT","t":6328956968,"p":"73409.99000000","q":"0.00007000","T":1779940191742,"m":true,"M":true}}"#,
         )
         .unwrap();
 
@@ -284,11 +283,11 @@ mod tests {
     #[test]
     fn parses_multiple_combined_stream_symbols() {
         let eth = parse_trade_message(
-            r#"{"stream":"ethusdt@aggTrade","data":{"e":"aggTrade","E":1779941620916,"s":"ETHUSDT","a":987654321,"p":"1979.94000000","q":"0.00510000","T":1779941620915,"m":true}}"#,
+            r#"{"stream":"ethusdt@trade","data":{"e":"trade","E":1779941620916,"s":"ETHUSDT","t":4049338705,"p":"1979.94000000","q":"0.00510000","T":1779941620915,"m":true,"M":true}}"#,
         )
         .unwrap();
         let btc = parse_trade_message(
-            r#"{"stream":"btcusdt@aggTrade","data":{"e":"aggTrade","E":1779941620961,"s":"BTCUSDT","a":123456790,"p":"73109.38000000","q":"0.00040000","T":1779941620961,"m":false}}"#,
+            r#"{"stream":"btcusdt@trade","data":{"e":"trade","E":1779941620961,"s":"BTCUSDT","t":6329162610,"p":"73109.38000000","q":"0.00040000","T":1779941620961,"m":false,"M":true}}"#,
         )
         .unwrap();
 
@@ -303,7 +302,7 @@ mod tests {
     #[test]
     fn parses_raw_trade_payload() {
         let trade = parse_trade_message(
-            r#"{"e":"aggTrade","E":1779940191742,"s":"BTCUSDT","a":123456789,"p":"73409.99000000","q":"0.00007000","T":1779940191742,"m":true}"#,
+            r#"{"e":"trade","E":1779940191742,"s":"BTCUSDT","t":6328956968,"p":"73409.99000000","q":"0.00007000","T":1779940191742,"m":true,"M":true}"#,
         )
         .unwrap();
 
