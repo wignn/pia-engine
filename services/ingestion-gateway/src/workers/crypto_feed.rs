@@ -29,14 +29,14 @@ struct TradeEvent {
     price: String,
     #[serde(rename = "q")]
     quantity: String,
-    #[serde(rename = "a")]
-    agg_trade_id: i64,
+
+    #[serde(rename = "a", default)]
+    agg_trade_id: Option<i64>,
     #[serde(rename = "T")]
     trade_time: i64,
     #[serde(rename = "m")]
     is_buyer_maker: bool,
 }
-
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 struct StreamMessage {
