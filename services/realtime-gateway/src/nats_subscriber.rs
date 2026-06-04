@@ -8,7 +8,6 @@ use crate::{config::Config, hub::Hub};
 
 const SUBJECTS: &[&str] = &[
     subjects::MD_RAW_PRIMARY_FX_QUOTES_V1,
-    subjects::MD_RAW_SECONDARY_FX_QUOTES_V1,
     subjects::MD_RAW_CRYPTO_TRADES_V1,
     subjects::MD_RAW_INDEX_QUOTES_V1,
     subjects::MARKET_ALERTS_V1,

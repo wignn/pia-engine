@@ -12,7 +12,6 @@ pub struct Config {
     pub primary_fx_api_key: String,
     pub secondary_fx_api_key: String,
     pub primary_fx_ws_url: String,
-    pub secondary_fx_ws_url: String,
     pub crypto_feed_ws_url: String,
     pub tradingview_quote_url_template: String,
     pub primary_fx_symbols: Vec<MarketSymbolConfig>,
@@ -43,18 +42,21 @@ impl Config {
             .map(|s| s.to_lowercase())
             .collect();
 
+        let primary_fx_symbols = parse_symbol_mappings(&get_env("PRIMARY_FX_SYMBOLS", ""), "forex");
+        let secondary_fx_symbols =
+            parse_symbol_mappings(&get_env("SECONDARY_FX_SYMBOLS", ""), "forex");
+
         Self {
             primary_fx_api_key: get_env("PRIMARY_FX_API_KEY", ""),
-            secondary_fx_api_key: get_env("SECONDARY_FX_API_KEY", ""),
+            secondary_fx_api_key: get_env(
+                "SECONDARY_FX_API_KEY",
+                &get_env("SECONDRY_FX_API_KEY", ""),
+            ),
             primary_fx_ws_url: get_env("PRIMARY_FX_WS_URL", ""),
-            secondary_fx_ws_url: get_env("SECONDARY_FX_WS_URL", ""),
             crypto_feed_ws_url: get_env("CRYPTO_FEED_WS_URL", ""),
             tradingview_quote_url_template: get_env("TRADINGVIEW_QUOTE_URL_TEMPLATE", ""),
-            primary_fx_symbols: parse_symbol_mappings(&get_env("PRIMARY_FX_SYMBOLS", ""), "forex"),
-            secondary_fx_symbols: parse_symbol_mappings(
-                &get_env("SECONDARY_FX_SYMBOLS", ""),
-                "forex",
-            ),
+            primary_fx_symbols,
+            secondary_fx_symbols,
             index_feed_symbols: parse_symbol_mappings(&get_env("INDEX_FEED_SYMBOLS", ""), "index"),
             stock_feed_symbols: parse_symbol_mappings(&get_env("STOCK_FEED_SYMBOLS", ""), "stock"),
             crypto_symbols,

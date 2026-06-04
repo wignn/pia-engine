@@ -51,6 +51,19 @@ type StockCauseRow = (
     Option<chrono::DateTime<chrono::Utc>>,
 );
 
+type MacroSignalRow = (
+    String,
+    String,
+    String,
+    chrono::NaiveDate,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    String,
+    String,
+    String,
+);
+
 pub async fn why_did_it_move(
     State(state): State<AppState>,
     Path(symbol): Path<String>,
@@ -103,6 +116,11 @@ pub async fn why_did_it_move(
             tracing::warn!(error = %err, symbol = %symbol, "failed to load why-move news causes");
             Vec::new()
         });
+
+    let macro_signals = load_macro_signals(&state.db).await.unwrap_or_else(|err| {
+        tracing::warn!(error = %err, symbol = %symbol, "failed to load macro signals");
+        Vec::new()
+    });
 
     let mut scored: Vec<(f64, Vec<String>, NewsCause)> = news
         .into_iter()
@@ -186,7 +204,7 @@ pub async fn why_did_it_move(
         "matched_terms": matched,
         "drivers": drivers,
         "cross_assets": cross_assets,
-        "causes": { "news": causes, "calendar": [] },
+        "causes": { "news": causes, "calendar": [], "macro": macro_signals },
     });
     let evidence_hash = evidence_hash(&evidence);
     if !query.refresh.unwrap_or(false) {
@@ -447,6 +465,41 @@ async fn load_news_causes(
         });
     }
     Ok(causes)
+}
+
+async fn load_macro_signals(db: &sqlx::PgPool) -> Result<Vec<Value>, sqlx::Error> {
+    let rows: Vec<MacroSignalRow> = sqlx::query_as(
+        "WITH latest AS (
+            SELECT DISTINCT ON (s.series_id) s.series_id, ms.title, s.category, s.signal_date, s.latest_value, s.change_1d, s.change_7d, s.direction, s.severity, s.narrative
+            FROM news.macro_signals s
+            JOIN news.macro_series ms ON ms.id = s.series_id
+            WHERE s.severity IN ('high', 'medium')
+            ORDER BY s.series_id, s.signal_date DESC
+        )
+        SELECT * FROM latest
+        ORDER BY CASE severity WHEN 'high' THEN 1 ELSE 2 END, category ASC, series_id ASC
+        LIMIT 12",
+    )
+    .fetch_all(db)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            json!({
+                "series_id": row.0,
+                "title": row.1,
+                "category": row.2,
+                "signal_date": row.3,
+                "latest_value": row.4,
+                "change_1d": row.5,
+                "change_7d": row.6,
+                "direction": row.7,
+                "severity": row.8,
+                "narrative": row.9,
+            })
+        })
+        .collect())
 }
 
 fn evidence_hash(evidence: &Value) -> String {

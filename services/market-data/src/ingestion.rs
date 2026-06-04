@@ -9,7 +9,6 @@ use crate::state::AppState;
 
 const NATS_SUBJECTS: &[&str] = &[
     subjects::MD_RAW_PRIMARY_FX_QUOTES_V1,
-    subjects::MD_RAW_SECONDARY_FX_QUOTES_V1,
     subjects::MD_RAW_CRYPTO_TRADES_V1,
     subjects::MD_RAW_INDEX_QUOTES_V1,
 ];
@@ -115,7 +114,7 @@ async fn handle_payload(payload: &str, state: &AppState) {
         .unwrap_or_else(|| {
             match feed {
                 "crypto" => "crypto",
-                "primary_fx" | "secondary_fx" => "forex",
+                "primary_fx" => "forex",
                 "index" => "index",
                 "stock" => "stock",
                 _ => "unknown",

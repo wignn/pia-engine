@@ -23,6 +23,7 @@ pub fn build_router(state: AppState) -> Router {
             get(crate::news::source_statuses),
         )
         .route("/api/v1/stock/news", get(crate::news::latest_stock_news))
+        .route("/api/v1/macro/dashboard", get(crate::news::macro_dashboard))
         .layer(cors)
         .with_state(state)
 }

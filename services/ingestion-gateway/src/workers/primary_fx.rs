@@ -76,7 +76,8 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: Hea
         let url = cfg
             .primary_fx_ws_url
             .trim()
-            .replace("{token}", cfg.primary_fx_api_key.trim());
+            .replace("{token}", cfg.primary_fx_api_key.trim())
+            .replace("***", cfg.primary_fx_api_key.trim());
 
         info!(
             worker = WORKER,

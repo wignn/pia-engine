@@ -5,7 +5,8 @@ use std::time::Duration;
 use atlsd_eventbus::subjects;
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
-use serde_json::{json, Value};
+use serde::Deserialize;
+use serde_json::json;
 use tokio::time::{interval, MissedTickBehavior};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
@@ -19,10 +20,26 @@ use crate::config::{Config, MarketSymbolConfig};
 use crate::health::HealthRegistry;
 use crate::market_hours;
 
+#[derive(Debug, Deserialize)]
+struct ProviderTrade {
+    p: f64,
+    s: String,
+    t: i64,
+    v: f64,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProviderMessage {
+    #[serde(rename = "type")]
+    msg_type: String,
+    #[serde(default)]
+    data: Vec<ProviderTrade>,
+}
+
 const WORKER: &str = "secondary_fx";
 const FEED: &str = "secondary_fx";
 const SOURCE: &str = "market_data";
-const TOPIC: &str = subjects::MD_RAW_SECONDARY_FX_QUOTES_V1;
+const TOPIC: &str = subjects::MD_RAW_PRIMARY_FX_QUOTES_V1;
 const PUBLISH_TIMEOUT: Duration = Duration::from_secs(5);
 const READ_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
 const PUBLISH_QUEUE_CAPACITY: usize = 10_000;
@@ -51,11 +68,16 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: Hea
             continue;
         }
 
-        if cfg.secondary_fx_ws_url.trim().is_empty() {
-            error!(worker = WORKER, "secondary FX websocket URL not configured");
+        if cfg.primary_fx_ws_url.trim().is_empty() {
+            error!(worker = WORKER, "primary FX websocket URL not configured");
             tokio::time::sleep(backoff.next_delay()).await;
             continue;
         }
+        let url = cfg
+            .primary_fx_ws_url
+            .trim()
+            .replace("{token}", cfg.secondary_fx_api_key.trim())
+            .replace("***", cfg.secondary_fx_api_key.trim());
 
         info!(
             worker = WORKER,
@@ -63,7 +85,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: Hea
             "connecting to market data websocket"
         );
 
-        let ws_stream = match connect_async(cfg.secondary_fx_ws_url.trim()).await {
+        let ws_stream = match connect_async(&url).await {
             Ok((stream, _response)) => {
                 info!(worker = WORKER, "websocket connected");
                 health.set_connected(WORKER, true).await;
@@ -79,32 +101,24 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: Hea
         };
 
         let (mut write, mut read) = ws_stream.split();
-        let provider_symbols: Vec<&str> = cfg
-            .secondary_fx_symbols
-            .iter()
-            .map(|symbol| symbol.provider_symbol.as_str())
-            .collect();
 
-        let sub_msg = json!({
-            "eventName": "subscribe",
-            "authorization": &cfg.secondary_fx_api_key,
-            "eventData": {
-                "thresholdLevel": 5,
-                "tickers": provider_symbols
+        for symbol in &cfg.secondary_fx_symbols {
+            let sub_msg = json!({
+                "type": "subscribe",
+                "symbol": symbol.provider_symbol
+            });
+
+            if let Err(e) = write.send(Message::Text(sub_msg.to_string())).await {
+                error!(worker = WORKER, error = %e, "failed to send subscribe message");
+                let delay = backoff.next_delay();
+                tokio::time::sleep(delay).await;
+                continue;
             }
-        });
-
-        if let Err(e) = write.send(Message::Text(sub_msg.to_string())).await {
-            error!(worker = WORKER, error = %e, "failed to send subscribe message");
-            let delay = backoff.next_delay();
-            tokio::time::sleep(delay).await;
-            continue;
         }
 
         info!(
             worker = WORKER,
             symbols = cfg.secondary_fx_symbols.len(),
-            threshold_level = 5,
             "subscribed"
         );
 
@@ -173,6 +187,13 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: Hea
         );
         health.record_disconnect(WORKER, disconnect_reason).await;
 
+        for symbol in &cfg.secondary_fx_symbols {
+            let unsub_msg = json!({
+                "type": "unsubscribe",
+                "symbol": symbol.provider_symbol
+            });
+            let _ = write.send(Message::Text(unsub_msg.to_string())).await;
+        }
         let _ = write.send(Message::Close(None)).await;
         let _ = write.close().await;
 
@@ -198,98 +219,58 @@ fn handle_message(
     tick_count: &mut u64,
     queued_count: &mut u64,
 ) -> anyhow::Result<()> {
-    let msg: Value = serde_json::from_str(text)?;
+    let msg: ProviderMessage = serde_json::from_str(text)?;
 
-    let msg_type = msg
-        .get("messageType")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-
-    match msg_type {
-        "I" => {
-            info!(worker = WORKER, "subscription confirmed");
-            return Ok(());
-        }
-        "H" => {
-            debug!(worker = WORKER, "heartbeat received");
-            return Ok(());
-        }
-        "A" => {}
-        other => {
-            debug!(worker = WORKER, msg_type = other, "unknown message type");
-            return Ok(());
-        }
-    }
-
-    let data = match msg.get("data").and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => return Ok(()),
-    };
-
-    if data.len() < 7 {
-        debug!(worker = WORKER, len = data.len(), "data array too short");
+    if msg.msg_type == "ping" {
         return Ok(());
     }
 
-    let service_type = data[0].as_str().unwrap_or("");
-    if service_type != "Q" {
-        debug!(worker = WORKER, service = service_type, "non-quote data");
+    if msg.msg_type != "trade" {
+        debug!(worker = WORKER, msg_type = %msg.msg_type, "non-trade message");
         return Ok(());
     }
 
-    let ticker = data[1].as_str().unwrap_or("unknown");
-    let Some(symbol) = symbol_map.get(ticker) else {
-        debug!(worker = WORKER, "unmapped symbol received");
-        return Ok(());
-    };
+    for trade in &msg.data {
+        let Some(symbol) = symbol_map.get(&trade.s) else {
+            debug!(worker = WORKER, "unmapped symbol received");
+            continue;
+        };
 
-    let datetime = data[2].as_str().unwrap_or("");
-    let bid_price = data[3].as_f64();
-    let mid_price = data[5].as_f64();
-    let ask_price = data[6].as_f64();
+        *tick_count += 1;
+        let health = health.clone();
 
-    let price = mid_price.or(bid_price).or(ask_price).unwrap_or(0.0);
+        let payload = json!({
+            "feed": FEED,
+            "source": SOURCE,
+            "symbol": symbol.public_symbol,
+            "asset_type": symbol.asset_type,
+            "price": trade.p,
+            "volume": trade.v,
+            "timestamp_ms": trade.t,
+            "received_at": Utc::now().to_rfc3339(),
+        });
 
-    if price <= 0.0 {
-        return Ok(());
+        let queued = enqueue_or_drop(
+            WORKER,
+            publish_queue,
+            PublishEvent {
+                subject: TOPIC,
+                payload: payload.to_string(),
+                symbol: symbol.public_symbol.clone(),
+            },
+            queued_count,
+        );
+        let queue_depth = PUBLISH_QUEUE_CAPACITY.saturating_sub(publish_queue.capacity());
+
+        tokio::spawn(async move {
+            health.record_tick(WORKER).await;
+            if queued {
+                health.record_queued(WORKER, queue_depth).await;
+            } else {
+                health.record_drop(WORKER, queue_depth).await;
+            }
+        });
     }
-
-    *tick_count += 1;
-    let health = health.clone();
-
-    let payload = json!({
-        "feed": FEED,
-        "source": SOURCE,
-        "symbol": symbol.public_symbol,
-        "asset_type": symbol.asset_type,
-        "price": price,
-        "bid": bid_price,
-        "ask": ask_price,
-        "mid": mid_price,
-        "provider_timestamp": datetime,
-        "received_at": Utc::now().to_rfc3339(),
-    });
-
-    let queued = enqueue_or_drop(
-        WORKER,
-        publish_queue,
-        PublishEvent {
-            subject: TOPIC,
-            payload: payload.to_string(),
-            symbol: symbol.public_symbol.clone(),
-        },
-        queued_count,
-    );
-    let queue_depth = PUBLISH_QUEUE_CAPACITY.saturating_sub(publish_queue.capacity());
-
-    tokio::spawn(async move {
-        health.record_tick(WORKER).await;
-        if queued {
-            health.record_queued(WORKER, queue_depth).await;
-        } else {
-            health.record_drop(WORKER, queue_depth).await;
-        }
-    });
 
     Ok(())
 }

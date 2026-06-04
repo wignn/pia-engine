@@ -11,6 +11,12 @@ pub struct Config {
     pub realtime_poll_sec: u64,
     pub rss_fetch_sec: u64,
     pub stock_fetch_sec: u64,
+    pub finnhub_api_key: Option<String>,
+    pub finnhub_news_poll_sec: u64,
+    pub finnhub_economic_calendar_poll_sec: u64,
+    pub fred_api_key: Option<String>,
+    pub fred_series: Vec<String>,
+    pub fred_poll_sec: u64,
     pub ai_service_url: Option<String>,
 }
 
@@ -18,7 +24,7 @@ impl Config {
     pub fn load() -> Self {
         let mut database_url = get_env(
             "DATABASE_URL",
-            "postgres://postgres:postgres@localhost:5432/forex",
+            "postgres://postgres:***@localhost:5432/forex",
         );
         database_url = database_url.replace("postgresql+asyncpg://", "postgres://");
         database_url = database_url.replace("postgresql://", "postgres://");
@@ -41,6 +47,17 @@ impl Config {
             realtime_poll_sec: get_env_u64("NEWS_REALTIME_POLL_SEC", 10).max(1),
             rss_fetch_sec: get_env_u64("RSS_FETCH_SEC", 60).max(15),
             stock_fetch_sec: get_env_u64("STOCK_FETCH_SEC", 300).max(60),
+            finnhub_api_key: optional_env("FINNHUB_API_KEY")
+                .or_else(|| optional_env("PRIMARY_FX_API_KEY")),
+            finnhub_news_poll_sec: get_env_u64("FINNHUB_NEWS_POLL_SEC", 900).max(600),
+            finnhub_economic_calendar_poll_sec: get_env_u64(
+                "FINNHUB_ECONOMIC_CALENDAR_POLL_SEC",
+                3600,
+            )
+            .max(1800),
+            fred_api_key: optional_env("FRED_API_KEY"),
+            fred_series: list_env("FRED_SERIES"),
+            fred_poll_sec: get_env_u64("FRED_POLL_SEC", 21_600).max(21_600),
             ai_service_url: optional_env("AI_SERVICE_URL"),
         }
     }
@@ -51,6 +68,19 @@ fn optional_env(key: &str) -> Option<String> {
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn list_env(key: &str) -> Vec<String> {
+    std::env::var(key)
+        .ok()
+        .map(|value| {
+            value
+                .split(',')
+                .map(|item| item.trim().to_uppercase())
+                .filter(|item| !item.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn env_bool(key: &str, default: bool) -> bool {

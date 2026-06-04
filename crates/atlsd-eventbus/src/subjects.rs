@@ -1,5 +1,4 @@
 pub const MD_RAW_PRIMARY_FX_QUOTES_V1: &str = "md.raw.primary_fx.quotes.v1";
-pub const MD_RAW_SECONDARY_FX_QUOTES_V1: &str = "md.raw.secondary_fx.quotes.v1";
 pub const MD_RAW_CRYPTO_TRADES_V1: &str = "md.raw.crypto.trades.v1";
 pub const MD_RAW_INDEX_QUOTES_V1: &str = "md.raw.index.quotes.v1";
 pub const MARKET_ALERTS_V1: &str = "market.alerts.v1";

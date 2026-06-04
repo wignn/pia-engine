@@ -222,6 +222,20 @@ pub async fn latest_stock_news(
     }
 }
 
+pub async fn macro_dashboard(
+    State(state): State<AppState>,
+    Query(query): Query<LimitQuery>,
+) -> Json<Value> {
+    let limit = query.limit.unwrap_or(50).clamp(1, 100);
+    match crate::pipeline::r#macro::dashboard(&state.db, limit).await {
+        Ok(response) => Json(response),
+        Err(err) => {
+            error!(error = %err, "macro dashboard query failed");
+            Json(json!({ "error": "query failed" }))
+        }
+    }
+}
+
 fn forex_rows_response(rows: Result<Vec<ForexNewsRow>, sqlx::Error>) -> Json<Value> {
     match rows {
         Ok(rows) => {
