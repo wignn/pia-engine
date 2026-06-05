@@ -84,6 +84,7 @@ impl FinnhubClient {
             let published_at = Utc.timestamp_opt(item.datetime, 0).single();
             let content_hash = format!("finnhub-news-{}", item.id);
             let source_name = clean_news_source(&item.source);
+            let headline = clean_news_headline(&item.headline, &source_name);
             let source_id = ensure_news_source(pool, &source_name).await?;
             let url = if item.url.trim().is_empty() {
                 format!("https://finnhub.io/news/{}", item.id)
@@ -99,7 +100,7 @@ impl FinnhubClient {
             .bind(source_id)
             .bind(content_hash)
             .bind(url)
-            .bind(item.headline)
+            .bind(headline)
             .bind(item.summary.as_deref())
             .bind(item.summary.as_deref())
             .bind(published_at)
@@ -220,6 +221,25 @@ fn clean_news_source(source: &str) -> String {
     } else {
         source.to_string()
     }
+}
+
+fn clean_news_headline(headline: &str, source: &str) -> String {
+    let headline = headline.trim();
+    let source = source.trim();
+    if source.is_empty() || source == FALLBACK_NEWS_SOURCE {
+        return headline.to_string();
+    }
+
+    let lower = headline.to_lowercase();
+    let source_lower = source.to_lowercase();
+    for separator in [" - ", " – ", " — "] {
+        let suffix = format!("{separator}{source_lower}");
+        if lower.ends_with(&suffix) {
+            return headline[..headline.len() - suffix.len()].trim().to_string();
+        }
+    }
+
+    headline.to_string()
 }
 
 fn source_slug(source: &str) -> String {
