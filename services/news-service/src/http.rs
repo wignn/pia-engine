@@ -24,7 +24,15 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/v1/stock/news", get(crate::news::latest_stock_news))
         .route("/api/v1/macro/dashboard", get(crate::news::macro_dashboard))
-        .route("/api/v1/geosignals", get(crate::geosignals::list_geosignals))
+        .route("/api/v1/geosignals/map", get(crate::geosignals::map_layers))
+        .route(
+            "/api/v1/geosignals/assets",
+            get(crate::geosignals::asset_impacts),
+        )
+        .route(
+            "/api/v1/geosignals",
+            get(crate::geosignals::list_geosignals),
+        )
         .layer(cors)
         .with_state(state)
 }

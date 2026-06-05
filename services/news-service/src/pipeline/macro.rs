@@ -1,6 +1,95 @@
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate, TimeZone, Utc};
 use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
+
+fn macro_geosignal_event_id(series_id: &str, signal_date: NaiveDate) -> String {
+    format!("macro:{series_id}:{signal_date}")
+}
+
+fn macro_severity_score(severity: &str) -> f64 {
+    match severity.trim().to_lowercase().as_str() {
+        "high" => 0.75,
+        "medium" => 0.5,
+        "low" => 0.25,
+        _ => 0.25,
+    }
+}
+
+fn macro_sentiment_score(direction: &str) -> f64 {
+    match direction.trim().to_lowercase().as_str() {
+        "up" => 0.25,
+        "down" => -0.25,
+        _ => 0.0,
+    }
+}
+
+fn macro_affected_assets(category: &str, series_id: &str) -> Vec<String> {
+    match (category, series_id) {
+        ("rates", "DGS10") => vec!["US10Y".to_string()],
+        ("rates", "DGS2") => vec!["US02Y".to_string()],
+        ("dollar_liquidity", _) => vec!["DXY".to_string()],
+        ("commodities", "DCOILWTICO") => vec!["WTI".to_string()],
+        ("commodities", "DCOILBRENTEU") => vec!["BRENT".to_string()],
+        _ => Vec::new(),
+    }
+}
+
+fn macro_asset_impact(assets: &[String], severity_score: f64) -> Value {
+    Value::Object(
+        assets
+            .iter()
+            .map(|asset| (asset.clone(), json!(severity_score)))
+            .collect(),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builds_macro_geosignal_event_id() {
+        let date = NaiveDate::from_ymd_opt(2026, 6, 5).unwrap();
+        assert_eq!(
+            macro_geosignal_event_id("DGS10", date),
+            "macro:DGS10:2026-06-05"
+        );
+    }
+
+    #[test]
+    fn maps_macro_severity_to_score() {
+        assert_eq!(macro_severity_score("low"), 0.25);
+        assert_eq!(macro_severity_score("medium"), 0.5);
+        assert_eq!(macro_severity_score("high"), 0.75);
+        assert_eq!(macro_severity_score("unknown"), 0.25);
+    }
+
+    #[test]
+    fn maps_macro_direction_to_sentiment_score() {
+        assert_eq!(macro_sentiment_score("up"), 0.25);
+        assert_eq!(macro_sentiment_score("down"), -0.25);
+        assert_eq!(macro_sentiment_score("flat"), 0.0);
+        assert_eq!(macro_sentiment_score("unknown"), 0.0);
+    }
+
+    #[test]
+    fn maps_macro_category_to_affected_assets() {
+        assert_eq!(macro_affected_assets("rates", "DGS10"), vec!["US10Y"]);
+        assert_eq!(
+            macro_affected_assets("dollar_liquidity", "DTWEXBGS"),
+            vec!["DXY"]
+        );
+        assert_eq!(
+            macro_affected_assets("commodities", "DCOILWTICO"),
+            vec!["WTI"]
+        );
+        assert_eq!(
+            macro_affected_assets("commodities", "DCOILBRENTEU"),
+            vec!["BRENT"]
+        );
+        assert!(macro_affected_assets("growth", "GDP").is_empty());
+    }
+}
 
 #[derive(Debug)]
 struct MacroPoint {
@@ -37,6 +126,7 @@ pub async fn refresh_signals(pool: &PgPool) -> anyhow::Result<usize> {
             change_7d,
         );
 
+        let mut tx = pool.begin().await?;
         sqlx::query(
             "INSERT INTO macro_signals (series_id, category, signal_date, latest_value, previous_value, change_1d, change_7d, change_30d, direction, severity, narrative)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -52,9 +142,39 @@ pub async fn refresh_signals(pool: &PgPool) -> anyhow::Result<usize> {
         .bind(change_30d)
         .bind(direction)
         .bind(severity)
-        .bind(narrative)
-        .execute(pool)
+        .bind(&narrative)
+        .execute(&mut *tx)
         .await?;
+
+        let assets = macro_affected_assets(&category, &series_id);
+        let severity_score = macro_severity_score(severity);
+        let timestamp = Utc
+            .with_ymd_and_hms(
+                latest.date.year(),
+                latest.date.month(),
+                latest.date.day(),
+                0,
+                0,
+                0,
+            )
+            .single()
+            .unwrap_or_else(Utc::now);
+        sqlx::query(
+            "INSERT INTO news.geosignals (event_id, timestamp, source, source_url, title, summary, category, country, region, location_scope, severity_score, sentiment_score, confidence_score, affected_assets, asset_impact, freshness)
+             VALUES ($1, $2, 'fred', NULL, $3, $4, 'macro', NULL, NULL, 'global', $5, $6, 0.75, $7, $8, 'fresh')
+             ON CONFLICT (event_id) DO UPDATE SET timestamp = EXCLUDED.timestamp, title = EXCLUDED.title, summary = EXCLUDED.summary, severity_score = EXCLUDED.severity_score, sentiment_score = EXCLUDED.sentiment_score, affected_assets = EXCLUDED.affected_assets, asset_impact = EXCLUDED.asset_impact, freshness = EXCLUDED.freshness",
+        )
+        .bind(macro_geosignal_event_id(&series_id, latest.date))
+        .bind(timestamp)
+        .bind(&title)
+        .bind(&narrative)
+        .bind(severity_score)
+        .bind(macro_sentiment_score(direction))
+        .bind(&assets)
+        .bind(macro_asset_impact(&assets, severity_score))
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
         upserted += 1;
     }
 

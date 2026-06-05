@@ -1,52 +1,99 @@
--- Create schema if needed (should already exist from 005_schema_foundation.sql)
 CREATE SCHEMA IF NOT EXISTS news;
 
--- Create geosignals table
 CREATE TABLE IF NOT EXISTS news.geosignals (
     event_id TEXT PRIMARY KEY,
     timestamp TIMESTAMPTZ NOT NULL,
-    source TEXT,
+    source TEXT NOT NULL,
     source_url TEXT,
-    title TEXT,
+    title TEXT NOT NULL,
     summary TEXT,
-    category TEXT,
+    category TEXT NOT NULL,
     country TEXT,
     region TEXT,
-    location_scope TEXT,
-    severity_score DOUBLE PRECISION,
-    sentiment_score DOUBLE PRECISION,
-    confidence_score DOUBLE PRECISION,
-    affected_assets TEXT[] DEFAULT '{}',
-    asset_impact JSONB DEFAULT '{}'::jsonb,
-    freshness TIMESTAMPTZ,
+    location_scope TEXT NOT NULL,
+    severity_score DOUBLE PRECISION NOT NULL CHECK (severity_score >= 0 AND severity_score <= 1),
+    sentiment_score DOUBLE PRECISION NOT NULL CHECK (sentiment_score >= -1 AND sentiment_score <= 1),
+    confidence_score DOUBLE PRECISION NOT NULL CHECK (confidence_score >= 0 AND confidence_score <= 1),
+    affected_assets TEXT[] NOT NULL DEFAULT '{}',
+    asset_impact JSONB NOT NULL DEFAULT '{}'::jsonb,
+    freshness TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    -- CHECK constraints for score ranges
-    CONSTRAINT severity_score_range CHECK (severity_score >= 0 AND severity_score <= 1),
-    CONSTRAINT sentiment_score_range CHECK (sentiment_score >= -1 AND sentiment_score <= 1),
-    CONSTRAINT confidence_score_range CHECK (confidence_score >= 0 AND confidence_score <= 1)
+    CONSTRAINT geosignals_event_id_len CHECK (char_length(event_id) <= 255),
+    CONSTRAINT geosignals_source_len CHECK (char_length(source) <= 255),
+    CONSTRAINT geosignals_category_len CHECK (char_length(category) <= 100),
+    CONSTRAINT geosignals_country_len CHECK (country IS NULL OR char_length(country) <= 100),
+    CONSTRAINT geosignals_region_len CHECK (region IS NULL OR char_length(region) <= 100),
+    CONSTRAINT geosignals_location_scope_len CHECK (char_length(location_scope) <= 50),
+    CONSTRAINT geosignals_freshness_len CHECK (char_length(freshness) <= 50)
 );
 
--- Index on timestamp (most common query pattern)
+ALTER TABLE news.geosignals
+    ALTER COLUMN freshness DROP DEFAULT;
+
+ALTER TABLE news.geosignals
+    ALTER COLUMN freshness TYPE TEXT USING CASE
+        WHEN lower(freshness::text) IN ('fresh', 'stale', 'partial') THEN lower(freshness::text)
+        ELSE 'fresh'
+    END;
+
+ALTER TABLE news.geosignals
+    ALTER COLUMN source SET DEFAULT 'unknown',
+    ALTER COLUMN title SET DEFAULT '',
+    ALTER COLUMN category SET DEFAULT 'market_news',
+    ALTER COLUMN location_scope SET DEFAULT 'global',
+    ALTER COLUMN severity_score SET DEFAULT 0,
+    ALTER COLUMN sentiment_score SET DEFAULT 0,
+    ALTER COLUMN confidence_score SET DEFAULT 0,
+    ALTER COLUMN affected_assets SET DEFAULT '{}',
+    ALTER COLUMN asset_impact SET DEFAULT '{}'::jsonb,
+    ALTER COLUMN freshness SET DEFAULT 'fresh';
+
+UPDATE news.geosignals
+SET source = COALESCE(source, 'unknown'),
+    title = COALESCE(title, event_id),
+    category = COALESCE(category, 'market_news'),
+    location_scope = COALESCE(location_scope, 'global'),
+    severity_score = COALESCE(severity_score, 0),
+    sentiment_score = COALESCE(sentiment_score, 0),
+    confidence_score = COALESCE(confidence_score, 0),
+    affected_assets = COALESCE(affected_assets, '{}'),
+    asset_impact = COALESCE(asset_impact, '{}'::jsonb),
+    freshness = COALESCE(NULLIF(freshness, ''), 'fresh');
+
+ALTER TABLE news.geosignals
+    ALTER COLUMN source SET NOT NULL,
+    ALTER COLUMN title SET NOT NULL,
+    ALTER COLUMN category SET NOT NULL,
+    ALTER COLUMN location_scope SET NOT NULL,
+    ALTER COLUMN severity_score SET NOT NULL,
+    ALTER COLUMN sentiment_score SET NOT NULL,
+    ALTER COLUMN confidence_score SET NOT NULL,
+    ALTER COLUMN affected_assets SET NOT NULL,
+    ALTER COLUMN asset_impact SET NOT NULL,
+    ALTER COLUMN freshness SET NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_geosignals_timestamp_desc
     ON news.geosignals(timestamp DESC);
 
--- Composite index on category + timestamp
 CREATE INDEX IF NOT EXISTS idx_geosignals_category_timestamp_desc
     ON news.geosignals(category, timestamp DESC);
 
--- Partial index on country + timestamp (where country is not null)
 CREATE INDEX IF NOT EXISTS idx_geosignals_country_timestamp_desc
     ON news.geosignals(country, timestamp DESC)
     WHERE country IS NOT NULL;
 
--- Partial index on region + timestamp (where region is not null)
 CREATE INDEX IF NOT EXISTS idx_geosignals_region_timestamp_desc
     ON news.geosignals(region, timestamp DESC)
     WHERE region IS NOT NULL;
 
--- Index on severity_score for filtering high-impact events
 CREATE INDEX IF NOT EXISTS idx_geosignals_severity_score_desc
     ON news.geosignals(severity_score DESC);
+
+CREATE INDEX IF NOT EXISTS idx_geosignals_affected_assets_gin
+    ON news.geosignals USING gin(affected_assets);
+
+CREATE INDEX IF NOT EXISTS idx_geosignals_asset_impact_gin
+    ON news.geosignals USING gin(asset_impact);
 
 -- Table comment
 COMMENT ON TABLE news.geosignals IS 'Geo-spatial signals tracking geopolitical, environmental, and regional events with impact scoring.';

@@ -52,6 +52,65 @@ struct EconomicCalendarItem {
     time: String,
 }
 
+fn calendar_geosignal_event_id(event_hash: &str) -> String {
+    format!("calendar:finnhub:{event_hash}")
+}
+
+fn calendar_severity_score(impact: &str) -> f64 {
+    match impact.trim().to_lowercase().as_str() {
+        "high" => 0.75,
+        "medium" => 0.5,
+        "low" => 0.25,
+        _ => 0.25,
+    }
+}
+
+fn calendar_sentiment_score(actual: Option<f64>, forecast: Option<f64>) -> f64 {
+    match (actual, forecast) {
+        (Some(actual), Some(forecast)) if actual > forecast => 0.25,
+        (Some(actual), Some(forecast)) if actual < forecast => -0.25,
+        _ => 0.0,
+    }
+}
+
+fn calendar_affected_assets(country: &str, event_name: &str) -> Vec<String> {
+    let country = country.trim().to_lowercase();
+    let event = event_name.trim().to_lowercase();
+    if event.contains("oil") {
+        return vec!["WTI".to_string()];
+    }
+
+    let us_event = matches!(country.as_str(), "us" | "usa" | "united states")
+        || ["fed", "cpi", "jobs", "payroll", "yield", "rate"]
+            .iter()
+            .any(|term| event.contains(term));
+    if us_event {
+        vec!["DXY".to_string(), "US10Y".to_string()]
+    } else {
+        Vec::new()
+    }
+}
+
+fn calendar_asset_impact(assets: &[String], severity_score: f64) -> serde_json::Value {
+    serde_json::Value::Object(
+        assets
+            .iter()
+            .map(|asset| (asset.clone(), serde_json::json!(severity_score)))
+            .collect(),
+    )
+}
+
+fn calendar_summary(event: &EconomicCalendarItem) -> String {
+    format!(
+        "{} {} impact; actual {:?}, forecast {:?}, previous {:?}.",
+        event.country.trim(),
+        event.impact.trim(),
+        event.actual,
+        event.estimate,
+        event.previous
+    )
+}
+
 impl FinnhubClient {
     pub fn new(http: Client, token: String) -> Self {
         Self { http, token }
@@ -141,22 +200,7 @@ impl FinnhubClient {
             }
             let event_hash = calendar_hash(&event);
             let event_time = parse_calendar_time(&event.time);
-            let count = sqlx::query_scalar::<_, i64>(
-                "INSERT INTO news.economic_calendar_events (source, event_hash, country, event_name, impact, unit, actual, forecast, previous, event_time, raw_payload)
-                 VALUES ('finnhub', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                 ON CONFLICT (source, event_hash) DO UPDATE SET actual = EXCLUDED.actual, forecast = EXCLUDED.forecast, previous = EXCLUDED.previous, raw_payload = EXCLUDED.raw_payload, updated_at = NOW()
-                 RETURNING 1",
-            )
-            .bind(event_hash)
-            .bind(event.country.trim())
-            .bind(event.event.trim())
-            .bind(empty_to_none(&event.impact))
-            .bind(event.unit.as_deref())
-            .bind(event.actual)
-            .bind(event.estimate)
-            .bind(event.previous)
-            .bind(event_time)
-            .bind(serde_json::to_value(serde_json::json!({
+            let raw_payload = serde_json::to_value(serde_json::json!({
                 "country": event.country,
                 "event": event.event,
                 "impact": event.impact,
@@ -165,9 +209,48 @@ impl FinnhubClient {
                 "estimate": event.estimate,
                 "previous": event.previous,
                 "time": event.time,
-            }))?)
-            .fetch_one(pool)
+            }))?;
+            let mut tx = pool.begin().await?;
+            let count = sqlx::query_scalar::<_, i64>(
+                "INSERT INTO news.economic_calendar_events (source, event_hash, country, event_name, impact, unit, actual, forecast, previous, event_time, raw_payload)
+                 VALUES ('finnhub', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                 ON CONFLICT (source, event_hash) DO UPDATE SET actual = EXCLUDED.actual, forecast = EXCLUDED.forecast, previous = EXCLUDED.previous, raw_payload = EXCLUDED.raw_payload, updated_at = NOW()
+                 RETURNING 1",
+            )
+            .bind(&event_hash)
+            .bind(event.country.trim())
+            .bind(event.event.trim())
+            .bind(empty_to_none(&event.impact))
+            .bind(event.unit.as_deref())
+            .bind(event.actual)
+            .bind(event.estimate)
+            .bind(event.previous)
+            .bind(event_time)
+            .bind(raw_payload)
+            .fetch_one(&mut *tx)
             .await?;
+
+            let assets = calendar_affected_assets(&event.country, &event.event);
+            let severity_score = calendar_severity_score(&event.impact);
+            sqlx::query(
+                "INSERT INTO news.geosignals (event_id, timestamp, source, source_url, title, summary, category, country, region, location_scope, severity_score, sentiment_score, confidence_score, affected_assets, asset_impact, freshness)
+                 VALUES ($1, $2, 'finnhub', NULL, $3, $4, 'macro', $5, NULL, $6, $7, $8, 0.7, $9, $10, 'fresh')
+                 ON CONFLICT (event_id) DO UPDATE SET timestamp = EXCLUDED.timestamp, title = EXCLUDED.title, summary = EXCLUDED.summary, country = EXCLUDED.country, location_scope = EXCLUDED.location_scope, severity_score = EXCLUDED.severity_score, sentiment_score = EXCLUDED.sentiment_score, affected_assets = EXCLUDED.affected_assets, asset_impact = EXCLUDED.asset_impact, freshness = EXCLUDED.freshness",
+            )
+            .bind(calendar_geosignal_event_id(&event_hash))
+            .bind(event_time.unwrap_or_else(Utc::now))
+            .bind(event.event.trim())
+            .bind(calendar_summary(&event))
+            .bind(empty_to_none(&event.country))
+            .bind(if event.country.trim().is_empty() { "global" } else { "country" })
+            .bind(severity_score)
+            .bind(calendar_sentiment_score(event.actual, event.estimate))
+            .bind(&assets)
+            .bind(calendar_asset_impact(&assets, severity_score))
+            .execute(&mut *tx)
+            .await?;
+            tx.commit().await?;
+
             inserted += count as usize;
         }
 
@@ -309,7 +392,7 @@ fn calendar_hash(event: &EconomicCalendarItem) -> String {
         event.event.trim(),
         event.impact.trim()
     );
-    format!("finnhub-economic-{:x}", md5_like(&raw))
+    format!("finnhub-economic-{}", stable_hash_prefix(&raw))
 }
 
 fn parse_calendar_time(value: &str) -> Option<chrono::DateTime<Utc>> {
@@ -332,9 +415,70 @@ fn empty_to_none(value: &str) -> Option<&str> {
     }
 }
 
-fn md5_like(value: &str) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    value.hash(&mut hasher);
-    hasher.finish()
+fn stable_hash_prefix(value: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(value.as_bytes());
+    let digest = hasher.finalize();
+    hex::encode(&digest[..8])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builds_calendar_geosignal_event_id() {
+        assert_eq!(calendar_geosignal_event_id("abc"), "calendar:finnhub:abc");
+    }
+
+    #[test]
+    fn maps_calendar_impact_to_severity_score() {
+        assert_eq!(calendar_severity_score("high"), 0.75);
+        assert_eq!(calendar_severity_score("medium"), 0.5);
+        assert_eq!(calendar_severity_score("low"), 0.25);
+        assert_eq!(calendar_severity_score("unknown"), 0.25);
+    }
+
+    #[test]
+    fn maps_calendar_actual_vs_forecast_to_sentiment_score() {
+        assert_eq!(calendar_sentiment_score(Some(2.0), Some(1.0)), 0.25);
+        assert_eq!(calendar_sentiment_score(Some(1.0), Some(2.0)), -0.25);
+        assert_eq!(calendar_sentiment_score(Some(1.0), Some(1.0)), 0.0);
+        assert_eq!(calendar_sentiment_score(None, Some(1.0)), 0.0);
+        assert_eq!(calendar_sentiment_score(Some(1.0), None), 0.0);
+    }
+
+    #[test]
+    fn maps_calendar_events_to_affected_assets() {
+        assert_eq!(
+            calendar_affected_assets("US", "CPI Inflation"),
+            vec!["DXY", "US10Y"]
+        );
+        assert_eq!(
+            calendar_affected_assets("United States", "Jobs Report"),
+            vec!["DXY", "US10Y"]
+        );
+        assert_eq!(
+            calendar_affected_assets("EU", "Oil inventories"),
+            vec!["WTI"]
+        );
+        assert!(calendar_affected_assets("JP", "Consumer Confidence").is_empty());
+    }
+
+    #[test]
+    fn calendar_hash_is_stable_sha256_prefix() {
+        let event = EconomicCalendarItem {
+            event: "CPI Inflation".to_string(),
+            country: "US".to_string(),
+            impact: "high".to_string(),
+            unit: Some("%".to_string()),
+            actual: None,
+            estimate: Some(3.2),
+            previous: Some(3.1),
+            time: "2026-06-05 12:30:00".to_string(),
+        };
+
+        assert_eq!(calendar_hash(&event), "finnhub-economic-defcc2d276d6e318");
+    }
 }

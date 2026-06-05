@@ -94,7 +94,11 @@ impl GeoSignal {
             location_scope: GeoLocationScope::Global,
             severity_score,
             sentiment_score: sentiment_score(&article.sentiment),
-            confidence_score: if article.relevance_score.is_nan() { 0.0 } else { article.relevance_score },
+            confidence_score: if article.relevance_score.is_nan() {
+                0.0
+            } else {
+                article.relevance_score
+            },
             affected_assets: article.article.symbols,
             asset_impact,
             freshness: GeoSignalFreshness::Fresh,

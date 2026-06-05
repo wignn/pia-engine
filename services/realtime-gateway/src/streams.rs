@@ -149,7 +149,11 @@ pub fn candidate_streams(channel: &str, data: &Value) -> HashSet<String> {
 
         if let Some(assets) = data.get("affected_assets").and_then(|a| a.as_array()) {
             for asset in assets {
-                if let Some(symbol) = asset.as_str().map(normalize_symbol).filter(|s| !s.is_empty()) {
+                if let Some(symbol) = asset
+                    .as_str()
+                    .map(normalize_symbol)
+                    .filter(|s| !s.is_empty())
+                {
                     streams.insert(format!("geosignals:asset:{symbol}"));
                 }
             }
@@ -278,6 +282,7 @@ fn normalize_slug(value: &str) -> String {
     value
         .trim()
         .to_lowercase()
+        .replace('_', "-")
         .split_whitespace()
         .collect::<Vec<_>>()
         .join("-")
@@ -506,6 +511,19 @@ mod tests {
     }
 
     #[test]
+    fn category_streams_normalize_snake_case_to_slug() {
+        assert_eq!(
+            parse_stream("geosignals:category:supply_chain").unwrap(),
+            "geosignals:category:supply-chain"
+        );
+        let data = json!({
+            "category": "supply_chain"
+        });
+        let streams = candidate_streams("geosignals", &data);
+        assert!(streams.contains("geosignals:category:supply-chain"));
+    }
+
+    #[test]
     fn candidate_streams_geosignals_single_asset() {
         let data = json!({
             "affected_assets": ["AAPL"]
@@ -566,7 +584,9 @@ mod tests {
         let streams = candidate_streams("geosignals", &data);
         assert!(streams.contains("geosignals:region:europe"));
         assert!(!streams.iter().any(|s| s.starts_with("geosignals:country:")));
-        assert!(!streams.iter().any(|s| s.starts_with("geosignals:category:")));
+        assert!(!streams
+            .iter()
+            .any(|s| s.starts_with("geosignals:category:")));
     }
 
     #[test]
