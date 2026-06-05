@@ -40,7 +40,6 @@ impl Config {
             clickhouse_password: get_env("CLICKHOUSE_PASSWORD", ""),
         }
     }
-
     pub fn has_clickhouse(&self) -> bool {
         !self.clickhouse_url.trim().is_empty()
     }

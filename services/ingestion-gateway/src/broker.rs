@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use atlsd_eventbus::{
     DualPublisher, EventBusMode, EventPublisher, NatsPublisher, NoopPublisher, RedisPublisher,
 };
+use std::sync::Arc;
 use tracing::{debug, warn};
 
 use crate::config::Config;

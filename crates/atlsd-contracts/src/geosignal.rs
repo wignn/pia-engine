@@ -1,8 +1,7 @@
+use crate::news::{EnrichedNewsArticle, ImpactLevel, SentimentLabel};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-
-use crate::news::{EnrichedNewsArticle, ImpactLevel, SentimentLabel};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GeoSignal {

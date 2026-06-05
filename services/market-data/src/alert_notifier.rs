@@ -1,8 +1,7 @@
-use std::{collections::HashMap, time::Duration};
-
 use atlsd_eventbus::subjects;
 use chrono::{DateTime, Utc};
 use serde_json::json;
+use std::{collections::HashMap, time::Duration};
 use tracing::{info, warn};
 
 use crate::{alerts, state::AppState};

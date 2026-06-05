@@ -8,7 +8,6 @@ pub fn init_tracing(service_name: &str, log_level: &str) {
         "TRACE" => "trace",
         _ => "info",
     };
-
     let env_filter = EnvFilter::new(format!("{}={},tower_http=debug", service_name, log_level));
     fmt()
         .json()

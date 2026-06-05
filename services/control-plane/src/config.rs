@@ -8,16 +8,13 @@ pub struct Config {
     pub port: u16,
     pub admin_api_key: String,
     pub log_level: String,
-    // JWT
     pub jwt_secret: String,
     pub jwt_expiry_days: u64,
-    // OAuth
     pub google_client_id: String,
     pub google_client_secret: String,
     pub github_client_id: String,
     pub github_client_secret: String,
     pub frontend_url: String,
-    // Encryption
     pub encryption_key: String,
 }
 

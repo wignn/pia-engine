@@ -1,8 +1,7 @@
+use crate::metrics::Metrics;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-
-use crate::metrics::Metrics;
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;

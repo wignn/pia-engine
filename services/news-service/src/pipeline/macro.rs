@@ -46,7 +46,6 @@ fn macro_asset_impact(assets: &[String], severity_score: f64) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn builds_macro_geosignal_event_id() {
         let date = NaiveDate::from_ymd_opt(2026, 6, 5).unwrap();

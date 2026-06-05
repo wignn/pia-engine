@@ -1,3 +1,4 @@
+use crate::state::AppState;
 use axum::{
     middleware,
     routing::{any, get},
@@ -5,8 +6,6 @@ use axum::{
 };
 use serde_json::{json, Value};
 use tower_http::cors::{Any, CorsLayer};
-
-use crate::state::AppState;
 
 pub fn build_router(state: AppState) -> Router {
     let cors = CorsLayer::new()
