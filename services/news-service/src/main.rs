@@ -1,4 +1,5 @@
 mod config;
+mod geosignals;
 mod http;
 mod news;
 mod pipeline;

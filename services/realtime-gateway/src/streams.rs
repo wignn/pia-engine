@@ -13,6 +13,7 @@ const BASE_STREAMS: &[&str] = &[
     "volatility",
     "x",
     "system",
+    "geosignals",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,6 +72,10 @@ pub fn parse_stream(raw: &str) -> Result<String, StreamError> {
         return Ok(format!("x:{username}"));
     }
 
+    if let Some(rest) = lower.strip_prefix("geosignals:") {
+        return parse_geosignals_stream(rest);
+    }
+
     Err(StreamError::bad_request(format!(
         "Unknown stream: {stream}"
     )))
@@ -111,6 +116,43 @@ pub fn candidate_streams(channel: &str, data: &Value) -> HashSet<String> {
             .filter(|username| !username.is_empty())
         {
             streams.insert(format!("x:{username}"));
+        }
+    }
+
+    if channel == "geosignals" {
+        if let Some(country) = data
+            .get("country")
+            .and_then(|c| c.as_str())
+            .map(normalize_slug)
+            .filter(|s| !s.is_empty())
+        {
+            streams.insert(format!("geosignals:country:{country}"));
+        }
+
+        if let Some(region) = data
+            .get("region")
+            .and_then(|r| r.as_str())
+            .map(normalize_slug)
+            .filter(|s| !s.is_empty())
+        {
+            streams.insert(format!("geosignals:region:{region}"));
+        }
+
+        if let Some(category) = data
+            .get("category")
+            .and_then(|c| c.as_str())
+            .map(normalize_slug)
+            .filter(|s| !s.is_empty())
+        {
+            streams.insert(format!("geosignals:category:{category}"));
+        }
+
+        if let Some(assets) = data.get("affected_assets").and_then(|a| a.as_array()) {
+            for asset in assets {
+                if let Some(symbol) = asset.as_str().map(normalize_symbol).filter(|s| !s.is_empty()) {
+                    streams.insert(format!("geosignals:asset:{symbol}"));
+                }
+            }
         }
     }
 
@@ -232,6 +274,61 @@ fn normalize_username(username: &str) -> String {
     username.trim().trim_start_matches('@').to_lowercase()
 }
 
+fn normalize_slug(value: &str) -> String {
+    value
+        .trim()
+        .to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+fn parse_geosignals_stream(rest: &str) -> Result<String, StreamError> {
+    if let Some(slug) = rest.strip_prefix("country:") {
+        let slug = normalize_slug(slug);
+        if slug.is_empty() {
+            return Err(StreamError::bad_request(
+                "Geosignals country stream requires a country",
+            ));
+        }
+        return Ok(format!("geosignals:country:{slug}"));
+    }
+
+    if let Some(slug) = rest.strip_prefix("region:") {
+        let slug = normalize_slug(slug);
+        if slug.is_empty() {
+            return Err(StreamError::bad_request(
+                "Geosignals region stream requires a region",
+            ));
+        }
+        return Ok(format!("geosignals:region:{slug}"));
+    }
+
+    if let Some(slug) = rest.strip_prefix("category:") {
+        let slug = normalize_slug(slug);
+        if slug.is_empty() {
+            return Err(StreamError::bad_request(
+                "Geosignals category stream requires a category",
+            ));
+        }
+        return Ok(format!("geosignals:category:{slug}"));
+    }
+
+    if let Some(symbol) = rest.strip_prefix("asset:") {
+        let symbol = normalize_symbol(symbol);
+        if symbol.is_empty() {
+            return Err(StreamError::bad_request(
+                "Geosignals asset stream requires a symbol",
+            ));
+        }
+        return Ok(format!("geosignals:asset:{symbol}"));
+    }
+
+    Err(StreamError::bad_request(format!(
+        "Unknown geosignals stream: {rest}"
+    )))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,5 +352,254 @@ mod tests {
     #[test]
     fn parse_stream_rejects_unknown_stream() {
         assert!(parse_stream("unknown").is_err());
+    }
+
+    // Geosignals country stream tests
+    #[test]
+    fn parse_stream_normalizes_geosignals_country() {
+        assert_eq!(
+            parse_stream("geosignals:country:United States").unwrap(),
+            "geosignals:country:united-states"
+        );
+    }
+
+    #[test]
+    fn parse_stream_geosignals_country_lowercase() {
+        assert_eq!(
+            parse_stream("geosignals:country:FRANCE").unwrap(),
+            "geosignals:country:france"
+        );
+    }
+
+    #[test]
+    fn parse_stream_geosignals_country_multi_word() {
+        assert_eq!(
+            parse_stream("geosignals:country:New Zealand").unwrap(),
+            "geosignals:country:new-zealand"
+        );
+    }
+
+    #[test]
+    fn parse_stream_geosignals_country_empty_rejects() {
+        assert!(parse_stream("geosignals:country:").is_err());
+    }
+
+    // Geosignals region stream tests
+    #[test]
+    fn parse_stream_normalizes_geosignals_region() {
+        assert_eq!(
+            parse_stream("geosignals:region:North America").unwrap(),
+            "geosignals:region:north-america"
+        );
+    }
+
+    #[test]
+    fn parse_stream_geosignals_region_lowercase() {
+        assert_eq!(
+            parse_stream("geosignals:region:EUROPE").unwrap(),
+            "geosignals:region:europe"
+        );
+    }
+
+    #[test]
+    fn parse_stream_geosignals_region_empty_rejects() {
+        assert!(parse_stream("geosignals:region:").is_err());
+    }
+
+    // Geosignals category stream tests
+    #[test]
+    fn parse_stream_normalizes_geosignals_category() {
+        assert_eq!(
+            parse_stream("geosignals:category:Natural Disaster").unwrap(),
+            "geosignals:category:natural-disaster"
+        );
+    }
+
+    #[test]
+    fn parse_stream_geosignals_category_lowercase() {
+        assert_eq!(
+            parse_stream("geosignals:category:POLITICAL UNREST").unwrap(),
+            "geosignals:category:political-unrest"
+        );
+    }
+
+    #[test]
+    fn parse_stream_geosignals_category_empty_rejects() {
+        assert!(parse_stream("geosignals:category:").is_err());
+    }
+
+    // Geosignals asset stream tests
+    #[test]
+    fn parse_stream_normalizes_geosignals_asset() {
+        assert_eq!(
+            parse_stream("geosignals:asset:aapl").unwrap(),
+            "geosignals:asset:AAPL"
+        );
+    }
+
+    #[test]
+    fn parse_stream_geosignals_asset_uppercase() {
+        assert_eq!(
+            parse_stream("geosignals:asset:MSFT").unwrap(),
+            "geosignals:asset:MSFT"
+        );
+    }
+
+    #[test]
+    fn parse_stream_geosignals_asset_mixed_case() {
+        assert_eq!(
+            parse_stream("geosignals:asset:GoOgL").unwrap(),
+            "geosignals:asset:GOOGL"
+        );
+    }
+
+    #[test]
+    fn parse_stream_geosignals_asset_empty_rejects() {
+        assert!(parse_stream("geosignals:asset:").is_err());
+    }
+
+    // Geosignals base stream
+    #[test]
+    fn parse_stream_geosignals_base() {
+        assert_eq!(parse_stream("geosignals").unwrap(), "geosignals");
+    }
+
+    #[test]
+    fn parse_stream_geosignals_base_case_insensitive() {
+        assert_eq!(parse_stream("GEOSIGNALS").unwrap(), "geosignals");
+    }
+
+    // Candidate streams tests for geosignals
+    #[test]
+    fn candidate_streams_geosignals_includes_base() {
+        let data = json!({});
+        let streams = candidate_streams("geosignals", &data);
+        assert!(streams.contains("all"));
+        assert!(streams.contains("geosignals"));
+    }
+
+    #[test]
+    fn candidate_streams_geosignals_country() {
+        let data = json!({
+            "country": "United States"
+        });
+        let streams = candidate_streams("geosignals", &data);
+        assert!(streams.contains("geosignals:country:united-states"));
+    }
+
+    #[test]
+    fn candidate_streams_geosignals_region() {
+        let data = json!({
+            "region": "North America"
+        });
+        let streams = candidate_streams("geosignals", &data);
+        assert!(streams.contains("geosignals:region:north-america"));
+    }
+
+    #[test]
+    fn candidate_streams_geosignals_category() {
+        let data = json!({
+            "category": "Natural Disaster"
+        });
+        let streams = candidate_streams("geosignals", &data);
+        assert!(streams.contains("geosignals:category:natural-disaster"));
+    }
+
+    #[test]
+    fn candidate_streams_geosignals_single_asset() {
+        let data = json!({
+            "affected_assets": ["AAPL"]
+        });
+        let streams = candidate_streams("geosignals", &data);
+        assert!(streams.contains("geosignals:asset:AAPL"));
+    }
+
+    #[test]
+    fn candidate_streams_geosignals_multiple_assets() {
+        let data = json!({
+            "affected_assets": ["aapl", "MSFT", "googl"]
+        });
+        let streams = candidate_streams("geosignals", &data);
+        assert!(streams.contains("geosignals:asset:AAPL"));
+        assert!(streams.contains("geosignals:asset:MSFT"));
+        assert!(streams.contains("geosignals:asset:GOOGL"));
+    }
+
+    #[test]
+    fn candidate_streams_geosignals_all_fields() {
+        let data = json!({
+            "country": "France",
+            "region": "Europe",
+            "category": "Political Unrest",
+            "affected_assets": ["bnp", "TCS"]
+        });
+        let streams = candidate_streams("geosignals", &data);
+        assert!(streams.contains("all"));
+        assert!(streams.contains("geosignals"));
+        assert!(streams.contains("geosignals:country:france"));
+        assert!(streams.contains("geosignals:region:europe"));
+        assert!(streams.contains("geosignals:category:political-unrest"));
+        assert!(streams.contains("geosignals:asset:BNP"));
+        assert!(streams.contains("geosignals:asset:TCS"));
+        assert_eq!(streams.len(), 7);
+    }
+
+    #[test]
+    fn candidate_streams_geosignals_ignores_empty_assets() {
+        let data = json!({
+            "affected_assets": ["AAPL", "", "MSFT"]
+        });
+        let streams = candidate_streams("geosignals", &data);
+        assert!(streams.contains("geosignals:asset:AAPL"));
+        assert!(streams.contains("geosignals:asset:MSFT"));
+        // Should not contain empty asset stream
+        assert!(!streams.iter().any(|s| s == "geosignals:asset:"));
+    }
+
+    #[test]
+    fn candidate_streams_geosignals_ignores_null_fields() {
+        let data = json!({
+            "country": null,
+            "region": "Europe",
+            "category": null
+        });
+        let streams = candidate_streams("geosignals", &data);
+        assert!(streams.contains("geosignals:region:europe"));
+        assert!(!streams.iter().any(|s| s.starts_with("geosignals:country:")));
+        assert!(!streams.iter().any(|s| s.starts_with("geosignals:category:")));
+    }
+
+    #[test]
+    fn candidate_streams_geosignals_empty_assets_array() {
+        let data = json!({
+            "affected_assets": []
+        });
+        let streams = candidate_streams("geosignals", &data);
+        assert!(streams.contains("all"));
+        assert!(streams.contains("geosignals"));
+        // Only base streams
+        assert_eq!(streams.len(), 2);
+    }
+
+    #[test]
+    fn candidate_streams_geosignals_country_with_spaces() {
+        let data = json!({
+            "country": "  United Arab Emirates  "
+        });
+        let streams = candidate_streams("geosignals", &data);
+        assert!(streams.contains("geosignals:country:united-arab-emirates"));
+    }
+
+    #[test]
+    fn candidate_streams_non_geosignals_channel() {
+        let data = json!({
+            "country": "France",
+            "region": "Europe"
+        });
+        let streams = candidate_streams("market_data", &data);
+        // Should not include geosignals streams for non-geosignals channel
+        assert!(streams.contains("all"));
+        assert!(streams.contains("market_data"));
+        assert!(!streams.iter().any(|s| s.starts_with("geosignals:")));
     }
 }
