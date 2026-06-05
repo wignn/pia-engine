@@ -10,7 +10,7 @@ struct MacroPoint {
 
 pub async fn refresh_signals(pool: &PgPool) -> anyhow::Result<usize> {
     let series = sqlx::query_as::<_, (String, String, String)>(
-        "SELECT id, title, category FROM news.macro_series WHERE provider = 'fred' ORDER BY id",
+        "SELECT id, title, category FROM macro_series WHERE provider = 'fred' ORDER BY id",
     )
     .fetch_all(pool)
     .await?;
@@ -38,7 +38,7 @@ pub async fn refresh_signals(pool: &PgPool) -> anyhow::Result<usize> {
         );
 
         sqlx::query(
-            "INSERT INTO news.macro_signals (series_id, category, signal_date, latest_value, previous_value, change_1d, change_7d, change_30d, direction, severity, narrative)
+            "INSERT INTO macro_signals (series_id, category, signal_date, latest_value, previous_value, change_1d, change_7d, change_30d, direction, severity, narrative)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              ON CONFLICT (series_id, signal_date) DO UPDATE SET category = EXCLUDED.category, latest_value = EXCLUDED.latest_value, previous_value = EXCLUDED.previous_value, change_1d = EXCLUDED.change_1d, change_7d = EXCLUDED.change_7d, change_30d = EXCLUDED.change_30d, direction = EXCLUDED.direction, severity = EXCLUDED.severity, narrative = EXCLUDED.narrative, updated_at = NOW()",
         )
@@ -65,8 +65,8 @@ pub async fn dashboard(pool: &PgPool, limit: i64) -> anyhow::Result<Value> {
     let rows = sqlx::query(
         "WITH latest AS (
             SELECT DISTINCT ON (s.id) s.id, ms.title, ms.category, s.signal_date, s.latest_value, s.change_1d, s.change_7d, s.change_30d, s.direction, s.severity, s.narrative
-            FROM news.macro_signals s
-            JOIN news.macro_series ms ON ms.id = s.series_id
+            FROM macro_signals s
+            JOIN macro_series ms ON ms.id = s.series_id
             ORDER BY s.id, s.signal_date DESC
         )
         SELECT * FROM latest ORDER BY
@@ -103,7 +103,7 @@ pub async fn dashboard(pool: &PgPool, limit: i64) -> anyhow::Result<Value> {
 
 async fn load_recent_points(pool: &PgPool, series_id: &str) -> anyhow::Result<Vec<MacroPoint>> {
     let rows = sqlx::query_as::<_, (NaiveDate, f64)>(
-        "SELECT observation_date, value FROM news.macro_observations WHERE series_id = $1 AND value IS NOT NULL ORDER BY observation_date DESC LIMIT 90",
+        "SELECT observation_date, value FROM macro_observations WHERE series_id = $1 AND value IS NOT NULL ORDER BY observation_date DESC LIMIT 90",
     )
     .bind(series_id)
     .fetch_all(pool)

@@ -145,7 +145,7 @@ impl FredClient {
             };
             let value = parse_fred_value(&observation.value);
             sqlx::query(
-                "INSERT INTO news.macro_observations (series_id, observation_date, value, raw_value)
+                "INSERT INTO macro_observations (series_id, observation_date, value, raw_value)
                  VALUES ($1, $2, $3, $4)
                  ON CONFLICT (series_id, observation_date) DO UPDATE SET value = EXCLUDED.value, raw_value = EXCLUDED.raw_value, updated_at = NOW()",
             )
@@ -159,7 +159,7 @@ impl FredClient {
         }
 
         sqlx::query(
-            "UPDATE news.macro_series SET last_synced_at = NOW(), updated_at = NOW() WHERE id = $1",
+            "UPDATE macro_series SET last_synced_at = NOW(), updated_at = NOW() WHERE id = $1",
         )
         .bind(&series.id)
         .execute(pool)
@@ -230,7 +230,7 @@ async fn upsert_series(
     category: &str,
 ) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO news.macro_series (id, provider, title, category, units, frequency, seasonal_adjustment, observation_start, observation_end)
+        "INSERT INTO macro_series (id, provider, title, category, units, frequency, seasonal_adjustment, observation_start, observation_end)
          VALUES ($1, 'fred', $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, category = EXCLUDED.category, units = EXCLUDED.units, frequency = EXCLUDED.frequency, seasonal_adjustment = EXCLUDED.seasonal_adjustment, observation_start = EXCLUDED.observation_start, observation_end = EXCLUDED.observation_end, updated_at = NOW()",
     )

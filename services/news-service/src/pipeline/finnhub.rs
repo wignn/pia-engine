@@ -4,6 +4,8 @@ use serde::Deserialize;
 use sqlx::PgPool;
 use tracing::{info, warn};
 
+const FALLBACK_NEWS_SOURCE: &str = "Market News Wire";
+
 #[derive(Clone)]
 pub struct FinnhubClient {
     http: Client,
@@ -64,7 +66,6 @@ impl FinnhubClient {
             return Ok(0);
         }
 
-        ensure_source(pool).await?;
         let items = self
             .http
             .get("https://finnhub.io/api/v1/news")
@@ -82,6 +83,8 @@ impl FinnhubClient {
             }
             let published_at = Utc.timestamp_opt(item.datetime, 0).single();
             let content_hash = format!("finnhub-news-{}", item.id);
+            let source_name = clean_news_source(&item.source);
+            let source_id = ensure_news_source(pool, &source_name).await?;
             let url = if item.url.trim().is_empty() {
                 format!("https://finnhub.io/news/{}", item.id)
             } else {
@@ -89,10 +92,11 @@ impl FinnhubClient {
             };
             let count = sqlx::query_scalar::<_, i64>(
                 "INSERT INTO news.forex_news_articles (source_id, content_hash, original_url, original_title, original_content, summary, is_processed, processed_at, published_at)
-                 VALUES ('feed-finnhub-market-news', $1, $2, $3, $4, $5, TRUE, NOW(), $6)
+                 VALUES ($1, $2, $3, $4, $5, $6, TRUE, NOW(), $7)
                  ON CONFLICT (content_hash) DO NOTHING
                  RETURNING 1",
             )
+            .bind(source_id)
             .bind(content_hash)
             .bind(url)
             .bind(item.headline)
@@ -193,15 +197,48 @@ pub async fn run_economic_calendar_loop(client: FinnhubClient, pool: PgPool, int
     }
 }
 
-async fn ensure_source(pool: &PgPool) -> anyhow::Result<()> {
+async fn ensure_news_source(pool: &PgPool, name: &str) -> anyhow::Result<String> {
+    let slug = source_slug(name);
+    let id = format!("feed-market-news-{slug}");
     sqlx::query(
         "INSERT INTO news.forex_news_sources (id, name, slug, source_type, url, category, poll_interval_sec, priority, is_active, updated_at)
-         VALUES ('feed-finnhub-market-news', 'Finnhub Market News', 'finnhub-market-news', 'api', 'https://finnhub.io', 'macro', 900, 90, TRUE, NOW())
-         ON CONFLICT (id) DO NOTHING",
+         VALUES ($1, $2, $3, 'api', '', 'macro', 900, 90, TRUE, NOW())
+         ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()",
     )
+    .bind(&id)
+    .bind(name)
+    .bind(slug)
     .execute(pool)
     .await?;
-    Ok(())
+    Ok(id)
+}
+
+fn clean_news_source(source: &str) -> String {
+    let source = source.trim();
+    if source.is_empty() {
+        FALLBACK_NEWS_SOURCE.to_string()
+    } else {
+        source.to_string()
+    }
+}
+
+fn source_slug(source: &str) -> String {
+    let slug: String = source
+        .trim()
+        .to_lowercase()
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
+        .collect();
+    let slug = slug
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    if slug.is_empty() {
+        "market-news-wire".to_string()
+    } else {
+        slug
+    }
 }
 
 fn is_macro_news(item: &MarketNewsItem) -> bool {

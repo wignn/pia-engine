@@ -471,8 +471,8 @@ async fn load_macro_signals(db: &sqlx::PgPool) -> Result<Vec<Value>, sqlx::Error
     let rows: Vec<MacroSignalRow> = sqlx::query_as(
         "WITH latest AS (
             SELECT DISTINCT ON (s.series_id) s.series_id, ms.title, s.category, s.signal_date, s.latest_value, s.change_1d, s.change_7d, s.direction, s.severity, s.narrative
-            FROM news.macro_signals s
-            JOIN news.macro_series ms ON ms.id = s.series_id
+            FROM macro_signals s
+            JOIN macro_series ms ON ms.id = s.series_id
             WHERE s.severity IN ('high', 'medium')
             ORDER BY s.series_id, s.signal_date DESC
         )
