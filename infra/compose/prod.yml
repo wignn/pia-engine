@@ -327,7 +327,6 @@ services:
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.public-web
-    image: atlsd-public-web:latest
     env_file:
       - ../env/.env.public-web
     container_name: atlsd-public-web
