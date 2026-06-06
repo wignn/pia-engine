@@ -55,18 +55,6 @@ struct PriceTickRow<'a> {
     asset_type: &'a str,
 }
 
-#[derive(Serialize)]
-struct OhlcvCandleRow<'a> {
-    symbol: &'a str,
-    resolution: &'static str,
-    time: String,
-    open: f64,
-    high: f64,
-    low: f64,
-    close: f64,
-    volume: f64,
-}
-
 impl ClickHouseClient {
     pub fn new(url: String, database: String, user: String, password: String) -> Self {
         Self {
@@ -118,28 +106,11 @@ impl ClickHouseClient {
             return Ok(());
         }
 
-        let mut body = String::new();
-        for (price, minute) in batch {
-            let row = OhlcvCandleRow {
-                symbol: &price.symbol,
-                resolution: "1m",
-                time: minute.format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
-                open: price.price,
-                high: price.price,
-                low: price.price,
-                close: price.price,
-                volume: price.volume.unwrap_or(0.0),
-            };
-            body.push_str(&serde_json::to_string(&row)?);
-            body.push('\n');
-        }
-
-        let sql = format!(
-            "INSERT INTO {}.ohlcv_candles FORMAT JSONEachRow",
-            ident(&self.database)
-        );
-        self.insert_json_each_row(&sql, body, "ClickHouse ohlcv candle batch insert")
-            .await
+        // Historical candles are aggregated from raw price_ticks in latest_history().
+        // Writing one row per tick into market.ohlcv_candles would create flat
+        // open/high/low/close rows; ReplacingMergeTree does not merge those rows
+        // into a real intraminute OHLC candle.
+        Ok(())
     }
 
     pub async fn latest_prices(&self) -> anyhow::Result<Vec<LatestPriceTick>> {
@@ -165,17 +136,7 @@ impl ClickHouseClient {
         resolution: &str,
         limit: usize,
     ) -> anyhow::Result<Vec<Value>> {
-        let bucket_minutes = history_bucket_minutes(resolution);
-        let bucket_interval = clickhouse_bucket_interval(bucket_minutes);
-        let lookback_minutes = history_lookback_minutes(bucket_minutes, limit);
-        let sql = format!(
-            "SELECT toUnixTimestamp(bucket_time) AS time, argMax(price, time) AS value, argMin(price, time) AS open, max(price) AS high, min(price) AS low, argMax(price, time) AS close FROM (SELECT toStartOfInterval(time, {}) AS bucket_time, time, price FROM {}.price_ticks WHERE symbol = {} AND price > 0 AND time >= now() - INTERVAL {} MINUTE) GROUP BY bucket_time ORDER BY bucket_time DESC LIMIT {} FORMAT JSONEachRow",
-            bucket_interval,
-            ident(&self.database),
-            string_literal(symbol),
-            lookback_minutes,
-            limit.clamp(1, 1000)
-        );
+        let sql = latest_history_sql(&self.database, symbol, resolution, limit);
         let mut rows: Vec<Value> = self.query_json_each_row(&sql).await?;
         rows.reverse();
         Ok(rows)
@@ -271,6 +232,20 @@ fn history_lookback_minutes(bucket_minutes: u32, limit: usize) -> u32 {
     requested.clamp(240, 43_200) as u32
 }
 
+fn latest_history_sql(database: &str, symbol: &str, resolution: &str, limit: usize) -> String {
+    let bucket_minutes = history_bucket_minutes(resolution);
+    let bucket_interval = clickhouse_bucket_interval(bucket_minutes);
+    let lookback_minutes = history_lookback_minutes(bucket_minutes, limit);
+    format!(
+        "SELECT toUnixTimestamp(bucket_time) AS time, argMax(price, time) AS value, argMin(price, time) AS open, max(price) AS high, min(price) AS low, argMax(price, time) AS close FROM (SELECT toStartOfInterval(time, {}) AS bucket_time, time, price FROM {}.price_ticks WHERE symbol = {} AND price > 0 AND time >= now() - INTERVAL {} MINUTE) GROUP BY bucket_time ORDER BY bucket_time DESC LIMIT {} FORMAT JSONEachRow",
+        bucket_interval,
+        ident(database),
+        string_literal(symbol),
+        lookback_minutes,
+        limit.clamp(1, 1000)
+    )
+}
+
 fn ident(value: &str) -> String {
     value
         .chars()
@@ -317,6 +292,45 @@ mod tests {
         assert_eq!(clickhouse_bucket_interval(60), "INTERVAL 1 HOUR");
         assert_eq!(history_lookback_minutes(1, 120), 360);
         assert_eq!(history_lookback_minutes(60, 1000), 43_200);
+    }
+
+    #[test]
+    fn latest_history_query_aggregates_ohlc_from_raw_ticks() {
+        let sql = latest_history_sql("market", "BTCUSDT", "5m", 120);
+
+        assert!(sql.contains("FROM market.price_ticks"));
+        assert!(sql.contains("toStartOfInterval(time, INTERVAL 5 MINUTE) AS bucket_time"));
+        assert!(sql.contains("argMin(price, time) AS open"));
+        assert!(sql.contains("max(price) AS high"));
+        assert!(sql.contains("min(price) AS low"));
+        assert!(sql.contains("argMax(price, time) AS close"));
+        assert!(!sql.contains("FROM market.ohlcv_candles"));
+    }
+
+    #[tokio::test]
+    async fn clickhouse_ohlcv_batch_insert_is_disabled_to_avoid_flat_replacements() {
+        let client = ClickHouseClient::new(
+            "http://127.0.0.1:8123".to_string(),
+            "market".to_string(),
+            "default".to_string(),
+            String::new(),
+        );
+        let price = CachedPrice {
+            symbol: "BTCUSDT".to_string(),
+            price: 50_000.0,
+            bid: None,
+            ask: None,
+            volume: Some(1.0),
+            source: "test".to_string(),
+            asset_type: "crypto".to_string(),
+            received_at: None,
+        };
+
+        let result = client
+            .insert_ohlcv_candles_batch(&[(price, chrono::Utc::now())])
+            .await;
+
+        assert!(result.is_ok());
     }
 
     #[test]

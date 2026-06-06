@@ -73,7 +73,7 @@ async fn postgres_history(
 ) -> Result<Vec<Value>, sqlx::Error> {
     let rows: Vec<(chrono::DateTime<chrono::Utc>, f64, f64, f64, f64)> = if resolution == "1m" {
         sqlx::query_as(
-            "SELECT time, open, high, low, close FROM market.ohlcv_candles WHERE symbol = $1 AND resolution = '1m' ORDER BY time DESC LIMIT $2",
+            "SELECT time, open, high, low, close FROM market.ohlcv_candles WHERE symbol = $1 AND resolution = '1m' AND time >= NOW() - INTERVAL '1 day' ORDER BY time DESC LIMIT $2",
         )
         .bind(symbol)
         .bind(limit as i64)
@@ -85,7 +85,7 @@ async fn postgres_history(
             "WITH bucketed AS (
                 SELECT to_timestamp(floor(extract(epoch from time) / $2) * $2) AS bucket_time, time, open, high, low, close
                 FROM market.ohlcv_candles
-                WHERE symbol = $1 AND resolution = '1m'
+                WHERE symbol = $1 AND resolution = '1m' AND time >= NOW() - INTERVAL '7 days'
             ), ranked AS (
                 SELECT
                     bucket_time,
