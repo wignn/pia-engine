@@ -71,9 +71,9 @@ async fn postgres_history(
     resolution: &str,
     limit: usize,
 ) -> Result<Vec<Value>, sqlx::Error> {
-    let rows: Vec<(chrono::DateTime<chrono::Utc>, f64)> = if resolution == "1m" {
+    let rows: Vec<(chrono::DateTime<chrono::Utc>, f64, f64, f64, f64)> = if resolution == "1m" {
         sqlx::query_as(
-            "SELECT time, close FROM market.ohlcv_candles WHERE symbol = $1 AND resolution = '1m' ORDER BY time DESC LIMIT $2",
+            "SELECT time, open, high, low, close FROM market.ohlcv_candles WHERE symbol = $1 AND resolution = '1m' ORDER BY time DESC LIMIT $2",
         )
         .bind(symbol)
         .bind(limit as i64)
@@ -83,14 +83,20 @@ async fn postgres_history(
         let bucket_seconds = resolution_bucket_seconds(resolution);
         sqlx::query_as(
             "WITH bucketed AS (
-                SELECT to_timestamp(floor(extract(epoch from time) / $2) * $2) AS bucket_time, time, close
+                SELECT to_timestamp(floor(extract(epoch from time) / $2) * $2) AS bucket_time, time, open, high, low, close
                 FROM market.ohlcv_candles
                 WHERE symbol = $1 AND resolution = '1m'
             ), ranked AS (
-                SELECT bucket_time, close, row_number() OVER (PARTITION BY bucket_time ORDER BY time DESC) AS rn
+                SELECT
+                    bucket_time,
+                    first_value(open) OVER (PARTITION BY bucket_time ORDER BY time ASC) AS open,
+                    max(high) OVER (PARTITION BY bucket_time) AS high,
+                    min(low) OVER (PARTITION BY bucket_time) AS low,
+                    first_value(close) OVER (PARTITION BY bucket_time ORDER BY time DESC) AS close,
+                    row_number() OVER (PARTITION BY bucket_time ORDER BY time DESC) AS rn
                 FROM bucketed
             )
-            SELECT bucket_time, close FROM ranked WHERE rn = 1 ORDER BY bucket_time DESC LIMIT $3",
+            SELECT bucket_time, open, high, low, close FROM ranked WHERE rn = 1 ORDER BY bucket_time DESC LIMIT $3",
         )
         .bind(symbol)
         .bind(bucket_seconds as f64)
@@ -102,7 +108,16 @@ async fn postgres_history(
     Ok(rows
         .into_iter()
         .rev()
-        .map(|(time, value)| json!({ "time": time.timestamp(), "value": value }))
+        .map(|(time, open, high, low, close)| {
+            json!({
+                "time": time.timestamp(),
+                "value": close,
+                "open": open,
+                "high": high,
+                "low": low,
+                "close": close
+            })
+        })
         .collect())
 }
 
@@ -120,7 +135,17 @@ async fn latest_price_history_fallback(
             let now = chrono::Utc::now().timestamp();
             let start = now - (119 * 60);
             (0..120)
-                .map(|i| json!({ "time": start + (i * 60), "value": price.price, "source": "last_known" }))
+                .map(|i| {
+                    json!({
+                        "time": start + (i * 60),
+                        "value": price.price,
+                        "open": price.price,
+                        "high": price.price,
+                        "low": price.price,
+                        "close": price.price,
+                        "source": "last_known"
+                    })
+                })
                 .collect()
         }
         Ok(_) => Vec::new(),
