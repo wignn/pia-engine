@@ -165,26 +165,17 @@ impl ClickHouseClient {
         resolution: &str,
         limit: usize,
     ) -> anyhow::Result<Vec<Value>> {
-        let sql = if resolution == "1m" {
-            format!(
-                "SELECT toUnixTimestamp(time) AS time, close AS value FROM {}.ohlcv_candles WHERE symbol = {} AND resolution = '1m' ORDER BY time DESC LIMIT {} FORMAT JSONEachRow",
-                ident(&self.database),
-                string_literal(symbol),
-                limit.clamp(1, 1000)
-            )
-        } else {
-            let table = rollup_table(resolution).ok_or_else(|| {
-                anyhow::anyhow!("unsupported ClickHouse history resolution: {resolution}")
-            })?;
-            format!(
-                "SELECT toUnixTimestamp(time) AS time, argMaxMerge(close_state) AS value FROM {}.{} WHERE symbol = {} AND resolution = {} GROUP BY symbol, resolution, time ORDER BY time DESC LIMIT {} FORMAT JSONEachRow",
-                ident(&self.database),
-                table,
-                string_literal(symbol),
-                string_literal(resolution),
-                limit.clamp(1, 1000)
-            )
-        };
+        let bucket_minutes = history_bucket_minutes(resolution);
+        let bucket_interval = clickhouse_bucket_interval(bucket_minutes);
+        let lookback_minutes = history_lookback_minutes(bucket_minutes, limit);
+        let sql = format!(
+            "SELECT toUnixTimestamp(bucket_time) AS time, argMax(price, time) AS value, argMin(price, time) AS open, max(price) AS high, min(price) AS low, argMax(price, time) AS close FROM (SELECT toStartOfInterval(time, {}) AS bucket_time, time, price FROM {}.price_ticks WHERE symbol = {} AND price > 0 AND time >= now() - INTERVAL {} MINUTE) GROUP BY bucket_time ORDER BY bucket_time DESC LIMIT {} FORMAT JSONEachRow",
+            bucket_interval,
+            ident(&self.database),
+            string_literal(symbol),
+            lookback_minutes,
+            limit.clamp(1, 1000)
+        );
         let mut rows: Vec<Value> = self.query_json_each_row(&sql).await?;
         rows.reverse();
         Ok(rows)
@@ -256,13 +247,28 @@ impl ClickHouseClient {
     }
 }
 
-fn rollup_table(resolution: &str) -> Option<&'static str> {
+fn history_bucket_minutes(resolution: &str) -> u32 {
     match resolution {
-        "5m" => Some("ohlcv_candles_5m"),
-        "15m" => Some("ohlcv_candles_15m"),
-        "1h" => Some("ohlcv_candles_1h"),
-        _ => None,
+        "5m" => 5,
+        "15m" => 15,
+        "1h" => 60,
+        _ => 1,
     }
+}
+
+fn clickhouse_bucket_interval(bucket_minutes: u32) -> String {
+    if bucket_minutes % 60 == 0 {
+        format!("INTERVAL {} HOUR", bucket_minutes / 60)
+    } else {
+        format!("INTERVAL {bucket_minutes} MINUTE")
+    }
+}
+
+fn history_lookback_minutes(bucket_minutes: u32, limit: usize) -> u32 {
+    let requested = (bucket_minutes as usize)
+        .saturating_mul(limit.clamp(1, 1000))
+        .saturating_mul(3);
+    requested.clamp(240, 43_200) as u32
 }
 
 fn ident(value: &str) -> String {
@@ -304,10 +310,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn rollup_table_maps_supported_resolutions() {
-        assert_eq!(rollup_table("5m"), Some("ohlcv_candles_5m"));
-        assert_eq!(rollup_table("1h"), Some("ohlcv_candles_1h"));
-        assert_eq!(rollup_table("1d"), None);
+    fn history_resolution_helpers_map_supported_intervals() {
+        assert_eq!(history_bucket_minutes("5m"), 5);
+        assert_eq!(history_bucket_minutes("1h"), 60);
+        assert_eq!(clickhouse_bucket_interval(15), "INTERVAL 15 MINUTE");
+        assert_eq!(clickhouse_bucket_interval(60), "INTERVAL 1 HOUR");
+        assert_eq!(history_lookback_minutes(1, 120), 360);
+        assert_eq!(history_lookback_minutes(60, 1000), 43_200);
     }
 
     #[test]
