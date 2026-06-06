@@ -115,7 +115,9 @@ async fn postgres_history(
                 "open": open,
                 "high": high,
                 "low": low,
-                "close": close
+                "close": close,
+                "tick_count": null,
+                "source": "postgres_ohlcv_candles"
             })
         })
         .collect())
@@ -143,6 +145,7 @@ async fn latest_price_history_fallback(
                         "high": price.price,
                         "low": price.price,
                         "close": price.price,
+                        "tick_count": 0,
                         "source": "last_known"
                     })
                 })
