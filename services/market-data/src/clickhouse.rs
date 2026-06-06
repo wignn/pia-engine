@@ -257,7 +257,7 @@ fn history_bucket_minutes(resolution: &str) -> u32 {
 }
 
 fn clickhouse_bucket_interval(bucket_minutes: u32) -> String {
-    if bucket_minutes % 60 == 0 {
+    if bucket_minutes.is_multiple_of(60) {
         format!("INTERVAL {} HOUR", bucket_minutes / 60)
     } else {
         format!("INTERVAL {bucket_minutes} MINUTE")
