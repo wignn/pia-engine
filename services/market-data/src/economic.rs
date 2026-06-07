@@ -298,7 +298,7 @@ pub async fn list_indicators(
     State(state): State<AppState>,
     Query(params): Query<IndicatorsQuery>,
 ) -> Json<serde_json::Value> {
-    let limit = params.limit.unwrap_or(50).min(500).max(1);
+    let limit = params.limit.unwrap_or(50).clamp(1, 500);
     let offset = params.offset.unwrap_or(0).max(0);
 
     let mut conditions = vec!["1=1".to_string()];
@@ -354,7 +354,7 @@ pub async fn get_series(
     axum::extract::Path(series_id): axum::extract::Path<String>,
     Query(params): Query<SeriesQuery>,
 ) -> Json<serde_json::Value> {
-    let limit = params.limit.unwrap_or(100).min(500).max(1);
+    let limit = params.limit.unwrap_or(100).clamp(1, 500);
 
     let result = query_indicators(
         &state.db,
@@ -454,6 +454,7 @@ pub async fn list_categories() -> Json<serde_json::Value> {
 
 // --- DB Queries ---
 
+#[allow(clippy::too_many_arguments)]
 async fn query_indicators(
     pool: &PgPool,
     country: Option<&str>,
