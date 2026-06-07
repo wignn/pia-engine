@@ -5,6 +5,7 @@ mod calendar;
 mod clickhouse;
 mod config;
 mod data_quality;
+mod economic;
 mod history;
 mod http;
 mod ingestion;
@@ -120,6 +121,15 @@ async fn main() {
     tokio::spawn(async move {
         alert_notifier::run(alert_state).await;
     });
+
+    if cfg.has_fred() {
+        let econ_cfg = cfg.clone();
+        let econ_pool = state.db.clone();
+        tokio::spawn(async move {
+            economic::run_sync(econ_cfg, econ_pool).await;
+        });
+        info!("economic data sync (FRED) enabled");
+    }
 
     let listener = match TcpListener::bind(&cfg.bind_addr).await {
         Ok(listener) => listener,

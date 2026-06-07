@@ -31,6 +31,26 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/market/spikes", get(crate::spikes::spikes))
         .route("/api/v1/market/alerts", get(crate::alerts::alerts))
         .route("/api/v1/market/smart-alerts", get(crate::alerts::alerts))
+        .route(
+            "/api/v1/market/economic/indicators",
+            get(crate::economic::list_indicators),
+        )
+        .route(
+            "/api/v1/market/economic/indicators/{series_id}",
+            get(crate::economic::get_series),
+        )
+        .route(
+            "/api/v1/market/economic/latest",
+            get(crate::economic::latest_indicators),
+        )
+        .route(
+            "/api/v1/market/economic/countries",
+            get(crate::economic::list_countries),
+        )
+        .route(
+            "/api/v1/market/economic/categories",
+            get(crate::economic::list_categories),
+        )
         .layer(cors)
         .with_state(state)
 }

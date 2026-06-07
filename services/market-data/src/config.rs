@@ -17,6 +17,8 @@ pub struct Config {
     pub alert_notifications_enabled: bool,
     pub alert_scan_sec: u64,
     pub alert_cooldown_sec: u64,
+    pub fred_api_key: String,
+    pub economic_refresh_sec: u64,
 }
 
 impl Config {
@@ -52,6 +54,8 @@ impl Config {
             alert_notifications_enabled: get_env_bool("ALERT_NOTIFICATIONS_ENABLED", false),
             alert_scan_sec: get_env_u64("ALERT_SCAN_SEC", 30).max(10),
             alert_cooldown_sec: get_env_u64("ALERT_COOLDOWN_SEC", 900).max(60),
+            fred_api_key: get_env("FRED_API_KEY", ""),
+            economic_refresh_sec: get_env_u64("ECONOMIC_REFRESH_SEC", 21600).max(600),
         }
     }
 
@@ -61,6 +65,10 @@ impl Config {
 
     pub fn has_clickhouse(&self) -> bool {
         !self.clickhouse_url.trim().is_empty()
+    }
+
+    pub fn has_fred(&self) -> bool {
+        !self.fred_api_key.trim().is_empty()
     }
 }
 

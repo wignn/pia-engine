@@ -42,6 +42,26 @@ pub fn build_router(state: AppState) -> Router {
             any(crate::proxy::proxy_request),
         )
         .route(
+            "/api/v1/market/economic/indicators",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/market/economic/indicators/{series_id}",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/market/economic/latest",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/market/economic/countries",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/market/economic/categories",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
             "/api/v1/market/why/{symbol}",
             any(crate::proxy::proxy_request),
         )
