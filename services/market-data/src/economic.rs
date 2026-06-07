@@ -301,30 +301,6 @@ pub async fn list_indicators(
     let limit = params.limit.unwrap_or(50).clamp(1, 500);
     let offset = params.offset.unwrap_or(0).max(0);
 
-    let mut conditions = vec!["1=1".to_string()];
-    let mut bind_idx = 0u32;
-
-    if params.country.is_some() {
-        bind_idx += 1;
-        conditions.push(format!("ms.id IN (SELECT id FROM macro_series WHERE provider = 'fred') AND country_code = ${bind_idx}"));
-    }
-    if params.category.is_some() {
-        bind_idx += 1;
-        conditions.push(format!("ms.category = ${bind_idx}"));
-    }
-    if params.series_id.is_some() {
-        bind_idx += 1;
-        conditions.push(format!("ms.id = ${bind_idx}"));
-    }
-    if params.from.is_some() {
-        bind_idx += 1;
-        conditions.push(format!("mo.observation_date >= ${bind_idx}"));
-    }
-    if params.to.is_some() {
-        bind_idx += 1;
-        conditions.push(format!("mo.observation_date <= ${bind_idx}"));
-    }
-
     let result = query_indicators(
         &state.db,
         params.country.as_deref(),
