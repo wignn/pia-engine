@@ -5,14 +5,12 @@ mod proxy;
 mod state;
 mod tenant;
 mod usage;
-
-use tokio::net::TcpListener;
-use tracing::{error, info, warn};
-
 use crate::config::Config;
 use crate::state::AppState;
 use crate::tenant::TenantRegistry;
 use crate::usage::UsageTracker;
+use tokio::net::TcpListener;
+use tracing::{error, info, warn};
 
 #[tokio::main]
 async fn main() {
