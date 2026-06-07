@@ -1,11 +1,10 @@
+use crate::state::AppState;
 use axum::{
     body::Body,
     extract::State,
     http::{HeaderMap, Method, StatusCode, Uri},
     response::Response,
 };
-
-use crate::state::AppState;
 
 pub async fn proxy_request(
     State(state): State<AppState>,

@@ -1,6 +1,6 @@
 [package]
 name = "api-gateway"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "ATLSD public REST API gateway"
 license = "MIT"
