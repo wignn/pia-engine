@@ -8,9 +8,9 @@ use crate::prices::{self, CachedPrice};
 use crate::state::AppState;
 
 const NATS_SUBJECTS: &[&str] = &[
-    subjects::MD_DEDUP_PRIMARY_FX_QUOTES_V1,
-    subjects::MD_DEDUP_CRYPTO_TRADES_V1,
-    subjects::MD_DEDUP_INDEX_QUOTES_V1,
+    subjects::MD_RAW_PRIMARY_FX_QUOTES_V1,
+    subjects::MD_RAW_CRYPTO_TRADES_V1,
+    subjects::MD_RAW_INDEX_QUOTES_V1,
 ];
 
 pub async fn run(state: AppState) {
@@ -50,7 +50,7 @@ async fn subscribe_redis_loop(state: &AppState) -> anyhow::Result<()> {
 
     while let Some(message) = pubsub.on_message().next().await {
         let payload: String = message.get_payload()?;
-        handle_payload(&payload, state).await;
+        handle_payload(&payload, state, None).await;
     }
 
     Ok(())
@@ -75,14 +75,19 @@ async fn subscribe_nats_loop(state: &AppState) -> anyhow::Result<()> {
     info!(subjects = ?NATS_SUBJECTS, "market-data connected to NATS ingestion subjects");
 
     while let Some(message) = subscribers.next().await {
+        let subject = message.subject.as_str();
         let payload = std::str::from_utf8(&message.payload)?;
-        handle_payload(payload, state).await;
+        handle_payload(payload, state, Some((&client, subject))).await;
     }
 
     Ok(())
 }
 
-async fn handle_payload(payload: &str, state: &AppState) {
+async fn handle_payload(
+    payload: &str,
+    state: &AppState,
+    nats: Option<(&async_nats::Client, &str)>,
+) {
     let parsed: Value = match serde_json::from_str(payload) {
         Ok(value) => value,
         Err(err) => {
@@ -159,6 +164,31 @@ async fn handle_payload(payload: &str, state: &AppState) {
         prices.insert(symbol.clone(), current.clone());
         current
     };
+
+    // Publish deduplicated tick to NATS for realtime-gateway
+    if let Some((client, subject)) = nats {
+        let dedup_subject = match subject {
+            subjects::MD_RAW_PRIMARY_FX_QUOTES_V1 => Some(subjects::MD_DEDUP_PRIMARY_FX_QUOTES_V1),
+            subjects::MD_RAW_CRYPTO_TRADES_V1 => Some(subjects::MD_DEDUP_CRYPTO_TRADES_V1),
+            subjects::MD_RAW_INDEX_QUOTES_V1 => Some(subjects::MD_DEDUP_INDEX_QUOTES_V1),
+            _ => None,
+        };
+        if let Some(dedup_subject) = dedup_subject {
+            if let Err(err) = client
+                .publish(
+                    dedup_subject.to_string(),
+                    payload.as_bytes().to_vec().into(),
+                )
+                .await
+            {
+                warn!(
+                    error = %err,
+                    subject = %dedup_subject,
+                    "failed to publish deduplicated tick to NATS"
+                );
+            }
+        }
+    }
 
     let current = if state.config.write_latest {
         Some(current)

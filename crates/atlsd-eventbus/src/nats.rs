@@ -32,11 +32,7 @@ pub fn dedup_headers(msg_id: &str) -> async_nats::HeaderMap {
     headers
 }
 
-pub async fn init_jetstream_streams(client: &async_nats::Client) -> anyhow::Result<()> {
-    let jetstream = async_nats::jetstream::new(client.clone());
-    jetstream
-        .get_or_create_stream(market_stream_config())
-        .await?;
+pub async fn init_jetstream_streams(_client: &async_nats::Client) -> anyhow::Result<()> {
     Ok(())
 }
 
