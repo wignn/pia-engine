@@ -15,17 +15,6 @@ const SUBJECTS: &[&str] = &[
     subjects::NEWS_STOCK_PROCESSED_V1,
 ];
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn market_subjects_use_deduplicated_streams() {
-        assert!(SUBJECTS.contains(&subjects::MD_DEDUP_PRIMARY_FX_QUOTES_V1));
-        assert!(!SUBJECTS.contains(&subjects::MD_RAW_PRIMARY_FX_QUOTES_V1));
-    }
-}
-
 pub async fn run(cfg: Config, hub: Arc<Hub>) {
     match EventBusMode::from_env_value(&cfg.eventbus_mode) {
         EventBusMode::Nats | EventBusMode::Dual => run_loop(cfg, hub).await,
@@ -103,4 +92,15 @@ fn market_tick(payload: &str) -> anyhow::Result<Option<Value>> {
 
     object.insert("source".to_string(), json!("market_data"));
     Ok(Some(tick))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn market_subjects_use_deduplicated_streams() {
+        assert!(SUBJECTS.contains(&subjects::MD_DEDUP_PRIMARY_FX_QUOTES_V1));
+        assert!(!SUBJECTS.contains(&subjects::MD_RAW_PRIMARY_FX_QUOTES_V1));
+    }
 }

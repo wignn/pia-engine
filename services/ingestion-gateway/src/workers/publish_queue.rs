@@ -20,19 +20,6 @@ pub fn market_data_msg_id(symbol: &str, timestamp_ms: i64, price: f64, volume: f
     format!("{symbol}:{timestamp_ms}:{price}:{volume}")
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn market_data_msg_id_is_deterministic() {
-        assert_eq!(
-            market_data_msg_id("XAUUSD", 1_710_000_000_000, 4204.795, 1.0),
-            "XAUUSD:1710000000000:4204.795:1"
-        );
-    }
-}
-
 pub fn spawn_publisher(
     worker: &'static str,
     broker: Arc<dyn BrokerPublisher>,
@@ -128,5 +115,18 @@ pub fn enqueue_or_drop(
             );
             false
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn market_data_msg_id_is_deterministic() {
+        assert_eq!(
+            market_data_msg_id("XAUUSD", 1_710_000_000_000, 4204.795, 1.0),
+            "XAUUSD:1710000000000:4204.795:1"
+        );
     }
 }
