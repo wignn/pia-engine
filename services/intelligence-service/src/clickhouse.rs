@@ -1,4 +1,7 @@
 use serde::{Deserialize, Deserializer};
+use std::time::Duration;
+
+const CLICKHOUSE_HTTP_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Debug)]
 pub struct ClickHouseClient {
@@ -23,8 +26,23 @@ pub struct SpikeCandidate {
 
 impl ClickHouseClient {
     pub fn new(url: String, database: String, user: String, password: String) -> Self {
+        Self::new_with_timeout(url, database, user, password, CLICKHOUSE_HTTP_TIMEOUT)
+    }
+
+    fn new_with_timeout(
+        url: String,
+        database: String,
+        user: String,
+        password: String,
+        timeout: Duration,
+    ) -> Self {
+        let client = reqwest::Client::builder()
+            .timeout(timeout)
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+
         Self {
-            client: reqwest::Client::new(),
+            client,
             url: url.trim_end_matches('/').to_string(),
             database,
             user,
@@ -97,6 +115,38 @@ fn spike_candidates_sql(database: &str, window_minutes: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
+
+    async fn hanging_clickhouse_endpoint() -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            if let Ok((_socket, _)) = listener.accept().await {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            }
+        });
+        format!("http://{addr}")
+    }
+
+    #[tokio::test]
+    async fn clickhouse_client_times_out_hung_requests() {
+        let client = ClickHouseClient::new_with_timeout(
+            hanging_clickhouse_endpoint().await,
+            "market".to_string(),
+            "default".to_string(),
+            String::new(),
+            Duration::from_millis(100),
+        );
+
+        let result =
+            tokio::time::timeout(Duration::from_millis(750), client.spike_candidates(5)).await;
+
+        assert!(
+            result.is_ok(),
+            "ClickHouse request should fail via client timeout"
+        );
+        assert!(result.unwrap().is_err());
+    }
 
     #[test]
     fn spike_candidates_query_uses_bounded_context_window() {
