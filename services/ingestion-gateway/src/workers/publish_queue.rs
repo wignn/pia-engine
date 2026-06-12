@@ -11,9 +11,27 @@ pub struct PublishEvent {
     pub subject: &'static str,
     pub payload: String,
     pub symbol: String,
+    pub msg_id: Option<String>,
 }
 
 pub type PublishQueue = mpsc::Sender<PublishEvent>;
+
+pub fn market_data_msg_id(symbol: &str, timestamp_ms: i64, price: f64, volume: f64) -> String {
+    format!("{symbol}:{timestamp_ms}:{price}:{volume}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn market_data_msg_id_is_deterministic() {
+        assert_eq!(
+            market_data_msg_id("XAUUSD", 1_710_000_000_000, 4204.795, 1.0),
+            "XAUUSD:1710000000000:4204.795:1"
+        );
+    }
+}
 
 pub fn spawn_publisher(
     worker: &'static str,
@@ -34,12 +52,18 @@ pub fn spawn_publisher(
         let mut published_count = 0_u64;
 
         while let Some(event) = rx.recv().await {
-            match tokio::time::timeout(
-                publish_timeout,
-                broker.publish(event.subject, &event.payload),
-            )
-            .await
-            {
+            let publish = async {
+                match event.msg_id.as_deref() {
+                    Some(msg_id) => {
+                        broker
+                            .publish_with_id(event.subject, &event.payload, msg_id)
+                            .await
+                    }
+                    None => broker.publish(event.subject, &event.payload).await,
+                }
+            };
+
+            match tokio::time::timeout(publish_timeout, publish).await {
                 Ok(Ok(())) => {
                     published_count += 1;
                     health.record_published(worker, rx.len()).await;

@@ -11,6 +11,7 @@ use crate::{config::Config, workers::reconnect::ReconnectPolicy};
 #[async_trait]
 pub trait BrokerPublisher: Send + Sync + 'static {
     async fn publish(&self, topic: &str, payload: &str) -> Result<()>;
+    async fn publish_with_id(&self, topic: &str, payload: &str, msg_id: &str) -> Result<()>;
 }
 
 pub struct EventBusBrokerPublisher {
@@ -27,6 +28,12 @@ impl EventBusBrokerPublisher {
 impl BrokerPublisher for EventBusBrokerPublisher {
     async fn publish(&self, topic: &str, payload: &str) -> Result<()> {
         self.publisher.publish_str(topic, payload).await
+    }
+
+    async fn publish_with_id(&self, topic: &str, payload: &str, msg_id: &str) -> Result<()> {
+        self.publisher
+            .publish_str_with_id(topic, payload, msg_id)
+            .await
     }
 }
 

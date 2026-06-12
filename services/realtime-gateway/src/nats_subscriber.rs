@@ -7,13 +7,24 @@ use tracing::{error, info, warn};
 use crate::{config::Config, hub::Hub};
 
 const SUBJECTS: &[&str] = &[
-    subjects::MD_RAW_PRIMARY_FX_QUOTES_V1,
-    subjects::MD_RAW_CRYPTO_TRADES_V1,
-    subjects::MD_RAW_INDEX_QUOTES_V1,
+    subjects::MD_DEDUP_PRIMARY_FX_QUOTES_V1,
+    subjects::MD_DEDUP_CRYPTO_TRADES_V1,
+    subjects::MD_DEDUP_INDEX_QUOTES_V1,
     subjects::MARKET_ALERTS_V1,
     subjects::NEWS_FOREX_PROCESSED_V1,
     subjects::NEWS_STOCK_PROCESSED_V1,
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn market_subjects_use_deduplicated_streams() {
+        assert!(SUBJECTS.contains(&subjects::MD_DEDUP_PRIMARY_FX_QUOTES_V1));
+        assert!(!SUBJECTS.contains(&subjects::MD_RAW_PRIMARY_FX_QUOTES_V1));
+    }
+}
 
 pub async fn run(cfg: Config, hub: Arc<Hub>) {
     match EventBusMode::from_env_value(&cfg.eventbus_mode) {
@@ -33,6 +44,7 @@ async fn run_loop(cfg: Config, hub: Arc<Hub>) {
 
 async fn subscribe_loop(nats_url: &str, hub: &Arc<Hub>) -> anyhow::Result<()> {
     let client = async_nats::connect(nats_url).await?;
+    atlsd_eventbus::nats::init_jetstream_streams(&client).await?;
     let mut subscribers = futures_util::stream::SelectAll::new();
     for subject in SUBJECTS {
         subscribers.push(client.subscribe((*subject).to_string()).await?);

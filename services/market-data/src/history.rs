@@ -206,6 +206,8 @@ mod tests {
             source: "market_data".to_string(),
             asset_type: "index".to_string(),
             received_at: None,
+            timestamp_ms: None,
+            feed: None,
         };
 
         let after_close = chrono::Utc.with_ymd_and_hms(2026, 5, 27, 22, 0, 0).unwrap();
@@ -229,6 +231,8 @@ mod tests {
             source: "market_data".to_string(),
             asset_type: "crypto".to_string(),
             received_at: None,
+            timestamp_ms: None,
+            feed: None,
         };
 
         assert!(should_emit_last_known_fallback(&price, &calendar));

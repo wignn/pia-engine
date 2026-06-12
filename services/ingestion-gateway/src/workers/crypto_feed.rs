@@ -289,6 +289,7 @@ fn handle_message(
                 subject: TOPIC,
                 payload: payload.to_string(),
                 symbol,
+                msg_id: None,
             },
             queued_count,
         );

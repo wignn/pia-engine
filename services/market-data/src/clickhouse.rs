@@ -376,6 +376,8 @@ mod tests {
             source: "test".to_string(),
             asset_type: "crypto".to_string(),
             received_at: None,
+            timestamp_ms: None,
+            feed: None,
         };
 
         let result = client
@@ -422,6 +424,8 @@ mod tests {
             source: "test".to_string(),
             asset_type: "crypto".to_string(),
             received_at: Some("2026-05-28T12:00:00Z".to_string()),
+            timestamp_ms: None,
+            feed: None,
         };
 
         let received_at = chrono::Utc::now();

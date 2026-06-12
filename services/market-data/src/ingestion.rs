@@ -8,9 +8,9 @@ use crate::prices::{self, CachedPrice};
 use crate::state::AppState;
 
 const NATS_SUBJECTS: &[&str] = &[
-    subjects::MD_RAW_PRIMARY_FX_QUOTES_V1,
-    subjects::MD_RAW_CRYPTO_TRADES_V1,
-    subjects::MD_RAW_INDEX_QUOTES_V1,
+    subjects::MD_DEDUP_PRIMARY_FX_QUOTES_V1,
+    subjects::MD_DEDUP_CRYPTO_TRADES_V1,
+    subjects::MD_DEDUP_INDEX_QUOTES_V1,
 ];
 
 pub async fn run(state: AppState) {
@@ -67,6 +67,7 @@ async fn run_nats(state: AppState) {
 
 async fn subscribe_nats_loop(state: &AppState) -> anyhow::Result<()> {
     let client = async_nats::connect(&state.config.nats_url).await?;
+    atlsd_eventbus::nats::init_jetstream_streams(&client).await?;
     let mut subscribers = futures_util::stream::SelectAll::new();
     for subject in NATS_SUBJECTS {
         subscribers.push(client.subscribe((*subject).to_string()).await?);
@@ -125,10 +126,22 @@ async fn handle_payload(payload: &str, state: &AppState) {
         .get("received_at")
         .and_then(|value| value.as_str())
         .map(|value| value.to_string());
+    let timestamp_ms = provider_timestamp_ms(&parsed);
 
-    state.prices.write().insert(
-        symbol.clone(),
-        CachedPrice {
+    let current = {
+        let mut prices = state.prices.write();
+        let existing_timestamp_ms = prices.get(&symbol).and_then(|price| price.timestamp_ms);
+        if !should_accept_tick(existing_timestamp_ms, timestamp_ms) {
+            debug!(
+                symbol = %symbol,
+                existing_timestamp_ms = ?existing_timestamp_ms,
+                incoming_timestamp_ms = ?timestamp_ms,
+                "ignored stale market-data tick"
+            );
+            return;
+        }
+
+        let current = CachedPrice {
             symbol: symbol.clone(),
             price,
             bid: parsed.get("bid").and_then(|value| value.as_f64()),
@@ -140,11 +153,15 @@ async fn handle_payload(payload: &str, state: &AppState) {
             source: "market_data".to_string(),
             asset_type,
             received_at,
-        },
-    );
+            timestamp_ms,
+            feed: Some(feed.to_string()),
+        };
+        prices.insert(symbol.clone(), current.clone());
+        current
+    };
 
     let current = if state.config.write_latest {
-        state.prices.read().get(&symbol).cloned()
+        Some(current)
     } else {
         None
     };
@@ -245,6 +262,23 @@ async fn persist_ohlcv_candle(
     }
 }
 
+fn provider_timestamp_ms(payload: &Value) -> Option<i64> {
+    payload
+        .get("timestamp_ms")
+        .or_else(|| payload.get("trade_time_ms"))
+        .and_then(|value| value.as_i64())
+}
+
+fn should_accept_tick(
+    existing_timestamp_ms: Option<i64>,
+    incoming_timestamp_ms: Option<i64>,
+) -> bool {
+    match (existing_timestamp_ms, incoming_timestamp_ms) {
+        (Some(existing), Some(incoming)) => incoming > existing,
+        _ => true,
+    }
+}
+
 fn minute_bucket(received_at: DateTime<Utc>) -> Option<DateTime<Utc>> {
     Utc.timestamp_opt((received_at.timestamp() / 60) * 60, 0)
         .single()
@@ -271,5 +305,26 @@ pub async fn hydrate(state: &AppState) {
     match prices::hydrate_price_cache(state).await {
         Ok(count) => info!(count, "hydrated market-data price cache"),
         Err(err) => warn!(error = %err, "failed to hydrate market-data price cache"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn provider_timestamp_ms_reads_timestamp_ms() {
+        assert_eq!(
+            provider_timestamp_ms(&json!({ "timestamp_ms": 1710000000000_i64 })),
+            Some(1710000000000)
+        );
+    }
+
+    #[test]
+    fn should_accept_tick_rejects_older_or_equal_provider_timestamps() {
+        assert!(should_accept_tick(Some(100), Some(101)));
+        assert!(!should_accept_tick(Some(100), Some(100)));
+        assert!(!should_accept_tick(Some(100), Some(99)));
     }
 }

@@ -12,7 +12,9 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
 
 use super::{
-    publish_queue::{enqueue_or_drop, spawn_publisher, PublishEvent, PublishQueue},
+    publish_queue::{
+        enqueue_or_drop, market_data_msg_id, spawn_publisher, PublishEvent, PublishQueue,
+    },
     reconnect::ReconnectPolicy,
 };
 use crate::broker::BrokerPublisher;
@@ -257,6 +259,12 @@ fn handle_message(
                 subject: TOPIC,
                 payload: payload.to_string(),
                 symbol: symbol.public_symbol.clone(),
+                msg_id: Some(market_data_msg_id(
+                    &symbol.public_symbol,
+                    trade.t,
+                    trade.p,
+                    trade.v,
+                )),
             },
             queued_count,
         );

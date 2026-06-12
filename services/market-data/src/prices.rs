@@ -17,6 +17,8 @@ pub struct CachedPrice {
     pub source: String,
     pub asset_type: String,
     pub received_at: Option<String>,
+    pub timestamp_ms: Option<i64>,
+    pub feed: Option<String>,
 }
 
 type LatestPriceRow = (
@@ -91,6 +93,8 @@ pub fn price_json_with_calendar(
         "source": price.source,
         "asset_type": price.asset_type,
         "received_at": price.received_at,
+        "timestamp_ms": price.timestamp_ms,
+        "feed": price.feed,
         "session": session,
     })
 }
@@ -106,6 +110,8 @@ fn cached_price_from_row(row: LatestPriceRow) -> CachedPrice {
         source,
         asset_type,
         received_at: received_at.map(|dt| dt.to_rfc3339()),
+        timestamp_ms: None,
+        feed: None,
     }
 }
 
@@ -119,6 +125,8 @@ fn cached_price_from_clickhouse(row: LatestPriceTick) -> CachedPrice {
         source: row.source,
         asset_type: row.asset_type,
         received_at: Some(row.received_at),
+        timestamp_ms: None,
+        feed: None,
     }
 }
 
@@ -187,6 +195,8 @@ mod tests {
                 source: "test".to_string(),
                 asset_type: "crypto".to_string(),
                 received_at: None,
+                timestamp_ms: None,
+                feed: None,
             },
             None,
         );

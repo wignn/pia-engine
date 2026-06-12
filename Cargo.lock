@@ -75,7 +75,7 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "api-gateway"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "atlsd-auth",
@@ -244,6 +244,7 @@ dependencies = [
  "redis",
  "serde",
  "serde_json",
+ "tokio",
  "tracing",
 ]
 
