@@ -1,4 +1,4 @@
-use atlsd_eventbus::subjects;
+use atlsd_eventbus::{subjects, EventPublisher};
 use std::{sync::Arc, time::Duration};
 
 use chrono::Utc;
@@ -12,7 +12,6 @@ use super::{
     publish_queue::{enqueue_or_drop, spawn_publisher, PublishEvent, PublishQueue},
     reconnect::ReconnectPolicy,
 };
-use crate::broker::BrokerPublisher;
 use crate::config::Config;
 use crate::health::HealthRegistry;
 
@@ -101,7 +100,7 @@ fn inst_id_to_symbol(inst_id: &str) -> String {
     inst_id.replace('-', "").replace("SWAP", "")
 }
 
-pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: HealthRegistry) {
+pub async fn run(cfg: Arc<Config>, broker: Arc<dyn EventPublisher>, health: HealthRegistry) {
     let mut backoff = ReconnectPolicy::new(cfg.reconnect_base_sec, cfg.reconnect_max_sec);
     let publish_queue = spawn_publisher(
         WORKER,

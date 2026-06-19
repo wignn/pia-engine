@@ -1,8 +1,9 @@
+use atlsd_eventbus::EventPublisher;
 use std::sync::Arc;
 
 use tracing::{error, info, warn};
 
-use crate::broker::{self, BrokerPublisher};
+use crate::broker;
 use crate::config::Config;
 use crate::health::HealthRegistry;
 use crate::market_hours;
@@ -30,7 +31,7 @@ pub async fn run(cfg: Config) {
     let health_bind_addr = cfg.health_bind_addr.clone();
     let health_server = tokio::spawn(crate::health::serve(health_bind_addr, health.clone()));
 
-    let broker: Arc<dyn BrokerPublisher> = broker::build_broker(&cfg).await;
+    let broker: Arc<dyn EventPublisher> = broker::build_broker(&cfg).await;
 
     let cfg = Arc::new(cfg);
     let mut worker_handles = Vec::new();

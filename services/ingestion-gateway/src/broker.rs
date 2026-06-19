@@ -1,43 +1,13 @@
-use anyhow::Result;
-use async_trait::async_trait;
 use atlsd_eventbus::{
     DualPublisher, EventBusMode, EventPublisher, NatsPublisher, NoopPublisher, RedisPublisher,
 };
 use std::sync::Arc;
 use tracing::{debug, warn};
 
-use crate::{config::Config, workers::reconnect::ReconnectPolicy};
+use crate::config::Config;
+use crate::workers::reconnect::ReconnectPolicy;
 
-#[async_trait]
-pub trait BrokerPublisher: Send + Sync + 'static {
-    async fn publish(&self, topic: &str, payload: &str) -> Result<()>;
-    async fn publish_with_id(&self, topic: &str, payload: &str, msg_id: &str) -> Result<()>;
-}
-
-pub struct EventBusBrokerPublisher {
-    publisher: Arc<dyn EventPublisher>,
-}
-
-impl EventBusBrokerPublisher {
-    pub fn new(publisher: Arc<dyn EventPublisher>) -> Self {
-        Self { publisher }
-    }
-}
-
-#[async_trait]
-impl BrokerPublisher for EventBusBrokerPublisher {
-    async fn publish(&self, topic: &str, payload: &str) -> Result<()> {
-        self.publisher.publish_str(topic, payload).await
-    }
-
-    async fn publish_with_id(&self, topic: &str, payload: &str, msg_id: &str) -> Result<()> {
-        self.publisher
-            .publish_str_with_id(topic, payload, msg_id)
-            .await
-    }
-}
-
-pub async fn build_broker(cfg: &Config) -> Arc<dyn BrokerPublisher> {
+pub async fn build_broker(cfg: &Config) -> Arc<dyn EventPublisher> {
     let mode = EventBusMode::from_env_value(&cfg.eventbus_mode);
     let redis = build_redis(cfg);
     let nats = match mode {
@@ -45,7 +15,7 @@ pub async fn build_broker(cfg: &Config) -> Arc<dyn BrokerPublisher> {
         EventBusMode::Redis | EventBusMode::Noop => None,
     };
 
-    let publisher: Arc<dyn EventPublisher> = match mode {
+    match mode {
         EventBusMode::Redis => redis.unwrap_or_else(|| Arc::new(NoopPublisher)),
         EventBusMode::Nats => nats.unwrap_or_else(|| Arc::new(NoopPublisher)),
         EventBusMode::Dual => match (redis, nats) {
@@ -55,9 +25,7 @@ pub async fn build_broker(cfg: &Config) -> Arc<dyn BrokerPublisher> {
             (None, None) => Arc::new(NoopPublisher),
         },
         EventBusMode::Noop => Arc::new(NoopPublisher),
-    };
-
-    Arc::new(EventBusBrokerPublisher::new(publisher))
+    }
 }
 
 fn build_redis(cfg: &Config) -> Option<Arc<dyn EventPublisher>> {

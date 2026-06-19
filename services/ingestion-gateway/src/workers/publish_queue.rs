@@ -1,9 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
+use atlsd_eventbus::EventPublisher;
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
-use crate::broker::BrokerPublisher;
 use crate::health::HealthRegistry;
 
 #[derive(Debug)]
@@ -22,7 +22,7 @@ pub fn market_data_msg_id(symbol: &str, timestamp_ms: i64, price: f64, volume: f
 
 pub fn spawn_publisher(
     worker: &'static str,
-    broker: Arc<dyn BrokerPublisher>,
+    broker: Arc<dyn EventPublisher>,
     health: HealthRegistry,
     capacity: usize,
     publish_timeout: Duration,
@@ -43,10 +43,10 @@ pub fn spawn_publisher(
                 match event.msg_id.as_deref() {
                     Some(msg_id) => {
                         broker
-                            .publish_with_id(event.subject, &event.payload, msg_id)
+                            .publish_str_with_id(event.subject, &event.payload, msg_id)
                             .await
                     }
-                    None => broker.publish(event.subject, &event.payload).await,
+                    None => broker.publish_str(event.subject, &event.payload).await,
                 }
             };
 

@@ -12,26 +12,6 @@ pub struct JwtClaims {
     pub iat: usize,
 }
 
-pub trait JwtUser {
-    fn jwt_sub(&self) -> String;
-    fn jwt_email(&self) -> &str;
-    fn jwt_plan(&self) -> &str;
-}
-
-pub fn create_jwt_for_user<U: JwtUser>(
-    user: &U,
-    secret: &str,
-    expiry_days: u64,
-) -> Result<String, jsonwebtoken::errors::Error> {
-    create_jwt(
-        user.jwt_sub(),
-        user.jwt_email(),
-        user.jwt_plan(),
-        secret,
-        expiry_days,
-    )
-}
-
 pub fn create_jwt(
     sub: String,
     email: &str,
@@ -113,29 +93,8 @@ pub fn validate_oauth_state(provider: &str, state_token: &str, secret: &str) -> 
 #[cfg(test)]
 mod tests {
     use super::{
-        create_jwt, create_jwt_for_user, create_oauth_state, decode_jwt, validate_oauth_state,
-        JwtUser,
+        create_jwt, create_oauth_state, decode_jwt, validate_oauth_state,
     };
-
-    struct TestUser {
-        id: String,
-        email: String,
-        plan: String,
-    }
-
-    impl JwtUser for TestUser {
-        fn jwt_sub(&self) -> String {
-            self.id.clone()
-        }
-
-        fn jwt_email(&self) -> &str {
-            &self.email
-        }
-
-        fn jwt_plan(&self) -> &str {
-            &self.plan
-        }
-    }
 
     #[test]
     fn jwt_roundtrip_preserves_claims() {
@@ -161,22 +120,6 @@ mod tests {
         .unwrap();
 
         assert!(decode_jwt(&token, "wrong-secret").is_none());
-    }
-
-    #[test]
-    fn creates_jwt_from_trait_user() {
-        let user = TestUser {
-            id: "user-2".to_string(),
-            email: "trait@example.com".to_string(),
-            plan: "enterprise".to_string(),
-        };
-        let secret = "test-secret-with-enough-entropy";
-        let token = create_jwt_for_user(&user, secret, 1).unwrap();
-        let claims = decode_jwt(&token, secret).unwrap();
-
-        assert_eq!(claims.sub, "user-2");
-        assert_eq!(claims.email, "trait@example.com");
-        assert_eq!(claims.plan, "enterprise");
     }
 
     #[test]

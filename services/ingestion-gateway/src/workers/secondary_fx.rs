@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use atlsd_eventbus::subjects;
+use atlsd_eventbus::{subjects, EventPublisher};
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
@@ -17,7 +17,6 @@ use super::{
     },
     reconnect::ReconnectPolicy,
 };
-use crate::broker::BrokerPublisher;
 use crate::config::{Config, MarketSymbolConfig};
 use crate::health::HealthRegistry;
 use crate::market_hours;
@@ -50,7 +49,7 @@ const SUBSCRIBE_PACE: Duration = Duration::from_millis(50);
 const PUBLISH_QUEUE_CAPACITY: usize = 10_000;
 const PROGRESS_LOG_INTERVAL: u64 = 1_000;
 
-pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: HealthRegistry) {
+pub async fn run(cfg: Arc<Config>, broker: Arc<dyn EventPublisher>, health: HealthRegistry) {
     let mut backoff = ReconnectPolicy::new(cfg.reconnect_base_sec, cfg.reconnect_max_sec);
     let publish_queue = spawn_publisher(
         WORKER,

@@ -1,11 +1,10 @@
-use atlsd_eventbus::subjects;
+use atlsd_eventbus::{subjects, EventPublisher};
 use chrono::Utc;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info};
 
-use crate::broker::BrokerPublisher;
 use crate::config::{Config, MarketSymbolConfig};
 use crate::workers::tradingview;
 
@@ -14,7 +13,7 @@ const SOURCE: &str = "market_data";
 const POLL_INTERVAL_SEC: u64 = 10;
 const TOPIC: &str = subjects::MD_RAW_INDEX_QUOTES_V1;
 
-pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
+pub async fn run(cfg: Arc<Config>, broker: Arc<dyn EventPublisher>) {
     info!(worker = WORKER, "starting reference price poller");
 
     let client = reqwest::Client::builder()
@@ -41,7 +40,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>) {
 async fn poll_symbol(
     client: &reqwest::Client,
     cfg: &Config,
-    broker: &dyn BrokerPublisher,
+    broker: &dyn EventPublisher,
     symbol: &MarketSymbolConfig,
 ) -> anyhow::Result<()> {
     let template = if cfg.tradingview_quote_url_template.trim().is_empty() {
@@ -74,6 +73,6 @@ async fn poll_symbol(
         "received_at": Utc::now().to_rfc3339(),
     });
 
-    broker.publish(TOPIC, &payload.to_string()).await?;
+    broker.publish_str(TOPIC, &payload.to_string()).await?;
     Ok(())
 }

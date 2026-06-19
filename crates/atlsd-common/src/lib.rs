@@ -1,7 +1,6 @@
 pub mod circuit_breaker;
 pub mod config;
 pub mod db;
-pub mod dlq;
 pub mod error;
 pub mod util;
 
