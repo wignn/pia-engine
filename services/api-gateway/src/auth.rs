@@ -16,6 +16,12 @@ pub async fn require_api_key_auth(
     next: Next,
 ) -> Result<Response, StatusCode> {
     let raw_key = require_api_key(&request)?;
+    if is_admin_path(request.uri().path()) {
+        if is_admin_key(&raw_key, &state.config.admin_api_key) {
+            return Ok(next.run(request).await);
+        }
+        return Err(StatusCode::FORBIDDEN);
+    }
     if state.config.api_keys.contains(&raw_key) {
         return Ok(next.run(request).await);
     }
@@ -54,6 +60,14 @@ pub async fn usage_logger(State(state): State<AppState>, request: Request, next:
 
 fn require_api_key(request: &Request) -> Result<String, StatusCode> {
     extract_api_key(request).ok_or(StatusCode::UNAUTHORIZED)
+}
+
+fn is_admin_path(path: &str) -> bool {
+    path.starts_with("/api/v1/admin/")
+}
+
+fn is_admin_key(raw_key: &str, admin_api_key: &str) -> bool {
+    !admin_api_key.trim().is_empty() && raw_key == admin_api_key
 }
 
 fn extract_api_key(request: &Request) -> Option<String> {
@@ -98,5 +112,21 @@ mod tests {
             .unwrap();
 
         assert_eq!(require_api_key(&request), Ok("tenant-key".to_string()));
+    }
+
+    #[test]
+    fn admin_forex_paths_require_admin_key() {
+        assert!(is_admin_path("/api/v1/admin/forex/sources"));
+        assert!(is_admin_path(
+            "/api/v1/admin/forex/sources/feed-fxstreet/toggle"
+        ));
+        assert!(!is_admin_path("/api/v1/forex/news"));
+    }
+
+    #[test]
+    fn admin_key_must_match_configured_admin_key() {
+        assert!(is_admin_key("admin-secret", "admin-secret"));
+        assert!(!is_admin_key("tenant-key", "admin-secret"));
+        assert!(!is_admin_key("admin-secret", ""));
     }
 }

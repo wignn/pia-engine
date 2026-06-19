@@ -36,6 +36,28 @@ pub struct CalendarQuery {
     pub limit: Option<usize>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct FeedSourcePayload {
+    pub name: String,
+    pub url: String,
+    pub rss_url: String,
+    pub category: Option<String>,
+    pub poll_interval_sec: Option<i32>,
+    pub priority: Option<i32>,
+    pub is_active: Option<bool>,
+}
+
+struct ValidFeedSourcePayload {
+    name: String,
+    slug: String,
+    url: String,
+    rss_url: String,
+    category: String,
+    poll_interval_sec: i32,
+    priority: i32,
+    is_active: bool,
+}
+
 type ForexNewsRow = (
     String,
     String,
@@ -47,6 +69,28 @@ type ForexNewsRow = (
     Option<chrono::DateTime<chrono::Utc>>,
     Option<chrono::DateTime<chrono::Utc>>,
 );
+
+#[derive(sqlx::FromRow)]
+struct FeedSourceRow {
+    id: String,
+    name: String,
+    slug: String,
+    url: String,
+    rss_url: Option<String>,
+    category: String,
+    poll_interval_sec: i32,
+    priority: i32,
+    is_active: bool,
+    last_success_at: Option<chrono::DateTime<chrono::Utc>>,
+    last_error_at: Option<chrono::DateTime<chrono::Utc>>,
+    blocked_until: Option<chrono::DateTime<chrono::Utc>>,
+    success_count: i64,
+    error_count: i64,
+    forbidden_count: i64,
+    parse_error_count: i64,
+    last_status: Option<i32>,
+    last_latency_ms: Option<i64>,
+}
 
 pub async fn list_calendar(Query(query): Query<CalendarQuery>) -> Json<Value> {
     let impact_filter = query.impact.as_deref().unwrap_or("high").to_lowercase();
@@ -125,6 +169,131 @@ pub async fn source_statuses(State(state): State<AppState>) -> Json<Value> {
             error!(error = %err, "forex source status query failed");
             Json(json!({ "error": "query failed" }))
         }
+    }
+}
+
+pub async fn admin_list_forex_sources(State(state): State<AppState>) -> Json<Value> {
+    let rows = sqlx::query_as::<_, FeedSourceRow>(
+        "SELECT id, name, slug, url, rss_url, category, poll_interval_sec, priority, is_active, last_success_at, last_error_at, blocked_until, success_count, error_count, forbidden_count, parse_error_count, last_status, last_latency_ms FROM news.forex_news_sources WHERE source_type = 'rss' ORDER BY priority ASC, name ASC",
+    )
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(rows) => {
+            let items: Vec<Value> = rows.into_iter().map(feed_source_json).collect();
+            Json(json!({ "items": items, "total": items.len() }))
+        }
+        Err(err) => {
+            error!(error = %err, "admin forex source query failed");
+            Json(json!({ "error": "query failed" }))
+        }
+    }
+}
+
+pub async fn admin_create_forex_source(
+    State(state): State<AppState>,
+    Json(payload): Json<FeedSourcePayload>,
+) -> Json<Value> {
+    let source = match validate_feed_source_payload(payload) {
+        Ok(source) => source,
+        Err(error) => return Json(json!({ "error": error })),
+    };
+    let id = format!("feed-{}", source.slug);
+
+    let result = sqlx::query("INSERT INTO news.forex_news_sources (id, name, slug, source_type, url, rss_url, category, poll_interval_sec, priority, is_active, updated_at) VALUES ($1, $2, $3, 'rss', $4, $5, $6, $7, $8, $9, NOW())")
+        .bind(&id)
+        .bind(&source.name)
+        .bind(&source.slug)
+        .bind(&source.url)
+        .bind(&source.rss_url)
+        .bind(&source.category)
+        .bind(source.poll_interval_sec)
+        .bind(source.priority)
+        .bind(source.is_active)
+        .execute(&state.db)
+        .await;
+
+    match result {
+        Ok(_) => Json(json!({ "id": id, "message": "Source created successfully" })),
+        Err(err) => {
+            warn!(error = %err, id = %id, "admin forex source create failed");
+            Json(json!({ "error": "source create failed" }))
+        }
+    }
+}
+
+pub async fn admin_update_forex_source(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<FeedSourcePayload>,
+) -> Json<Value> {
+    let source = match validate_feed_source_payload(payload) {
+        Ok(source) => source,
+        Err(error) => return Json(json!({ "error": error })),
+    };
+
+    let result = sqlx::query("UPDATE news.forex_news_sources SET name = $2, slug = $3, url = $4, rss_url = $5, category = $6, poll_interval_sec = $7, priority = $8, is_active = $9, updated_at = NOW() WHERE id = $1")
+        .bind(&id)
+        .bind(&source.name)
+        .bind(&source.slug)
+        .bind(&source.url)
+        .bind(&source.rss_url)
+        .bind(&source.category)
+        .bind(source.poll_interval_sec)
+        .bind(source.priority)
+        .bind(source.is_active)
+        .execute(&state.db)
+        .await;
+
+    match result {
+        Ok(result) if result.rows_affected() == 0 => Json(json!({ "error": "source not found" })),
+        Ok(_) => Json(json!({ "message": "Source updated successfully" })),
+        Err(err) => {
+            warn!(error = %err, id = %id, "admin forex source update failed");
+            Json(json!({ "error": "source update failed" }))
+        }
+    }
+}
+
+pub async fn admin_toggle_forex_source(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Json<Value> {
+    let row = sqlx::query_as::<_, (bool,)>(
+        "UPDATE news.forex_news_sources SET is_active = NOT is_active, updated_at = NOW() WHERE id = $1 RETURNING is_active",
+    )
+    .bind(&id)
+    .fetch_optional(&state.db)
+    .await;
+
+    match row {
+        Ok(Some((is_active,))) => Json(json!({
+            "message": "Source status updated",
+            "is_active": is_active,
+        })),
+        Ok(None) => Json(json!({ "error": "source not found" })),
+        Err(err) => {
+            warn!(error = %err, id = %id, "admin forex source toggle failed");
+            Json(json!({ "error": "source toggle failed" }))
+        }
+    }
+}
+
+pub async fn admin_test_forex_source(Json(payload): Json<FeedSourcePayload>) -> Json<Value> {
+    let source = match validate_feed_source_payload(payload) {
+        Ok(source) => source,
+        Err(error) => return Json(json!({ "ok": false, "error": error })),
+    };
+
+    let started = Instant::now();
+    match test_rss_source(&source.rss_url).await {
+        Ok(entries) => Json(json!({
+            "ok": true,
+            "entries": entries,
+            "latency_ms": started.elapsed().as_millis().min(u64::MAX as u128) as u64,
+        })),
+        Err(error) => Json(json!({ "ok": false, "error": error })),
     }
 }
 
@@ -265,6 +434,110 @@ fn forex_row_json(row: ForexNewsRow) -> Value {
     })
 }
 
+fn feed_source_json(row: FeedSourceRow) -> Value {
+    json!({
+        "id": row.id,
+        "name": row.name,
+        "slug": row.slug,
+        "url": row.url,
+        "rss_url": row.rss_url,
+        "category": row.category,
+        "poll_interval_sec": row.poll_interval_sec,
+        "priority": row.priority,
+        "is_active": row.is_active,
+        "last_success_at": row.last_success_at,
+        "last_error_at": row.last_error_at,
+        "blocked_until": row.blocked_until,
+        "success_count": row.success_count,
+        "error_count": row.error_count,
+        "forbidden_count": row.forbidden_count,
+        "parse_error_count": row.parse_error_count,
+        "last_status": row.last_status,
+        "last_latency_ms": row.last_latency_ms,
+    })
+}
+
+fn validate_feed_source_payload(
+    payload: FeedSourcePayload,
+) -> Result<ValidFeedSourcePayload, &'static str> {
+    let name = payload.name.trim();
+    if name.is_empty() {
+        return Err("name is required");
+    }
+    let url = payload.url.trim();
+    let rss_url = payload.rss_url.trim();
+    if !is_http_url(url) {
+        return Err("url must be http or https");
+    }
+    if !is_http_url(rss_url) {
+        return Err("rss_url must be http or https");
+    }
+    let poll_interval_sec = payload.poll_interval_sec.unwrap_or(45);
+    if poll_interval_sec < 15 {
+        return Err("poll_interval_sec must be at least 15");
+    }
+    let priority = payload.priority.unwrap_or(100).max(0);
+    let category = payload
+        .category
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("forex")
+        .to_string();
+
+    Ok(ValidFeedSourcePayload {
+        name: name.to_string(),
+        slug: slugify(name),
+        url: url.to_string(),
+        rss_url: rss_url.to_string(),
+        category,
+        poll_interval_sec,
+        priority,
+        is_active: payload.is_active.unwrap_or(true),
+    })
+}
+
+fn is_http_url(value: &str) -> bool {
+    value.starts_with("https://") || value.starts_with("http://")
+}
+
+fn slugify(value: &str) -> String {
+    value
+        .trim()
+        .to_lowercase()
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+async fn test_rss_source(rss_url: &str) -> Result<usize, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .user_agent("ATLSD feed-source-test/1.0")
+        .build()
+        .map_err(|error| format!("internal client error: {error}"))?;
+    let response = client
+        .get(rss_url)
+        .send()
+        .await
+        .map_err(|error| format!("upstream request failed: {error}"))?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("upstream returned status: {status}"));
+    }
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|error| format!("upstream body error: {error}"))?;
+    let channel =
+        rss::Channel::read_from(&bytes[..]).map_err(|error| format!("rss parse error: {error}"))?;
+    Ok(channel.items().len())
+}
+
 async fn get_calendar_events() -> Result<(Value, &'static str), String> {
     if let Ok(guard) = CALENDAR_CACHE.read() {
         if let Some((events, cached_at)) = guard.as_ref() {
@@ -339,4 +612,45 @@ fn stale_calendar_events() -> Option<Value> {
         .read()
         .ok()
         .and_then(|guard| guard.as_ref().map(|(events, _)| events.clone()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn feed_source_payload_defaults_match_admin_form_contract() {
+        let payload = FeedSourcePayload {
+            name: "FXStreet".to_string(),
+            url: "https://www.fxstreet.com".to_string(),
+            rss_url: "https://www.fxstreet.com/rss/news".to_string(),
+            category: None,
+            poll_interval_sec: None,
+            priority: None,
+            is_active: None,
+        };
+
+        let normalized = validate_feed_source_payload(payload).unwrap();
+
+        assert_eq!(normalized.slug, "fxstreet");
+        assert_eq!(normalized.category, "forex");
+        assert_eq!(normalized.poll_interval_sec, 45);
+        assert_eq!(normalized.priority, 100);
+        assert!(normalized.is_active);
+    }
+
+    #[test]
+    fn feed_source_payload_rejects_invalid_urls_and_short_polling() {
+        let payload = FeedSourcePayload {
+            name: "Bad".to_string(),
+            url: "not-a-url".to_string(),
+            rss_url: "https://example.com/feed.xml".to_string(),
+            category: Some("forex".to_string()),
+            poll_interval_sec: Some(10),
+            priority: Some(100),
+            is_active: Some(true),
+        };
+
+        assert!(validate_feed_source_payload(payload).is_err());
+    }
 }

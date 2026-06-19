@@ -14,13 +14,7 @@ pub async fn proxy_request(
     body: Body,
 ) -> Response {
     let path = uri.path();
-    let target_base = if path.starts_with("/api/v1/market/why") || path == "/api/v1/analyze" {
-        &state.config.intelligence_service_url
-    } else if path.starts_with("/api/v1/market/") {
-        &state.config.market_data_url
-    } else if path.starts_with("/api/v1/forex/") || path.starts_with("/api/v1/stock/") {
-        &state.config.news_service_url
-    } else {
+    let Some(target_base) = target_base_for_path(path, &state.config) else {
         return text_response(StatusCode::NOT_FOUND, "route not found");
     };
 
@@ -61,9 +55,77 @@ pub async fn proxy_request(
     }
 }
 
+fn target_base_for_path<'a>(path: &str, config: &'a crate::config::Config) -> Option<&'a str> {
+    if path.starts_with("/api/v1/market/why") || path == "/api/v1/analyze" {
+        Some(config.intelligence_service_url.as_str())
+    } else if path.starts_with("/api/v1/market/") {
+        Some(config.market_data_url.as_str())
+    } else if path.starts_with("/api/v1/forex/")
+        || path.starts_with("/api/v1/stock/")
+        || path.starts_with("/api/v1/macro/")
+        || path.starts_with("/api/v1/admin/forex/")
+    {
+        Some(config.news_service_url.as_str())
+    } else {
+        None
+    }
+}
+
 pub fn text_response(status: StatusCode, body: &'static str) -> Response {
     Response::builder()
         .status(status)
         .body(Body::from(body))
         .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+
+    fn config() -> Config {
+        Config {
+            bind_addr: "127.0.0.1:0".to_string(),
+            database_url: "postgres://postgres:postgres@localhost/test".to_string(),
+            redis_url: String::new(),
+            api_keys: vec!["legacy-admin".to_string()],
+            admin_api_key: "admin-secret".to_string(),
+            log_level: "INFO".to_string(),
+            market_data_url: "http://market-data".to_string(),
+            news_service_url: "http://news-service".to_string(),
+            intelligence_service_url: "http://intelligence-service".to_string(),
+        }
+    }
+
+    #[test]
+    fn macro_dashboard_routes_to_news_service() {
+        let cfg = config();
+
+        assert_eq!(
+            target_base_for_path("/api/v1/macro/dashboard", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+    }
+
+    #[test]
+    fn admin_forex_source_routes_to_news_service() {
+        let cfg = config();
+
+        assert_eq!(
+            target_base_for_path("/api/v1/admin/forex/sources", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/admin/forex/sources/feed-fxstreet", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/admin/forex/sources/feed-fxstreet/toggle", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/admin/forex/sources/test", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+    }
 }

@@ -77,6 +77,23 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/forex/sources/status",
             any(crate::proxy::proxy_request),
         )
+        .route("/api/v1/macro/dashboard", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/admin/forex/sources",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/admin/forex/sources/test",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/admin/forex/sources/{id}",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/admin/forex/sources/{id}/toggle",
+            any(crate::proxy::proxy_request),
+        )
         .route("/api/v1/stock/news", any(crate::proxy::proxy_request))
         .layer(middleware::from_fn_with_state(
             state.clone(),

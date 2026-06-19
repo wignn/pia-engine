@@ -1,4 +1,7 @@
-use axum::{routing::get, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::state::AppState;
@@ -21,6 +24,22 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/v1/forex/sources/status",
             get(crate::news::source_statuses),
+        )
+        .route(
+            "/api/v1/admin/forex/sources",
+            get(crate::news::admin_list_forex_sources).post(crate::news::admin_create_forex_source),
+        )
+        .route(
+            "/api/v1/admin/forex/sources/test",
+            post(crate::news::admin_test_forex_source),
+        )
+        .route(
+            "/api/v1/admin/forex/sources/{id}",
+            post(crate::news::admin_update_forex_source),
+        )
+        .route(
+            "/api/v1/admin/forex/sources/{id}/toggle",
+            post(crate::news::admin_toggle_forex_source),
         )
         .route("/api/v1/stock/news", get(crate::news::latest_stock_news))
         .route("/api/v1/macro/dashboard", get(crate::news::macro_dashboard))
