@@ -92,9 +92,7 @@ pub fn validate_oauth_state(provider: &str, state_token: &str, secret: &str) -> 
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        create_jwt, create_oauth_state, decode_jwt, validate_oauth_state,
-    };
+    use super::{create_jwt, create_oauth_state, decode_jwt, validate_oauth_state};
 
     #[test]
     fn jwt_roundtrip_preserves_claims() {
