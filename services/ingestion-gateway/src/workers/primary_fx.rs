@@ -7,7 +7,7 @@ use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::json;
-use tokio::time::{interval, MissedTickBehavior};
+use tokio::time::{interval, Instant, MissedTickBehavior};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
 
@@ -36,6 +36,8 @@ struct ProviderMessage {
     msg_type: String,
     #[serde(default)]
     data: Vec<ProviderTrade>,
+    #[serde(default)]
+    msg: Option<String>,
 }
 
 const WORKER: &str = "primary_fx";
@@ -44,6 +46,7 @@ const SOURCE: &str = "market_data";
 const TOPIC: &str = subjects::MD_RAW_PRIMARY_FX_QUOTES_V1;
 const PUBLISH_TIMEOUT: Duration = Duration::from_secs(5);
 const READ_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
+const SUBSCRIBE_PACE: Duration = Duration::from_millis(50);
 const PUBLISH_QUEUE_CAPACITY: usize = 10_000;
 const PROGRESS_LOG_INTERVAL: u64 = 1_000;
 
@@ -111,11 +114,13 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: Hea
             });
 
             if let Err(e) = write.send(Message::Text(sub_msg.to_string())).await {
-                error!(worker = WORKER, error = %e, "failed to send subscribe message");
+                error!(worker = WORKER, provider_symbol = %symbol.provider_symbol, error = %e, "failed to send subscribe message");
                 let delay = backoff.next_delay();
                 tokio::time::sleep(delay).await;
                 continue;
             }
+
+            tokio::time::sleep(SUBSCRIBE_PACE).await;
         }
 
         info!(
@@ -128,6 +133,9 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: Hea
         let check_interval_dur = Duration::from_secs(cfg.market_check_interval_sec);
         let mut market_check = interval(check_interval_dur);
         market_check.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        let tick_stale_timeout =
+            Duration::from_secs(cfg.health_stale_after_sec.max(READ_IDLE_TIMEOUT.as_secs()));
+        let mut last_trade_at = Instant::now();
         let mut tick_count: u64 = 0;
         let mut queued_count: u64 = 0;
 
@@ -138,8 +146,13 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: Hea
                 msg = tokio::time::timeout(READ_IDLE_TIMEOUT, read.next()) => {
                     match msg {
                         Ok(Some(Ok(Message::Text(text)))) => {
-                                                    if let Err(e) = handle_message(&text, &symbol_map, &publish_queue, &health, &mut tick_count, &mut queued_count) {
-                                debug!(worker = WORKER, error = %e, "message handling error");
+                            match handle_message(&text, &symbol_map, &publish_queue, &health, &mut tick_count, &mut queued_count) {
+                                Ok(processed) => {
+                                    if processed > 0 {
+                                        last_trade_at = Instant::now();
+                                    }
+                                }
+                                Err(e) => debug!(worker = WORKER, error = %e, "message handling error"),
                             }
                         }
                         Ok(Some(Ok(Message::Ping(data)))) => {
@@ -174,6 +187,18 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn BrokerPublisher>, health: Hea
                     if !market_hours::is_market_open() {
                         info!(worker = WORKER, ticks_received = tick_count, "market closed, disconnecting");
                         disconnect_reason = "market_closed";
+                        break;
+                    }
+
+                    if last_trade_at.elapsed() > tick_stale_timeout {
+                        warn!(
+                            worker = WORKER,
+                            stale_secs = last_trade_at.elapsed().as_secs(),
+                            stale_after_secs = tick_stale_timeout.as_secs(),
+                            ticks = tick_count,
+                            "no trade ticks received, forcing websocket reconnect"
+                        );
+                        disconnect_reason = "trade_stale_timeout";
                         break;
                     }
                 }
@@ -220,24 +245,26 @@ fn handle_message(
     health: &HealthRegistry,
     tick_count: &mut u64,
     queued_count: &mut u64,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<usize> {
     let msg: ProviderMessage = serde_json::from_str(text)?;
 
     if msg.msg_type == "ping" {
-        return Ok(());
+        return Ok(0);
     }
 
     if msg.msg_type != "trade" {
-        debug!(worker = WORKER, msg_type = %msg.msg_type, "non-trade message");
-        return Ok(());
+        warn!(worker = WORKER, msg_type = %msg.msg_type, provider_msg = ?msg.msg, "non-trade provider message");
+        return Ok(0);
     }
 
+    let mut processed = 0;
     for trade in &msg.data {
         let Some(symbol) = symbol_map.get(&trade.s) else {
-            debug!(worker = WORKER, "unmapped symbol received");
+            warn!(worker = WORKER, provider_symbol = %trade.s, "unmapped symbol received");
             continue;
         };
 
+        processed += 1;
         *tick_count += 1;
         let health = health.clone();
 
@@ -280,7 +307,7 @@ fn handle_message(
         });
     }
 
-    Ok(())
+    Ok(processed)
 }
 
 fn symbol_map(symbols: &[MarketSymbolConfig]) -> HashMap<String, MarketSymbolConfig> {
