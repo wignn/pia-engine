@@ -37,7 +37,9 @@ pub struct SecFiling {
 
 #[derive(Debug, Deserialize)]
 pub struct FilingsQuery {
+    #[serde(alias = "symbol")]
     pub ticker: Option<String>,
+    #[serde(alias = "form")]
     pub form_type: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
@@ -398,6 +400,20 @@ mod tests {
     fn normalizes_symbol_correctly() {
         assert_eq!(normalize_symbol(" aapl "), "AAPL");
         assert_eq!(normalize_symbol("msft"), "MSFT");
+    }
+
+    #[test]
+    fn deserializes_filings_query_aliases() {
+        let query: FilingsQuery = serde_json::from_value(serde_json::json!({
+            "symbol": "AAPL",
+            "form": "10-K",
+            "limit": 25,
+        }))
+        .unwrap();
+
+        assert_eq!(query.ticker.as_deref(), Some("AAPL"));
+        assert_eq!(query.form_type.as_deref(), Some("10-K"));
+        assert_eq!(query.limit, Some(25));
     }
 
     #[test]
