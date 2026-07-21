@@ -139,7 +139,11 @@ pub async fn get_company(
 }
 
 pub async fn run_sec_sync(cfg: Config, pool: sqlx::PgPool) {
-    let user_agent = match cfg.sec_user_agent.as_deref().filter(|s| !s.trim().is_empty()) {
+    let user_agent = match cfg
+        .sec_user_agent
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+    {
         Some(ua) => ua.to_string(),
         None => {
             warn!("SEC_USER_AGENT not configured; SEC EDGAR background sync is disabled");
@@ -299,7 +303,9 @@ async fn sync_sec_data(client: &reqwest::Client, pool: &sqlx::PgPool) -> Result<
             Some(a) => a,
             None => continue,
         };
-        let primary_doc_descs = recent.get("primaryDocDescription").and_then(|v| v.as_array());
+        let primary_doc_descs = recent
+            .get("primaryDocDescription")
+            .and_then(|v| v.as_array());
 
         let len = accessions.len();
         for i in 0..len {
@@ -315,8 +321,7 @@ async fn sync_sec_data(client: &reqwest::Client, pool: &sqlx::PgPool) -> Result<
                 Some(s) => s,
                 None => continue,
             };
-            let filing_date = match chrono::NaiveDate::parse_from_str(filing_date_str, "%Y-%m-%d")
-            {
+            let filing_date = match chrono::NaiveDate::parse_from_str(filing_date_str, "%Y-%m-%d") {
                 Ok(d) => d,
                 Err(_) => continue,
             };

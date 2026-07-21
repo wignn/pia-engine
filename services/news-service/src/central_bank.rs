@@ -69,90 +69,67 @@ pub struct BankDocumentsQuery {
     pub document_type: Option<String>,
 }
 
+const HAWKISH_PHRASES: &[&str] = &[
+    "inflation pressure",
+    "restrictive monetary policy",
+    "restrictive policy",
+    "elevated inflation",
+    "upside risk to inflation",
+    "above target",
+    "rate hike",
+    "rate hikes",
+    "higher for longer",
+    "policy tightening",
+    "monetary tightening",
+];
+
+const DOVISH_PHRASES: &[&str] = &[
+    "economic slowdown",
+    "easing labor market",
+    "rate cut",
+    "rate cuts",
+    "accommodative policy",
+    "downside risk to growth",
+    "below target",
+    "policy easing",
+    "monetary easing",
+    "weaker demand",
+    "disinflation",
+];
+
 pub fn classify_stance(text: &str) -> &'static str {
-    let lower = text.to_lowercase();
+    let lower = text.trim().to_lowercase();
+    if lower.is_empty() {
+        return "unknown";
+    }
 
-    let hawkish_keywords = [
-        "restrictive",
-        "inflation",
-        "elevated",
-        "tight",
-        "tightening",
-        "hike",
-        "raising",
-        "hawkish",
-        "upside risk",
-        "above target",
-    ];
+    let hawkish_score = score_phrases(&lower, HAWKISH_PHRASES);
+    let dovish_score = score_phrases(&lower, DOVISH_PHRASES);
 
-    let dovish_keywords = [
-        "easing",
-        "cut",
-        "cuts",
-        "slowdown",
-        "accommodative",
-        "dovish",
-        "unemployment",
-        "weakness",
-        "downside risk",
-        "below target",
-        "disinflation",
-    ];
-
-    let hawkish_score: usize = hawkish_keywords
-        .iter()
-        .filter(|&&k| lower.contains(k))
-        .count();
-    let dovish_score: usize = dovish_keywords
-        .iter()
-        .filter(|&&k| lower.contains(k))
-        .count();
-
-    if hawkish_score > dovish_score {
-        "hawkish"
-    } else if dovish_score > hawkish_score {
-        "dovish"
-    } else {
-        "neutral"
+    match hawkish_score.cmp(&dovish_score) {
+        std::cmp::Ordering::Greater if hawkish_score - dovish_score >= 2 => "hawkish",
+        std::cmp::Ordering::Less if dovish_score - hawkish_score >= 2 => "dovish",
+        _ => "unknown",
     }
 }
 
 pub fn calculate_confidence(text: &str, stance: &str) -> f64 {
-    if stance == "neutral" {
-        return 0.5;
-    }
-    let lower = text.to_lowercase();
-    let keywords = if stance == "hawkish" {
-        vec![
-            "restrictive",
-            "inflation",
-            "elevated",
-            "tight",
-            "tightening",
-            "hike",
-            "raising",
-            "hawkish",
-            "upside risk",
-            "above target",
-        ]
-    } else {
-        vec![
-            "easing",
-            "cut",
-            "cuts",
-            "slowdown",
-            "accommodative",
-            "dovish",
-            "unemployment",
-            "weakness",
-            "downside risk",
-            "below target",
-            "disinflation",
-        ]
+    let lower = text.trim().to_lowercase();
+    let phrases = match stance {
+        "hawkish" => HAWKISH_PHRASES,
+        "dovish" => DOVISH_PHRASES,
+        _ => return 0.0,
     };
 
-    let count = keywords.iter().filter(|&&k| lower.contains(k)).count();
+    let count = score_phrases(&lower, phrases);
     (0.5 + (count as f64 * 0.1)).min(1.0)
+}
+
+fn score_phrases(text: &str, phrases: &[&str]) -> usize {
+    phrases
+        .iter()
+        .filter(|&&phrase| text.contains(phrase))
+        .count()
 }
 
 pub fn generate_doc_id(bank: &str, url_or_title: &str) -> String {
@@ -222,7 +199,16 @@ pub async fn get_bank_stance(
 ) -> Result<Json<BankStance>, (StatusCode, String)> {
     let bank_upper = bank.trim().to_uppercase();
 
-    let latest_doc = sqlx::query_as::<_, (String, String, String, f64, Option<chrono::DateTime<chrono::Utc>>)>(
+    let latest_doc = sqlx::query_as::<
+        _,
+        (
+            String,
+            String,
+            String,
+            f64,
+            Option<chrono::DateTime<chrono::Utc>>,
+        ),
+    >(
         r#"
         SELECT id, title, stance, confidence, published_at
         FROM central_bank_documents
@@ -356,14 +342,11 @@ pub async fn run_central_bank_sync(cfg: Config, pool: sqlx::PgPool) {
             warn!(error = %err, "Central bank monitor sync iteration failed");
         }
 
-        tokio::time::sleep(Duration::from_secs(3600)).await;
+        tokio::time::sleep(Duration::from_secs(1800)).await;
     }
 }
 
-async fn sync_central_banks(
-    client: &reqwest::Client,
-    pool: &sqlx::PgPool,
-) -> Result<(), String> {
+async fn sync_central_banks(client: &reqwest::Client, pool: &sqlx::PgPool) -> Result<(), String> {
     let sources = sqlx::query_as::<_, (String, String, String)>(
         r#"
         SELECT bank, name, url
@@ -513,5 +496,31 @@ mod tests {
             "Economic slowdown and easing labor market suggest rate cuts are appropriate.",
         );
         assert_eq!(stance, "dovish");
+    }
+
+    #[test]
+    fn classifies_empty_text_as_unknown() {
+        assert_eq!(classify_stance("  "), "unknown");
+    }
+
+    #[test]
+    fn classifies_tied_text_as_unknown() {
+        let stance =
+            classify_stance("Inflation pressure remains high, but economic slowdown is clear.");
+        assert_eq!(stance, "unknown");
+    }
+
+    #[test]
+    fn classifies_neutral_text_as_unknown() {
+        let stance = classify_stance("The committee reviewed incoming data and market conditions.");
+        assert_eq!(stance, "unknown");
+    }
+
+    #[test]
+    fn unknown_confidence_is_zero() {
+        assert_eq!(
+            calculate_confidence("rate cuts are possible", "unknown"),
+            0.0
+        );
     }
 }

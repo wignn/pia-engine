@@ -1,5 +1,5 @@
-mod config;
 mod central_bank;
+mod config;
 mod geosignals;
 mod http;
 mod news;
