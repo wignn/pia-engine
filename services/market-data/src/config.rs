@@ -22,6 +22,8 @@ pub struct Config {
     pub rates_refresh_sec: u64,
     pub eia_api_key: String,
     pub eia_sync_sec: u64,
+    pub cot_sync_sec: u64,
+    pub cot_data_url: String,
 }
 
 impl Config {
@@ -62,6 +64,11 @@ impl Config {
             rates_refresh_sec: get_env_u64("RATES_REFRESH_SEC", 21600).max(600),
             eia_api_key: get_env("EIA_API_KEY", ""),
             eia_sync_sec: get_env_u64("EIA_SYNC_SEC", 86400).max(600),
+            cot_sync_sec: get_env_u64("COT_SYNC_SEC", 86400).max(600),
+            cot_data_url: get_env(
+                "COT_DATA_URL",
+                "https://www.cftc.gov/dea/newfmt/deacot2026.txt",
+            ),
         }
     }
 
