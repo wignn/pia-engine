@@ -118,13 +118,15 @@ pub async fn get_fear_greed_history(
     State(state): State<AppState>,
 ) -> Json<serde_json::Value> {
     let scope = query.scope.as_deref().unwrap_or("global");
-    let limit = query.limit.unwrap_or(30).min(365);
+    let limit = query.limit.unwrap_or(30).clamp(1, 365);
     let from_dt = query
         .from
-        .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc());
+        .and_then(|d| d.and_hms_opt(0, 0, 0))
+        .map(|dt| dt.and_utc());
     let to_dt = query
         .to
-        .map(|d| d.and_hms_opt(23, 59, 59).unwrap().and_utc());
+        .and_then(|d| d.and_hms_opt(23, 59, 59))
+        .map(|dt| dt.and_utc());
 
     let records = sqlx::query_as::<_, FearGreedRecord>(
         "SELECT id, scope, date, score, label, components, source_status, created_at \
@@ -253,11 +255,11 @@ pub async fn get_fear_greed_components(
 }
 
 pub async fn run_fear_greed_sync(
-    _cfg: Config,
+    cfg: Config,
     pool: PgPool,
     clickhouse: Option<Arc<ClickHouseClient>>,
 ) {
-    let mut interval = tokio::time::interval(Duration::from_secs(900));
+    let mut interval = tokio::time::interval(Duration::from_secs(cfg.fear_greed_sync_sec));
     loop {
         interval.tick().await;
         info!("updating fear & greed index");
@@ -332,16 +334,30 @@ pub async fn calculate_and_upsert_fear_greed(
 }
 
 async fn get_momentum_score(pool: &PgPool) -> Option<f64> {
-    let row: Option<(i64,)> = sqlx::query_as("SELECT COUNT(*) FROM market_latest_prices")
-        .fetch_optional(pool)
-        .await
-        .ok()?;
-    if let Some((count,)) = row {
-        if count > 0 {
-            return Some(50.0);
-        }
-    }
-    None
+    let row: Option<(Option<f64>,)> = sqlx::query_as(
+        r#"
+        WITH ranked AS (
+            SELECT
+                symbol,
+                close,
+                first_value(close) OVER (PARTITION BY symbol ORDER BY time ASC) AS first_close,
+                row_number() OVER (PARTITION BY symbol ORDER BY time DESC) AS latest_rank
+            FROM market.ohlcv_candles
+            WHERE resolution = '1m'
+              AND time >= NOW() - INTERVAL '1 day'
+              AND close > 0
+        )
+        SELECT AVG((close - first_close) / NULLIF(first_close, 0))
+        FROM ranked
+        WHERE latest_rank = 1
+        "#,
+    )
+    .fetch_optional(pool)
+    .await
+    .ok()?;
+
+    let avg_return = row.and_then(|(value,)| value)?;
+    Some((50.0 + avg_return * 500.0).clamp(0.0, 100.0))
 }
 
 async fn get_volatility_score(clickhouse: Option<&ClickHouseClient>) -> Option<f64> {

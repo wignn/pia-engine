@@ -24,6 +24,7 @@ pub struct Config {
     pub eia_sync_sec: u64,
     pub cot_sync_sec: u64,
     pub cot_data_url: String,
+    pub fear_greed_sync_sec: u64,
 }
 
 impl Config {
@@ -69,6 +70,7 @@ impl Config {
                 "COT_DATA_URL",
                 "https://www.cftc.gov/dea/newfmt/deacot2026.txt",
             ),
+            fear_greed_sync_sec: get_env_u64("FEAR_GREED_SYNC_SEC", 3600).max(600),
         }
     }
 
