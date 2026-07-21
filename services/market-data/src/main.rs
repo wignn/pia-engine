@@ -10,6 +10,7 @@ mod history;
 mod http;
 mod ingestion;
 mod prices;
+mod rates;
 mod session;
 mod spikes;
 mod state;
@@ -129,6 +130,13 @@ async fn main() {
             economic::run_sync(econ_cfg, econ_pool).await;
         });
         info!("economic data sync (FRED) enabled");
+
+        let rates_cfg = cfg.clone();
+        let rates_pool = state.db.clone();
+        tokio::spawn(async move {
+            rates::run_rates_sync(rates_cfg, rates_pool).await;
+        });
+        info!("rates data sync (FRED) enabled");
     }
 
     let listener = match TcpListener::bind(&cfg.bind_addr).await {

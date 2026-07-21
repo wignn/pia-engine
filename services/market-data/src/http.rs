@@ -51,6 +51,15 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/market/economic/categories",
             get(crate::economic::list_categories),
         )
+        .route(
+            "/api/v1/rates/yield-curve",
+            get(crate::rates::get_yield_curve),
+        )
+        .route("/api/v1/rates/spreads", get(crate::rates::get_spreads))
+        .route(
+            "/api/v1/rates/history/{tenor}",
+            get(crate::rates::get_history),
+        )
         .layer(cors)
         .with_state(state)
 }
