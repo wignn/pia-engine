@@ -60,6 +60,15 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/rates/history/{tenor}",
             get(crate::rates::get_history),
         )
+        .route("/api/v1/energy/series", get(crate::energy::list_series))
+        .route(
+            "/api/v1/energy/dashboard",
+            get(crate::energy::energy_dashboard),
+        )
+        .route(
+            "/api/v1/energy/{series_id}",
+            get(crate::energy::get_series_observations),
+        )
         .layer(cors)
         .with_state(state)
 }

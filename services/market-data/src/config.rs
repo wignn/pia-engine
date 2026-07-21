@@ -20,6 +20,8 @@ pub struct Config {
     pub fred_api_key: String,
     pub economic_refresh_sec: u64,
     pub rates_refresh_sec: u64,
+    pub eia_api_key: String,
+    pub eia_sync_sec: u64,
 }
 
 impl Config {
@@ -58,6 +60,8 @@ impl Config {
             fred_api_key: get_env("FRED_API_KEY", ""),
             economic_refresh_sec: get_env_u64("ECONOMIC_REFRESH_SEC", 21600).max(600),
             rates_refresh_sec: get_env_u64("RATES_REFRESH_SEC", 21600).max(600),
+            eia_api_key: get_env("EIA_API_KEY", ""),
+            eia_sync_sec: get_env_u64("EIA_SYNC_SEC", 86400).max(600),
         }
     }
 
@@ -71,6 +75,10 @@ impl Config {
 
     pub fn has_fred(&self) -> bool {
         !self.fred_api_key.trim().is_empty()
+    }
+
+    pub fn has_eia(&self) -> bool {
+        !self.eia_api_key.trim().is_empty()
     }
 }
 

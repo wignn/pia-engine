@@ -6,6 +6,7 @@ mod clickhouse;
 mod config;
 mod data_quality;
 mod economic;
+mod energy;
 mod history;
 mod http;
 mod ingestion;
@@ -137,6 +138,15 @@ async fn main() {
             rates::run_rates_sync(rates_cfg, rates_pool).await;
         });
         info!("rates data sync (FRED) enabled");
+    }
+
+    if cfg.has_eia() {
+        let eia_cfg = cfg.clone();
+        let eia_pool = state.db.clone();
+        tokio::spawn(async move {
+            energy::run_energy_sync(eia_cfg, eia_pool).await;
+        });
+        info!("energy data sync (EIA) enabled");
     }
 
     let listener = match TcpListener::bind(&cfg.bind_addr).await {
