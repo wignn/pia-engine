@@ -61,6 +61,18 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/sec/companies/{symbol}",
             get(crate::sec::get_company),
         )
+        .route(
+            "/api/v1/central-banks/latest",
+            get(crate::central_bank::list_latest_documents),
+        )
+        .route(
+            "/api/v1/central-banks/{bank}/documents",
+            get(crate::central_bank::list_bank_documents),
+        )
+        .route(
+            "/api/v1/central-banks/{bank}/stance",
+            get(crate::central_bank::get_bank_stance),
+        )
         .layer(cors)
         .with_state(state)
 }

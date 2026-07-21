@@ -1,4 +1,5 @@
 mod config;
+mod central_bank;
 mod geosignals;
 mod http;
 mod news;
@@ -52,6 +53,12 @@ async fn main() {
     let sec_pool = pool.clone();
     tokio::spawn(async move {
         sec::run_sec_sync(sec_cfg, sec_pool).await;
+    });
+
+    let cb_cfg = cfg.clone();
+    let cb_pool = pool.clone();
+    tokio::spawn(async move {
+        central_bank::run_central_bank_sync(cb_cfg, cb_pool).await;
     });
 
     let state = AppState { db: pool };
