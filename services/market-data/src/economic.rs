@@ -9,7 +9,6 @@ use tracing::{error, info, warn};
 use crate::config::Config;
 use crate::state::AppState;
 
-
 #[derive(Clone)]
 #[allow(dead_code)]
 struct FredSeries {
@@ -223,7 +222,6 @@ const SERIES_REGISTRY: &[FredSeries] = &[
     },
 ];
 
-
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct EconomicObservation {
     pub series_id: String,
@@ -289,7 +287,6 @@ pub struct LatestQuery {
     pub country: Option<String>,
     pub category: Option<String>,
 }
-
 
 pub async fn list_indicators(
     State(state): State<AppState>,
@@ -424,7 +421,6 @@ pub async fn list_categories() -> Json<serde_json::Value> {
     ];
     Json(serde_json::json!({ "data": categories }))
 }
-
 
 #[allow(clippy::too_many_arguments)]
 async fn query_indicators(
@@ -563,7 +559,6 @@ async fn query_latest(
     .await
 }
 
-
 pub async fn run_sync(config: Config, pool: PgPool) {
     if !config.has_fred() {
         warn!("FRED_API_KEY not set, economic data sync disabled");
@@ -700,7 +695,6 @@ async fn sync_series(
 
     Ok(count)
 }
-
 
 #[derive(Debug, Deserialize)]
 struct FredObservationsResponse {
