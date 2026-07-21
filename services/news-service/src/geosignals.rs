@@ -253,6 +253,39 @@ pub async fn list_geosignals(
     }
 }
 
+pub async fn geosignal_status(State(state): State<AppState>) -> Json<Value> {
+    let totals = sqlx::query_as::<_, (i64, Option<chrono::DateTime<chrono::Utc>>)>(
+        "SELECT COUNT(*)::BIGINT, MAX(timestamp) FROM news.geosignals",
+    )
+    .fetch_one(&state.db)
+    .await;
+
+    let raw_count = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*)::BIGINT FROM geosignal_raw_events WHERE source = 'gdelt'",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+
+    match totals {
+        Ok((count, latest_timestamp)) => Json(json!({
+            "status": "active",
+            "source": "gdelt",
+            "total_signals": count,
+            "raw_events_count": raw_count,
+            "latest_signal_timestamp": latest_timestamp,
+        })),
+        Err(err) => {
+            error!(error = %err, "geosignal status query failed");
+            Json(json!({
+                "status": "error",
+                "source": "gdelt",
+                "error": "query failed"
+            }))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -49,6 +49,10 @@ pub fn build_router(state: AppState) -> Router {
             get(crate::geosignals::asset_impacts),
         )
         .route(
+            "/api/v1/geosignals/status",
+            get(crate::geosignals::geosignal_status),
+        )
+        .route(
             "/api/v1/geosignals",
             get(crate::geosignals::list_geosignals),
         )
