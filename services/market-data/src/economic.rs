@@ -9,7 +9,6 @@ use tracing::{error, info, warn};
 use crate::config::Config;
 use crate::state::AppState;
 
-// --- FRED Series Registry ---
 
 #[derive(Clone)]
 #[allow(dead_code)]
@@ -224,7 +223,6 @@ const SERIES_REGISTRY: &[FredSeries] = &[
     },
 ];
 
-// --- Models ---
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct EconomicObservation {
@@ -292,7 +290,6 @@ pub struct LatestQuery {
     pub category: Option<String>,
 }
 
-// --- Handlers ---
 
 pub async fn list_indicators(
     State(state): State<AppState>,
@@ -428,7 +425,6 @@ pub async fn list_categories() -> Json<serde_json::Value> {
     Json(serde_json::json!({ "data": categories }))
 }
 
-// --- DB Queries ---
 
 #[allow(clippy::too_many_arguments)]
 async fn query_indicators(
@@ -567,7 +563,6 @@ async fn query_latest(
     .await
 }
 
-// --- Background Job: FRED Sync ---
 
 pub async fn run_sync(config: Config, pool: PgPool) {
     if !config.has_fred() {
@@ -644,7 +639,6 @@ async fn sync_series(
     .execute(pool)
     .await?;
 
-    // Fetch observations from FRED
     let url = format!(
         "https://api.stlouisfed.org/fred/series/observations?series_id={}&api_key={}&file_type=json&sort_order=desc&limit=100",
         series.id, config.fred_api_key
@@ -691,7 +685,6 @@ async fn sync_series(
         count += 1;
     }
 
-    // Update observation range on series
     sqlx::query(
         r#"
         UPDATE macro_series SET
@@ -708,7 +701,6 @@ async fn sync_series(
     Ok(count)
 }
 
-// --- FRED API response types ---
 
 #[derive(Debug, Deserialize)]
 struct FredObservationsResponse {
