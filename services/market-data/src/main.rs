@@ -8,6 +8,7 @@ mod cot;
 mod data_quality;
 mod economic;
 mod energy;
+mod fear_greed;
 mod history;
 mod http;
 mod ingestion;
@@ -156,6 +157,14 @@ async fn main() {
         cot::run_cot_sync(cot_cfg, cot_pool).await;
     });
     info!("CFTC COT positioning data sync enabled");
+
+    let fg_cfg = cfg.clone();
+    let fg_pool = state.db.clone();
+    let fg_clickhouse = state.clickhouse.clone();
+    tokio::spawn(async move {
+        fear_greed::run_fear_greed_sync(fg_cfg, fg_pool, fg_clickhouse).await;
+    });
+    info!("Fear & Greed risk regime index sync enabled");
 
     let listener = match TcpListener::bind(&cfg.bind_addr).await {
         Ok(listener) => listener,

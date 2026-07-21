@@ -78,6 +78,18 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/cot/{market_code}",
             get(crate::cot::get_cot_by_market),
         )
+        .route(
+            "/api/v1/fear-greed",
+            get(crate::fear_greed::get_fear_greed_latest),
+        )
+        .route(
+            "/api/v1/fear-greed/history",
+            get(crate::fear_greed::get_fear_greed_history),
+        )
+        .route(
+            "/api/v1/fear-greed/components",
+            get(crate::fear_greed::get_fear_greed_components),
+        )
         .layer(cors)
         .with_state(state)
 }
