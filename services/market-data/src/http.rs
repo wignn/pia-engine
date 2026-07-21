@@ -90,6 +90,18 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/fear-greed/components",
             get(crate::fear_greed::get_fear_greed_components),
         )
+        .route(
+            "/api/v1/options/summary",
+            get(crate::options::get_options_summary),
+        )
+        .route(
+            "/api/v1/options/chain",
+            get(crate::options::get_options_chain),
+        )
+        .route(
+            "/api/v1/options/gex",
+            get(crate::options::get_options_gex),
+        )
         .layer(cors)
         .with_state(state)
 }
