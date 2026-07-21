@@ -2,7 +2,7 @@
 
 ## Purpose
 
-ATLSD needs more Bloomberg-like data coverage without relying on paid-only market data vendors. This pack adds six free/resmi/public-source backend data domains that strengthen macro, equity intelligence, geosignals, energy, and positioning coverage:
+ATLSD needs more Bloomberg-like data coverage without relying on paid-only market data vendors. This pack adds seven free/resmi/public-source backend data domains that strengthen macro, equity intelligence, geosignals, energy, positioning, and risk-regime coverage:
 
 1. Rates / Yield Curve
 2. SEC EDGAR Filings
@@ -10,12 +10,13 @@ ATLSD needs more Bloomberg-like data coverage without relying on paid-only marke
 4. GDELT Geosignals
 5. EIA Energy Data
 6. CFTC COT Positioning
+7. Fear & Greed / Risk Regime Index
 
 The pack deliberately skips data that is paid-only or licensing-heavy for a production product: real-time regulated futures, OPRA options, Level 2 order books, full individual bond pricing, institutional ETF holdings feeds, and analyst ratings.
 
 ## Goals
 
-- Add production-ready ingestion for the six selected free data domains.
+- Add production-ready ingestion for the seven selected free data domains.
 - Store raw payloads where useful for audit/debugging and normalized rows for API reads.
 - Expose REST endpoints through the owning service and API gateway.
 - Keep ingestion idempotent, bounded, observable, and safe to retry.
@@ -39,6 +40,7 @@ services/market-data
   src/rates.rs
   src/energy.rs
   src/cot.rs
+  src/fear_greed.rs
 
 services/news-service
   src/sec.rs
@@ -48,7 +50,7 @@ services/news-service
 
 Rationale:
 
-- `market-data` owns market/macro-adjacent numeric data: rates, energy, COT.
+- `market-data` owns market/macro-adjacent numeric data: rates, energy, COT, and the composite fear/greed index.
 - `news-service` owns document/event intelligence: SEC filings, central bank documents, GDELT/geosignals.
 - A new service would add operational overhead before the source volume requires it.
 
@@ -460,6 +462,84 @@ GET /api/v1/cot/{market_code}?limit=156
 GET /api/v1/cot/symbol/{symbol}?limit=156
 ```
 
+## Feature 7 — Fear & Greed / Risk Regime Index
+
+### Source
+
+Do not depend on a proprietary Fear & Greed feed. Build ATLSD's own composite index from data ATLSD already stores or can fetch from free/public sources.
+
+Initial components:
+
+- market momentum from existing price/candle history
+- volatility pressure from existing volatility spikes
+- safe-haven pressure from DXY/XAUUSD/rates data where available
+- rates stress from yield curve/spread data
+- news/geosignal risk from existing news sentiment and geosignal severity
+- positioning stress from CFTC COT once available
+
+### Data model
+
+```text
+fear_greed_index
+- id text primary key
+- scope text
+- date timestamptz
+- score double precision
+- label text
+- components jsonb
+- source_status jsonb
+- created_at timestamptz
+unique(scope, date)
+```
+
+`scope` values for v1:
+
+```text
+global
+fx
+crypto
+stocks
+commodities
+```
+
+`label` values:
+
+```text
+extreme_fear
+fear
+neutral
+greed
+extreme_greed
+```
+
+### API
+
+```text
+GET /api/v1/fear-greed?scope=global
+GET /api/v1/fear-greed/history?scope=global&limit=365
+GET /api/v1/fear-greed/components?scope=global
+```
+
+### Scoring
+
+Use a transparent weighted score from 0 to 100:
+
+```text
+0   = extreme fear
+50  = neutral
+100 = extreme greed
+```
+
+V1 weights:
+
+- momentum: 25%
+- volatility/spikes: 20%
+- safe-haven/rates stress: 20%
+- news/geosignal risk: 20%
+- positioning/COT: 15%
+
+If a component is unavailable, re-normalize weights across available components and include the missing component in `source_status`. Do not invent component values.
+
 ## Sync scheduling
 
 Each domain gets a small background loop inside its owning service:
@@ -480,6 +560,7 @@ CENTRAL_BANK_SYNC_SEC=1800
 GDELT_SYNC_SEC=900
 EIA_SYNC_SEC=21600
 COT_SYNC_SEC=21600
+FEAR_GREED_SYNC_SEC=3600
 ```
 
 Sync loops must:
@@ -500,6 +581,7 @@ Add protected proxy routes:
 /api/v1/central-banks/*
 /api/v1/energy/*
 /api/v1/cot/*
+/api/v1/fear-greed*
 /api/v1/geosignals/status
 ```
 
@@ -521,6 +603,7 @@ Each module needs one small runnable check for parsing/normalization:
 - GDELT: category/asset mapping normalization
 - EIA: observation parsing and WoW dashboard change
 - COT: CSV/fixed-format row parsing and net position calculation
+- fear/greed: component normalization, missing-component weight rebalancing, and label mapping
 
 No broad framework changes are required.
 
@@ -555,8 +638,9 @@ Implement in this order:
 4. GDELT Geosignals status + ingestion
 5. EIA Energy Data
 6. CFTC COT Positioning
+7. Fear & Greed / Risk Regime Index
 
-Rates comes first because ATLSD already has FRED integration. SEC and central bank follow because they are official public sources and add high-value document intelligence. GDELT, EIA, and COT then deepen geosignal, energy, and positioning coverage.
+Rates comes first because ATLSD already has FRED integration. SEC and central bank follow because they are official public sources and add high-value document intelligence. GDELT, EIA, and COT then deepen geosignal, energy, and positioning coverage. Fear/greed comes after the source components exist so it can be computed from real inputs instead of placeholders.
 
 ## Deliberate skips
 
