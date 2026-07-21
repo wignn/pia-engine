@@ -338,12 +338,12 @@ const SPREAD_SERIES_LIST: &[SpreadSeriesConfig] = &[
     SpreadSeriesConfig {
         id: "T10Y2Y",
         country: "US",
-        spread: "10Y2Y",
+        spread: "2s10s",
     },
     SpreadSeriesConfig {
         id: "T10Y3M",
         country: "US",
-        spread: "10Y3M",
+        spread: "3m10y",
     },
 ];
 

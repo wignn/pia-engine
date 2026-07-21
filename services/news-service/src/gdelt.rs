@@ -98,7 +98,7 @@ fn sha256_hex(input: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
-pub async fn run_gdelt_sync(_cfg: Config, pool: sqlx::PgPool) {
+pub async fn run_gdelt_sync(cfg: Config, pool: sqlx::PgPool) {
     let client = match reqwest::Client::builder()
         .user_agent("ATLSD/1.0 (news-service gdelt fetcher)")
         .timeout(Duration::from_secs(15))
@@ -118,7 +118,7 @@ pub async fn run_gdelt_sync(_cfg: Config, pool: sqlx::PgPool) {
             warn!(error = %err, "GDELT sync iteration failed");
         }
 
-        tokio::time::sleep(Duration::from_secs(1800)).await;
+        tokio::time::sleep(Duration::from_secs(cfg.gdelt_sync_sec)).await;
     }
 }
 

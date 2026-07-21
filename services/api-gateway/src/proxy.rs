@@ -169,5 +169,17 @@ mod tests {
             target_base_for_path("/api/v1/geosignals/status", &cfg),
             Some(cfg.news_service_url.as_str())
         );
+        assert_eq!(
+            target_base_for_path("/api/v1/geosignals", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/geosignals/map", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/geosignals/assets", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
     }
 }

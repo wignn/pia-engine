@@ -63,6 +63,20 @@ pub fn normalize_symbol(symbol: &str) -> String {
     symbol.trim().to_uppercase()
 }
 
+fn rotating_company_batch<T>(items: &[T], batch_size: usize, timestamp_secs: i64) -> Vec<&T> {
+    if items.is_empty() || batch_size == 0 {
+        return Vec::new();
+    }
+
+    let batch_size = batch_size.min(items.len());
+    let hour = timestamp_secs.max(0) as usize / 3600;
+    let start = hour.saturating_mul(batch_size) % items.len();
+
+    (0..batch_size)
+        .map(|idx| &items[(start + idx) % items.len()])
+        .collect()
+}
+
 pub async fn list_filings(
     State(state): State<AppState>,
     Query(query): Query<FilingsQuery>,
@@ -232,6 +246,11 @@ async fn sync_sec_data(client: &reqwest::Client, pool: &sqlx::PgPool) -> Result<
         // Upsert company into sec_companies
         let _ = sqlx::query(
             r#"
+            WITH removed AS (
+                DELETE FROM sec_companies
+                WHERE (cik = $1 OR ticker = $2)
+                  AND NOT (cik = $1 AND ticker = $2)
+            )
             INSERT INTO sec_companies (cik, ticker, name, updated_at)
             VALUES ($1, $2, $3, NOW())
             ON CONFLICT (cik) DO UPDATE
@@ -249,15 +268,17 @@ async fn sync_sec_data(client: &reqwest::Client, pool: &sqlx::PgPool) -> Result<
         fetched_companies.push((cik_raw, ticker, title));
     }
 
+    fetched_companies.sort_by(|a, b| a.1.cmp(&b.1));
+
     info!(
         count = fetched_companies.len(),
         "Upserted SEC company tickers"
     );
 
-    // ponytail: Limit inline filings fetching loop to a small set per cycle to comply with SEC rate limits and avoid long blocks
-    let company_sample = fetched_companies.iter().take(20);
+    let filing_batch =
+        rotating_company_batch(&fetched_companies, 100, chrono::Utc::now().timestamp());
 
-    for (cik, ticker, title) in company_sample {
+    for (cik, ticker, title) in filing_batch {
         tokio::time::sleep(Duration::from_millis(200)).await;
 
         let filings_url = format!("https://data.sec.gov/submissions/CIK{}.json", cik);
@@ -419,6 +440,14 @@ mod tests {
         assert_eq!(query.ticker.as_deref(), Some("AAPL"));
         assert_eq!(query.form_type.as_deref(), Some("10-K"));
         assert_eq!(query.limit, Some(25));
+    }
+
+    #[test]
+    fn rotates_company_batches_by_hour() {
+        let items = vec!["A", "B", "C", "D", "E"];
+        assert_eq!(rotating_company_batch(&items, 2, 0), vec![&"A", &"B"]);
+        assert_eq!(rotating_company_batch(&items, 2, 3600), vec![&"C", &"D"]);
+        assert_eq!(rotating_company_batch(&items, 2, 7200), vec![&"E", &"A"]);
     }
 
     #[test]

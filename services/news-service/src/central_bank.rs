@@ -342,7 +342,7 @@ pub async fn run_central_bank_sync(cfg: Config, pool: sqlx::PgPool) {
             warn!(error = %err, "Central bank monitor sync iteration failed");
         }
 
-        tokio::time::sleep(Duration::from_secs(1800)).await;
+        tokio::time::sleep(Duration::from_secs(cfg.central_bank_sync_sec)).await;
     }
 }
 

@@ -20,6 +20,8 @@ pub struct Config {
     pub ai_service_url: Option<String>,
     pub sec_user_agent: Option<String>,
     pub sec_poll_sec: u64,
+    pub gdelt_sync_sec: u64,
+    pub central_bank_sync_sec: u64,
 }
 
 impl Config {
@@ -63,6 +65,8 @@ impl Config {
             ai_service_url: optional_env("AI_SERVICE_URL"),
             sec_user_agent: optional_env("SEC_USER_AGENT"),
             sec_poll_sec: get_env_u64("SEC_POLL_SEC", 3600).max(300),
+            gdelt_sync_sec: get_env_u64("GDELT_SYNC_SEC", 900).max(300),
+            central_bank_sync_sec: get_env_u64("CENTRAL_BANK_SYNC_SEC", 1800).max(300),
         }
     }
 }

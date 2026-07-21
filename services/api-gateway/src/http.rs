@@ -149,10 +149,16 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/central-banks/{bank}/stance",
             any(crate::proxy::proxy_request),
         )
+        .route("/api/v1/geosignals/map", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/geosignals/assets",
+            any(crate::proxy::proxy_request),
+        )
         .route(
             "/api/v1/geosignals/status",
             any(crate::proxy::proxy_request),
         )
+        .route("/api/v1/geosignals", any(crate::proxy::proxy_request))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             crate::auth::usage_logger,
