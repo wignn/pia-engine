@@ -4,6 +4,7 @@ mod http;
 mod news;
 mod pipeline;
 mod realtime;
+mod sec;
 mod state;
 
 use axum::Json;
@@ -45,6 +46,12 @@ async fn main() {
     let realtime_pool = pool.clone();
     tokio::spawn(async move {
         realtime::run(realtime_cfg, realtime_pool).await;
+    });
+
+    let sec_cfg = cfg.clone();
+    let sec_pool = pool.clone();
+    tokio::spawn(async move {
+        sec::run_sec_sync(sec_cfg, sec_pool).await;
     });
 
     let state = AppState { db: pool };

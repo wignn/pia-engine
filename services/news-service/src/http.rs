@@ -52,6 +52,15 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/geosignals",
             get(crate::geosignals::list_geosignals),
         )
+        .route("/api/v1/sec/filings", get(crate::sec::list_filings))
+        .route(
+            "/api/v1/sec/filings/{accession_number}",
+            get(crate::sec::get_filing),
+        )
+        .route(
+            "/api/v1/sec/companies/{symbol}",
+            get(crate::sec::get_company),
+        )
         .layer(cors)
         .with_state(state)
 }
