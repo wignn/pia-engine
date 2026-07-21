@@ -1,6 +1,6 @@
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::time::Duration;
@@ -18,6 +18,7 @@ pub struct RateObservation {
     pub value: f64,
     pub unit: String,
     pub raw_series_id: String,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -26,13 +27,18 @@ pub struct RateSpreadObservation {
     pub spread: String,
     pub date: NaiveDate,
     pub value: f64,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct YieldCurveData {
     pub country: String,
+    pub source: String,
     pub date: Option<NaiveDate>,
-    pub rates: Vec<RateObservation>,
+    pub points: Vec<RateObservation>,
+    pub spreads: Vec<RateSpreadObservation>,
+    pub stale: bool,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -58,12 +64,8 @@ pub struct HistoryQuery {
     pub limit: Option<i64>,
 }
 
-#[allow(dead_code)]
-pub fn calculate_spread(
-    tenors: &[(String, f64)],
-    short_tenor: &str,
-    long_tenor: &str,
-) -> Option<f64> {
+#[cfg(test)]
+fn calculate_spread(tenors: &[(String, f64)], short_tenor: &str, long_tenor: &str) -> Option<f64> {
     let short_val = tenors
         .iter()
         .find(|(t, _)| t == short_tenor)
@@ -83,7 +85,7 @@ pub async fn get_yield_curve(
     let result = query_yield_curve(&state.db, country, params.date).await;
 
     match result {
-        Ok(yc) => Json(serde_json::json!({ "data": yc })),
+        Ok(yc) => Json(serde_json::json!(yc)),
         Err(err) => {
             error!(error = %err, country = %country, "failed to query yield curve");
             Json(serde_json::json!({ "error": "internal server error" }))
@@ -141,15 +143,16 @@ async fn query_yield_curve(
     country: &str,
     target_date: Option<NaiveDate>,
 ) -> Result<YieldCurveData, sqlx::Error> {
-    let rates = sqlx::query_as::<_, RateObservation>(
+    let points = sqlx::query_as::<_, RateObservation>(
         r#"
-        SELECT source, country, tenor, date, value, unit, raw_series_id
-        FROM macro_rates
-        WHERE country = $1
-          AND date = (
-            SELECT MAX(date) FROM macro_rates
+        SELECT source, country, tenor, date, value, unit, raw_series_id, updated_at
+        FROM (
+            SELECT DISTINCT ON (tenor)
+                source, country, tenor, date, value, unit, raw_series_id, updated_at
+            FROM macro_rates
             WHERE country = $1 AND ($2::date IS NULL OR date <= $2)
-          )
+            ORDER BY tenor, date DESC
+        ) latest
         ORDER BY
           CASE tenor
             WHEN '3M' THEN 1
@@ -166,12 +169,27 @@ async fn query_yield_curve(
     .fetch_all(pool)
     .await?;
 
-    let latest_date = rates.first().map(|r| r.date);
+    let spreads = query_latest_spreads(pool, country, target_date).await?;
+    let date = points.iter().map(|p| p.date).max();
+    let updated_at = points
+        .iter()
+        .map(|p| p.updated_at)
+        .chain(spreads.iter().map(|s| s.updated_at))
+        .max();
+    let source = points
+        .first()
+        .map(|p| p.source.clone())
+        .unwrap_or_else(|| "fred".to_string());
+    let stale = points.iter().any(|p| Some(p.date) != target_date.or(date));
 
     Ok(YieldCurveData {
         country: country.to_string(),
-        date: latest_date,
-        rates,
+        source,
+        date,
+        points,
+        spreads,
+        stale,
+        updated_at,
     })
 }
 
@@ -185,7 +203,7 @@ async fn query_spreads(
 ) -> Result<Vec<RateSpreadObservation>, sqlx::Error> {
     sqlx::query_as::<_, RateSpreadObservation>(
         r#"
-        SELECT country, spread, date, value
+        SELECT country, spread, date, value, updated_at
         FROM macro_rate_spreads
         WHERE country = $1
           AND ($2::text IS NULL OR spread = $2)
@@ -204,6 +222,29 @@ async fn query_spreads(
     .await
 }
 
+async fn query_latest_spreads(
+    pool: &PgPool,
+    country: &str,
+    target_date: Option<NaiveDate>,
+) -> Result<Vec<RateSpreadObservation>, sqlx::Error> {
+    sqlx::query_as::<_, RateSpreadObservation>(
+        r#"
+        SELECT country, spread, date, value, updated_at
+        FROM (
+            SELECT DISTINCT ON (spread) country, spread, date, value, updated_at
+            FROM macro_rate_spreads
+            WHERE country = $1 AND ($2::date IS NULL OR date <= $2)
+            ORDER BY spread, date DESC
+        ) latest
+        ORDER BY spread
+        "#,
+    )
+    .bind(country)
+    .bind(target_date)
+    .fetch_all(pool)
+    .await
+}
+
 async fn query_history(
     pool: &PgPool,
     country: &str,
@@ -214,7 +255,7 @@ async fn query_history(
 ) -> Result<Vec<RateObservation>, sqlx::Error> {
     sqlx::query_as::<_, RateObservation>(
         r#"
-        SELECT source, country, tenor, date, value, unit, raw_series_id
+        SELECT source, country, tenor, date, value, unit, raw_series_id, updated_at
         FROM macro_rates
         WHERE country = $1
           AND tenor = $2
