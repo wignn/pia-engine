@@ -58,12 +58,20 @@ pub async fn proxy_request(
 fn target_base_for_path<'a>(path: &str, config: &'a crate::config::Config) -> Option<&'a str> {
     if path.starts_with("/api/v1/market/why") || path == "/api/v1/analyze" {
         Some(config.intelligence_service_url.as_str())
-    } else if path.starts_with("/api/v1/market/") {
+    } else if path.starts_with("/api/v1/market/")
+        || path.starts_with("/api/v1/rates/")
+        || path.starts_with("/api/v1/energy/")
+        || path.starts_with("/api/v1/cot/")
+        || path.starts_with("/api/v1/fear-greed")
+    {
         Some(config.market_data_url.as_str())
     } else if path.starts_with("/api/v1/forex/")
         || path.starts_with("/api/v1/stock/")
         || path.starts_with("/api/v1/macro/")
         || path.starts_with("/api/v1/admin/forex/")
+        || path.starts_with("/api/v1/sec/")
+        || path.starts_with("/api/v1/central-banks/")
+        || path.starts_with("/api/v1/geosignals")
     {
         Some(config.news_service_url.as_str())
     } else {
@@ -125,6 +133,52 @@ mod tests {
         );
         assert_eq!(
             target_base_for_path("/api/v1/admin/forex/sources/test", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+    }
+
+    #[test]
+    fn routes_new_free_data_pack_paths() {
+        let cfg = config();
+
+        assert_eq!(
+            target_base_for_path("/api/v1/rates/yield-curve", &cfg),
+            Some(cfg.market_data_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/sec/filings", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/central-banks/latest", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/energy/dashboard", &cfg),
+            Some(cfg.market_data_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/cot/markets", &cfg),
+            Some(cfg.market_data_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/fear-greed", &cfg),
+            Some(cfg.market_data_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/geosignals/status", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/geosignals", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/geosignals/map", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/geosignals/assets", &cfg),
             Some(cfg.news_service_url.as_str())
         );
     }

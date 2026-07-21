@@ -19,6 +19,12 @@ pub struct Config {
     pub alert_cooldown_sec: u64,
     pub fred_api_key: String,
     pub economic_refresh_sec: u64,
+    pub rates_refresh_sec: u64,
+    pub eia_api_key: String,
+    pub eia_sync_sec: u64,
+    pub cot_sync_sec: u64,
+    pub cot_data_url: String,
+    pub fear_greed_sync_sec: u64,
 }
 
 impl Config {
@@ -56,6 +62,15 @@ impl Config {
             alert_cooldown_sec: get_env_u64("ALERT_COOLDOWN_SEC", 900).max(60),
             fred_api_key: get_env("FRED_API_KEY", ""),
             economic_refresh_sec: get_env_u64("ECONOMIC_REFRESH_SEC", 21600).max(600),
+            rates_refresh_sec: get_env_u64("RATES_REFRESH_SEC", 21600).max(600),
+            eia_api_key: get_env("EIA_API_KEY", ""),
+            eia_sync_sec: get_env_u64("EIA_SYNC_SEC", 86400).max(600),
+            cot_sync_sec: get_env_u64("COT_SYNC_SEC", 86400).max(600),
+            cot_data_url: get_env(
+                "COT_DATA_URL",
+                "https://www.cftc.gov/dea/newfmt/deacot2026.txt",
+            ),
+            fear_greed_sync_sec: get_env_u64("FEAR_GREED_SYNC_SEC", 3600).max(600),
         }
     }
 
@@ -69,6 +84,10 @@ impl Config {
 
     pub fn has_fred(&self) -> bool {
         !self.fred_api_key.trim().is_empty()
+    }
+
+    pub fn has_eia(&self) -> bool {
+        !self.eia_api_key.trim().is_empty()
     }
 }
 

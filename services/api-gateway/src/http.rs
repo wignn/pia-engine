@@ -95,6 +95,70 @@ pub fn build_router(state: AppState) -> Router {
             any(crate::proxy::proxy_request),
         )
         .route("/api/v1/stock/news", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/rates/yield-curve",
+            any(crate::proxy::proxy_request),
+        )
+        .route("/api/v1/rates/spreads", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/rates/history/{tenor}",
+            any(crate::proxy::proxy_request),
+        )
+        .route("/api/v1/energy/series", any(crate::proxy::proxy_request))
+        .route("/api/v1/energy/dashboard", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/energy/{series_id}",
+            any(crate::proxy::proxy_request),
+        )
+        .route("/api/v1/cot/markets", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/cot/symbol/{symbol}",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/cot/{market_code}",
+            any(crate::proxy::proxy_request),
+        )
+        .route("/api/v1/fear-greed", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/fear-greed/history",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/fear-greed/components",
+            any(crate::proxy::proxy_request),
+        )
+        .route("/api/v1/sec/filings", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/sec/filings/{accession_number}",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/sec/companies/{symbol}",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/central-banks/latest",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/central-banks/{bank}/documents",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/central-banks/{bank}/stance",
+            any(crate::proxy::proxy_request),
+        )
+        .route("/api/v1/geosignals/map", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/geosignals/assets",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/geosignals/status",
+            any(crate::proxy::proxy_request),
+        )
+        .route("/api/v1/geosignals", any(crate::proxy::proxy_request))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             crate::auth::usage_logger,

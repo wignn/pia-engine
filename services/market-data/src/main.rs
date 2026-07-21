@@ -4,12 +4,16 @@ mod batcher;
 mod calendar;
 mod clickhouse;
 mod config;
+mod cot;
 mod data_quality;
 mod economic;
+mod energy;
+mod fear_greed;
 mod history;
 mod http;
 mod ingestion;
 mod prices;
+mod rates;
 mod session;
 mod spikes;
 mod state;
@@ -129,7 +133,38 @@ async fn main() {
             economic::run_sync(econ_cfg, econ_pool).await;
         });
         info!("economic data sync (FRED) enabled");
+
+        let rates_cfg = cfg.clone();
+        let rates_pool = state.db.clone();
+        tokio::spawn(async move {
+            rates::run_rates_sync(rates_cfg, rates_pool).await;
+        });
+        info!("rates data sync (FRED) enabled");
     }
+
+    if cfg.has_eia() {
+        let eia_cfg = cfg.clone();
+        let eia_pool = state.db.clone();
+        tokio::spawn(async move {
+            energy::run_energy_sync(eia_cfg, eia_pool).await;
+        });
+        info!("energy data sync (EIA) enabled");
+    }
+
+    let cot_cfg = cfg.clone();
+    let cot_pool = state.db.clone();
+    tokio::spawn(async move {
+        cot::run_cot_sync(cot_cfg, cot_pool).await;
+    });
+    info!("CFTC COT positioning data sync enabled");
+
+    let fg_cfg = cfg.clone();
+    let fg_pool = state.db.clone();
+    let fg_clickhouse = state.clickhouse.clone();
+    tokio::spawn(async move {
+        fear_greed::run_fear_greed_sync(fg_cfg, fg_pool, fg_clickhouse).await;
+    });
+    info!("Fear & Greed risk regime index sync enabled");
 
     let listener = match TcpListener::bind(&cfg.bind_addr).await {
         Ok(listener) => listener,
