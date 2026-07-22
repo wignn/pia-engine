@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     logger.info("Warming up sentiment model...")
     analyzer.initialize()
     nats_url = os.getenv("NATS_URL", "nats://nats:4222")
-    poll_sec = int(os.getenv("OPTIONS_POLL_SEC", "60"))
+    poll_sec = int(os.getenv("OPTIONS_POLL_SEC", "900"))
     options_task = asyncio.create_task(start_options_worker(nats_url, poll_sec))
     logger.info("Service initialized and ready to process requests.")
     yield
