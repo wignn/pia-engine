@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use std::time::Duration;
 use atlsd_eventbus::{subjects, EventPublisher};
 use chrono::Utc;
 use serde_json::json;
+use std::sync::Arc;
+use std::time::Duration;
 use tracing::{error, info};
 
 use crate::config::Config;
@@ -65,8 +65,8 @@ pub fn calculate_greeks(
 ) -> (f64, f64, f64, f64) {
     if time_years <= 0.0 || iv <= 0.0 || underlying_price <= 0.0 || strike <= 0.0 {
         let delta = match option_type.to_lowercase().as_str() {
-            "call" => if underlying_price > strike { 1.0 } else { 0.0 },
-            "put" => if underlying_price < strike { -1.0 } else { 0.0 },
+            "call" if underlying_price > strike => 1.0,
+            "put" if underlying_price < strike => -1.0,
             _ => 0.0,
         };
         return (delta, 0.0, 0.0, 0.0);
@@ -134,10 +134,8 @@ pub fn calculate_max_pain(contracts: &[OptionContractData]) -> f64 {
                 if cand_strike > c.strike {
                     total_payout += (cand_strike - c.strike) * oi;
                 }
-            } else if c.option_type.eq_ignore_ascii_case("put") {
-                if cand_strike < c.strike {
-                    total_payout += (c.strike - cand_strike) * oi;
-                }
+            } else if c.option_type.eq_ignore_ascii_case("put") && cand_strike < c.strike {
+                total_payout += (c.strike - cand_strike) * oi;
             }
         }
 
@@ -273,10 +271,22 @@ pub async fn fetch_deribit_options(
         };
 
         let raw_bid = item.bid_price;
-        let bid = raw_bid.map(|p| if p > 0.0 && p < 10.0 && underlying_price > 0.0 { p * underlying_price } else { p });
+        let bid = raw_bid.map(|p| {
+            if p > 0.0 && p < 10.0 && underlying_price > 0.0 {
+                p * underlying_price
+            } else {
+                p
+            }
+        });
 
         let raw_ask = item.ask_price;
-        let ask = raw_ask.map(|p| if p > 0.0 && p < 10.0 && underlying_price > 0.0 { p * underlying_price } else { p });
+        let ask = raw_ask.map(|p| {
+            if p > 0.0 && p < 10.0 && underlying_price > 0.0 {
+                p * underlying_price
+            } else {
+                p
+            }
+        });
 
         let iv = item
             .mark_iv
@@ -373,7 +383,10 @@ pub async fn fetch_yahoo_options(
     client: &reqwest::Client,
     symbol: &str,
 ) -> anyhow::Result<(f64, Vec<OptionContractData>)> {
-    let url = format!("https://query2.finance.yahoo.com/v7/finance/options/{}", symbol);
+    let url = format!(
+        "https://query2.finance.yahoo.com/v7/finance/options/{}",
+        symbol
+    );
     let res: YahooOptionsResponse = client.get(&url).send().await?.json().await?;
 
     let chain = res
@@ -486,7 +499,9 @@ async fn publish_options_data(
         .min_by(|a, b| {
             let diff_a = (a.strike - underlying_price).abs();
             let diff_b = (b.strike - underlying_price).abs();
-            diff_a.partial_cmp(&diff_b).unwrap_or(std::cmp::Ordering::Equal)
+            diff_a
+                .partial_cmp(&diff_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
         .map(|c| c.implied_volatility)
         .unwrap_or(0.0);
@@ -512,14 +527,20 @@ async fn publish_options_data(
     });
 
     if let Err(e) = broker
-        .publish_str(subjects::MARKET_OPTIONS_SUMMARY_V1, &summary_payload.to_string())
+        .publish_str(
+            subjects::MARKET_OPTIONS_SUMMARY_V1,
+            &summary_payload.to_string(),
+        )
         .await
     {
         error!(symbol = symbol, error = %e, "failed to publish market.options.summary");
     }
 
     if let Err(e) = broker
-        .publish_str(subjects::MARKET_OPTIONS_CHAIN_V1, &chain_payload.to_string())
+        .publish_str(
+            subjects::MARKET_OPTIONS_CHAIN_V1,
+            &chain_payload.to_string(),
+        )
         .await
     {
         error!(symbol = symbol, error = %e, "failed to publish market.options.chain");
@@ -544,7 +565,8 @@ pub async fn run_options_feed(cfg: Arc<Config>, broker: Arc<dyn EventPublisher>)
             match fetch_deribit_options(&client, currency).await {
                 Ok((underlying_price, contracts)) => {
                     if !contracts.is_empty() {
-                        publish_options_data(&*broker, currency, underlying_price, &contracts).await;
+                        publish_options_data(&*broker, currency, underlying_price, &contracts)
+                            .await;
                     }
                 }
                 Err(e) => {
@@ -591,8 +613,14 @@ mod tests {
         let (delta_p, gamma_p, theta_p, vega_p) =
             calculate_greeks("put", 100.0, 100.0, 1.0, 0.2, 0.05);
         assert!(delta_p < 0.0 && delta_p > -0.5, "delta put was {}", delta_p);
-        assert!((gamma_c - gamma_p).abs() < 1e-6, "gamma put should match call gamma");
-        assert!((vega_c - vega_p).abs() < 1e-6, "vega put should match call vega");
+        assert!(
+            (gamma_c - gamma_p).abs() < 1e-6,
+            "gamma put should match call gamma"
+        );
+        assert!(
+            (vega_c - vega_p).abs() < 1e-6,
+            "vega put should match call vega"
+        );
         assert!(theta_p < 0.0, "theta put was {}", theta_p);
     }
 

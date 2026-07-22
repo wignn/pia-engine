@@ -419,8 +419,16 @@ async fn subscribe_nats_loop(state: &AppState) -> anyhow::Result<()> {
     let client = async_nats::connect(&state.config.nats_url).await?;
     atlsd_eventbus::nats::init_jetstream_streams(&client).await?;
     let mut subscribers = futures_util::stream::SelectAll::new();
-    subscribers.push(client.subscribe(subjects::MARKET_OPTIONS_SUMMARY_V1.to_string()).await?);
-    subscribers.push(client.subscribe(subjects::MARKET_OPTIONS_CHAIN_V1.to_string()).await?);
+    subscribers.push(
+        client
+            .subscribe(subjects::MARKET_OPTIONS_SUMMARY_V1.to_string())
+            .await?,
+    );
+    subscribers.push(
+        client
+            .subscribe(subjects::MARKET_OPTIONS_CHAIN_V1.to_string())
+            .await?,
+    );
     info!("connected to NATS market.options.* subjects");
 
     while let Some(message) = subscribers.next().await {
@@ -434,7 +442,10 @@ async fn subscribe_nats_loop(state: &AppState) -> anyhow::Result<()> {
 
 pub async fn handle_options_payload(payload: &str, pool: &PgPool) {
     if let Ok(summary) = serde_json::from_str::<OptionsSummaryPayload>(payload) {
-        if summary.put_call_ratio >= 0.0 && !summary.symbol.is_empty() && summary.max_pain_strike >= 0.0 {
+        if summary.put_call_ratio >= 0.0
+            && !summary.symbol.is_empty()
+            && summary.max_pain_strike >= 0.0
+        {
             if let Err(err) = upsert_options_summary(pool, &summary).await {
                 error!(error = %err, symbol = %summary.symbol, "failed to upsert options summary");
             }

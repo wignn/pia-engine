@@ -98,10 +98,7 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/options/chain",
             get(crate::options::get_options_chain),
         )
-        .route(
-            "/api/v1/options/gex",
-            get(crate::options::get_options_gex),
-        )
+        .route("/api/v1/options/gex", get(crate::options::get_options_gex))
         .layer(cors)
         .with_state(state)
 }
