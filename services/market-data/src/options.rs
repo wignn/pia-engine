@@ -536,7 +536,6 @@ pub async fn get_options_gex(
     }
 }
 
-
 // Background Subscriber / Sync Function
 
 pub async fn run_options_subscriber(state: AppState) {
@@ -628,24 +627,36 @@ async fn subscribe_nats_loop(state: &AppState) -> anyhow::Result<()> {
 }
 
 pub async fn handle_options_payload(payload: &str, pool: &PgPool) {
-    if let Ok(summary) = serde_json::from_str::<OptionsSummaryPayload>(payload) {
-        if summary.put_call_ratio >= 0.0
-            && !summary.symbol.is_empty()
-            && summary.max_pain_strike >= 0.0
+    match serde_json::from_str::<OptionsSummaryPayload>(payload) {
+        Ok(summary)
+            if summary.put_call_ratio >= 0.0
+                && !summary.symbol.is_empty()
+                && summary.max_pain_strike >= 0.0 =>
         {
             if let Err(err) = upsert_options_summary(pool, &summary).await {
                 error!(error = %err, symbol = %summary.symbol, "failed to upsert options summary");
+            } else {
+                info!(symbol = %summary.symbol, "upserted options summary");
             }
             return;
         }
+        Ok(summary) => {
+            warn!(symbol = %summary.symbol, "ignored invalid options summary payload");
+        }
+        Err(_) => {}
     }
 
-    if let Ok(chain) = serde_json::from_str::<OptionsChainPayload>(payload) {
-        if !chain.symbol.is_empty() {
+    match serde_json::from_str::<OptionsChainPayload>(payload) {
+        Ok(chain) if !chain.symbol.is_empty() => {
+            let contract_count = chain.contracts.len();
             if let Err(err) = upsert_options_chain(pool, &chain).await {
-                error!(error = %err, symbol = %chain.symbol, "failed to upsert options chain");
+                error!(error = %err, symbol = %chain.symbol, contract_count, "failed to upsert options chain");
+            } else {
+                info!(symbol = %chain.symbol, contract_count, "upserted options chain");
             }
         }
+        Ok(_) => warn!("ignored options chain payload with empty symbol"),
+        Err(err) => warn!(error = %err, "payload is not an options chain"),
     }
 }
 
