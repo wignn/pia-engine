@@ -63,6 +63,7 @@ fn target_base_for_path<'a>(path: &str, config: &'a crate::config::Config) -> Op
         || path.starts_with("/api/v1/energy/")
         || path.starts_with("/api/v1/cot/")
         || path.starts_with("/api/v1/fear-greed")
+        || path.starts_with("/api/v1/options/")
     {
         Some(config.market_data_url.as_str())
     } else if path.starts_with("/api/v1/forex/")
@@ -180,6 +181,10 @@ mod tests {
         assert_eq!(
             target_base_for_path("/api/v1/geosignals/assets", &cfg),
             Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/options/summary", &cfg),
+            Some(cfg.market_data_url.as_str())
         );
     }
 }

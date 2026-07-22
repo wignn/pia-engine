@@ -5,6 +5,8 @@ pub const MD_DEDUP_PRIMARY_FX_QUOTES_V1: &str = "md.dedup.primary_fx.quotes.v1";
 pub const MD_DEDUP_CRYPTO_TRADES_V1: &str = "md.dedup.crypto.trades.v1";
 pub const MD_DEDUP_INDEX_QUOTES_V1: &str = "md.dedup.index.quotes.v1";
 pub const MARKET_ALERTS_V1: &str = "market.alerts.v1";
+pub const MARKET_OPTIONS_SUMMARY_V1: &str = "market.options.summary";
+pub const MARKET_OPTIONS_CHAIN_V1: &str = "market.options.chain";
 pub const NEWS_FOREX_PROCESSED_V1: &str = "news.forex.processed.v1";
 pub const NEWS_STOCK_PROCESSED_V1: &str = "news.stock.processed.v1";
 

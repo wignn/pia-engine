@@ -98,6 +98,7 @@ mod tests {
             reconnect_base_sec: 1,
             reconnect_max_sec: 1,
             market_check_interval_sec: 30,
+            options_sync_sec: 60,
             health_bind_addr: "127.0.0.1:0".to_string(),
             health_stale_after_sec: 180,
             log_level: "INFO".to_string(),

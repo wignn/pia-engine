@@ -86,6 +86,16 @@ pub async fn run(cfg: Config) {
         info!(worker = "index_feed", "worker spawned");
     }
 
+    {
+        let cfg = cfg.clone();
+        let broker = broker.clone();
+        let handle = tokio::spawn(async move {
+            workers::options_feed::run_options_feed(cfg, broker).await;
+        });
+        worker_handles.push(("options_feed", handle));
+        info!(worker = "options_feed", "worker spawned");
+    }
+
     if worker_handles.is_empty() {
         error!("no workers enabled");
         std::process::exit(1);
