@@ -58,13 +58,16 @@ def _symbols() -> list[str]:
 
 
 def _underlying_price(api_key: str, secret_key: str, symbol: str) -> float:
+    logger.info("fetching Alpaca underlying price for %s", symbol)
     res = requests.get(
         f"https://data.alpaca.markets/v2/stocks/{symbol}/trades/latest",
         headers={"APCA-API-KEY-ID": api_key, "APCA-API-SECRET-KEY": secret_key},
         timeout=10,
     )
     res.raise_for_status()
-    return _as_float(res.json().get("trade", {}).get("p"))
+    price = _as_float(res.json().get("trade", {}).get("p"))
+    logger.info("fetched Alpaca underlying price for %s: %s", symbol, price)
+    return price
 
 
 def _snapshots(option_client: OptionHistoricalDataClient, symbols: list[str]) -> dict[str, Any]:
@@ -113,6 +116,7 @@ def _payloads(
     now = datetime.now(tz=ZoneInfo("America/New_York"))
     limit = max(1, int(os.getenv("OPTIONS_CONTRACT_LIMIT", "200")))
     days = max(1, int(os.getenv("OPTIONS_EXPIRATION_DAYS", "60")))
+    logger.info("fetching Alpaca option contracts for %s", symbol)
     contracts_res = trade_client.get_option_contracts(
         GetOptionContractsRequest(
             underlying_symbols=[symbol],
@@ -125,11 +129,18 @@ def _payloads(
     )
     contracts = list(getattr(contracts_res, "option_contracts", []) or [])
     contract_symbols = [str(_get(contract, "symbol")) for contract in contracts if _get(contract, "symbol")]
+    logger.info("fetched Alpaca option contracts for %s: %s", symbol, len(contract_symbols))
 
     try:
         snapshots = _snapshots(option_client, contract_symbols)
+        logger.info("fetched Alpaca option snapshots for %s: %s", symbol, len(snapshots))
     except Exception as exc:
-        logger.warning("failed to fetch Alpaca option snapshots for %s: %s", symbol, exc)
+        logger.warning(
+            "failed to fetch Alpaca option snapshots for %s (%s contracts): %s",
+            symbol,
+            len(contract_symbols),
+            exc,
+        )
         snapshots = {}
 
     price = _underlying_price(api_key, secret_key, symbol)
@@ -163,7 +174,7 @@ async def start_options_worker(nats_url: str, poll_interval: int) -> None:
                 await nats_client.publish(CHAIN_SUBJECT, json.dumps(chain, allow_nan=False).encode())
                 logger.info("published Alpaca options payload for %s (%s contracts)", symbol, len(chain["contracts"]))
             except Exception as exc:
-                logger.warning("failed to publish Alpaca options for %s: %s", symbol, exc)
+                logger.warning("failed to publish Alpaca options for %s: %s", symbol, exc, exc_info=True)
             if symbol_delay:
                 await asyncio.sleep(symbol_delay)
         await asyncio.sleep(poll_interval)
