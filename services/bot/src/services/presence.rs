@@ -19,7 +19,7 @@ pub fn spawn_presence_loop(shard_manager: Arc<ShardManager>) {
             }
 
             let runners = shard_manager.runners.lock().await;
-            for (_, runner) in runners.iter() {
+            for runner in runners.values() {
                 runner.runner_tx.set_presence(
                     Some(activities[idx % activities.len()].clone()),
                     OnlineStatus::Online,
