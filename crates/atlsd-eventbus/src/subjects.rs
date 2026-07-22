@@ -1,6 +1,8 @@
 pub const MD_RAW_PRIMARY_FX_QUOTES_V1: &str = "md.raw.primary_fx.quotes.v1";
 pub const MD_RAW_CRYPTO_TRADES_V1: &str = "md.raw.crypto.trades.v1";
 pub const MD_RAW_INDEX_QUOTES_V1: &str = "md.raw.index.quotes.v1";
+pub const MD_RAW_OPTIONS_SUMMARY_V1: &str = "md.raw.options.summary.v1";
+pub const MD_RAW_OPTIONS_CHAIN_V1: &str = "md.raw.options.chain.v1";
 pub const MD_DEDUP_PRIMARY_FX_QUOTES_V1: &str = "md.dedup.primary_fx.quotes.v1";
 pub const MD_DEDUP_CRYPTO_TRADES_V1: &str = "md.dedup.crypto.trades.v1";
 pub const MD_DEDUP_INDEX_QUOTES_V1: &str = "md.dedup.index.quotes.v1";

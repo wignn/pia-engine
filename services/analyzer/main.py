@@ -1,3 +1,4 @@
+import asyncio
 import os
 import logging
 from contextlib import asynccontextmanager
@@ -7,6 +8,7 @@ from analyzer import AdvancedSentimentAnalyzer
 from event_extractor import extract_event
 from language import detect_language
 from rule_engine import interpret_market
+from options_worker import start_options_worker
 from schemas import AnalysisRequest, AnalysisResponse, WhyMoveRequest, WhyMoveResponse
 from translator import build_translation_payload, maybe_trim_translated_text, translate_to_english
 from why_engine import explain_why
@@ -25,8 +27,12 @@ analyzer = AdvancedSentimentAnalyzer()
 async def lifespan(app: FastAPI):
     logger.info("Warming up sentiment model...")
     analyzer.initialize()
+    nats_url = os.getenv("NATS_URL", "nats://nats:4222")
+    poll_sec = int(os.getenv("OPTIONS_POLL_SEC", "60"))
+    options_task = asyncio.create_task(start_options_worker(nats_url, poll_sec))
     logger.info("Service initialized and ready to process requests.")
     yield
+    options_task.cancel()
     logger.info("Service shutting down.")
 
 

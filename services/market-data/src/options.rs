@@ -10,6 +10,125 @@ use futures_util::StreamExt;
 
 use crate::state::AppState;
 
+fn norm_cdf(x: f64) -> f64 {
+    0.5 * (1.0 + erf(x / std::f64::consts::SQRT_2))
+}
+
+fn norm_pdf(x: f64) -> f64 {
+    (-0.5 * x * x).exp() / (2.0 * std::f64::consts::PI).sqrt()
+}
+
+fn erf(x: f64) -> f64 {
+    let a1 = 0.254829592;
+    let a2 = -0.284496736;
+    let a3 = 1.421413741;
+    let a4 = -1.453152027;
+    let a5 = 1.061405429;
+    let p = 0.3275911;
+
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x_abs = x.abs();
+    let t = 1.0 / (1.0 + p * x_abs);
+    let y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-x_abs * x_abs).exp();
+
+    sign * y
+}
+
+fn calculate_greeks(
+    option_type: &str,
+    strike: f64,
+    underlying_price: f64,
+    time_years: f64,
+    iv: f64,
+    risk_free_rate: f64,
+) -> (f64, f64, f64, f64) {
+    if time_years <= 0.0 || iv <= 0.0 || underlying_price <= 0.0 || strike <= 0.0 {
+        return (
+            contract_delta_at_expiry(option_type, strike, underlying_price),
+            0.0,
+            0.0,
+            0.0,
+        );
+    }
+
+    let sqrt_t = time_years.sqrt();
+    let d1 = ((underlying_price / strike).ln() + (risk_free_rate + 0.5 * iv * iv) * time_years)
+        / (iv * sqrt_t);
+    let d2 = d1 - iv * sqrt_t;
+    let n_d1 = norm_cdf(d1);
+    let n_prime_d1 = norm_pdf(d1);
+
+    let (delta, theta) = match option_type.to_lowercase().as_str() {
+        "call" => (
+            n_d1,
+            -(underlying_price * n_prime_d1 * iv) / (2.0 * sqrt_t)
+                - risk_free_rate * strike * (-risk_free_rate * time_years).exp() * norm_cdf(d2),
+        ),
+        "put" => (
+            n_d1 - 1.0,
+            -(underlying_price * n_prime_d1 * iv) / (2.0 * sqrt_t)
+                + risk_free_rate * strike * (-risk_free_rate * time_years).exp() * norm_cdf(-d2),
+        ),
+        _ => (0.0, 0.0),
+    };
+
+    let gamma = n_prime_d1 / (underlying_price * iv * sqrt_t);
+    let vega = underlying_price * n_prime_d1 * sqrt_t;
+
+    (delta, gamma, theta, vega)
+}
+
+fn contract_delta_at_expiry(option_type: &str, strike: f64, underlying_price: f64) -> f64 {
+    match option_type.to_lowercase().as_str() {
+        "call" if underlying_price > strike => 1.0,
+        "put" if underlying_price < strike => -1.0,
+        _ => 0.0,
+    }
+}
+
+fn calculate_gex(gamma: f64, underlying_price: f64, open_interest: i64, is_call: bool) -> f64 {
+    let sign = if is_call { 1.0 } else { -1.0 };
+    sign * gamma * underlying_price * underlying_price * 100.0 * open_interest as f64
+}
+
+fn option_time_years(expiration_date: NaiveDate) -> f64 {
+    let days = expiration_date
+        .signed_duration_since(Utc::now().date_naive())
+        .num_days() as f64;
+    (days / 365.25).max(0.001)
+}
+
+fn calculate_max_pain(contracts: &[OptionContractPayload]) -> f64 {
+    let mut strikes: Vec<f64> = contracts.iter().map(|contract| contract.strike).collect();
+    strikes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    strikes.dedup();
+
+    strikes
+        .into_iter()
+        .min_by(|left, right| {
+            payout_at(*left, contracts)
+                .partial_cmp(&payout_at(*right, contracts))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .unwrap_or(0.0)
+}
+
+fn payout_at(strike: f64, contracts: &[OptionContractPayload]) -> f64 {
+    contracts
+        .iter()
+        .map(|contract| {
+            let oi = contract.open_interest as f64;
+            if contract.option_type.eq_ignore_ascii_case("call") && strike > contract.strike {
+                (strike - contract.strike) * oi
+            } else if contract.option_type.eq_ignore_ascii_case("put") && strike < contract.strike {
+                (contract.strike - strike) * oi
+            } else {
+                0.0
+            }
+        })
+        .sum()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct OptionsSnapshotRow {
     pub id: String,
@@ -248,9 +367,46 @@ pub async fn upsert_options_chain(
         .map(|dt| dt.with_timezone(&Utc))
         .unwrap_or_else(Utc::now);
 
+    let underlying_price = payload.underlying_price.unwrap_or(0.0);
+    let mut total_open_interest = 0_i64;
+    let mut total_volume = 0_i64;
+    let mut total_gex = 0.0;
+    let mut call_volume = 0_i64;
+    let mut put_volume = 0_i64;
+    let mut iv_atm: Option<(f64, f64)> = None;
+
     for contract in &payload.contracts {
         let expiration_date = NaiveDate::parse_from_str(&contract.expiration_date, "%Y-%m-%d")
             .unwrap_or_else(|_| Utc::now().date_naive());
+        let (delta, gamma, theta, vega) = calculate_greeks(
+            &contract.option_type,
+            contract.strike,
+            underlying_price,
+            option_time_years(expiration_date),
+            contract.implied_volatility,
+            0.045,
+        );
+        let gex = calculate_gex(
+            gamma,
+            underlying_price,
+            contract.open_interest,
+            contract.option_type.eq_ignore_ascii_case("call"),
+        );
+        total_open_interest += contract.open_interest;
+        total_volume += contract.volume;
+        total_gex += gex;
+        if contract.option_type.eq_ignore_ascii_case("call") {
+            call_volume += contract.volume;
+        } else if contract.option_type.eq_ignore_ascii_case("put") {
+            put_volume += contract.volume;
+        }
+        let atm_distance = (contract.strike - underlying_price).abs();
+        if iv_atm
+            .map(|(distance, _)| atm_distance < distance)
+            .unwrap_or(true)
+        {
+            iv_atm = Some((atm_distance, contract.implied_volatility));
+        }
 
         sqlx::query(
             r#"
@@ -287,16 +443,36 @@ pub async fn upsert_options_chain(
         .bind(contract.bid)
         .bind(contract.ask)
         .bind(contract.implied_volatility)
-        .bind(contract.delta)
-        .bind(contract.gamma)
-        .bind(contract.theta)
-        .bind(contract.vega)
-        .bind(contract.gex)
+        .bind(delta)
+        .bind(gamma)
+        .bind(theta)
+        .bind(vega)
+        .bind(gex)
         .bind(contract.open_interest)
         .bind(contract.volume)
         .bind(updated_at)
         .execute(pool)
         .await?;
+    }
+
+    if !payload.contracts.is_empty() {
+        let summary = OptionsSummaryPayload {
+            id: Some(payload.symbol.clone()),
+            symbol: payload.symbol.clone(),
+            underlying_price,
+            put_call_ratio: if call_volume == 0 {
+                0.0
+            } else {
+                put_volume as f64 / call_volume as f64
+            },
+            max_pain_strike: calculate_max_pain(&payload.contracts),
+            total_open_interest,
+            total_volume,
+            total_gex,
+            iv_atm: iv_atm.map(|(_, iv)| iv),
+            updated_at: payload.updated_at.clone(),
+        };
+        upsert_options_summary(pool, &summary).await?;
     }
 
     Ok(())
@@ -427,6 +603,16 @@ async fn subscribe_nats_loop(state: &AppState) -> anyhow::Result<()> {
     subscribers.push(
         client
             .subscribe(subjects::MARKET_OPTIONS_CHAIN_V1.to_string())
+            .await?,
+    );
+    subscribers.push(
+        client
+            .subscribe(subjects::MD_RAW_OPTIONS_SUMMARY_V1.to_string())
+            .await?,
+    );
+    subscribers.push(
+        client
+            .subscribe(subjects::MD_RAW_OPTIONS_CHAIN_V1.to_string())
             .await?,
     );
     info!("connected to NATS market.options.* subjects");

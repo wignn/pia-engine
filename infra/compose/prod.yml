@@ -59,7 +59,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-  
+
   nats:
     image: nats:2.10-alpine
     container_name: nats
@@ -242,7 +242,7 @@ services:
     restart: always
     networks:
       - private
-      
+
   control-plane:
     container_name: world-control-plane
     image: wign/atlsd-control-plane
@@ -320,6 +320,11 @@ services:
     restart: always
     env_file:
       - ../env/.env.analyze
+    environment:
+      NATS_URL: nats://nats:4222
+    depends_on:
+      nats:
+        condition: service_started
     networks:
       - private
   
@@ -338,7 +343,6 @@ services:
       - "${PUBLIC_WEB_PORT:-5173}:5173"
     restart: unless-stopped
 
-
 networks:
   private:
     driver: bridge
@@ -347,6 +351,3 @@ volumes:
   postgres_data:
   clickhouse_data:
   redis_data:
-
-
-
