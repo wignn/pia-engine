@@ -536,6 +536,7 @@ pub async fn get_options_gex(
     }
 }
 
+
 // Background Subscriber / Sync Function
 
 pub async fn run_options_subscriber(state: AppState) {
