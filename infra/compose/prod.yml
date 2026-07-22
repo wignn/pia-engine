@@ -320,7 +320,6 @@ services:
     restart: always
     env_file:
       - ../env/.env.analyze
-      - ../../.env.alpa
     environment:
       NATS_URL: nats://nats:4222
     depends_on:
