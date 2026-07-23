@@ -26,6 +26,8 @@ pub struct Config {
     pub cot_data_url: String,
     pub fear_greed_sync_sec: u64,
     pub options_sync_sec: u64,
+    pub institutional_sync_sec: u64,
+    pub institutional_symbols: String,
 }
 
 impl Config {
@@ -73,6 +75,11 @@ impl Config {
             ),
             fear_greed_sync_sec: get_env_u64("FEAR_GREED_SYNC_SEC", 3600).max(600),
             options_sync_sec: get_env_u64("OPTIONS_SYNC_SEC", 3600).max(600),
+            institutional_sync_sec: get_env_u64("INSTITUTIONAL_SYNC_SEC", 21600).max(600),
+            institutional_symbols: get_env(
+                "INSTITUTIONAL_SYMBOLS",
+                "SPY,QQQ,AAPL,MSFT,TSLA,NVDA,GLD",
+            ),
         }
     }
 

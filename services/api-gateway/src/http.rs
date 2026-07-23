@@ -42,6 +42,22 @@ pub fn build_router(state: AppState) -> Router {
             any(crate::proxy::proxy_request),
         )
         .route(
+            "/api/v1/market/trading-halts",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/market/corporate-actions",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/market/realized-volatility",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/market/implied-volatility",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
             "/api/v1/market/economic/indicators",
             any(crate::proxy::proxy_request),
         )

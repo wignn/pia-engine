@@ -186,5 +186,21 @@ mod tests {
             target_base_for_path("/api/v1/options/summary", &cfg),
             Some(cfg.market_data_url.as_str())
         );
+        assert_eq!(
+            target_base_for_path("/api/v1/market/trading-halts", &cfg),
+            Some(cfg.market_data_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/market/corporate-actions", &cfg),
+            Some(cfg.market_data_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/market/realized-volatility", &cfg),
+            Some(cfg.market_data_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/market/implied-volatility", &cfg),
+            Some(cfg.market_data_url.as_str())
+        );
     }
 }

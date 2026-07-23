@@ -32,6 +32,22 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/market/alerts", get(crate::alerts::alerts))
         .route("/api/v1/market/smart-alerts", get(crate::alerts::alerts))
         .route(
+            "/api/v1/market/trading-halts",
+            get(crate::institutional::get_trading_halts),
+        )
+        .route(
+            "/api/v1/market/corporate-actions",
+            get(crate::institutional::get_corporate_actions),
+        )
+        .route(
+            "/api/v1/market/realized-volatility",
+            get(crate::institutional::get_realized_volatility),
+        )
+        .route(
+            "/api/v1/market/implied-volatility",
+            get(crate::institutional::get_implied_volatility),
+        )
+        .route(
             "/api/v1/market/economic/indicators",
             get(crate::economic::list_indicators),
         )

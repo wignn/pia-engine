@@ -12,6 +12,7 @@ mod fear_greed;
 mod history;
 mod http;
 mod ingestion;
+mod institutional;
 mod options;
 mod prices;
 mod rates;
@@ -166,6 +167,13 @@ async fn main() {
         fear_greed::run_fear_greed_sync(fg_cfg, fg_pool, fg_clickhouse).await;
     });
     info!("Fear & Greed risk regime index sync enabled");
+
+    let institutional_cfg = cfg.clone();
+    let institutional_pool = state.db.clone();
+    tokio::spawn(async move {
+        institutional::run_sync(institutional_cfg, institutional_pool).await;
+    });
+    info!("institutional market data sync enabled");
 
     let options_state = state.clone();
     tokio::spawn(async move {
