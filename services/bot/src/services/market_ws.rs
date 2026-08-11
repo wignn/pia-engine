@@ -132,18 +132,3 @@ mod tests {
         assert_eq!(cached.price_str, "1.08257");
     }
 }
-
-pub fn get_price(symbol: &str) -> Option<CachedPrice> {
-    let cache = PRICE_CACHE.read();
-    let upper = symbol.to_uppercase();
-    cache.get(&upper).cloned()
-}
-
-pub fn get_all_prices() -> Vec<CachedPrice> {
-    let cache = PRICE_CACHE.read();
-    cache.values().cloned().collect()
-}
-
-pub fn get_xauusd_display() -> Option<String> {
-    get_price("XAUUSD").map(|p| format!("XAUUSD ${:.2}", p.price))
-}
