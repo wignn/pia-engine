@@ -92,6 +92,21 @@ fn update_cached_price(symbol: &str, price: f64, asset_type: &str) -> CachedPric
     cached
 }
 
+pub fn get_price(symbol: &str) -> Option<CachedPrice> {
+    let cache = PRICE_CACHE.read();
+    let upper = symbol.to_uppercase();
+    cache.get(&upper).cloned()
+}
+
+pub fn get_all_prices() -> Vec<CachedPrice> {
+    let cache = PRICE_CACHE.read();
+    cache.values().cloned().collect()
+}
+
+pub fn get_xauusd_display() -> Option<String> {
+    get_price("XAUUSD").map(|p| format!("XAUUSD ${:.2}", p.price))
+}
+
 fn infer_asset_type(symbol: &str) -> &'static str {
     if symbol.ends_with("USDT") || symbol.ends_with("BTC") || symbol.ends_with("ETH") {
         "crypto"

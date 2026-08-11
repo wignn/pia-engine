@@ -69,7 +69,7 @@ impl RealtimeWsService {
             "channels": ["market_prices", "news_feed"]
         });
         write
-            .send(Message::Text(subscription.to_string().into()))
+            .send(Message::Text(subscription.to_string()))
             .await?;
 
         loop {
