@@ -68,9 +68,7 @@ impl RealtimeWsService {
             "action": "subscribe",
             "channels": ["market_prices", "news_feed"]
         });
-        write
-            .send(Message::Text(subscription.to_string()))
-            .await?;
+        write.send(Message::Text(subscription.to_string())).await?;
 
         loop {
             tokio::select! {
