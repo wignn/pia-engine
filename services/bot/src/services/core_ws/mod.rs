@@ -18,16 +18,16 @@ pub struct RealtimeWsService {
     pub(super) db: DbPool,
     pub(super) http: Arc<Http>,
     realtime_url: String,
-    bot_id: String,
+    api_key: String,
 }
 
 impl RealtimeWsService {
-    pub fn new(db: DbPool, http: Arc<Http>, realtime_url: String, bot_id: String) -> Self {
+    pub fn new(db: DbPool, http: Arc<Http>, realtime_url: String, api_key: String) -> Self {
         Self {
             db,
             http,
             realtime_url,
-            bot_id,
+            api_key,
         }
     }
 
@@ -56,24 +56,24 @@ impl RealtimeWsService {
     }
 
     async fn connect_and_listen(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let url = format!(
-            "{}/api/v1/ws?bot_id={}&channels=all",
-            self.realtime_url, self.bot_id
-        );
-        println!("[REALTIME-WS] Connecting to: {}", url);
+        let mut url = reqwest::Url::parse(&self.realtime_url)?;
+        url.query_pairs_mut().append_pair("api_key", &self.api_key);
+        println!("[REALTIME-WS] Connecting to realtime gateway");
 
-        let (ws_stream, _) = connect_async(&url).await?;
+        let (ws_stream, _) = connect_async(url.as_str()).await?;
         let (mut write, mut read) = ws_stream.split();
         println!("[OK] Realtime WebSocket connected!");
 
-        let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(30));
+        let subscription = serde_json::json!({
+            "action": "subscribe",
+            "channels": ["market_prices", "news_feed"]
+        });
+        write
+            .send(Message::Text(subscription.to_string().into()))
+            .await?;
 
         loop {
             tokio::select! {
-                _ = heartbeat_interval.tick() => {
-                    let hb = serde_json::json!({"event": "heartbeat", "data": {}});
-                    write.send(Message::Text(hb.to_string())).await?;
-                }
                 msg = read.next() => {
                     match msg {
                         Some(Ok(Message::Text(text))) => {
@@ -104,9 +104,9 @@ pub fn start_realtime_ws_service(
     db: DbPool,
     http: Arc<Http>,
     realtime_url: String,
-    bot_id: String,
+    api_key: String,
 ) {
-    let service = Arc::new(RealtimeWsService::new(db, http, realtime_url, bot_id));
+    let service = Arc::new(RealtimeWsService::new(db, http, realtime_url, api_key));
     tokio::spawn(async move {
         service.start().await;
     });

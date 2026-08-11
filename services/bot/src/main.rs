@@ -34,7 +34,7 @@ async fn main() -> Result<(), BotError> {
         db,
         bot_client.http,
         config.realtime_ws_url.clone(),
-        config.client_id.clone(),
+        config.api_key.clone(),
     );
     println!(
         "[OK] Realtime WebSocket service started (connecting to {})",

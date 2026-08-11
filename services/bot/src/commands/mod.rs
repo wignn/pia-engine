@@ -23,6 +23,7 @@ pub struct Data {
     pub owners: HashSet<UserId>,
     pub db: DbPool,
     pub api_http_url: String,
+    pub api_key: String,
 }
 
 pub fn all() -> Vec<poise::Command<Data, Error>> {
@@ -77,6 +78,7 @@ impl std::fmt::Debug for Data {
             .field("owners", &self.owners)
             .field("db", &"Arc<SqlitePool>")
             .field("api_http_url", &self.api_http_url)
+            .field("api_key", &"<redacted>")
             .finish()
     }
 }

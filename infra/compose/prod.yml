@@ -197,6 +197,26 @@ services:
     networks:
       - private
 
+  bot:
+    container_name: bot
+    image: wign/atlsd-bot:latest
+    env_file:
+      - ../env/.env.bot
+    environment:
+      API_GATEWAY_URL: http://api-gateway:8000
+      REALTIME_GATEWAY_WS_URL: ws://realtime-gateway:8020/ws/v1
+      DATABASE_PATH: /data/bot.db
+    volumes:
+      - bot_data:/data
+    depends_on:
+      api-gateway:
+        condition: service_started
+      realtime-gateway:
+        condition: service_started
+    restart: always
+    networks:
+      - private
+
   news-service:
     container_name: news-service
     image: wign/atlsd-news-service
@@ -328,10 +348,22 @@ services:
     networks:
       - private
   
+  portal:
+    container_name: portal
+    image: wign/atlsd-portal:latest
+    env_file:
+      - ../env/.env.portal
+    ports:
+      - "${PORTAL_PORT:-5174}:80"
+    depends_on:
+      control-plane:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - private
+
   public-web:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.public-web
+    image: wign/atlsd-public-web:latest
     env_file:
       - ../env/.env.public-web
     container_name: atlsd-public-web
@@ -342,6 +374,8 @@ services:
     ports:
       - "${PUBLIC_WEB_PORT:-5173}:5173"
     restart: unless-stopped
+    networks:
+      - private
 
 networks:
   private:
@@ -351,3 +385,4 @@ volumes:
   postgres_data:
   clickhouse_data:
   redis_data:
+  bot_data:

@@ -6,6 +6,7 @@ use poise::serenity_prelude::{ChannelId, CreateEmbed, CreateEmbedFooter, CreateM
 use super::RealtimeWsService;
 use super::embed::build_embed;
 use super::types::{ArticleData, CalendarEventData, CoreEvent, DiscordEmbed, TweetData};
+use crate::services::market_ws::{MarketTickData, update_tick};
 
 impl RealtimeWsService {
     pub(super) async fn handle_message(
@@ -15,6 +16,7 @@ impl RealtimeWsService {
         let event: CoreEvent = serde_json::from_str(text)?;
 
         match event.event.as_str() {
+            "tick" => self.handle_market_tick(&event).await,
             "news.new" | "news.high_impact" => self.handle_news_event(&event).await?,
             "stock.news.new" | "stock.news.high_impact" | "equity.news.new" => {
                 self.handle_stock_news_event(&event).await?;
@@ -47,6 +49,26 @@ impl RealtimeWsService {
             )
             .await;
         }
+    }
+
+    async fn handle_market_tick(&self, event: &CoreEvent) {
+        let Some(data) = event.data.as_ref() else {
+            return;
+        };
+        let Ok(tick) = serde_json::from_value::<MarketTickData>(data.clone()) else {
+            println!("[REALTIME-WS] Invalid market tick payload");
+            return;
+        };
+        let cached = update_tick(&tick);
+        crate::services::price_alert::check_price(
+            &cached.symbol,
+            cached.price,
+            &cached.price_str,
+            &cached.asset_type,
+            &self.http,
+            &self.db,
+        )
+        .await;
     }
 
     async fn handle_news_event(

@@ -11,21 +11,22 @@ pub async fn latest(
 
     let limit = limit.unwrap_or(5).clamp(1, 10);
     let realtime_url = ctx.data().api_http_url.clone();
-    let url = format!("{}/api/v1/equity/news?limit={}", realtime_url, limit);
+    let url = format!("{}/api/v1/stock/news?limit={}", realtime_url, limit);
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
         .build()?;
 
-    let response = client.get(&url).send().await;
-
-    let items = match response {
-        Ok(resp) => match resp.json::<serde_json::Value>().await {
-            Ok(body) => body["items"].as_array().cloned().unwrap_or_default(),
-            Err(_) => vec![],
-        },
-        Err(_) => vec![],
-    };
+    let response = client
+        .get(&url)
+        .header("X-API-Key", &ctx.data().api_key)
+        .send()
+        .await?;
+    let body = response
+        .error_for_status()?
+        .json::<serde_json::Value>()
+        .await?;
+    let items = body["news"].as_array().cloned().unwrap_or_default();
 
     if items.is_empty() {
         let embed = CreateEmbed::new()
@@ -40,20 +41,26 @@ pub async fn latest(
 
     let mut lines = Vec::new();
     for item in &items {
-        let title = item["title"].as_str().unwrap_or("(no title)");
-        let tickers = item["tickers"].as_str().unwrap_or("");
+        let headline = item["headline"].as_str().unwrap_or("(no headline)");
+        let source = item["source"].as_str().unwrap_or("");
         let sentiment = item["sentiment"].as_str().unwrap_or("");
+        let url = item["url"].as_str().unwrap_or("");
         let sentiment_icon = match sentiment {
-            "positive" => "🟢",
-            "negative" => "🔴",
+            "bullish" => "🟢",
+            "bearish" => "🔴",
             _ => "⚪",
         };
-        let ticker_str = if tickers.is_empty() {
+        let source_str = if source.is_empty() {
             String::new()
         } else {
-            format!(" `{}`", tickers)
+            format!(" `{source}`")
         };
-        lines.push(format!("{} **{}**{}", sentiment_icon, title, ticker_str));
+        let link = if url.is_empty() {
+            headline.to_string()
+        } else {
+            format!("[{headline}]({url})")
+        };
+        lines.push(format!("{sentiment_icon} **{link}**{source_str}"));
     }
 
     let embed = CreateEmbed::new()

@@ -76,6 +76,7 @@ jobs:
             bot:
               - 'services/bot/**'
               - 'crates/**'
+              - 'db/migrations/bot/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.dockerignore'
@@ -119,6 +120,14 @@ jobs:
               - 'Cargo.lock'
               - '.dockerignore'
               - 'infra/docker/Dockerfile.intelligence-service'
+            portal:
+              - 'apps/portal/**'
+              - 'infra/docker/Dockerfile.portal'
+              - '.dockerignore'
+            public_web:
+              - 'apps/public-web/**'
+              - 'infra/docker/Dockerfile.public-web'
+              - '.dockerignore'
 
       - name: Build Docker matrix
         id: matrix
@@ -134,6 +143,8 @@ jobs:
           REALTIME_GATEWAY_CHANGED: ${{ steps.filter.outputs.realtime_gateway }}
           NEWS_SERVICE_CHANGED: ${{ steps.filter.outputs.news_service }}
           INTELLIGENCE_SERVICE_CHANGED: ${{ steps.filter.outputs.intelligence_service }}
+          PORTAL_CHANGED: ${{ steps.filter.outputs.portal }}
+          PUBLIC_WEB_CHANGED: ${{ steps.filter.outputs.public_web }}
         run: |
           json='{"include":['
           sep=''
@@ -177,6 +188,14 @@ jobs:
 
           if [[ "$BUILD_ALL" == "true" || "$INTELLIGENCE_SERVICE_CHANGED" == "true" ]]; then
             add '{"image":"atlsd-intelligence-service","dockerfile":"infra/docker/Dockerfile.intelligence-service"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$PORTAL_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-portal","dockerfile":"infra/docker/Dockerfile.portal"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$PUBLIC_WEB_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-public-web","dockerfile":"infra/docker/Dockerfile.public-web"}'
           fi
           json="${json}]}";
           echo "matrix=$json" >> "$GITHUB_OUTPUT"

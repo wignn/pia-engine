@@ -16,24 +16,29 @@ pub async fn forex_calendar(ctx: Context<'_>) -> Result<(), Error> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
         .build()?;
-    let response = client.get(&url).send().await;
+    let response = client
+        .get(&url)
+        .header("X-API-Key", &ctx.data().api_key)
+        .send()
+        .await?;
+    let body = response
+        .error_for_status()?
+        .json::<serde_json::Value>()
+        .await?;
 
     let mut high_impact_events = Vec::new();
-    if let Ok(resp) = response
-        && let Ok(body) = resp.json::<serde_json::Value>().await
-        && let Some(items) = body["items"].as_array()
-    {
-        for event in items {
+    if let Some(events) = body["events"].as_array() {
+        for event in events {
             let title = event["title"].as_str().unwrap_or_default();
-            let currency = event["currency"].as_str().unwrap_or_default();
-            let date = event["date"].as_str().unwrap_or_default();
+            let country = event["country"].as_str().unwrap_or_default();
+            let time = event["time"].as_str().unwrap_or_default();
             let forecast = event["forecast"].as_str().unwrap_or_default();
             let previous = event["previous"].as_str().unwrap_or_default();
 
             high_impact_events.push(format!(
                 "**{}**  `{}`\n{}\nForecast: `{}` | Previous: `{}`",
-                currency,
-                date,
+                country,
+                time,
                 title,
                 if forecast.is_empty() { "-" } else { forecast },
                 if previous.is_empty() { "-" } else { previous }

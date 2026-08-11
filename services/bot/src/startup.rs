@@ -32,6 +32,7 @@ pub async fn build_bot_client(config: &Config, db: DbPool) -> Result<BotClient, 
     let owners_for_setup = owners.clone();
     let db_for_setup = db.clone();
     let api_http_url = config.api_http_url.clone();
+    let api_key = config.api_key.clone();
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -48,6 +49,7 @@ pub async fn build_bot_client(config: &Config, db: DbPool) -> Result<BotClient, 
             let db = db_for_setup.clone();
             let owners = owners_for_setup.clone();
             let api_http_url = api_http_url.clone();
+            let api_key = api_key.clone();
 
             Box::pin(async move {
                 println!("[OK] Logged in as {}", ready.user.name);
@@ -58,6 +60,7 @@ pub async fn build_bot_client(config: &Config, db: DbPool) -> Result<BotClient, 
                     owners,
                     db,
                     api_http_url,
+                    api_key,
                 })
             })
         })
