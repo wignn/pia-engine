@@ -354,7 +354,7 @@ services:
     env_file:
       - ../env/.env.portal
     ports:
-      - "${PORTAL_PORT:-5174}:80"
+      - "${PORTAL_PORT:-5174}:5174"
     depends_on:
       control-plane:
         condition: service_started
