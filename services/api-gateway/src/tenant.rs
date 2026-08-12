@@ -154,8 +154,12 @@ impl TenantRegistry {
         let channel = format!("{prefix}:tenant:config_changed");
         loop {
             match self.subscribe_redis(&redis_url, &channel).await {
-                Ok(()) => warn!(channel = %channel, "api-gateway Redis config sync ended; reconnecting"),
-                Err(err) => warn!(error = %err, channel = %channel, "api-gateway Redis config sync failed"),
+                Ok(()) => {
+                    warn!(channel = %channel, "api-gateway Redis config sync ended; reconnecting")
+                }
+                Err(err) => {
+                    warn!(error = %err, channel = %channel, "api-gateway Redis config sync failed")
+                }
             }
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
