@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -51,6 +52,10 @@ type TenantRow = (
     i32,
     Option<DateTime<Utc>>,
 );
+
+pub fn reload_interval() -> Duration {
+    Duration::from_secs(60)
+}
 
 impl TenantRegistry {
     pub fn new(db: PgPool) -> Arc<Self> {
