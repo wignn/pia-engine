@@ -28,12 +28,6 @@ impl Config {
         let token = env::var("TOKEN").map_err(|_| "TOKEN not configured in .env")?;
         let client_id = env::var("CLIENT_ID").map_err(|_| "CLIENT_ID not configured in .env")?;
         let api_key = env::var("API_KEY").map_err(|_| "API_KEY not configured in .env")?;
-        let valid_key = api_key
-            .strip_prefix("wi_live_")
-            .is_some_and(|key| key.len() == 48 && key.bytes().all(|byte| byte.is_ascii_hexdigit()));
-        if !valid_key {
-            return Err("API_KEY must match wi_live_<48 hex characters>".into());
-        }
         let realtime_ws_url = normalize_ws_url(
             env::var("REALTIME_GATEWAY_WS_URL")
                 .or_else(|_| env::var("realtime_ws_url"))
