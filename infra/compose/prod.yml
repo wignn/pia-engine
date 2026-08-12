@@ -155,6 +155,9 @@ services:
         - DOCKER_BUILD_TYPE=release
     env_file:
       - ../env/.env.market-data
+    environment:
+      EVENTBUS_MODE: nats
+      NATS_URL: nats://nats:4222
     depends_on:
       postgres:
         condition: service_healthy
@@ -182,6 +185,9 @@ services:
         - DOCKER_BUILD_TYPE=release
     env_file:
       - ../env/.env.realtime-gateway
+    environment:
+      EVENTBUS_MODE: nats
+      NATS_URL: nats://nats:4222
     ports:
       - "${REALTIME_GATEWAY_PORT:-8020}:8020"
     depends_on:
@@ -227,6 +233,9 @@ services:
         - DOCKER_BUILD_TYPE=release
     env_file:
       - ../env/.env.news-service
+    environment:
+      EVENTBUS_MODE: nats
+      NATS_URL: nats://nats:4222
     depends_on:
       postgres:
         condition: service_healthy

@@ -59,16 +59,17 @@ pub fn update_tick(data: &MarketTickData) -> CachedPrice {
 }
 
 fn update_cached_price(symbol: &str, price: f64, asset_type: &str) -> CachedPrice {
+    let symbol = normalize_symbol(symbol);
     let mut cache = PRICE_CACHE.write();
 
-    let old_price = cache.get(symbol).map(|c| c.price).unwrap_or(price);
+    let old_price = cache.get(&symbol).map(|c| c.price).unwrap_or(price);
     let direction = if price > old_price {
         "buy".to_string()
     } else if price < old_price {
         "sell".to_string()
     } else {
         cache
-            .get(symbol)
+            .get(&symbol)
             .map(|c| c.direction.clone())
             .unwrap_or_else(|| "none".to_string())
     };
@@ -98,8 +99,7 @@ fn update_cached_price(symbol: &str, price: f64, asset_type: &str) -> CachedPric
 
 pub fn get_price(symbol: &str) -> Option<CachedPrice> {
     let cache = PRICE_CACHE.read();
-    let upper = symbol.to_uppercase();
-    cache.get(&upper).cloned()
+    cache.get(&normalize_symbol(symbol)).cloned()
 }
 
 pub fn get_all_prices() -> Vec<CachedPrice> {
@@ -109,6 +109,10 @@ pub fn get_all_prices() -> Vec<CachedPrice> {
 
 pub fn get_xauusd_display() -> Option<String> {
     get_price("XAUUSD").map(|p| format!("XAUUSD ${:.2}", p.price))
+}
+
+fn normalize_symbol(symbol: &str) -> String {
+    symbol.trim().to_uppercase().replace(['/', '-', '_'], "")
 }
 
 fn infer_asset_type(symbol: &str) -> &'static str {
@@ -123,7 +127,7 @@ fn infer_asset_type(symbol: &str) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{MarketTickData, MarketTradeEvent, update_price, update_tick};
+    use super::{MarketTickData, MarketTradeEvent, get_xauusd_display, update_price, update_tick};
 
     #[test]
     fn parses_gateway_market_trade_without_asset_type() {
@@ -145,5 +149,16 @@ mod tests {
         let cached = update_tick(&tick);
         assert_eq!(cached.asset_type, "forex");
         assert_eq!(cached.price_str, "1.08257");
+    }
+
+    #[test]
+    fn normalizes_xauusd_provider_symbol_for_presence() {
+        let event: MarketTradeEvent = serde_json::from_str(
+            r#"{"event":"market.trade","data":{"tick":{"symbol":"XAU/USD","price":2412.5}}}"#,
+        )
+        .unwrap();
+        let cached = update_price(&event.data.unwrap().tick);
+        assert_eq!(cached.symbol, "XAUUSD");
+        assert_eq!(get_xauusd_display(), Some("XAUUSD $2412.50".to_string()));
     }
 }
