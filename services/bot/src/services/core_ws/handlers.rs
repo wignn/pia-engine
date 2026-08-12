@@ -14,7 +14,11 @@ impl RealtimeWsService {
         text: &str,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let payload: serde_json::Value = serde_json::from_str(text)?;
-        if payload.get("event").and_then(serde_json::Value::as_str).is_none() {
+        if payload
+            .get("event")
+            .and_then(serde_json::Value::as_str)
+            .is_none()
+        {
             return Ok(());
         }
 
