@@ -235,20 +235,20 @@ services:
     networks:
       - private
 
-  portal:
-    container_name: portal
-    image: wign/atlsd-portal
+  pia:
+    container_name: pia
+    image: wign/atlsd-pia
     build:
       context: ../..
-      dockerfile: infra/docker/Dockerfile.portal
+      dockerfile: infra/docker/Dockerfile.pia
       args:
-        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8081/api/v1}
-        VITE_CORE_API_BASE: ${VITE_CORE_API_BASE:-http://localhost:8000}
-        VITE_CORE_WS_BASE: ${VITE_CORE_WS_BASE:-ws://localhost:8020}
+        CONTROL_PLANE_INTERNAL_URL: http://control-plane:8080
     env_file:
-      - ../env/.env.portal
+      - ../env/.env.pia
+    environment:
+      CONTROL_PLANE_INTERNAL_URL: http://control-plane:8080
     ports:
-      - "${PORTAL_PORT:-5173}:80"
+      - "${PIA_PORT:-5174}:3000"
     depends_on:
       control-plane:
         condition: service_started

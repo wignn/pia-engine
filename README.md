@@ -303,7 +303,7 @@ Compose reads env files from `infra/env/`. Local env files are intentionally not
 | `.env.control-plane` | SaaS control plane |
 | `.env.ingestion` | Ingestion gateway |
 | `.env.bot` | Discord bot |
-| `.env.portal` | Public/admin frontend image build/runtime |
+| `.env.pia` | PIA frontend image build/runtime |
 | `.env.rsshub` | RSSHub |
 | `.env.analyze` | Python analyzer |
 

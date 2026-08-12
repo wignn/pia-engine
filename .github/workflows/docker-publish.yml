@@ -120,9 +120,9 @@ jobs:
               - 'Cargo.lock'
               - '.dockerignore'
               - 'infra/docker/Dockerfile.intelligence-service'
-            portal:
+            pia:
               - 'apps/pia/**'
-              - 'infra/docker/Dockerfile.portal'
+              - 'infra/docker/Dockerfile.pia'
               - '.dockerignore'
             public_web:
               - 'apps/public-web/**'
@@ -143,7 +143,7 @@ jobs:
           REALTIME_GATEWAY_CHANGED: ${{ steps.filter.outputs.realtime_gateway }}
           NEWS_SERVICE_CHANGED: ${{ steps.filter.outputs.news_service }}
           INTELLIGENCE_SERVICE_CHANGED: ${{ steps.filter.outputs.intelligence_service }}
-          PORTAL_CHANGED: ${{ steps.filter.outputs.portal }}
+          PIA_CHANGED: ${{ steps.filter.outputs.pia }}
           PUBLIC_WEB_CHANGED: ${{ steps.filter.outputs.public_web }}
         run: |
           json='{"include":['
@@ -190,8 +190,8 @@ jobs:
             add '{"image":"atlsd-intelligence-service","dockerfile":"infra/docker/Dockerfile.intelligence-service"}'
           fi
 
-          if [[ "$BUILD_ALL" == "true" || "$PORTAL_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-portal","dockerfile":"infra/docker/Dockerfile.portal"}'
+          if [[ "$BUILD_ALL" == "true" || "$PIA_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-pia","dockerfile":"infra/docker/Dockerfile.pia"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$PUBLIC_WEB_CHANGED" == "true" ]]; then

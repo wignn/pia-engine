@@ -348,15 +348,15 @@ services:
     networks:
       - private
   
-  portal:
-    container_name: portal
-    image: wign/atlsd-portal:latest
+  pia:
+    container_name: pia
+    image: wign/atlsd-pia:latest
     env_file:
-      - ../env/.env.portal
+      - ../env/.env.pia
     environment:
       CONTROL_PLANE_INTERNAL_URL: http://control-plane:8080
     ports:
-      - "${PORTAL_PORT:-5174}:3000"
+      - "${PIA_PORT:-5174}:3000"
     depends_on:
       control-plane:
         condition: service_started
