@@ -13,7 +13,12 @@ impl RealtimeWsService {
         &self,
         text: &str,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let event: CoreEvent = serde_json::from_str(text)?;
+        let payload: serde_json::Value = serde_json::from_str(text)?;
+        if payload.get("event").and_then(serde_json::Value::as_str).is_none() {
+            return Ok(());
+        }
+
+        let event: CoreEvent = serde_json::from_value(payload)?;
 
         match event.event.as_str() {
             "tick" => self.handle_market_tick(&event).await,

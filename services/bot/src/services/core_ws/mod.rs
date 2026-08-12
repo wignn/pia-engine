@@ -65,8 +65,16 @@ impl RealtimeWsService {
         println!("[OK] Realtime WebSocket connected!");
 
         let subscription = serde_json::json!({
-            "action": "subscribe",
-            "channels": ["market_prices", "news_feed"]
+            "method": "SUBSCRIBE",
+            "params": [
+                "market_data",
+                "forex_news",
+                "stock_news",
+                "calendar",
+                "volatility",
+                "x"
+            ],
+            "id": "bot-subscribe"
         });
         write.send(Message::Text(subscription.to_string())).await?;
 
