@@ -2,11 +2,11 @@ FROM node:22-alpine AS deps
 
 WORKDIR /app
 
-COPY apps/pia/package.json apps/pia/package-lock.json ./apps/pia/
+COPY apps/pia/package.json ./apps/pia/
 
 WORKDIR /app/apps/pia
 
-RUN npm ci
+RUN npm install
 
 FROM node:22-alpine AS builder
 
@@ -37,10 +37,13 @@ RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
 
 COPY --from=builder --chown=nextjs:nodejs \
-    /app/apps/pia/.next/standalone ./
+    /app/apps/pia/.next ./apps/pia/.next
 
 COPY --from=builder --chown=nextjs:nodejs \
-    /app/apps/pia/.next/static ./apps/pia/.next/static
+    /app/apps/pia/node_modules ./apps/pia/node_modules
+
+COPY --from=builder --chown=nextjs:nodejs \
+    /app/apps/pia/package.json ./apps/pia/package.json
 
 COPY --from=builder --chown=nextjs:nodejs \
     /app/apps/pia/public ./apps/pia/public
@@ -53,4 +56,5 @@ ENV PORT=3000
 
 ENV HOSTNAME=0.0.0.0
 
-CMD ["node", "apps/pia/server.js"]
+WORKDIR /app/apps/pia
+CMD ["npm", "run", "start"]
