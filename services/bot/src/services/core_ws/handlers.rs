@@ -4,7 +4,7 @@ use crate::repository::{
 use poise::serenity_prelude::{ChannelId, CreateEmbed, CreateEmbedFooter, CreateMessage};
 
 use super::RealtimeWsService;
-use super::embed::build_embed;
+use super::embed::{build_article_embed, build_embed};
 use super::types::{ArticleData, CalendarEventData, CoreEvent, DiscordEmbed, TweetData};
 use crate::services::market_ws::{MarketTickData, update_tick};
 
@@ -26,8 +26,14 @@ impl RealtimeWsService {
 
         match event.event.as_str() {
             "tick" => self.handle_market_tick(&event).await,
-            "news.new" | "news.high_impact" => self.handle_news_event(&event).await?,
-            "stock.news.new" | "stock.news.high_impact" | "equity.news.new" => {
+            "news.new" | "news.high_impact" | "forex_news.new" | "forex_news.high_impact" => {
+                self.handle_news_event(&event).await?;
+            }
+            "stock.news.new"
+            | "stock.news.high_impact"
+            | "stock_news.new"
+            | "stock_news.high_impact"
+            | "equity.news.new" => {
                 self.handle_stock_news_event(&event).await?;
             }
             "calendar.reminder" => self.handle_calendar_event(&event).await?,
@@ -87,8 +93,11 @@ impl RealtimeWsService {
         let data = event.data.as_ref().ok_or("No data in event")?;
         let article: ArticleData =
             serde_json::from_value(data.get("article").cloned().ok_or("No article")?)?;
-        let discord_embed: DiscordEmbed =
-            serde_json::from_value(data.get("discord_embed").cloned().ok_or("No embed")?)?;
+        let embed = data
+            .get("discord_embed")
+            .and_then(|value| serde_json::from_value::<DiscordEmbed>(value.clone()).ok())
+            .map(|value| build_embed(&value))
+            .unwrap_or_else(|| build_article_embed(&article));
 
         if ForexRepository::is_news_sent(&self.db, &article.id).await? {
             return Ok(());
@@ -98,8 +107,10 @@ impl RealtimeWsService {
             return Ok(());
         }
 
-        let embed = build_embed(&discord_embed);
-        let is_high_impact = event.event == "news.high_impact";
+        let is_high_impact = matches!(
+            event.event.as_str(),
+            "news.high_impact" | "forex_news.high_impact"
+        );
         let mention = data
             .get("mention_everyone")
             .and_then(|v| v.as_bool())
@@ -135,8 +146,11 @@ impl RealtimeWsService {
         let data = event.data.as_ref().ok_or("No data")?;
         let article: ArticleData =
             serde_json::from_value(data.get("article").cloned().ok_or("No article")?)?;
-        let discord_embed: DiscordEmbed =
-            serde_json::from_value(data.get("discord_embed").cloned().ok_or("No embed")?)?;
+        let embed = data
+            .get("discord_embed")
+            .and_then(|value| serde_json::from_value::<DiscordEmbed>(value.clone()).ok())
+            .map(|value| build_embed(&value))
+            .unwrap_or_else(|| build_article_embed(&article));
 
         if StockRepository::is_stock_news_sent(&self.db, &article.id).await? {
             return Ok(());
@@ -146,8 +160,10 @@ impl RealtimeWsService {
             return Ok(());
         }
 
-        let embed = build_embed(&discord_embed);
-        let is_high_impact = event.event == "stock.news.high_impact";
+        let is_high_impact = matches!(
+            event.event.as_str(),
+            "stock.news.high_impact" | "stock_news.high_impact"
+        );
 
         for channel in &channels {
             let channel_id = ChannelId::new(channel.channel_id as u64);

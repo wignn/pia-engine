@@ -13,14 +13,14 @@ pub struct MarketTradeEvent {
 #[derive(Debug, Clone, Deserialize)]
 pub struct MarketTradeDataWrapper {
     pub tick: MarketTradeData,
-    pub asset_type: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct MarketTradeData {
     pub symbol: String,
     pub price: f64,
-    pub asset_type: String,
+    #[serde(default)]
+    pub asset_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -46,7 +46,11 @@ static PRICE_CACHE: Lazy<Arc<RwLock<HashMap<String, CachedPrice>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 pub fn update_price(data: &MarketTradeData) -> CachedPrice {
-    update_cached_price(&data.symbol, data.price, &data.asset_type)
+    let asset_type = data
+        .asset_type
+        .as_deref()
+        .unwrap_or_else(|| infer_asset_type(&data.symbol));
+    update_cached_price(&data.symbol, data.price, asset_type)
 }
 
 pub fn update_tick(data: &MarketTickData) -> CachedPrice {
@@ -119,7 +123,18 @@ fn infer_asset_type(symbol: &str) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{MarketTickData, update_tick};
+    use super::{MarketTickData, MarketTradeEvent, update_price, update_tick};
+
+    #[test]
+    fn parses_gateway_market_trade_without_asset_type() {
+        let event: MarketTradeEvent = serde_json::from_str(
+            r#"{"event":"market.trade","data":{"tick":{"symbol":"EURUSD","price":1.0825,"source":"market_data"}}}"#,
+        )
+        .unwrap();
+        let cached = update_price(&event.data.unwrap().tick);
+        assert_eq!(cached.symbol, "EURUSD");
+        assert_eq!(cached.asset_type, "forex");
+    }
 
     #[test]
     fn parses_new_tick_and_formats_price() {

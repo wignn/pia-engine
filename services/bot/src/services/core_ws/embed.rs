@@ -33,3 +33,14 @@ pub fn build_embed(de: &DiscordEmbed) -> CreateEmbed {
     }
     embed
 }
+
+pub fn build_article_embed(article: &super::types::ArticleData) -> CreateEmbed {
+    let mut embed = CreateEmbed::new().title(&article.title);
+    if let Some(summary) = &article.summary {
+        embed = embed.description(summary);
+    }
+    if let Some(url) = &article.original_url {
+        embed = embed.url(url);
+    }
+    embed.field("Source", &article.source_name, true)
+}

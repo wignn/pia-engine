@@ -19,8 +19,8 @@ pub struct ArticleData {
     pub summary: Option<String>,
     pub summary_id: Option<String>,
     pub source_name: String,
-    #[serde(alias = "url")]
-    pub original_url: String,
+    #[serde(alias = "url", default)]
+    pub original_url: Option<String>,
     pub sentiment: Option<String>,
     pub impact_level: Option<String>,
     #[serde(default)]
@@ -83,4 +83,20 @@ pub struct TweetData {
     pub url: String,
     #[serde(default)]
     pub media_urls: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ArticleData;
+
+    #[test]
+    fn parses_news_service_article_without_embed_or_url() {
+        let article: ArticleData = serde_json::from_str(
+            r#"{"id":"article-1","title":"Headline","summary":"Summary","source_name":"Wire","impact_level":"high"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(article.title, "Headline");
+        assert_eq!(article.original_url, None);
+    }
 }
