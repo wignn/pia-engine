@@ -121,7 +121,7 @@ jobs:
               - '.dockerignore'
               - 'infra/docker/Dockerfile.intelligence-service'
             portal:
-              - 'apps/portal/**'
+              - 'apps/pia/**'
               - 'infra/docker/Dockerfile.portal'
               - '.dockerignore'
             public_web:

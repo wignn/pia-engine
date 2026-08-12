@@ -353,8 +353,10 @@ services:
     image: wign/atlsd-portal:latest
     env_file:
       - ../env/.env.portal
+    environment:
+      CONTROL_PLANE_INTERNAL_URL: http://control-plane:8080
     ports:
-      - "${PORTAL_PORT:-5174}:5174"
+      - "${PORTAL_PORT:-5174}:3000"
     depends_on:
       control-plane:
         condition: service_started
