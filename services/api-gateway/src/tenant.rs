@@ -142,6 +142,41 @@ impl TenantRegistry {
         }
     }
 
+    pub async fn run_reload_loop(self: Arc<Self>) {
+        let mut interval = tokio::time::interval(reload_interval());
+        loop {
+            interval.tick().await;
+            self.reload().await;
+        }
+    }
+
+    pub async fn run_redis_sync_loop(self: Arc<Self>, redis_url: String, prefix: String) {
+        let channel = format!("{prefix}:tenant:config_changed");
+        loop {
+            match self.subscribe_redis(&redis_url, &channel).await {
+                Ok(()) => warn!(channel = %channel, "api-gateway Redis config sync ended; reconnecting"),
+                Err(err) => warn!(error = %err, channel = %channel, "api-gateway Redis config sync failed"),
+            }
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        }
+    }
+
+    async fn subscribe_redis(&self, redis_url: &str, channel: &str) -> anyhow::Result<()> {
+        use futures_util::StreamExt;
+
+        let client = redis::Client::open(redis_url)?;
+        let mut pubsub = client.get_async_pubsub().await?;
+        pubsub.subscribe(channel).await?;
+        info!(channel = %channel, "api-gateway subscribed to tenant config sync");
+
+        while let Some(message) = pubsub.on_message().next().await {
+            let _: String = message.get_payload()?;
+            self.reload().await;
+        }
+
+        Ok(())
+    }
+
     pub async fn validate_key(&self, raw_key: &str) -> Option<TenantContext> {
         let hash = hash_key(raw_key);
         let cached = self.keys.read().await.get(&hash).cloned()?;

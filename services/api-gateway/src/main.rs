@@ -45,6 +45,23 @@ async fn main() {
 
     let tenant_registry = TenantRegistry::new(pool.clone());
     tenant_registry.reload().await;
+
+    let reload_registry = tenant_registry.clone();
+    tokio::spawn(async move {
+        reload_registry.run_reload_loop().await;
+    });
+
+    if cfg.has_redis() {
+        let sync_registry = tenant_registry.clone();
+        let redis_url = cfg.redis_url.clone();
+        let prefix = atlsd_common::config::get_env("REDIS_CHANNEL_PREFIX", "world-info");
+        tokio::spawn(async move {
+            sync_registry.run_redis_sync_loop(redis_url, prefix).await;
+        });
+    } else {
+        warn!("api-gateway Redis config sync disabled; REDIS_URL is empty");
+    }
+
     let usage_tracker = std::sync::Arc::new(UsageTracker::new(pool.clone(), redis_client));
     let http = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
