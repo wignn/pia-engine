@@ -12,7 +12,6 @@ pub struct CoreEvent {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ArticleData {
     pub id: String,
-    #[serde(alias = "original_title")]
     pub title: String,
     #[serde(alias = "translated_title")]
     pub title_id: Option<String>,
