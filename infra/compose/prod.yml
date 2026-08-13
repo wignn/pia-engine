@@ -71,6 +71,26 @@ services:
     networks:
       - private
 
+  social-worker:
+    container_name: social-worker
+    image: wign/atlsd-social-worker:latest
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.social-worker
+    env_file:
+      - ../env/.env.social-worker
+    environment:
+      TWITTER_DB: /data/accounts.db
+      NATS_URL: nats://nats:4222
+    volumes:
+      - social_worker_data:/data
+    depends_on:
+      nats:
+        condition: service_started
+    restart: always
+    networks:
+      - private
+
   db-migrate:
     image: postgres:16-alpine
     container_name: db-migrate
@@ -402,3 +422,4 @@ volumes:
   clickhouse_data:
   redis_data:
   bot_data:
+  social_worker_data:

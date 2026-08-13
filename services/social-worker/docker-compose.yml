@@ -1,0 +1,18 @@
+services:
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js"]
+    restart: unless-stopped
+
+  worker:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - nats
+    env_file:
+      - .env
+    environment:
+      TWITTER_DB: /data/accounts.db
+      NATS_URL: nats://nats:4222
+    volumes:
+      - ./data:/data

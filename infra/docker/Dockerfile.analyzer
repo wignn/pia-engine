@@ -2,19 +2,15 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install python packages
 COPY services/analyzer/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-# Copy the source code
 COPY services/analyzer/ .
 
-# Pre-download model weights during image building to ensure offline-ready container and fast start times
 RUN python -c "from transformers import BertTokenizer, BertForSequenceClassification; \
                BertTokenizer.from_pretrained('yiyanghkust/finbert-tone'); \
                BertForSequenceClassification.from_pretrained('yiyanghkust/finbert-tone')"

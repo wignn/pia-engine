@@ -128,6 +128,10 @@ jobs:
               - 'apps/public-web/**'
               - 'infra/docker/Dockerfile.public-web'
               - '.dockerignore'
+            social_worker:
+              - 'services/social-worker/**'
+              - 'infra/docker/Dockerfile.social-worker'
+              - '.dockerignore'
 
       - name: Build Docker matrix
         id: matrix
@@ -145,6 +149,7 @@ jobs:
           INTELLIGENCE_SERVICE_CHANGED: ${{ steps.filter.outputs.intelligence_service }}
           PIA_CHANGED: ${{ steps.filter.outputs.pia }}
           PUBLIC_WEB_CHANGED: ${{ steps.filter.outputs.public_web }}
+          SOCIAL_WORKER_CHANGED: ${{ steps.filter.outputs.social_worker }}
         run: |
           json='{"include":['
           sep=''
@@ -196,6 +201,10 @@ jobs:
 
           if [[ "$BUILD_ALL" == "true" || "$PUBLIC_WEB_CHANGED" == "true" ]]; then
             add '{"image":"atlsd-public-web","dockerfile":"infra/docker/Dockerfile.public-web"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$SOCIAL_WORKER_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-social-worker","dockerfile":"infra/docker/Dockerfile.social-worker"}'
           fi
           json="${json}]}";
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
