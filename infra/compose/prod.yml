@@ -206,6 +206,11 @@ services:
   bot:
     container_name: bot
     image: wign/atlsd-bot:latest
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.bot
+      args:
+        - DOCKER_BUILD_TYPE=release
     env_file:
       - ../env/.env.bot
     environment:

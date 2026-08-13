@@ -68,12 +68,10 @@ impl TwitterRepository {
             }),
         )
     }
-
     pub async fn is_tweet_sent(pool: &SqlitePool, tweet_id: &str) -> Result<bool, sqlx::Error> {
         let prefixed_id = format!("tweet_{}", tweet_id);
         sent_item::exists(pool, &prefixed_id).await
     }
-
     pub async fn insert_tweet(
         pool: &SqlitePool,
         tweet_id: &str,
