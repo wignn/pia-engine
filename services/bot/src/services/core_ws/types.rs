@@ -13,12 +13,11 @@ pub struct CoreEvent {
 pub struct ArticleData {
     pub id: String,
     pub title: String,
-    #[serde(alias = "translated_title")]
     pub title_id: Option<String>,
     pub summary: Option<String>,
     pub summary_id: Option<String>,
     pub source_name: String,
-    #[serde(alias = "url", default)]
+    #[serde(default)]
     pub original_url: Option<String>,
     pub sentiment: Option<String>,
     pub impact_level: Option<String>,
@@ -27,6 +26,24 @@ pub struct ArticleData {
     pub published_at: Option<String>,
     pub processed_at: Option<String>,
     pub image_url: Option<String>,
+}
+
+impl ArticleData {
+    pub fn from_value(mut value: serde_json::Value) -> Result<Self, serde_json::Error> {
+        if let Some(object) = value.as_object_mut() {
+            if object.contains_key("title_id") {
+                object.remove("translated_title");
+            } else if let Some(title_id) = object.remove("translated_title") {
+                object.insert("title_id".to_string(), title_id);
+            }
+            if object.contains_key("original_url") {
+                object.remove("url");
+            } else if let Some(url) = object.remove("url") {
+                object.insert("original_url".to_string(), url);
+            }
+        }
+        serde_json::from_value(value)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -90,12 +107,22 @@ mod tests {
 
     #[test]
     fn parses_news_service_article_without_embed_or_url() {
-        let article: ArticleData = serde_json::from_str(
-            r#"{"id":"article-1","title":"Headline","summary":"Summary","source_name":"Wire","impact_level":"high"}"#,
-        )
+        let article = ArticleData::from_value(serde_json::json!({
+            "id": "article-1",
+            "title": "Headline",
+            "original_title": "Original",
+            "url": "https://example.test",
+            "original_url": "https://example.test",
+            "summary": "Summary",
+            "source_name": "Wire",
+            "impact_level": "high"
+        }))
         .unwrap();
 
         assert_eq!(article.title, "Headline");
-        assert_eq!(article.original_url, None);
+        assert_eq!(
+            article.original_url.as_deref(),
+            Some("https://example.test")
+        );
     }
 }

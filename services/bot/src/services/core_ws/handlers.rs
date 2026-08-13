@@ -91,8 +91,7 @@ impl RealtimeWsService {
         event: &CoreEvent,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let data = event.data.as_ref().ok_or("No data in event")?;
-        let article: ArticleData =
-            serde_json::from_value(data.get("article").cloned().ok_or("No article")?)?;
+        let article = ArticleData::from_value(data.get("article").cloned().ok_or("No article")?)?;
         let embed = data
             .get("discord_embed")
             .and_then(|value| serde_json::from_value::<DiscordEmbed>(value.clone()).ok())
@@ -144,8 +143,7 @@ impl RealtimeWsService {
         event: &CoreEvent,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let data = event.data.as_ref().ok_or("No data")?;
-        let article: ArticleData =
-            serde_json::from_value(data.get("article").cloned().ok_or("No article")?)?;
+        let article = ArticleData::from_value(data.get("article").cloned().ok_or("No article")?)?;
         let embed = data
             .get("discord_embed")
             .and_then(|value| serde_json::from_value::<DiscordEmbed>(value.clone()).ok())
