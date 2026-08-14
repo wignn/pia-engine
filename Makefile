@@ -20,7 +20,7 @@ up:
 	cd $(INFRA_DIR) && $(COMPOSE) up -d
 
 down:
-	cd $(INFRA_DIR) && $(COMPOSE) down -v
+	cd $(INFRA_DIR) && $(COMPOSE) down
 
 restart: down up
 
