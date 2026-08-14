@@ -382,21 +382,21 @@ services:
     networks:
       - private
   
-  pia:
-    container_name: pia
-    image: wign/atlsd-pia:latest
-    env_file:
-      - ../env/.env.pia
-    environment:
-      CONTROL_PLANE_INTERNAL_URL: http://control-plane:8080
-    ports:
-      - "${PIA_PORT:-5175}:3000"
-    depends_on:
-      control-plane:
-        condition: service_started
-    restart: unless-stopped
-    networks:
-      - private
+  # pia:
+  #   container_name: pia
+  #   image: wign/atlsd-pia:latest
+  #   env_file:
+  #     - ../env/.env.pia
+  #   environment:
+  #     CONTROL_PLANE_INTERNAL_URL: http://control-plane:8080
+  #   ports:
+  #     - "${PIA_PORT:-5175}:3000"
+  #   depends_on:
+  #     control-plane:
+  #       condition: service_started
+  #   restart: unless-stopped
+  #   networks:
+  #     - private
 
   public-web:
     image: wign/atlsd-public-web:latest
