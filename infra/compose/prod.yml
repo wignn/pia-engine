@@ -403,6 +403,9 @@ services:
     env_file:
       - ../env/.env.public-web
     container_name: atlsd-public-web
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.public-web
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
