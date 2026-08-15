@@ -7,6 +7,7 @@ members = [    "services/control-plane",
     "services/news-service",
     "services/intelligence-service",
     "services/bot",
+    "services/scrapy",
     "crates/*"
 ]
 resolver = "2"

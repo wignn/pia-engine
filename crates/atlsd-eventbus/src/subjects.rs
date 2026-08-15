@@ -11,6 +11,12 @@ pub const MARKET_OPTIONS_SUMMARY_V1: &str = "market.options.summary";
 pub const MARKET_OPTIONS_CHAIN_V1: &str = "market.options.chain";
 pub const NEWS_FOREX_PROCESSED_V1: &str = "news.forex.processed.v1";
 pub const NEWS_STOCK_PROCESSED_V1: &str = "news.stock.processed.v1";
+pub const SOCIAL_POSTS: &str = "social.posts";
+
+// scrapy worker contract: news-service publishes fetch jobs, scrapy returns
+// extracted article content. Plain subjects (scrapy owns the JetStream streams).
+pub const SCRAPE_JOBS: &str = "scrape.jobs";
+pub const SCRAPE_RESULTS: &str = "scrape.results";
 
 pub const TENANT_CONFIG_CHANGED_V1: &str = "tenant.config.changed.v1";
 pub const USAGE_API_REQUESTED_V1: &str = "usage.api.requested.v1";

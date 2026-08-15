@@ -5,6 +5,7 @@ pub mod r#macro;
 mod persistence;
 mod rss;
 mod scheduler;
+pub mod scrape;
 mod sources;
 mod text;
 

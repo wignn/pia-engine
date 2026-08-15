@@ -50,6 +50,13 @@ async fn main() {
         realtime::run(realtime_cfg, realtime_pool).await;
     });
 
+    // Backfill full article text from scrapy results (scrape.results → original_content).
+    let scrape_cfg = cfg.clone();
+    let scrape_pool = pool.clone();
+    tokio::spawn(async move {
+        pipeline::scrape::run_consumer(scrape_cfg, scrape_pool).await;
+    });
+
     let sec_cfg = cfg.clone();
     let sec_pool = pool.clone();
     tokio::spawn(async move {

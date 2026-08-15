@@ -2,6 +2,8 @@ use sqlx::PgPool;
 use tokio::time::{self, Duration};
 use tracing::{error, info, warn};
 
+use atlsd_eventbus::EventBusMode;
+
 use crate::config::Config;
 
 use super::analysis::AnalyzerClient;
@@ -9,6 +11,7 @@ use super::finnhub;
 use super::fred;
 use super::persistence;
 use super::rss::RssClient;
+use super::scrape;
 use super::sources;
 
 pub async fn run(cfg: Config, pool: PgPool) {
@@ -18,6 +21,21 @@ pub async fn run(cfg: Config, pool: PgPool) {
             error!(error = %err, "failed to create RSS client");
             return;
         }
+    };
+
+    let scrape_client = if matches!(
+        EventBusMode::from_env_value(&cfg.eventbus_mode),
+        EventBusMode::Nats | EventBusMode::Dual
+    ) {
+        match scrape::connect_publisher(&cfg.nats_url).await {
+            Ok(client) => Some(client),
+            Err(err) => {
+                warn!(error = %err, "scrape job publisher disabled; NATS unavailable");
+                None
+            }
+        }
+    } else {
+        None
     };
     let analyzer = AnalyzerClient::new(rss_client.http_client(), cfg.ai_service_url.clone());
     if let Some(token) = cfg.finnhub_api_key.clone() {
@@ -51,16 +69,21 @@ pub async fn run(cfg: Config, pool: PgPool) {
         "news ingestion pipeline running"
     );
 
-    run_once(&pool, &rss_client, &analyzer).await;
+    run_once(&pool, &rss_client, &analyzer, scrape_client.as_deref()).await;
 
     let mut interval = time::interval(Duration::from_secs(cfg.rss_fetch_sec));
     loop {
         interval.tick().await;
-        run_once(&pool, &rss_client, &analyzer).await;
+        run_once(&pool, &rss_client, &analyzer, scrape_client.as_deref()).await;
     }
 }
 
-async fn run_once(pool: &PgPool, rss_client: &RssClient, analyzer: &AnalyzerClient) {
+async fn run_once(
+    pool: &PgPool,
+    rss_client: &RssClient,
+    analyzer: &AnalyzerClient,
+    scrape_client: Option<&async_nats::jetstream::Context>,
+) {
     let sources = match sources::due_sources(pool).await {
         Ok(sources) => sources,
         Err(err) => {
@@ -70,7 +93,7 @@ async fn run_once(pool: &PgPool, rss_client: &RssClient, analyzer: &AnalyzerClie
     };
 
     for source in sources {
-        match poll_source(pool, rss_client, analyzer, &source).await {
+        match poll_source(pool, rss_client, analyzer, scrape_client, &source).await {
             Ok(inserted) => info!(source = %source.name, inserted, "news source polled"),
             Err(err) => warn!(source = %source.name, error = %err, "news source poll failed"),
         }
@@ -81,6 +104,7 @@ async fn poll_source(
     pool: &PgPool,
     rss_client: &RssClient,
     analyzer: &AnalyzerClient,
+    scrape_client: Option<&async_nats::jetstream::Context>,
     source: &sources::NewsSource,
 ) -> anyhow::Result<usize> {
     let result = rss_client.fetch(source).await?;
@@ -99,7 +123,20 @@ async fn poll_source(
     let mut inserted = 0usize;
     for article in result.articles {
         let analysis = analyzer.analyze(&article).await;
-        inserted += persistence::insert_forex_article(pool, source, &article, &analysis).await?;
+        let rows = persistence::insert_forex_article(pool, source, &article, &analysis).await?;
+        inserted += rows;
+        // Only chase full text for newly-inserted rows scrapy can actually handle.
+        if rows > 0 {
+            if let Some(client) = scrape_client {
+                if scrape::is_supported(&article.url) {
+                    if let Err(err) =
+                        scrape::publish_job(client, &article.content_hash, &article.url).await
+                    {
+                        warn!(error = %err, url = %article.url, "failed to publish scrape job");
+                    }
+                }
+            }
+        }
     }
 
     sources::record_success(pool, source, result.status, result.latency_ms).await?;

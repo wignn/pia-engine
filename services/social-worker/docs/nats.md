@@ -3,19 +3,21 @@
 ## Jalur data
 
 ```text
-X/twscrape -> PollingWorker -> NATS subject -> subscriber
+X/twscrape -> PollingWorker -> NATS subject -> realtime-gateway -> WebSocket clients
+
+The worker publishes to `social.posts`; realtime-gateway broadcasts Twitter records as `x.post` on channel `x` and other platform records as `social.post` on channel `social`.
 ```
 
-Worker mengambil postingan terbaru dari username di `TWITTER_ACCOUNTS`, lalu mempublish hanya tweet baru ke subject `NATS_SUBJECT`.
+Worker mengambil postingan terbaru dari akun di `SOCIAL_ACCOUNTS`, lalu mempublish hanya posting baru ke subject `NATS_SUBJECT`. `TWITTER_ACCOUNTS` masih didukung sebagai fallback legacy.
 
 ## Jalankan lokal
 
 ```powershell
 pip install -r requirements.txt
-$env:TWITTER_ACCOUNTS = "akun_a,akun_b"
+$env:SOCIAL_ACCOUNTS = "twitter:akun_a,twitter:akun_b"
 $env:TWITTER_DB = "accounts.db"
 $env:NATS_URL = "nats://127.0.0.1:4222"
-$env:NATS_SUBJECT = "twitter.tweets"
+$env:NATS_SUBJECT = "social.posts"
 python run_worker.py
 ```
 
@@ -70,7 +72,7 @@ async def main():
         tweet = json.loads(message.data)
         print(tweet["source_account"], tweet["text"])
 
-    await nc.subscribe("twitter.tweets", cb=handle)
+    await nc.subscribe("social.posts", cb=handle)
     try:
         await asyncio.Event().wait()
     finally:
@@ -89,12 +91,12 @@ pip install nats-py
 
 | Variable | Default | Fungsi |
 |---|---|---|
-| `TWITTER_ACCOUNTS` | wajib | Username dipisahkan koma |
+| `SOCIAL_ACCOUNTS` | wajib | Akun `platform:username` dipisahkan koma |
 | `TWITTER_POLL_SECONDS` | `60` | Interval polling |
 | `TWITTER_TWEET_LIMIT` | `20` | Limit per akun per siklus |
 | `TWITTER_DB` | `accounts.db` | Database session twscrape |
 | `NATS_URL` | `nats://127.0.0.1:4222` | Alamat NATS |
-| `NATS_SUBJECT` | `twitter.tweets` | Subject publish |
+| `NATS_SUBJECT` | `social.posts` | Core NATS subject consumed by realtime-gateway |
 | `NATS_CREDS` | kosong | Credential file opsional |
 
 ## Reliability

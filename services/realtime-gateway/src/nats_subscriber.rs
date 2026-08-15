@@ -13,6 +13,7 @@ const SUBJECTS: &[&str] = &[
     subjects::MARKET_ALERTS_V1,
     subjects::NEWS_FOREX_PROCESSED_V1,
     subjects::NEWS_STOCK_PROCESSED_V1,
+    subjects::SOCIAL_POSTS,
 ];
 
 pub async fn run(cfg: Config, hub: Arc<Hub>) {
@@ -50,6 +51,7 @@ async fn subscribe_loop(nats_url: &str, hub: &Arc<Hub>) -> anyhow::Result<()> {
             subjects::NEWS_STOCK_PROCESSED_V1 => {
                 broadcast_news(hub, "stock.news.new", payload, "stock_news").await
             }
+            subjects::SOCIAL_POSTS => broadcast_social(hub, payload).await,
             subjects::MARKET_ALERTS_V1 => {
                 broadcast_news(hub, "market.alert", payload, "market_alerts").await
             }
@@ -73,6 +75,32 @@ async fn broadcast_news(hub: &Arc<Hub>, event: &str, payload: &str, channel: &st
             hub.broadcast(event, data, channel).await;
         }
         Err(err) => warn!(error = %err, channel, "failed to parse NATS news payload"),
+    }
+}
+
+async fn broadcast_social(hub: &Arc<Hub>, payload: &str) {
+    let post = match serde_json::from_str::<Value>(payload) {
+        Ok(Value::Object(post)) => Value::Object(post),
+        Ok(_) => {
+            warn!("failed to parse NATS social payload: expected JSON object");
+            return;
+        }
+        Err(err) => {
+            warn!(error = %err, "failed to parse NATS social payload");
+            return;
+        }
+    };
+
+    let (event, channel) = social_route(&post);
+    hub.broadcast(event, serde_json::json!({ "post": post }), channel)
+        .await;
+}
+
+fn social_route(post: &Value) -> (&'static str, &'static str) {
+    if post.get("platform").and_then(Value::as_str) == Some("twitter") {
+        ("x.post", "x")
+    } else {
+        ("social.post", "social")
     }
 }
 
@@ -102,5 +130,17 @@ mod tests {
     fn market_subjects_use_deduplicated_streams() {
         assert!(SUBJECTS.contains(&subjects::MD_DEDUP_PRIMARY_FX_QUOTES_V1));
         assert!(!SUBJECTS.contains(&subjects::MD_RAW_PRIMARY_FX_QUOTES_V1));
+    }
+
+    #[test]
+    fn social_posts_route_twitter_to_existing_x_channel() {
+        let post = serde_json::json!({"platform": "twitter"});
+        assert_eq!(social_route(&post), ("x.post", "x"));
+    }
+
+    #[test]
+    fn social_posts_route_other_platforms_to_social_channel() {
+        let post = serde_json::json!({"platform": "truth"});
+        assert_eq!(social_route(&post), ("social.post", "social"));
     }
 }

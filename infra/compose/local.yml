@@ -88,8 +88,26 @@ services:
     environment:
       TWITTER_DB: /data/accounts.db
       NATS_URL: nats://nats:4222
+      NATS_SUBJECT: social.posts
     volumes:
       - social_worker_data:/data
+    depends_on:
+      nats:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - private
+
+  scrapy:
+    container_name: scrapy
+    image: wign/atlsd-scrapy
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.scrapy
+      args:
+        - DOCKER_BUILD_TYPE=release
+    environment:
+      NATS_URL: nats://nats:4222
     depends_on:
       nats:
         condition: service_started
@@ -203,6 +221,9 @@ services:
         - DOCKER_BUILD_TYPE=release
     env_file:
       - ../env/.env.news-service
+    environment:
+      EVENTBUS_MODE: nats
+      NATS_URL: nats://nats:4222
     depends_on:
       postgres:
         condition: service_healthy

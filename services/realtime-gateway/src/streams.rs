@@ -12,6 +12,7 @@ const BASE_STREAMS: &[&str] = &[
     "high_impact",
     "volatility",
     "x",
+    "social",
     "system",
     "geosignals",
 ];

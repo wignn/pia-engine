@@ -132,6 +132,13 @@ jobs:
               - 'services/social-worker/**'
               - 'infra/docker/Dockerfile.social-worker'
               - '.dockerignore'
+            scrapy:
+              - 'services/scrapy/**'
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'infra/docker/Dockerfile.scrapy'
+              - '.dockerignore'
 
       - name: Build Docker matrix
         id: matrix
@@ -150,6 +157,7 @@ jobs:
           PIA_CHANGED: ${{ steps.filter.outputs.pia }}
           PUBLIC_WEB_CHANGED: ${{ steps.filter.outputs.public_web }}
           SOCIAL_WORKER_CHANGED: ${{ steps.filter.outputs.social_worker }}
+          SCRAPY_CHANGED: ${{ steps.filter.outputs.scrapy }}
         run: |
           json='{"include":['
           sep=''
@@ -205,6 +213,10 @@ jobs:
 
           if [[ "$BUILD_ALL" == "true" || "$SOCIAL_WORKER_CHANGED" == "true" ]]; then
             add '{"image":"atlsd-social-worker","dockerfile":"infra/docker/Dockerfile.social-worker"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$SCRAPY_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-scrapy","dockerfile":"infra/docker/Dockerfile.scrapy"}'
           fi
           json="${json}]}";
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
