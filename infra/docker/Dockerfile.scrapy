@@ -14,6 +14,7 @@ COPY services/news-service/Cargo.toml services/news-service/Cargo.toml
 COPY services/intelligence-service/Cargo.toml services/intelligence-service/Cargo.toml
 COPY services/bot/Cargo.toml services/bot/Cargo.toml
 COPY services/scrapy/Cargo.toml services/scrapy/Cargo.toml
+COPY services/db-migrate/Cargo.toml services/db-migrate/Cargo.toml
 COPY crates/ crates/
 
 RUN mkdir -p services/api-gateway/src services/control-plane/src services/ingestion-gateway/src services/market-data/src services/realtime-gateway/src services/news-service/src services/intelligence-service/src services/bot/src services/scrapy/src && \
@@ -26,6 +27,10 @@ RUN mkdir -p services/api-gateway/src services/control-plane/src services/ingest
     echo "fn main(){}" > services/intelligence-service/src/main.rs && \
     echo "fn main(){}" > services/bot/src/main.rs && \
     echo "fn main(){}" > services/scrapy/src/main.rs
+
+RUN mkdir -p services/scrapy/src services/db-migrate/src && \
+    echo "fn main(){}" > services/scrapy/src/main.rs && \
+    echo "fn main(){}" > services/db-migrate/src/main.rs
 
 RUN cargo chef prepare --recipe-path recipe.json
 
@@ -48,6 +53,7 @@ COPY services/realtime-gateway/Cargo.toml services/realtime-gateway/Cargo.toml
 COPY services/news-service/Cargo.toml services/news-service/Cargo.toml
 COPY services/intelligence-service/Cargo.toml services/intelligence-service/Cargo.toml
 COPY services/bot/Cargo.toml services/bot/Cargo.toml
+COPY services/db-migrate/Cargo.toml services/db-migrate/Cargo.toml
 COPY crates/ crates/
 
 RUN mkdir -p services/api-gateway/src services/control-plane/src services/ingestion-gateway/src services/market-data/src services/realtime-gateway/src services/news-service/src services/intelligence-service/src services/bot/src && \
@@ -59,6 +65,8 @@ RUN mkdir -p services/api-gateway/src services/control-plane/src services/ingest
     echo "fn main(){}" > services/news-service/src/main.rs && \
     echo "fn main(){}" > services/intelligence-service/src/main.rs && \
     echo "fn main(){}" > services/bot/src/main.rs
+
+RUN mkdir -p services/scrapy/src services/db-migrate/src && echo "fn main(){}" > services/scrapy/src/main.rs && echo "fn main(){}" > services/db-migrate/src/main.rs
 
 RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cargo build --release -p scrapy; else cargo build -p scrapy; fi
 RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cp /app/target/release/scrapy /app/target/scrapy; else cp /app/target/debug/scrapy /app/target/scrapy; fi
