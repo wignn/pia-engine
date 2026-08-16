@@ -125,13 +125,6 @@ impl ClickHouseClient {
             .await
     }
 
-    pub async fn ohlcv_1m_history(&self, symbol: &str, limit: usize) -> anyhow::Result<Vec<Value>> {
-        let sql = ohlcv_1m_history_sql(&self.database, symbol, limit);
-        let mut rows: Vec<Value> = self.query_json_each_row(&sql).await?;
-        rows.reverse();
-        Ok(rows)
-    }
-
     pub async fn recent_ticks(&self, minutes: u32) -> anyhow::Result<Vec<RecentTick>> {
         let bounded = minutes.clamp(1, 60);
         let sql = format!(
@@ -282,14 +275,6 @@ fn ident(value: &str) -> String {
         .collect::<String>()
 }
 
-fn ohlcv_1m_history_sql(database: &str, symbol: &str, limit: usize) -> String {
-    format!(
-        "SELECT toUnixTimestamp(minute) AS time, argMinMerge(open_state) AS open, maxMerge(high_state) AS high, minMerge(low_state) AS low, argMaxMerge(close_state) AS close, sumMerge(volume_state) AS volume, 'clickhouse_ohlcv_1m_mv' AS source FROM {}.ohlcv_1m WHERE symbol = {} GROUP BY symbol, minute ORDER BY minute DESC LIMIT {} FORMAT JSONEachRow",
-        ident(database),
-        string_literal(symbol),
-        limit.clamp(1, 1000)
-    )
-}
 
 fn string_literal(value: &str) -> String {
     format!("'{}'", value.replace('\\', "\\\\").replace('\'', "\\''"))
@@ -377,20 +362,6 @@ mod tests {
         assert!(sql.contains("count() AS tick_count"));
         assert!(sql.contains("'clickhouse_price_ticks' AS source"));
         assert!(!sql.contains("FROM market.ohlcv_candles"));
-    }
-
-    #[test]
-    fn ohlcv_1m_history_query_merges_aggregate_states() {
-        let sql = ohlcv_1m_history_sql("market", "BTCUSDT", 120);
-
-        assert!(sql.contains("FROM market.ohlcv_1m"));
-        assert!(sql.contains("argMinMerge(open_state) AS open"));
-        assert!(sql.contains("maxMerge(high_state) AS high"));
-        assert!(sql.contains("minMerge(low_state) AS low"));
-        assert!(sql.contains("argMaxMerge(close_state) AS close"));
-        assert!(sql.contains("sumMerge(volume_state) AS volume"));
-        assert!(sql.contains("'clickhouse_ohlcv_1m_mv' AS source"));
-        assert!(!sql.contains("FROM market.price_ticks"));
     }
 
     #[test]
