@@ -1,0 +1,27 @@
+[package]
+name = "scrapy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+atlsd-auth = { path = "../../crates/atlsd-auth" }
+atlsd-common = { path = "../../crates/atlsd-common" }
+atlsd-domain = { path = "../../crates/atlsd-domain" }
+atlsd-eventbus = { path = "../../crates/atlsd-eventbus" }
+atlsd-observability = { path = "../../crates/atlsd-observability" }
+
+tokio = { workspace = true }
+reqwest = { workspace = true }
+scraper = "0.20"
+serde = { workspace = true }
+serde_json = { workspace = true }
+regex = "1"
+anyhow = { workspace = true }
+fake_user_agent = "0.2.3"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+async-nats = "0.42"
+futures = "0.3"
+bytes = "1"
+sha2 = "0.11.0"
+hex = "0.4.3"
