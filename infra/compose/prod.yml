@@ -199,6 +199,8 @@ services:
       - private
 
   market-data:
+    container_name: market-data
+    image: wign/atlsd-market-data:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8010/health"]
       interval: 30s
@@ -325,6 +327,8 @@ services:
       - private
 
   intelligence-service:
+    container_name: intelligence-service
+    image: wign/atlsd-intelligence-service:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8040/health"]
       interval: 30s
