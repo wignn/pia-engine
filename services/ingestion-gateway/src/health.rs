@@ -194,10 +194,12 @@ async fn ready(State(registry): State<HealthRegistry>) -> impl IntoResponse {
     }
 }
 
+type PrometheusCounter = (&'static str, &'static str, fn(&WorkerHealth) -> u64);
+
 /// Renders the existing per-worker health counters in Prometheus text format
 /// (worker name is encoded in the metric name — no label cardinality).
 async fn prometheus_metrics(State(registry): State<HealthRegistry>) -> String {
-    const COUNTERS: &[(&str, &str, fn(&WorkerHealth) -> u64)] = &[
+    const COUNTERS: &[PrometheusCounter] = &[
         ("received_total", "Ticks received from the feed.", |w| {
             w.received
         }),
