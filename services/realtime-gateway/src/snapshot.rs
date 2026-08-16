@@ -30,10 +30,6 @@ impl Snapshot {
             market_data_url,
         }
     }
-
-    pub fn market_data_url(&self) -> &str {
-        &self.market_data_url
-    }
 }
 
 /// True when the subscribed streams should receive a market snapshot.
