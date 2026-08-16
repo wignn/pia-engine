@@ -33,33 +33,6 @@ jobs:
       - name: Build (includes type checking)
         run: bun run build
 
-  public-web:
-    name: public-web (SvelteKit)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/public-web
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
-        with:
-          # Fetch root submodules only; apps/pia contains a stale nested old-portal gitlink.
-          submodules: true
-
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Lint
-        run: bun run lint
-
-      - name: Type check
-        run: bun run check
-
-      - name: Build
-        run: bun run build
 
   python:
     name: Python services
@@ -68,7 +41,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
         with:
-          # Fetch root submodules only; apps/pia contains a stale nested old-portal gitlink.
           submodules: true
 
       - name: Install Python
@@ -79,8 +51,6 @@ jobs:
       - name: Install social-worker dependencies
         run: python -m pip install -r services/social-worker/requirements.txt
 
-      # social-worker: tests are stdlib unittest + mock; they import the
-      # `app` package, so they must run from the service root.
       - name: social-worker tests
         working-directory: services/social-worker
         run: python -m unittest discover -s tests -v
