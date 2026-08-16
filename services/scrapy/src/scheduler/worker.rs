@@ -29,7 +29,7 @@ pub async fn run(
         let fallback_id = format!("job-{}", NEXT_ID.fetch_add(1, Ordering::Relaxed));
         let job = match serde_json::from_slice::<ScrapeJob>(&message.payload)
             .map_err(anyhow::Error::from)
-            .and_then(|job| job.validate(fallback_id.clone()))
+            .and_then(|job| crate::models::validate_job(job, fallback_id.clone()))
         {
             Ok(job) => job,
             Err(error) => {

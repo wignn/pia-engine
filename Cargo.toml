@@ -8,6 +8,7 @@ members = [    "services/control-plane",
     "services/intelligence-service",
     "services/bot",
     "services/scrapy",
+    "services/db-migrate",
     "crates/*"
 ]
 resolver = "2"

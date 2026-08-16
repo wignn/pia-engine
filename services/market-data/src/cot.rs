@@ -212,7 +212,6 @@ async fn query_cot_reports(
     to: Option<NaiveDate>,
     limit: i64,
 ) -> Result<Vec<DerivedCotReport>, sqlx::Error> {
-    // Fetch limit + 1 to calculate WoW change for the last report in the page
     let raw_reports = sqlx::query_as::<_, CotReportRow>(
         r#"
         SELECT market_code, market_name, report_date, report_type,
@@ -313,8 +312,6 @@ pub fn compute_derived_reports(reports: Vec<CotReportRow>) -> Vec<DerivedCotRepo
 
     derived
 }
-
-// --- Background Sync for CFTC COT Positioning ---
 
 struct SeedMarket {
     market_code: &'static str,
@@ -536,7 +533,6 @@ async fn fetch_and_sync_cot(
             None => continue,
         };
 
-        // Ensure cot_market_map entry exists
         sqlx::query(
             r#"
             INSERT INTO cot_market_map (market_code, symbol, asset_class, display_name)
@@ -549,7 +545,6 @@ async fn fetch_and_sync_cot(
         .execute(pool)
         .await?;
 
-        // Upsert into cot_reports
         sqlx::query(
             r#"
             INSERT INTO cot_reports (

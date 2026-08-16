@@ -27,7 +27,6 @@ pub struct OptionContractData {
     pub volume: u64,
 }
 
-// Deribit JSON responses
 #[derive(Debug, serde::Deserialize)]
 struct DeribitResponse {
     result: Option<Vec<DeribitBookSummary>>,
@@ -183,12 +182,12 @@ async fn publish_options_data(
 
     if let Err(e) = broker
         .publish_str(
-            subjects::MARKET_OPTIONS_CHAIN_V1,
+            subjects::MD_RAW_OPTIONS_CHAIN_V1,
             &chain_payload.to_string(),
         )
         .await
     {
-        error!(symbol = symbol, error = %e, "failed to publish market.options.chain");
+        error!(symbol = symbol, error = %e, "failed to publish md.raw.options.chain.v1");
     }
 }
 

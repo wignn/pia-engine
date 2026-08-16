@@ -44,13 +44,14 @@ async fn main() {
         });
     }
 
+    let metrics = std::sync::Arc::new(atlsd_observability::MetricsRegistry::new());
     let realtime_cfg = cfg.clone();
     let realtime_pool = pool.clone();
+    let realtime_metrics = metrics.clone();
     tokio::spawn(async move {
-        realtime::run(realtime_cfg, realtime_pool).await;
+        realtime::run(realtime_cfg, realtime_pool, realtime_metrics).await;
     });
 
-    // Backfill full article text from scrapy results (scrape.results → original_content).
     let scrape_cfg = cfg.clone();
     let scrape_pool = pool.clone();
     tokio::spawn(async move {
@@ -75,7 +76,7 @@ async fn main() {
         gdelt::run_gdelt_sync(gdelt_cfg, gdelt_pool).await;
     });
 
-    let state = AppState { db: pool };
+    let state = AppState { db: pool, metrics };
     let listener = match TcpListener::bind(&cfg.bind_addr).await {
         Ok(listener) => listener,
         Err(err) => {

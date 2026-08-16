@@ -68,7 +68,7 @@ FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 
 # ca-certificates: scrapy makes outbound HTTPS (rustls) to target sites.
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/scrapy /usr/local/bin/scrapy
 

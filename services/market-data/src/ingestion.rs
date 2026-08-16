@@ -133,6 +133,22 @@ async fn handle_payload(
         .map(|value| value.to_string());
     let timestamp_ms = provider_timestamp_ms(&parsed);
 
+    if let Some(candle) = &state.candle {
+        let volume = parsed
+            .get("volume")
+            .or_else(|| parsed.get("quantity"))
+            .and_then(|value| value.as_f64())
+            .unwrap_or(0.0);
+        candle.accept_tick(
+            &symbol,
+            timestamp_ms,
+            price,
+            volume,
+            &asset_type,
+            chrono::Utc::now(),
+        );
+    }
+
     let current = {
         let mut prices = state.prices.write();
         let existing_timestamp_ms = prices.get(&symbol).and_then(|price| price.timestamp_ms);
@@ -207,7 +223,6 @@ async fn handle_payload(
         );
         if session.is_open {
             persist_ohlcv_candle(&state.db, &current, received_at).await;
-            persist_clickhouse_ohlcv_candle(state, &current, received_at).await;
         } else {
             debug!(symbol = %current.symbol, state = %session.state, reason = %session.reason, "skipped ohlcv candle outside open session");
         }
@@ -229,30 +244,13 @@ async fn persist_clickhouse_price_tick(
     }
 }
 
-async fn persist_clickhouse_ohlcv_candle(
-    state: &AppState,
-    price: &CachedPrice,
-    received_at: DateTime<Utc>,
-) {
-    let Some(tx) = &state.candle_tx else {
-        return;
-    };
-    let Some(minute) = minute_bucket(received_at) else {
-        return;
-    };
-
-    if let Err(err) = tx.send((price.clone(), minute)).await {
-        warn!(error = %err, symbol = %price.symbol, "failed to enqueue ClickHouse ohlcv candle");
-    }
-}
-
 async fn persist_latest_price(
     pool: &sqlx::PgPool,
     price: &CachedPrice,
     received_at: DateTime<Utc>,
 ) {
     if let Err(err) = sqlx::query(
-        "INSERT INTO market.market_latest_prices (symbol, price, bid, ask, volume, source, asset_type, received_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (symbol) DO UPDATE SET price = EXCLUDED.price, bid = EXCLUDED.bid, ask = EXCLUDED.ask, volume = EXCLUDED.volume, source = EXCLUDED.source, asset_type = EXCLUDED.asset_type, received_at = EXCLUDED.received_at",
+        "INSERT INTO market.market_latest_prices (symbol, price, bid, ask, volume, source, asset_type, received_at, provider_ts_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (symbol) DO UPDATE SET price = EXCLUDED.price, bid = EXCLUDED.bid, ask = EXCLUDED.ask, volume = EXCLUDED.volume, source = EXCLUDED.source, asset_type = EXCLUDED.asset_type, received_at = EXCLUDED.received_at, provider_ts_ms = EXCLUDED.provider_ts_ms",
     )
     .bind(&price.symbol)
     .bind(price.price)
@@ -262,6 +260,7 @@ async fn persist_latest_price(
     .bind(&price.source)
     .bind(&price.asset_type)
     .bind(received_at)
+    .bind(price.timestamp_ms)
     .execute(pool)
     .await
     {

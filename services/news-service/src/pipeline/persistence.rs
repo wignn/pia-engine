@@ -106,7 +106,7 @@ pub async fn insert_forex_article(
             INSERT INTO news.forex_news_articles (source_id, content_hash, original_url, original_title, original_content, summary, is_processed, processed_at, published_at)
             VALUES ($1, $2, $3, $4, $5, $6, TRUE, NOW(), $7)
             ON CONFLICT (content_hash) DO NOTHING
-            RETURNING id
+            RETURNING id, original_title, summary, original_url, published_at, processed_at
         ), analysis AS (
             INSERT INTO news.forex_news_analyses (article_id, sentiment, impact_level, currency_pairs)
             SELECT id, $8, $9, $10 FROM inserted
@@ -117,6 +117,24 @@ pub async fn insert_forex_article(
             FROM inserted
             ON CONFLICT (event_id) DO NOTHING
             RETURNING event_id
+        ), outbox AS (
+            INSERT INTO platform.outbox_events (aggregate_type, aggregate_id, subject, payload)
+            SELECT 'news.forex_article', id::text, 'news.forex.processed.v1',
+                   jsonb_build_object('article', jsonb_build_object(
+                       'id', id::text,
+                       'title', original_title,
+                       'original_title', original_title,
+                       'summary', summary,
+                       'source_name', $12,
+                       'url', original_url,
+                       'original_url', original_url,
+                       'sentiment', $8,
+                       'impact_level', $9,
+                       'published_at', published_at,
+                       'processed_at', processed_at
+                   ))
+            FROM inserted
+            RETURNING id
         )
         SELECT COUNT(*)::BIGINT FROM inserted",
     )

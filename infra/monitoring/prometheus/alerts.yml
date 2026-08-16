@@ -115,3 +115,59 @@ groups:
           summary: "Realtime gateway is not receiving WebSocket pong frames"
           description: "Ping frames are sent, but pong frames are not observed."
 
+
+      # --- Business health: event backbone (REMEDIATION_PLAN Fase 4) ---
+
+      - alert: NewsOutboxBacklogGrowing
+        expr: atlsd_news_outbox_backlog > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "News outbox backlog is not draining"
+          description: "More than 100 unpublished outbox rows for 10 minutes; the relay or JetStream is stuck."
+
+      - alert: NewsOutboxPublishFailing
+        expr: rate(atlsd_news_outbox_publish_failures_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "News outbox publishes are failing"
+          description: "Outbox rows cannot be published to JetStream; news delivery is delayed, not lost."
+
+      - alert: CandlePublishFailures
+        expr: rate(atlsd_market_candle_publish_failures_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Candle event publishes are failing"
+          description: "Candle events cannot reach JetStream; storage stays correct via the ClickHouse MV."
+
+      - alert: CandleCorrectionsSpike
+        expr: rate(atlsd_market_candle_corrections_total[15m]) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual rate of candle corrections"
+          description: "Late ticks are correcting already published candles frequently; check feed latency."
+
+      - alert: TicksMissingProviderTimestamp
+        expr: rate(atlsd_market_ticks_no_ts_total[15m]) > 1
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Ticks arriving without provider timestamps"
+          description: "Ticks without a provider timestamp are excluded from candles; check feed normalization."
+
+      - alert: IngestionQueueDroppingEvents
+        expr: rate(atlsd_ingestion_primary_fx_dropped_total[5m]) > 0 or rate(atlsd_ingestion_secondary_fx_dropped_total[5m]) > 0 or rate(atlsd_ingestion_crypto_dropped_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ingestion publish queue is full and dropping events"
+          description: "Market data events are being dropped at the queue; the broker is too slow or down."

@@ -203,6 +203,14 @@ impl Hub {
         }
     }
 
+    pub async fn push_to_client(&self, id: ClientId, payload: Vec<u8>) -> bool {
+        let clients = self.clients.read().await;
+        match clients.get(&id) {
+            Some(client) => client.sender.try_send(payload).is_ok(),
+            None => false,
+        }
+    }
+
     pub async fn broadcast(
         &self,
         event_type: &str,
@@ -228,21 +236,38 @@ impl Hub {
 
         let clients = self.clients.read().await;
         let mut count = 0;
+        let mut slow: Vec<ClientId> = Vec::new();
 
         let candidate_streams = streams::candidate_streams(channel, &data);
 
-        for client in clients.values() {
+        for (id, client) in clients.iter() {
             if candidate_streams.is_disjoint(&client.streams) {
                 continue;
             }
 
-            if let Ok(()) = client.sender.try_send(payload.clone()) {
-                count += 1;
-            } else {
-                self.metrics.send_failure();
+            match client.sender.try_send(payload.clone()) {
+                Ok(()) => count += 1,
+                // Full buffer = slow consumer, Closed = socket task gone.
+                // Either way the client is disconnected explicitly instead of
+                // silently accumulating a stale view.
+                Err(_) => {
+                    self.metrics.send_failure();
+                    slow.push(*id);
+                }
             }
         }
+        drop(clients);
         self.metrics.broadcast(count);
+
+        if !slow.is_empty() {
+            let mut clients = self.clients.write().await;
+            for id in slow {
+                if clients.remove(&id).is_some() {
+                    self.metrics.connection_closed();
+                    warn!(client = id, "slow consumer disconnected (send buffer full)");
+                }
+            }
+        }
 
         if let Some(redis_client) = &self.redis_client {
             let payload_text = String::from_utf8_lossy(&payload).to_string();
@@ -390,6 +415,31 @@ mod tests {
         hub.unregister(id).await;
 
         assert_eq!(hub.client_count().await, 0);
+        assert_eq!(hub.user_connection_count(&user_id).await, 0);
+    }
+
+    #[tokio::test]
+    async fn slow_consumer_is_disconnected_instead_of_silently_dropping() {
+        let hub = Hub::new(None, "test".to_string());
+        let user_id = Uuid::new_v4();
+        let (_id, _rx) =
+            register_test(&hub, "slow-bot", set(&["market_data"]), Some(user_id)).await;
+        // _rx is intentionally never drained: the 256-slot buffer fills up.
+
+        for _ in 0..300 {
+            hub.broadcast(
+                "market.trade",
+                serde_json::json!({ "tick": {} }),
+                "market_data",
+            )
+            .await;
+        }
+
+        assert_eq!(
+            hub.client_count().await,
+            0,
+            "client with a full buffer must be disconnected explicitly"
+        );
         assert_eq!(hub.user_connection_count(&user_id).await, 0);
     }
 

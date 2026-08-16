@@ -46,6 +46,15 @@ pub struct TickStats {
     pub latest_at: String,
 }
 
+/// Raw tick for candle-engine bootstrap: ts_ms avoids DateTime string parsing.
+#[derive(Clone, Debug, Deserialize)]
+pub struct RecentTick {
+    pub symbol: String,
+    pub ts_ms: i64,
+    pub price: f64,
+    pub volume: f64,
+}
+
 #[derive(Serialize)]
 struct PriceTickRow<'a> {
     symbol: &'a str,
@@ -116,19 +125,21 @@ impl ClickHouseClient {
             .await
     }
 
-    pub async fn insert_ohlcv_candles_batch(
-        &self,
-        batch: &[(CachedPrice, DateTime<Utc>)],
-    ) -> anyhow::Result<()> {
-        if batch.is_empty() {
-            return Ok(());
-        }
+    pub async fn ohlcv_1m_history(&self, symbol: &str, limit: usize) -> anyhow::Result<Vec<Value>> {
+        let sql = ohlcv_1m_history_sql(&self.database, symbol, limit);
+        let mut rows: Vec<Value> = self.query_json_each_row(&sql).await?;
+        rows.reverse();
+        Ok(rows)
+    }
 
-        // Historical candles are aggregated from raw price_ticks in latest_history().
-        // Writing one row per tick into market.ohlcv_candles would create flat
-        // open/high/low/close rows; ReplacingMergeTree does not merge those rows
-        // into a real intraminute OHLC candle.
-        Ok(())
+    pub async fn recent_ticks(&self, minutes: u32) -> anyhow::Result<Vec<RecentTick>> {
+        let bounded = minutes.clamp(1, 60);
+        let sql = format!(
+            "SELECT symbol, toUnixTimestamp64Milli(time) AS ts_ms, price, volume FROM {}.price_ticks WHERE time >= now() - INTERVAL {} MINUTE FORMAT JSONEachRow",
+            ident(&self.database),
+            bounded
+        );
+        self.query_json_each_row(&sql).await
     }
 
     pub async fn latest_prices(&self) -> anyhow::Result<Vec<LatestPriceTick>> {
@@ -271,6 +282,15 @@ fn ident(value: &str) -> String {
         .collect::<String>()
 }
 
+fn ohlcv_1m_history_sql(database: &str, symbol: &str, limit: usize) -> String {
+    format!(
+        "SELECT toUnixTimestamp(minute) AS time, argMinMerge(open_state) AS open, maxMerge(high_state) AS high, minMerge(low_state) AS low, argMaxMerge(close_state) AS close, sumMerge(volume_state) AS volume, 'clickhouse_ohlcv_1m_mv' AS source FROM {}.ohlcv_1m WHERE symbol = {} GROUP BY symbol, minute ORDER BY minute DESC LIMIT {} FORMAT JSONEachRow",
+        ident(database),
+        string_literal(symbol),
+        limit.clamp(1, 1000)
+    )
+}
+
 fn string_literal(value: &str) -> String {
     format!("'{}'", value.replace('\\', "\\\\").replace('\'', "\\''"))
 }
@@ -359,32 +379,18 @@ mod tests {
         assert!(!sql.contains("FROM market.ohlcv_candles"));
     }
 
-    #[tokio::test]
-    async fn clickhouse_ohlcv_batch_insert_is_disabled_to_avoid_flat_replacements() {
-        let client = ClickHouseClient::new(
-            "http://127.0.0.1:8123".to_string(),
-            "market".to_string(),
-            "default".to_string(),
-            String::new(),
-        );
-        let price = CachedPrice {
-            symbol: "BTCUSDT".to_string(),
-            price: 50_000.0,
-            bid: None,
-            ask: None,
-            volume: Some(1.0),
-            source: "test".to_string(),
-            asset_type: "crypto".to_string(),
-            received_at: None,
-            timestamp_ms: None,
-            feed: None,
-        };
+    #[test]
+    fn ohlcv_1m_history_query_merges_aggregate_states() {
+        let sql = ohlcv_1m_history_sql("market", "BTCUSDT", 120);
 
-        let result = client
-            .insert_ohlcv_candles_batch(&[(price, chrono::Utc::now())])
-            .await;
-
-        assert!(result.is_ok());
+        assert!(sql.contains("FROM market.ohlcv_1m"));
+        assert!(sql.contains("argMinMerge(open_state) AS open"));
+        assert!(sql.contains("maxMerge(high_state) AS high"));
+        assert!(sql.contains("minMerge(low_state) AS low"));
+        assert!(sql.contains("argMaxMerge(close_state) AS close"));
+        assert!(sql.contains("sumMerge(volume_state) AS volume"));
+        assert!(sql.contains("'clickhouse_ohlcv_1m_mv' AS source"));
+        assert!(!sql.contains("FROM market.price_ticks"));
     }
 
     #[test]

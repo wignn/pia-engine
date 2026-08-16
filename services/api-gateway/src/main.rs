@@ -73,6 +73,9 @@ async fn main() {
         http,
         tenant_registry,
         usage_tracker,
+        internal_api_key: std::env::var("INTERNAL_API_KEY")
+            .ok()
+            .filter(|key| !key.trim().is_empty()),
     };
 
     let listener = match TcpListener::bind(&cfg.bind_addr).await {

@@ -32,3 +32,4 @@ dotenvy = { workspace = true }
 anyhow = { workspace = true }
 futures-util = { workspace = true }
 
+reqwest = { workspace = true }

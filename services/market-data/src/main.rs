@@ -2,10 +2,12 @@ mod alert_notifier;
 mod alerts;
 mod batcher;
 mod calendar;
+mod candle_engine;
 mod clickhouse;
 mod config;
 mod cot;
 mod data_quality;
+mod deadletter;
 mod economic;
 mod energy;
 mod fear_greed;
@@ -66,48 +68,68 @@ async fn main() {
     } else {
         (None, None)
     };
-    let (candle_tx, candle_rx) = if clickhouse.is_some() {
-        let (tx, rx) = mpsc::channel(5_000);
-        (Some(tx), Some(rx))
-    } else {
-        (None, None)
-    };
 
     if let (Some(ch), Some(rx)) = (clickhouse.clone(), tick_rx) {
+        let dlq_pool = pool.clone();
         tokio::spawn(async move {
             batcher::run_batcher(
                 rx,
                 batcher::BatcherConfig {
                     max_batch_size: 1000,
                     max_delay: Duration::from_secs(1),
+                    ..batcher::BatcherConfig::default()
                 },
                 move |batch| {
                     let client = ch.clone();
                     async move { client.insert_price_ticks_batch(&batch).await }
                 },
+                move |batch, err| {
+                    let pool = dlq_pool.clone();
+                    async move {
+                        deadletter::record_tick_batch(&pool, &batch, &err).await;
+                    }
+                },
             )
             .await;
         });
     }
 
-    if let (Some(ch), Some(rx)) = (clickhouse.clone(), candle_rx) {
+    let metrics = std::sync::Arc::new(atlsd_observability::MetricsRegistry::new());
+    let candle_enabled = matches!(
+        atlsd_eventbus::EventBusMode::from_env_value(&cfg.eventbus_mode),
+        atlsd_eventbus::EventBusMode::Nats | atlsd_eventbus::EventBusMode::Dual
+    );
+    let (candle, candle_rx) = if candle_enabled {
+        let grace_secs: u64 = atlsd_common::config::get_env("CANDLE_GRACE_SEC", "5")
+            .parse()
+            .unwrap_or(5);
+        let (handle, rx) =
+            candle_engine::CandleEngineHandle::new(grace_secs, Some(metrics.clone()));
+        (Some(handle), Some(rx))
+    } else {
+        (None, None)
+    };
+
+    if let (Some(handle), Some(rx)) = (candle.clone(), candle_rx) {
+        if let Some(clickhouse) = clickhouse.as_ref() {
+            candle_engine::bootstrap_from_ticks(&handle, clickhouse).await;
+        }
+        let collector_handle = handle.clone();
         tokio::spawn(async move {
-            batcher::run_batcher(
-                rx,
-                batcher::BatcherConfig {
-                    max_batch_size: 500,
-                    max_delay: Duration::from_secs(2),
-                },
-                move |batch| {
-                    let client = ch.clone();
-                    async move { client.insert_ohlcv_candles_batch(&batch).await }
-                },
-            )
-            .await;
+            candle_engine::run_collector(collector_handle).await;
+        });
+        let nats_url = cfg.nats_url.clone();
+        let publisher_metrics = metrics.clone();
+        tokio::spawn(async move {
+            if let Err(err) =
+                candle_engine::run_publisher(rx, &nats_url, Some(publisher_metrics)).await
+            {
+                error!(error = %err, "candle event publisher exited");
+            }
         });
     }
 
-    let state = AppState::new(cfg.clone(), pool, clickhouse, tick_tx, candle_tx);
+    let state = AppState::new(cfg.clone(), pool, clickhouse, tick_tx, candle, metrics);
     calendar::hydrate(&state.db, &state.calendar).await;
     let calendar_pool = state.db.clone();
     let calendar_cache = state.calendar.clone();

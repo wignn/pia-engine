@@ -5,9 +5,11 @@ mod hub;
 mod metrics;
 mod nats_subscriber;
 mod redis_subscriber;
+mod snapshot;
 mod state;
 mod streams;
 mod tenant;
+mod ticket;
 
 use axum::Json;
 use serde_json::{json, Value};
@@ -51,11 +53,27 @@ async fn main() {
             }
         }
     };
+    let ticket_store = if cfg.has_redis() {
+        match redis::Client::open(cfg.redis_url.clone()) {
+            Ok(client) => {
+                info!("ws ticket store backed by redis");
+                Arc::new(ticket::TicketStore::redis(client))
+            }
+            Err(err) => {
+                warn!(error = %err, "invalid REDIS_URL; ws ticket store falls back to in-memory");
+                Arc::new(ticket::TicketStore::memory())
+            }
+        }
+    } else {
+        warn!("ws ticket store in-memory (single node only; set REDIS_URL for multi-node)");
+        Arc::new(ticket::TicketStore::memory())
+    };
     let state = AppState {
         config: cfg.clone(),
         hub: hub.clone(),
         tenant_registry,
-        ticket_store: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
+        ticket_store,
+        snapshot: Arc::new(snapshot::Snapshot::new(cfg.market_data_url.clone())),
     };
 
     if cfg.has_redis() {

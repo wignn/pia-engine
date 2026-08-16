@@ -11,9 +11,16 @@ pub fn build_router(state: AppState) -> Router {
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
+    let internal_auth = atlsd_auth::internal::InternalAuth::from_env();
 
     Router::new()
         .route("/health", get(crate::health))
+        .route(
+            "/metrics",
+            get(|state: axum::extract::State<AppState>| async move {
+                state.metrics.render_prometheus()
+            }),
+        )
         .route("/api/v1/forex/calendar", get(crate::news::list_calendar))
         .route("/api/v1/forex/news", get(crate::news::list_forex_news))
         .route(
@@ -77,6 +84,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/central-banks/{bank}/stance",
             get(crate::central_bank::get_bank_stance),
         )
+        .layer(axum::middleware::from_fn_with_state(
+            internal_auth,
+            atlsd_auth::internal::require_internal_key,
+        ))
         .layer(cors)
         .with_state(state)
 }

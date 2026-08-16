@@ -71,7 +71,10 @@ impl Config {
             cot_sync_sec: get_env_u64("COT_SYNC_SEC", 86400).max(600),
             cot_data_url: get_env(
                 "COT_DATA_URL",
-                "https://www.cftc.gov/dea/newfmt/deacot2026.txt",
+                &format!(
+                    "https://www.cftc.gov/dea/newfmt/deacot{}.txt",
+                    chrono::Utc::now().format("%Y")
+                ),
             ),
             fear_greed_sync_sec: get_env_u64("FEAR_GREED_SYNC_SEC", 3600).max(600),
             options_sync_sec: get_env_u64("OPTIONS_SYNC_SEC", 3600).max(600),

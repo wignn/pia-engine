@@ -36,6 +36,12 @@ pub async fn proxy_request(
         request = request.header(name, value);
     }
 
+    // Service-to-service credential: internal services require this header
+    // when INTERNAL_API_KEY is set (see atlsd_auth::internal).
+    if let Some(internal_key) = state.internal_api_key.as_deref() {
+        request = request.header(atlsd_auth::internal::INTERNAL_API_KEY_HEADER, internal_key);
+    }
+
     match request.body(bytes).send().await {
         Ok(response) => {
             let status = response.status();

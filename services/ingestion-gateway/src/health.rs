@@ -165,6 +165,7 @@ pub async fn serve(bind_addr: String, registry: HealthRegistry) {
     let app = Router::new()
         .route("/health", get(health))
         .route("/ready", get(ready))
+        .route("/metrics", get(prometheus_metrics))
         .with_state(registry);
 
     match TcpListener::bind(&bind_addr).await {
@@ -191,6 +192,58 @@ async fn ready(State(registry): State<HealthRegistry>) -> impl IntoResponse {
     } else {
         (StatusCode::SERVICE_UNAVAILABLE, Json(snapshot))
     }
+}
+
+/// Renders the existing per-worker health counters in Prometheus text format
+/// (worker name is encoded in the metric name — no label cardinality).
+async fn prometheus_metrics(State(registry): State<HealthRegistry>) -> String {
+    const COUNTERS: &[(&str, &str, fn(&WorkerHealth) -> u64)] = &[
+        ("received_total", "Ticks received from the feed.", |w| {
+            w.received
+        }),
+        (
+            "published_total",
+            "Events published to the eventbus.",
+            |w| w.published,
+        ),
+        (
+            "dropped_total",
+            "Events dropped because the publish queue was full.",
+            |w| w.dropped,
+        ),
+        (
+            "publish_failures_total",
+            "Publishes that returned an error.",
+            |w| w.publish_failures,
+        ),
+        ("publish_timeouts_total", "Publishes that timed out.", |w| {
+            w.publish_timeouts
+        }),
+        ("reconnects_total", "Feed reconnects.", |w| w.reconnects),
+    ];
+
+    let workers = registry.inner.read().await;
+    let mut names: Vec<&&'static str> = workers.keys().collect();
+    names.sort();
+
+    let mut output = String::new();
+    for name in names {
+        let Some(worker) = workers.get(*name) else {
+            continue;
+        };
+        let prefix = format!("atlsd_ingestion_{}", name.replace('-', "_"));
+        for (suffix, help, read) in COUNTERS {
+            output.push_str(&format!(
+                "# HELP {prefix}_{suffix} {help}\n# TYPE {prefix}_{suffix} counter\n{prefix}_{suffix} {}\n",
+                read(worker)
+            ));
+        }
+        output.push_str(&format!(
+            "# HELP {prefix}_queue_depth Current publish queue depth.\n# TYPE {prefix}_queue_depth gauge\n{prefix}_queue_depth {}\n",
+            worker.queue_depth
+        ));
+    }
+    output
 }
 
 fn now_ms() -> i64 {

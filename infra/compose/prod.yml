@@ -3,12 +3,13 @@ services:
     image: postgres:16-alpine
     container_name: postgres-prod
     restart: always
+    logging: *default-logging
     env_file:
       - ../env/.env.db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     networks:
       - private
     healthcheck:
@@ -21,20 +22,21 @@ services:
     image: clickhouse/clickhouse-server:24.8-alpine
     container_name: clickhouse-prod
     restart: always
+    logging: *default-logging
+    env_file:
+      - ../env/.env.datastores
     environment:
       CLICKHOUSE_DB: market
       CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: ""
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
       - clickhouse_data:/var/lib/clickhouse
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
     networks:
       - private
     healthcheck:
-      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      test: ["CMD-SHELL", "clickhouse-client --password \"$$CLICKHOUSE_PASSWORD\" --query SELECT 1"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -44,18 +46,21 @@ services:
     image: redis:7-alpine
     container_name: redis-prod
     restart: always
+    logging: *default-logging
+    env_file:
+      - ../env/.env.datastores
     command:
-      - redis-server
-      - --appendonly
-      - yes
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD" --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     networks:
       - private
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -64,16 +69,25 @@ services:
     image: nats:2.10-alpine
     container_name: nats
     restart: unless-stopped
-    command: ["-js", "-m", "8222"]
+    logging: *default-logging
+    command: ["-js", "-m", "8222", "-sd", "/data"]
     ports:
-      - "4222:4222"
-      - "8222:8222"
+      - "127.0.0.1:4222:4222"
+      - "127.0.0.1:8222:8222"
+    volumes:
+      - nats_data:/data
     networks:
       - private
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8222/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   social-worker:
     container_name: social-worker
-    image: wign/atlsd-social-worker:latest
+    image: wign/atlsd-social-worker:${ATLSD_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.social-worker
@@ -89,12 +103,13 @@ services:
       nats:
         condition: service_started
     restart: always
+    logging: *default-logging
     networks:
       - private
 
   scrapy:
     container_name: scrapy
-    image: wign/atlsd-scrapy:latest
+    image: wign/atlsd-scrapy:${ATLSD_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.scrapy
@@ -106,49 +121,36 @@ services:
       nats:
         condition: service_started
     restart: always
+    logging: *default-logging
     networks:
       - private
 
   db-migrate:
-    image: postgres:16-alpine
+    image: wign/atlsd-db-migrate:${ATLSD_IMAGE_TAG:-latest}
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.db-migrate
+      args:
+        - DOCKER_BUILD_TYPE=release
     container_name: db-migrate
     restart: "no"
+    logging: *default-logging
     env_file:
       - ../env/.env.db
+      - ../env/.env.datastores
+    environment:
+      MIGRATIONS_CORE_DIR: /migrations/core
+      MIGRATIONS_CLICKHOUSE_DIR: /migrations/clickhouse
+      CLICKHOUSE_URL: http://clickhouse:8123
+      # Baselines keep an already-migrated store from re-running old files;
+      # fresh installs apply everything from zero.
+      DB_MIGRATE_BASELINE_VERSION: "17"
+      DB_MIGRATE_CLICKHOUSE_BASELINE_VERSION: "1"
     volumes:
-      - ../../db/migrations/core:/migrations:ro
-    command:
-      - sh
-      - -c
-      - |
-        set -eu
-        export PGPASSWORD="$${POSTGRES_PASSWORD:-}"
-        for migration in $$(ls /migrations/*.sql | sort); do
-          echo "Applying $$migration"
-          psql -v ON_ERROR_STOP=1 -h postgres -U "$${POSTGRES_USER:-atlsd}" -d "$${POSTGRES_DB:-core}" -f "$$migration"
-        done
+      - ../../db/migrations:/migrations:ro
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - private
-
-  clickhouse-migrate:
-    image: clickhouse/clickhouse-server:24.8-alpine
-    container_name: clickhouse-migrate
-    restart: "no"
-    volumes:
-      - ../../db/migrations/clickhouse:/migrations:ro
-    command:
-      - sh
-      - -c
-      - |
-        set -eu
-        for migration in $$(ls /migrations/*.sql | sort); do
-          echo "Applying $$migration"
-          clickhouse-client --host clickhouse --multiquery < "$$migration"
-        done
-    depends_on:
       clickhouse:
         condition: service_healthy
     networks:
@@ -156,7 +158,13 @@ services:
 
   api-gateway:
     container_name: api-gateway
-    image: wign/atlsd-api-gateway
+    image: wign/atlsd-api-gateway:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.api-gateway
@@ -180,12 +188,17 @@ services:
       intelligence-service:
         condition: service_started
     restart: always
+    logging: *default-logging
     networks:
       - private
 
   market-data:
-    container_name: market-data
-    image: wign/atlsd-market-data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8010/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.market-data
@@ -193,6 +206,7 @@ services:
         - DOCKER_BUILD_TYPE=release
     env_file:
       - ../env/.env.market-data
+      - ../env/.env.datastores
     environment:
       EVENTBUS_MODE: nats
       NATS_URL: nats://nats:4222
@@ -205,17 +219,22 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
-      clickhouse-migrate:
-        condition: service_completed_successfully
       nats:
         condition: service_started
     restart: always
+    logging: *default-logging
     networks:
       - private
 
   realtime-gateway:
     container_name: realtime-gateway
-    image: wign/atlsd-realtime-gateway
+    image: wign/atlsd-realtime-gateway:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8020/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.realtime-gateway
@@ -238,12 +257,13 @@ services:
       nats:
         condition: service_started
     restart: always
+    logging: *default-logging
     networks:
       - private
 
   bot:
     container_name: bot
-    image: wign/atlsd-bot:latest
+    image: wign/atlsd-bot:${ATLSD_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.bot
@@ -263,12 +283,19 @@ services:
       realtime-gateway:
         condition: service_started
     restart: always
+    logging: *default-logging
     networks:
       - private
 
   news-service:
     container_name: news-service
-    image: wign/atlsd-news-service
+    image: wign/atlsd-news-service:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8030/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.news-service
@@ -287,12 +314,17 @@ services:
       nats:
         condition: service_started
     restart: always
+    logging: *default-logging
     networks:
       - private
 
   intelligence-service:
-    container_name: intelligence-service
-    image: wign/atlsd-intelligence-service
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8040/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.intelligence-service
@@ -300,6 +332,7 @@ services:
         - DOCKER_BUILD_TYPE=release
     env_file:
       - ../env/.env.intelligence-service
+      - ../env/.env.datastores
     depends_on:
       postgres:
         condition: service_healthy
@@ -307,17 +340,22 @@ services:
         condition: service_completed_successfully
       clickhouse:
         condition: service_healthy
-      clickhouse-migrate:
-        condition: service_completed_successfully
       analyzer:
         condition: service_started
     restart: always
+    logging: *default-logging
     networks:
       - private
 
   control-plane:
     container_name: world-control-plane
-    image: wign/atlsd-control-plane
+    image: wign/atlsd-control-plane:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.control-plane
@@ -335,13 +373,20 @@ services:
       redis:
         condition: service_healthy
     restart: always
+    logging: *default-logging
     networks:
       - private
 
 
   ingestion-gateway:
     container_name: ingestion-gateway
-    image: wign/atlsd-ingestion
+    image: wign/atlsd-ingestion:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8091/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.ingestion
@@ -355,41 +400,20 @@ services:
       nats:
         condition: service_started
     restart: always
+    logging: *default-logging
     networks:
       - private
-
-  rsshub:
-    image: diygod/rsshub:latest
-    container_name: rsshubs
-    restart: unless-stopped
-    env_file:
-      - ../env/.env.rsshub
-    ports:
-      - "1201:1200"
-    networks:
-      - private
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "require('http').get('http://127.0.0.1:1200/',res=>process.exit(res.statusCode<500?0:1)).on('error',()=>process.exit(1))",
-        ]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-
 
   analyzer:
     container_name: world-analyzer-prod
-    image: wign/atlsd-analyzer:latest
+    image: wign/atlsd-analyzer:${ATLSD_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.analyzer
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     restart: always
+    logging: *default-logging
     env_file:
       - ../env/.env.analyze
     environment:
@@ -417,7 +441,7 @@ services:
   #     - private
 
   public-web:
-    image: wign/atlsd-public-web:latest
+    image: wign/atlsd-public-web:${ATLSD_IMAGE_TAG:-latest}
     env_file:
       - ../env/.env.public-web
     container_name: atlsd-public-web
@@ -431,6 +455,7 @@ services:
     ports:
       - "${PUBLIC_WEB_PORT:-5173}:5173"
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - private
 
@@ -442,5 +467,6 @@ volumes:
   postgres_data:
   clickhouse_data:
   redis_data:
+  nats_data:
   bot_data:
   social_worker_data:

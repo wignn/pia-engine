@@ -30,6 +30,7 @@ type LatestPriceRow = (
     String,
     String,
     Option<chrono::DateTime<chrono::Utc>>,
+    Option<i64>,
 );
 
 pub async fn hydrate_price_cache(state: &AppState) -> anyhow::Result<usize> {
@@ -100,7 +101,7 @@ pub fn price_json_with_calendar(
 }
 
 fn cached_price_from_row(row: LatestPriceRow) -> CachedPrice {
-    let (symbol, price, bid, ask, volume, source, asset_type, received_at) = row;
+    let (symbol, price, bid, ask, volume, source, asset_type, received_at, provider_ts_ms) = row;
     CachedPrice {
         symbol,
         price,
@@ -110,7 +111,7 @@ fn cached_price_from_row(row: LatestPriceRow) -> CachedPrice {
         source,
         asset_type,
         received_at: received_at.map(|dt| dt.to_rfc3339()),
-        timestamp_ms: None,
+        timestamp_ms: provider_ts_ms,
         feed: None,
     }
 }
@@ -157,7 +158,7 @@ async fn load_clickhouse_latest_price(state: &AppState, symbol: &str) -> Option<
 
 pub async fn load_latest_prices(pool: &sqlx::PgPool) -> Result<Vec<CachedPrice>, sqlx::Error> {
     let rows: Vec<LatestPriceRow> = sqlx::query_as(
-        "SELECT symbol, price, bid, ask, volume, source, asset_type, received_at FROM market.market_latest_prices ORDER BY symbol",
+        "SELECT symbol, price, bid, ask, volume, source, asset_type, received_at, provider_ts_ms FROM market.market_latest_prices ORDER BY symbol",
     )
     .fetch_all(pool)
     .await?;
@@ -170,7 +171,7 @@ pub async fn load_latest_price(
     symbol: &str,
 ) -> Result<Option<CachedPrice>, sqlx::Error> {
     let row: Option<LatestPriceRow> = sqlx::query_as(
-        "SELECT symbol, price, bid, ask, volume, source, asset_type, received_at FROM market.market_latest_prices WHERE symbol = $1",
+        "SELECT symbol, price, bid, ask, volume, source, asset_type, received_at, provider_ts_ms FROM market.market_latest_prices WHERE symbol = $1",
     )
     .bind(symbol)
     .fetch_optional(pool)

@@ -29,6 +29,8 @@ pub struct OhlcvCandle {
     pub volume: f64,
     pub tick_count: u64,
     pub corrected: bool,
+    pub sequence: u64,
+    pub closed_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

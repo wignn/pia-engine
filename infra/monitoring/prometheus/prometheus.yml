@@ -30,6 +30,21 @@ scrape_configs:
     static_configs:
       - targets: ["realtime-gateway:8020"]
 
+  - job_name: market-data
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["market-data:8010"]
+
+  - job_name: news-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["news-service:8030"]
+
+  - job_name: ingestion-gateway
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["ingestion-gateway:8091"]
+
   - job_name: service-health
     metrics_path: /probe
     params:

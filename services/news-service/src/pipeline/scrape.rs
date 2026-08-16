@@ -9,15 +9,10 @@ use tracing::{info, warn};
 
 use crate::config::Config;
 
-/// scrapy only knows these sources (see services/scrapy/src/scraper/mod.rs).
-/// No point publishing a job it will reject.
 pub fn is_supported(url: &str) -> bool {
     url.contains("fxstreet.com") || url.contains("investing.com")
 }
 
-/// Publish a fetch job keyed by the article's content_hash so the result loop
-/// can match the extracted content back to the row. Best-effort: a NATS hiccup
-/// must not fail news ingestion.
 pub async fn connect_publisher(url: &str) -> anyhow::Result<Arc<jetstream::Context>> {
     let client = async_nats::connect(url).await?;
     let jetstream = jetstream::new(client);
@@ -37,35 +32,21 @@ pub async fn publish_job(
     content_hash: &str,
     url: &str,
 ) -> anyhow::Result<()> {
-    let payload = format!(
-        r#"{{"id":{},"url":{}}}"#,
-        json_str(content_hash),
-        json_str(url)
-    );
+    let job = atlsd_contracts::scrape::ScrapeJob {
+        id: Some(content_hash.to_string()),
+        url: url.to_string(),
+    };
+    let payload = serde_json::to_vec(&job)?;
     jetstream
-        .publish(
-            subjects::SCRAPE_JOBS.to_string(),
-            payload.into_bytes().into(),
-        )
+        .publish(subjects::SCRAPE_JOBS.to_string(), payload.into())
         .await?
         .await?;
     Ok(())
 }
 
-/// scrapy's ScrapeResult (services/scrapy/src/models/mod.rs). We only need id + content.
-#[derive(Deserialize)]
-struct ScrapeResult {
-    id: String,
-    ok: bool,
-    news: Option<News>,
-    #[serde(default)]
-    error: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct News {
-    content: Option<String>,
-}
+/// The result payload is the shared atlsd-contracts type; only id + content
+/// are consumed here.
+type ScrapeResult = atlsd_contracts::scrape::ScrapeResult;
 
 /// Subscribe to scrape.results and backfill original_content by content_hash.
 /// Reconnect loop mirrors realtime.rs.
@@ -132,13 +113,6 @@ async fn subscribe_loop(nats_url: &str, pool: &PgPool) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Minimal JSON string escaping (quotes + backslashes) — the only two
-/// characters that can break a URL or hex hash embedded in JSON.
-fn json_str(value: &str) -> String {
-    let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
-    format!("\"{escaped}\"")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,14 +125,16 @@ mod tests {
     }
 
     #[test]
-    fn job_payload_is_valid_json_and_escapes_quotes() {
-        let payload = format!(
-            r#"{{"id":{},"url":{}}}"#,
-            json_str("hash\"1"),
-            json_str(r#"https://x.com/a"b"#)
-        );
+    fn job_payload_serializes_via_shared_contract() {
+        let job = atlsd_contracts::scrape::ScrapeJob {
+            id: Some("hash\"1".to_string()),
+            url: r#"https://x.com/a"b"#.to_string(),
+        };
+        let payload = serde_json::to_string(&job).unwrap();
         let value: serde_json::Value = serde_json::from_str(&payload).unwrap();
         assert_eq!(value["id"], "hash\"1");
         assert_eq!(value["url"], r#"https://x.com/a"b"#);
+        let parsed: atlsd_contracts::scrape::ScrapeJob = serde_json::from_str(&payload).unwrap();
+        assert_eq!(parsed, job);
     }
 }

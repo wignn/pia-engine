@@ -1,5 +1,9 @@
 use tracing_subscriber::{fmt, EnvFilter};
 
+pub mod metrics;
+
+pub use metrics::MetricsRegistry;
+
 pub fn init_tracing(service_name: &str, log_level: &str) {
     let log_level = match log_level.to_uppercase().as_str() {
         "DEBUG" => "debug",

@@ -70,12 +70,20 @@ services:
     image: nats:2.10-alpine
     container_name: nats
     restart: unless-stopped
-    command: ["-js", "-m", "8222"]
+    command: ["-js", "-m", "8222", "-sd", "/data"]
     ports:
       - "4222:4222"
       - "8222:8222"
+    volumes:
+      - nats_data:/data
     networks:
       - private
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8222/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   social-worker:
     container_name: social-worker
@@ -115,22 +123,26 @@ services:
     networks:
       - private
 
-  clickhouse-migrate:
-    image: clickhouse/clickhouse-server:24.8-alpine
-    container_name: clickhouse-migrate
+  db-migrate:
+    image: wign/atlsd-db-migrate
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.db-migrate
+      args:
+        - DOCKER_BUILD_TYPE=release
+    container_name: db-migrate
     restart: "no"
+    env_file:
+      - ../env/.env.db
+    environment:
+      MIGRATIONS_CORE_DIR: /migrations/core
+      MIGRATIONS_CLICKHOUSE_DIR: /migrations/clickhouse
+      CLICKHOUSE_URL: http://clickhouse:8123
     volumes:
-      - ../../db/migrations/clickhouse:/migrations:ro
-    command:
-      - sh
-      - -c
-      - |
-        set -eu
-        for migration in $$(ls /migrations/*.sql | sort); do
-          echo "Applying $$migration"
-          clickhouse-client --host clickhouse --multiquery < "$$migration"
-        done
+      - ../../db/migrations:/migrations:ro
     depends_on:
+      postgres:
+        condition: service_healthy
       clickhouse:
         condition: service_healthy
     networks:
@@ -180,7 +192,7 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
-      clickhouse-migrate:
+      db-migrate:
         condition: service_completed_successfully
       nats:
         condition: service_started
@@ -248,7 +260,7 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
-      clickhouse-migrate:
+      db-migrate:
         condition: service_completed_successfully
       analyzer:
         condition: service_started
@@ -333,28 +345,6 @@ services:
       timeout: 5s
       retries: 5
 
-  rsshub:
-    image: diygod/rsshub:latest
-    container_name: rsshubs
-    restart: unless-stopped
-    env_file:
-      - ../env/.env.rsshub
-    ports:
-      - "1201:1200"
-    networks:
-      - private
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "require('http').get('http://127.0.0.1:1200/',res=>process.exit(res.statusCode<500?0:1)).on('error',()=>process.exit(1))",
-        ]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-
 networks:
   private:
     external: false
@@ -366,6 +356,7 @@ volumes:
   postgres_data:
   clickhouse_data:
   redis_data:
+  nats_data:
   social_worker_data:
 
 

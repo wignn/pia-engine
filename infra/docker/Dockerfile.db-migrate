@@ -1,0 +1,39 @@
+FROM lukemathwalker/cargo-chef:latest-rust-1.95-bookworm AS chef
+
+WORKDIR /app
+
+FROM chef AS planner
+
+COPY Cargo.toml Cargo.lock ./
+COPY services/db-migrate/Cargo.toml services/db-migrate/Cargo.toml
+COPY crates/ crates/
+
+RUN mkdir -p services/db-migrate/src && echo "fn main(){}" > services/db-migrate/src/main.rs
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+
+ARG DOCKER_BUILD_TYPE=release
+
+ENV SQLX_OFFLINE=true
+COPY --from=planner /app/recipe.json recipe.json
+
+RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cargo chef cook --release --recipe-path recipe.json; else cargo chef cook --recipe-path recipe.json; fi
+
+COPY Cargo.toml Cargo.lock ./
+COPY services/db-migrate/ services/db-migrate/
+COPY crates/ crates/
+
+RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cargo build --release -p db-migrate; else cargo build -p db-migrate; fi
+RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cp /app/target/release/db-migrate /app/target/db-migrate; else cp /app/target/debug/db-migrate /app/target/db-migrate; fi
+
+FROM debian:bookworm-slim AS runtime
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/target/db-migrate /usr/local/bin/db-migrate
+
+ENTRYPOINT ["/usr/local/bin/db-migrate"]

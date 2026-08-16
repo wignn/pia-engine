@@ -16,13 +16,19 @@ pub async fn build_broker(cfg: &Config) -> Arc<dyn EventPublisher> {
     };
 
     match mode {
-        EventBusMode::Redis => redis.unwrap_or_else(|| Arc::new(NoopPublisher)),
-        EventBusMode::Nats => nats.unwrap_or_else(|| Arc::new(NoopPublisher)),
+        EventBusMode::Redis => redis.unwrap_or_else(|| {
+            panic!("EVENTBUS_MODE=redis requires a working Redis publisher (check REDIS_URL)")
+        }),
+        EventBusMode::Nats => nats.unwrap_or_else(|| {
+            panic!("EVENTBUS_MODE=nats requires a working NATS publisher (check NATS_URL)")
+        }),
         EventBusMode::Dual => match (redis, nats) {
             (Some(redis), Some(nats)) => Arc::new(DualPublisher::new(redis, nats)),
-            (Some(redis), None) => redis,
-            (None, Some(nats)) => nats,
-            (None, None) => Arc::new(NoopPublisher),
+            (redis, nats) => panic!(
+                "EVENTBUS_MODE=dual requires both Redis and NATS publishers (redis_ok={} nats_ok={})",
+                redis.is_some(),
+                nats.is_some()
+            ),
         },
         EventBusMode::Noop => Arc::new(NoopPublisher),
     }
@@ -125,12 +131,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn build_broker_does_not_wait_for_nats_in_redis_mode() {
+    #[should_panic(expected = "EVENTBUS_MODE=redis requires a working Redis publisher")]
+    async fn build_broker_fails_hard_in_redis_mode_without_redis() {
         let mut cfg = test_config("nats://127.0.0.1:1".to_string());
         cfg.eventbus_mode = "redis".to_string();
 
         let result = tokio::time::timeout(Duration::from_millis(500), build_broker(&cfg)).await;
-
-        assert!(result.is_ok(), "Redis mode should not initialize NATS");
+        assert!(
+            result.is_err(),
+            "build_broker should not initialize NATS in redis mode"
+        );
     }
 }

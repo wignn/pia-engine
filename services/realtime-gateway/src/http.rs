@@ -11,7 +11,7 @@ use axum::{
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
-use crate::state::{AppState, Ticket};
+use crate::state::AppState;
 
 pub fn build_router(state: AppState) -> Router {
     let cors = CorsLayer::new()
@@ -121,11 +121,8 @@ async fn ws_handler_inner(
         .cloned();
 
     if let Some(ticket_id) = params.get("ticket") {
-        let mut store = state.ticket_store.write().await;
-        if let Some(ticket) = store.remove(ticket_id) {
-            if std::time::Instant::now() < ticket.expires_at {
-                token = Some(ticket.api_key);
-            }
+        if let Some(api_key) = state.ticket_store.redeem(ticket_id).await {
+            token = Some(api_key);
         }
     }
 
@@ -140,10 +137,15 @@ async fn ws_handler_inner(
         Some(registry) => registry.validate_key(raw_key).await,
         None => None,
     };
-    let admin_authenticated =
-        !state.config.admin_api_key.is_empty() && raw_key == &state.config.admin_api_key;
-    let authenticated =
-        admin_authenticated || tenant_context.is_some() || state.config.api_keys.contains(raw_key);
+    let admin_authenticated = !state.config.admin_api_key.is_empty()
+        && atlsd_auth::internal::secrets_match(&state.config.admin_api_key, raw_key);
+    let authenticated = admin_authenticated
+        || tenant_context.is_some()
+        || state
+            .config
+            .api_keys
+            .iter()
+            .any(|key| atlsd_auth::internal::secrets_match(key, raw_key));
     if !authenticated {
         return reject_ws(
             &state,
@@ -204,11 +206,30 @@ async fn ws_handler_inner(
 
     let user_id: Option<Uuid> = tenant_context.as_ref().map(|tenant| tenant.user_id);
     let hub = state.hub.clone();
+    let snapshot = state.snapshot.clone();
     ws.on_upgrade(move |socket| async move {
+        // Catch-up for clients that connected already subscribed to market
+        // streams: deliver the latest-price snapshot before the live stream.
+        let wants_snapshot = crate::snapshot::wants_market_snapshot(&initial_streams);
         let (client_id, rx) = hub
             .register_api_key(bot_id.clone(), initial_streams, user_id, api_key_id)
             .await;
-        crate::client::handle_registered_socket(socket, hub, client_id, rx, tenant_context).await;
+        if wants_snapshot {
+            let snapshot = snapshot.clone();
+            let hub = hub.clone();
+            tokio::spawn(async move {
+                crate::snapshot::send_snapshot(&snapshot, &hub, client_id).await;
+            });
+        }
+        crate::client::handle_registered_socket(
+            socket,
+            hub,
+            client_id,
+            rx,
+            tenant_context,
+            snapshot,
+        )
+        .await;
     })
 }
 
@@ -229,32 +250,26 @@ async fn generate_ws_ticket(
         .map(|s| s.strip_prefix("Bearer ").unwrap_or(s).to_string())
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    let admin_authenticated =
-        !state.config.admin_api_key.is_empty() && api_key == state.config.admin_api_key;
+    let admin_authenticated = !state.config.admin_api_key.is_empty()
+        && atlsd_auth::internal::secrets_match(&state.config.admin_api_key, &api_key);
     let valid = admin_authenticated
         || match &state.tenant_registry {
             Some(registry) => registry.validate_key(&api_key).await.is_some(),
             None => false,
         }
-        || state.config.api_keys.contains(&api_key);
+        || state
+            .config
+            .api_keys
+            .iter()
+            .any(|key| atlsd_auth::internal::secrets_match(key, &api_key));
     if !valid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    let ticket_id = Uuid::new_v4().to_string();
-    let ticket = Ticket {
-        api_key,
-        expires_at: std::time::Instant::now() + std::time::Duration::from_secs(30),
-    };
-
-    state
+    let ticket_id = state
         .ticket_store
-        .write()
-        .await
-        .insert(ticket_id.clone(), ticket);
-    let mut store = state.ticket_store.write().await;
-    let now = std::time::Instant::now();
-    store.retain(|_, ticket| ticket.expires_at > now);
+        .issue(api_key, std::time::Duration::from_secs(30))
+        .await;
 
     Ok(Json(TicketResponse { ticket: ticket_id }))
 }

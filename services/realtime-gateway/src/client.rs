@@ -51,6 +51,7 @@ pub async fn handle_registered_socket(
     client_id: crate::hub::ClientId,
     mut rx: mpsc::Receiver<Vec<u8>>,
     tenant_context: Option<TenantContext>,
+    snapshot: Arc<crate::snapshot::Snapshot>,
 ) {
     use axum::extract::ws::Message;
     use futures_util::{SinkExt, StreamExt};
@@ -116,6 +117,7 @@ pub async fn handle_registered_socket(
                         &control_tx,
                         tenant_context.as_ref(),
                         text.as_str(),
+                        &snapshot,
                     )
                     .await;
                 }
@@ -143,6 +145,7 @@ async fn handle_command(
     control_tx: &mpsc::Sender<Vec<u8>>,
     tenant_context: Option<&TenantContext>,
     text: &str,
+    snapshot: &Arc<crate::snapshot::Snapshot>,
 ) {
     hub.metrics().command();
     let command = match serde_json::from_str::<ClientCommand>(text) {
@@ -172,7 +175,16 @@ async fn handle_command(
                 send_control(control_tx, streams::error_response(&error, command.id)).await;
                 return;
             }
-            hub.subscribe(client_id, streams).await;
+            hub.subscribe(client_id, streams.clone()).await;
+            // Catch-up: a fresh market subscription first receives the current
+            // latest-price snapshot, then continues with the live stream.
+            if crate::snapshot::wants_market_snapshot(&streams) {
+                let snapshot = snapshot.clone();
+                let hub = hub.clone();
+                tokio::spawn(async move {
+                    crate::snapshot::send_snapshot(&snapshot, &hub, client_id).await;
+                });
+            }
             send_control(
                 control_tx,
                 json!({ "result": Value::Null, "id": command.id.unwrap_or(Value::Null) }),

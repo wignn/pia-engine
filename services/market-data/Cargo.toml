@@ -10,6 +10,7 @@ name = "market-data"
 path = "src/main.rs"
 
 [dependencies]
+atlsd-auth = { path = "../../crates/atlsd-auth" }
 atlsd-common = { path = "../../crates/atlsd-common" }
 atlsd-contracts = { path = "../../crates/atlsd-contracts" }
 atlsd-eventbus = { path = "../../crates/atlsd-eventbus" }

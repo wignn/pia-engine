@@ -138,13 +138,22 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'infra/docker/Dockerfile.scrapy'
+            db_migrate:
+              - 'services/db-migrate/**'
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'infra/docker/Dockerfile.db-migrate'
               - '.dockerignore'
 
       - name: Build Docker matrix
         id: matrix
         shell: bash
         env:
-          BUILD_ALL: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
+          # Every push to main builds the FULL image set: the deploy job pins
+          # ATLSD_IMAGE_TAG to this commit's sha, and a pinned deploy requires
+          # every service image to exist at that exact tag.
+          BUILD_ALL: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' }}
           CONTROL_PLANE_CHANGED: ${{ steps.filter.outputs.control_plane }}
           INGESTION_CHANGED: ${{ steps.filter.outputs.ingestion }}
           BOT_CHANGED: ${{ steps.filter.outputs.bot }}
@@ -158,6 +167,7 @@ jobs:
           PUBLIC_WEB_CHANGED: ${{ steps.filter.outputs.public_web }}
           SOCIAL_WORKER_CHANGED: ${{ steps.filter.outputs.social_worker }}
           SCRAPY_CHANGED: ${{ steps.filter.outputs.scrapy }}
+          DB_MIGRATE_CHANGED: ${{ steps.filter.outputs.db_migrate }}
         run: |
           json='{"include":['
           sep=''
@@ -218,6 +228,10 @@ jobs:
           if [[ "$BUILD_ALL" == "true" || "$SCRAPY_CHANGED" == "true" ]]; then
             add '{"image":"atlsd-scrapy","dockerfile":"infra/docker/Dockerfile.scrapy"}'
           fi
+
+          if [[ "$BUILD_ALL" == "true" || "$DB_MIGRATE_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-db-migrate","dockerfile":"infra/docker/Dockerfile.db-migrate"}'
+          fi
           json="${json}]}";
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
 
@@ -273,14 +287,24 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
-    needs: docker
-    if: github.ref == 'refs/heads/main' && always() && needs.docker.result == 'success'
+    needs: [check, docker]
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      !cancelled() &&
+      needs.check.result == 'success' &&
+      needs.docker.result != 'failure'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
+      - name: Resolve pinned image tag
+        id: tag
+        run: echo "image_tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
       - name: Deploy production over SSH
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
         with:
           host: ${{ secrets.PROD_SSH_HOST }}
           username: ${{ secrets.PROD_SSH_USER }}
@@ -288,12 +312,41 @@ jobs:
           port: ${{ secrets.PROD_SSH_PORT || 22 }}
           script: |
             set -euo pipefail
-            cd ${{ secrets.PROD_APP_DIR }}
-            git pull origin main --ff-only
+            cd "${{ secrets.PROD_APP_DIR }}"
+
+            # Infra files (compose, migrations, scripts) must match the commit
+            # being deployed; local edits on the VPS are treated as a bug.
+            git fetch origin main
+            git reset --hard origin/main
+
             cd infra/compose
-            docker compose -f prod.yml pull
+            export ATLSD_IMAGE_TAG="${IMAGE_TAG}"
+
+            echo "deploying pinned images: ${ATLSD_IMAGE_TAG}"
+            docker compose -f prod.yml pull --ignore-buildable
             docker compose -f prod.yml up -d --remove-orphans
+
+            echo "waiting for healthchecks to settle..."
+            sleep 30
             docker compose -f prod.yml ps
+
+            if docker compose -f prod.yml ps --format json | grep -q '"unhealthy"'; then
+              echo "::error::one or more services are UNHEALTHY after deploy"
+              echo "rollback: cd ${{ secrets.PROD_APP_DIR }}/infra/compose && ATLSD_IMAGE_TAG=<previous-sha> docker compose -f prod.yml up -d"
+              exit 1
+            fi
+
+            for endpoint in http://127.0.0.1:8000/health http://127.0.0.1:8010/health http://127.0.0.1:8020/health http://127.0.0.1:8030/health; do
+              if ! curl -sf --max-time 5 "$endpoint" > /dev/null; then
+                echo "::error::endpoint failed after deploy: $endpoint"
+                echo "rollback: cd ${{ secrets.PROD_APP_DIR }}/infra/compose && ATLSD_IMAGE_TAG=<previous-sha> docker compose -f prod.yml up -d"
+                exit 1
+              fi
+            done
+
+            echo "pruning dangling images from previous deploys"
+            docker image prune -f
+            echo "deploy of ${ATLSD_IMAGE_TAG} completed and verified"
 
 
 

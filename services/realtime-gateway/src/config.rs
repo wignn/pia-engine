@@ -13,6 +13,7 @@ pub struct Config {
     pub redis_subscribe_enabled: bool,
     pub eventbus_mode: String,
     pub nats_url: String,
+    pub market_data_url: String,
 }
 
 impl Config {
@@ -45,6 +46,7 @@ impl Config {
             redis_subscribe_enabled: env_bool("REALTIME_REDIS_SUBSCRIBE_ENABLED", true),
             eventbus_mode: get_env("EVENTBUS_MODE", "redis"),
             nats_url: get_env("NATS_URL", "nats://localhost:4222"),
+            market_data_url: get_env("MARKET_DATA_URL", "http://market-data:8010"),
         }
     }
 
