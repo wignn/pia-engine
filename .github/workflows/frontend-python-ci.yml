@@ -16,9 +16,10 @@ jobs:
         working-directory: apps/pia
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
-          submodules: recursive
+          # Fetch root submodules only; apps/pia contains a stale nested old-portal gitlink.
+          submodules: true
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
@@ -40,9 +41,10 @@ jobs:
         working-directory: apps/public-web
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
-          submodules: recursive
+          # Fetch root submodules only; apps/pia contains a stale nested old-portal gitlink.
+          submodules: true
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
@@ -64,9 +66,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
-          submodules: recursive
+          # Fetch root submodules only; apps/pia contains a stale nested old-portal gitlink.
+          submodules: true
 
       - name: Install Python
         uses: actions/setup-python@v5

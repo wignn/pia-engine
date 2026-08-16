@@ -13,9 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
-          submodules: recursive
+          submodules: true
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -50,9 +50,10 @@ jobs:
       has_changes: ${{ steps.matrix.outputs.has_changes }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
-          submodules: recursive
+          # Fetch root submodules only; apps/pia contains a stale nested old-portal gitlink.
+          submodules: true
 
       - name: Detect changed services
         id: filter
@@ -252,9 +253,10 @@ jobs:
       matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
-          submodules: recursive
+          # Fetch root submodules only; apps/pia contains a stale nested old-portal gitlink.
+          submodules: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
