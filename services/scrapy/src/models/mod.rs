@@ -1,5 +1,3 @@
-use atlsd_contracts::scrape::ScrapedNews;
-
 pub use atlsd_contracts::scrape::{ScrapeJob, ScrapeResult, ScrapedNews as News};
 
 pub fn validate_job(job: ScrapeJob, fallback_id: String) -> anyhow::Result<ValidatedJob> {
@@ -21,12 +19,3 @@ pub struct ValidatedJob {
     pub id: String,
     pub url: String,
 }
-
-const _: fn(Option<String>, Option<String>, Option<String>, Option<String>, String) -> ScrapedNews =
-    |title, author, published_time, content, url| ScrapedNews {
-        title,
-        author,
-        published_time,
-        content,
-        url,
-    };

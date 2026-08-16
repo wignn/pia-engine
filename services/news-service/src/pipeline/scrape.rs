@@ -3,7 +3,6 @@ use std::sync::Arc;
 use async_nats::jetstream::stream::RetentionPolicy;
 use async_nats::jetstream::{self, stream};
 use atlsd_eventbus::subjects;
-use serde::Deserialize;
 use sqlx::PgPool;
 use tracing::{info, warn};
 
