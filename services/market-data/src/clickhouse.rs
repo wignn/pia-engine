@@ -275,7 +275,6 @@ fn ident(value: &str) -> String {
         .collect::<String>()
 }
 
-
 fn string_literal(value: &str) -> String {
     format!("'{}'", value.replace('\\', "\\\\").replace('\'', "\\''"))
 }
