@@ -13,12 +13,10 @@ RETURN_TRANSLATED_TEXT = os.getenv("RETURN_TRANSLATED_TEXT", "true").lower() == 
 RETURN_TRANSLATED_TEXT_MAX_CHARS = int(os.getenv("RETURN_TRANSLATED_TEXT_MAX_CHARS", "2500"))
 
 IMPORTANT_KEYWORDS = [
-    # English
     "cpi", "inflation", "core", "nfp", "nonfarm", "payroll", "jobless",
     "claims", "unemployment", "pmi", "gdp", "fed", "fomc", "rate",
     "interest", "earnings", "revenue", "eps", "guidance", "dxy", "gold",
     "dollar", "forecast", "expected", "previous", "actual", "yield",
-    # Indonesian
     "inflasi", "inti", "klaim", "pengangguran", "tenaga kerja", "pmi",
     "imp", "pdb", "suku bunga", "bank indonesia", "bi", "the fed",
     "perkiraan", "diprakirakan", "ekspektasi", "sebelumnya", "aktual",

@@ -30,14 +30,10 @@ pub struct GeoSignalAssetQuery {
     pub window_hours: Option<i64>,
 }
 
-/// Normalizes the limit query parameter with defaults and clamping.
-/// Default: 50, Range: 1..200
 fn normalized_limit(limit: Option<i64>) -> i64 {
     limit.unwrap_or(50).clamp(1, 200)
 }
 
-/// Normalizes the min_severity query parameter with defaults and clamping.
-/// Default: 0.0, Range: 0.0..1.0
 fn normalized_min_severity(min_severity: Option<f64>) -> f64 {
     min_severity.unwrap_or(0.0).clamp(0.0, 1.0)
 }

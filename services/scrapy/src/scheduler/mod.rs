@@ -1,8 +1,7 @@
 pub mod worker;
 
-use std::{sync::Arc, time::Duration};
-
 use crate::{app::Config, error::Result, scraper::Scraper, storage::NatsStore};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::{Mutex, mpsc};
 
 pub struct Scheduler {

@@ -571,7 +571,6 @@ mod tests {
         let streams = candidate_streams("geosignals", &data);
         assert!(streams.contains("geosignals:asset:AAPL"));
         assert!(streams.contains("geosignals:asset:MSFT"));
-        // Should not contain empty asset stream
         assert!(!streams.iter().any(|s| s == "geosignals:asset:"));
     }
 

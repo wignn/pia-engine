@@ -273,9 +273,7 @@ jobs:
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix=sha-
-            type=ref,event=tag
+            type=raw,value=latest
 
       - name: Build and push image
         uses: docker/build-push-action@v6
@@ -299,14 +297,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Resolve pinned image tag
-        id: tag
-        run: echo "image_tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-
       - name: Deploy production over SSH
         uses: appleboy/ssh-action@v1.2.0
-        env:
-          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
         with:
           host: ${{ secrets.PROD_SSH_HOST }}
           username: ${{ secrets.PROD_SSH_USER }}
@@ -322,9 +314,9 @@ jobs:
             git reset --hard origin/main
 
             cd infra/compose
-            export ATLSD_IMAGE_TAG="${IMAGE_TAG}"
+            export ATLSD_IMAGE_TAG=latest
 
-            echo "deploying pinned images: ${ATLSD_IMAGE_TAG}"
+            echo "deploying images: ${ATLSD_IMAGE_TAG}"
             docker compose -f prod.yml pull --ignore-buildable
             docker compose -f prod.yml up -d --remove-orphans
 
@@ -334,14 +326,14 @@ jobs:
 
             if docker compose -f prod.yml ps --format json | grep -q '"unhealthy"'; then
               echo "::error::one or more services are UNHEALTHY after deploy"
-              echo "rollback: cd ${{ secrets.PROD_APP_DIR }}/infra/compose && ATLSD_IMAGE_TAG=<previous-sha> docker compose -f prod.yml up -d"
+              echo "rollback: cd ${{ secrets.PROD_APP_DIR }}/infra/compose && ATLSD_IMAGE_TAG=latest docker compose -f prod.yml up -d"
               exit 1
             fi
 
             for endpoint in http://127.0.0.1:8000/health http://127.0.0.1:8010/health http://127.0.0.1:8020/health http://127.0.0.1:8030/health; do
               if ! curl -sf --max-time 5 "$endpoint" > /dev/null; then
                 echo "::error::endpoint failed after deploy: $endpoint"
-                echo "rollback: cd ${{ secrets.PROD_APP_DIR }}/infra/compose && ATLSD_IMAGE_TAG=<previous-sha> docker compose -f prod.yml up -d"
+                echo "rollback: cd ${{ secrets.PROD_APP_DIR }}/infra/compose && ATLSD_IMAGE_TAG=latest docker compose -f prod.yml up -d"
                 exit 1
               fi
             done

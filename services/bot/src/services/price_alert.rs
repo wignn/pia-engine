@@ -104,7 +104,6 @@ pub async fn check_price(
         return;
     }
 
-    // Remove triggered alerts from cache
     {
         let mut cache = ALERT_CACHE.write();
         let upper = symbol.to_uppercase();

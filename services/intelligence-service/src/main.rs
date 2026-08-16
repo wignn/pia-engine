@@ -4,7 +4,6 @@ mod http;
 mod sentiment;
 mod state;
 mod why_move;
-
 use axum::Json;
 use serde_json::{json, Value};
 use std::sync::Arc;

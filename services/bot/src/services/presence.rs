@@ -5,7 +5,6 @@ pub fn spawn_presence_loop(shard_manager: Arc<ShardManager>) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
         let mut idx = 0usize;
-
         loop {
             interval.tick().await;
 

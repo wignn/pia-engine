@@ -7,7 +7,6 @@ from ..poller import PollingWorker
 
 
 async def publish_worker(config: Config, worker: PollingWorker) -> None:
-    """Publish cross-platform JSON records to Core NATS."""
     try:
         import nats
     except ImportError as exc:

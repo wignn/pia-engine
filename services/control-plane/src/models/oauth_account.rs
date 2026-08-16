@@ -18,7 +18,6 @@ pub struct OAuthAccount {
 }
 
 impl OAuthAccount {
-    /// Find an OAuth account by provider + provider_id.
     #[allow(dead_code)]
     pub async fn find_by_provider(
         db: &PgPool,

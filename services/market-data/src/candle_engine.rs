@@ -98,8 +98,6 @@ impl CandleEngine {
             .filter(|((_, minute), _)| *minute + self.grace + chrono::Duration::seconds(60) <= now)
             .map(|((symbol, minute), _)| (symbol.clone(), *minute))
             .collect();
-        // Chronological order so downstream consumers can apply events as a
-        // timeline even across symbols.
         due.sort_by_key(|(_, minute)| *minute);
 
         let mut events = Vec::with_capacity(due.len());
