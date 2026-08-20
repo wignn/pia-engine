@@ -248,7 +248,11 @@ impl ClickHouseMigrator {
             .http
             .post(&self.url)
             .basic_auth(&self.user, Some(&self.password))
-            .query(&[("database", self.database.as_str()), ("query", sql)])
+            .query(&[("database", self.database.as_str())])
+            // ClickHouse rejects bodyless POSTs with 411; a body makes reqwest
+            // send Content-Length, and keeps long statements out of the URL.
+            .header(reqwest::header::CONTENT_TYPE, "text/plain; charset=utf-8")
+            .body(sql.to_string())
             .send()
             .await?;
         let status = response.status();
