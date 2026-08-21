@@ -52,18 +52,20 @@ impl Config {
             &get_env("PRIMARY_FX_SYMBOLS", ""),
             "forex",
             MAX_SYMBOLS_PER_API_KEY,
+            true,
         );
         let secondary_fx_symbols = parse_symbol_mappings(
             &get_env("SECONDARY_FX_SYMBOLS", ""),
             "forex",
             MAX_SYMBOLS_PER_API_KEY,
+            true,
         );
         let secondary_fx_symbols = if secondary_fx_symbols.is_empty() {
             let legacy = get_env("SECONDARY_SYMBOLS", "");
             if !legacy.trim().is_empty() {
                 warn!("SECONDARY_SYMBOLS is deprecated; use SECONDARY_FX_SYMBOLS with provider|public|asset_type mappings");
             }
-            parse_symbol_mappings(&legacy, "forex", MAX_SYMBOLS_PER_API_KEY)
+            parse_symbol_mappings(&legacy, "forex", MAX_SYMBOLS_PER_API_KEY, true)
         } else {
             secondary_fx_symbols
         };
@@ -85,11 +87,13 @@ impl Config {
             &get_env("INDEX_FEED_SYMBOLS", ""),
             "index",
             MAX_NON_CRYPTO_SYMBOLS,
+            false,
         );
         let stock_feed_symbols = parse_symbol_mappings(
             &get_env("STOCK_FEED_SYMBOLS", ""),
             "stock",
             MAX_NON_CRYPTO_SYMBOLS,
+            false,
         );
         let (primary_fx_symbols, secondary_fx_symbols, index_feed_symbols, stock_feed_symbols) =
             deduplicate_non_crypto_symbols(
@@ -183,6 +187,7 @@ fn parse_symbol_mappings(
     raw: &str,
     _default_asset_type: &str,
     limit: usize,
+    strip_colon: bool,
 ) -> Vec<MarketSymbolConfig> {
     raw.split(',')
         .filter_map(|item| {
@@ -205,7 +210,11 @@ fn parse_symbol_mappings(
             }
 
             Some(MarketSymbolConfig {
-                provider_symbol: normalize_provider_symbol(provider_symbol),
+                provider_symbol: if strip_colon {
+                    normalize_provider_symbol(provider_symbol)
+                } else {
+                    provider_symbol.to_string()
+                },
                 public_symbol: public_symbol.to_uppercase(),
                 asset_type: asset_type.to_lowercase(),
             })
@@ -315,14 +324,20 @@ fn configured_non_crypto_count() -> usize {
         "FX:EURUSD|EURUSD|forex,FX:GBPUSD|GBPUSD|forex",
         "forex",
         MAX_SYMBOLS_PER_API_KEY,
+        true,
     );
     let secondary = parse_symbol_mappings(
         "FX:USDJPY|USDJPY|forex,FX:AUDUSD|AUDUSD|forex",
         "forex",
         MAX_SYMBOLS_PER_API_KEY,
+        true,
     );
-    let indices =
-        parse_symbol_mappings("IDX:COMPOSITE|IHSG|index", "index", MAX_NON_CRYPTO_SYMBOLS);
+    let indices = parse_symbol_mappings(
+        "IDX:COMPOSITE|IHSG|index",
+        "index",
+        MAX_NON_CRYPTO_SYMBOLS,
+        false,
+    );
     let stocks = Vec::new();
     let (primary, secondary, indices, stocks) =
         deduplicate_non_crypto_symbols(primary, secondary, indices, stocks);
@@ -346,7 +361,7 @@ mod tests {
 
     #[test]
     fn parses_mappings_and_rejects_bare_symbols() {
-        let parsed = parse_symbol_mappings("FX:EURUSD|EURUSD|forex,SPX", "index", 100);
+        let parsed = parse_symbol_mappings("FX:EURUSD|EURUSD|forex,SPX", "index", 100, true);
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].provider_symbol, "FXEURUSD");
         assert_eq!(parsed[0].public_symbol, "EURUSD");
@@ -411,7 +426,7 @@ mod tests {
             .collect::<Vec<_>>()
             .join(",");
         assert_eq!(
-            parse_symbol_mappings(&raw, "forex", MAX_SYMBOLS_PER_API_KEY).len(),
+            parse_symbol_mappings(&raw, "forex", MAX_SYMBOLS_PER_API_KEY, true).len(),
             MAX_SYMBOLS_PER_API_KEY
         );
     }
