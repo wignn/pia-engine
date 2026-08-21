@@ -239,7 +239,7 @@ fn fallback_session(symbol: &str, asset_type: &str, now: DateTime<Utc>) -> Marke
                 None,
             )
         }
-        "JCI" => {
+        "IHSG" | "JCI" => {
             return regular_session(
                 "IDX",
                 chrono_tz::Asia::Jakarta,

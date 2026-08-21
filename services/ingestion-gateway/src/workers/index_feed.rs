@@ -3,7 +3,7 @@ use chrono::Utc;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use crate::config::{Config, MarketSymbolConfig};
 use crate::workers::tradingview;
@@ -14,7 +14,19 @@ const POLL_INTERVAL_SEC: u64 = 10;
 const TOPIC: &str = subjects::MD_RAW_INDEX_QUOTES_V1;
 
 pub async fn run(cfg: Arc<Config>, broker: Arc<dyn EventPublisher>) {
-    info!(worker = WORKER, "starting reference price poller");
+    let symbol_count = cfg.index_feed_symbols.len() + cfg.stock_feed_symbols.len();
+    if symbol_count == 0 {
+        warn!(
+            worker = WORKER,
+            "no reference symbols configured; poller will remain idle"
+        );
+    } else {
+        info!(
+            worker = WORKER,
+            symbols = symbol_count,
+            "starting reference price poller"
+        );
+    }
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
