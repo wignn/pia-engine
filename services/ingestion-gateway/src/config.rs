@@ -325,6 +325,17 @@ fn configured_non_crypto_count() -> usize {
     symbol_count(&primary, &secondary, &indices, &stocks)
 }
 
+fn get_env(key: &str, fallback: &str) -> String {
+    env::var(key).unwrap_or_else(|_| fallback.to_string())
+}
+
+fn get_env_u64(key: &str, fallback: u64) -> u64 {
+    env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(fallback)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -399,15 +410,4 @@ mod tests {
             MAX_SYMBOLS_PER_API_KEY
         );
     }
-}
-
-fn get_env(key: &str, fallback: &str) -> String {
-    env::var(key).unwrap_or_else(|_| fallback.to_string())
-}
-
-fn get_env_u64(key: &str, fallback: u64) -> u64 {
-    env::var(key)
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(fallback)
 }
