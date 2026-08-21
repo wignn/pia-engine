@@ -205,13 +205,17 @@ fn parse_symbol_mappings(
             }
 
             Some(MarketSymbolConfig {
-                provider_symbol: provider_symbol.to_string(),
+                provider_symbol: normalize_provider_symbol(provider_symbol),
                 public_symbol: public_symbol.to_uppercase(),
                 asset_type: asset_type.to_lowercase(),
             })
         })
         .take(limit)
         .collect()
+}
+
+fn normalize_provider_symbol(provider_symbol: &str) -> String {
+    provider_symbol.trim().replace(':', "")
 }
 
 fn cap_non_crypto_symbols(
@@ -344,6 +348,7 @@ mod tests {
     fn parses_mappings_and_rejects_bare_symbols() {
         let parsed = parse_symbol_mappings("FX:EURUSD|EURUSD|forex,SPX", "index", 100);
         assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].provider_symbol, "FXEURUSD");
         assert_eq!(parsed[0].public_symbol, "EURUSD");
         assert_eq!(parsed[0].asset_type, "forex");
     }

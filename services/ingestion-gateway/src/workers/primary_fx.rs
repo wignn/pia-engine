@@ -8,7 +8,15 @@ use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::json;
 use tokio::time::{interval, Instant, MissedTickBehavior};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{
+        client::IntoClientRequest,
+        http::header::{HOST, USER_AGENT},
+        http::HeaderValue,
+        Message,
+    },
+};
 use tracing::{debug, error, info, warn};
 
 use super::{
@@ -89,18 +97,43 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn EventPublisher>, health: Heal
             "connecting to market data websocket"
         );
 
-        let ws_stream = match connect_async(&url).await {
-            Ok((stream, _response)) => {
-                info!(worker = WORKER, "websocket connected");
-                health.set_connected(WORKER, true).await;
-                backoff.reset();
-                stream
-            }
-            Err(e) => {
-                let delay = backoff.next_delay();
-                error!(worker = WORKER, error = %e, retry_secs = delay.as_secs(), "websocket connection failed");
-                tokio::time::sleep(delay).await;
-                continue;
+        let ws_stream = {
+            let req_res = url.as_str().into_client_request().map(|mut req| {
+                if let Ok(parsed_url) = url::Url::parse(&url) {
+                    if let Some(host) = parsed_url.host_str() {
+                        if let Ok(host_val) = HeaderValue::from_str(host) {
+                            req.headers_mut().insert(HOST, host_val);
+                        }
+                    }
+                }
+                req.headers_mut().insert(
+                    USER_AGENT,
+                    HeaderValue::from_static("ATLSD-IngestionGateway/1.0"),
+                );
+                req
+            });
+
+            match req_res {
+                Ok(req) => match connect_async(req).await {
+                    Ok((stream, _response)) => {
+                        info!(worker = WORKER, "websocket connected");
+                        health.set_connected(WORKER, true).await;
+                        backoff.reset();
+                        stream
+                    }
+                    Err(e) => {
+                        let delay = backoff.next_delay();
+                        error!(worker = WORKER, error = %e, retry_secs = delay.as_secs(), "websocket connection failed");
+                        tokio::time::sleep(delay).await;
+                        continue;
+                    }
+                },
+                Err(e) => {
+                    let delay = backoff.next_delay();
+                    error!(worker = WORKER, error = %e, retry_secs = delay.as_secs(), "websocket request construction failed");
+                    tokio::time::sleep(delay).await;
+                    continue;
+                }
             }
         };
 
@@ -109,7 +142,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn EventPublisher>, health: Heal
         for symbol in &cfg.primary_fx_symbols {
             let sub_msg = json!({
                 "type": "subscribe",
-                "symbol": symbol.provider_symbol
+                "symbol": symbol.provider_symbol.replace(':', "")
             });
 
             if let Err(e) = write.send(Message::Text(sub_msg.to_string())).await {
@@ -216,7 +249,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn EventPublisher>, health: Heal
         for symbol in &cfg.primary_fx_symbols {
             let unsub_msg = json!({
                 "type": "unsubscribe",
-                "symbol": symbol.provider_symbol
+                "symbol": symbol.provider_symbol.replace(':', "")
             });
             let _ = write.send(Message::Text(unsub_msg.to_string())).await;
         }
