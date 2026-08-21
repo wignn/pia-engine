@@ -68,15 +68,9 @@ pub async fn fetch_quote(
 }
 
 async fn fetch_scanner_quote(client: &reqwest::Client, symbol: &str) -> anyhow::Result<Value> {
-    let ticker = if symbol.contains(':') {
-        symbol.to_string()
-    } else {
-        format!("{symbol}")
-    };
-
     let payload = serde_json::json!({
         "symbols": {
-            "tickers": [ticker],
+            "tickers": [symbol],
             "query": { "types": [] }
         },
         "columns": ["close", "last", "lp", "price"]
