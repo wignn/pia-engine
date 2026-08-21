@@ -52,20 +52,20 @@ impl Config {
             &get_env("PRIMARY_FX_SYMBOLS", ""),
             "forex",
             MAX_SYMBOLS_PER_API_KEY,
-            true,
+            false,
         );
         let secondary_fx_symbols = parse_symbol_mappings(
             &get_env("SECONDARY_FX_SYMBOLS", ""),
             "forex",
             MAX_SYMBOLS_PER_API_KEY,
-            true,
+            false,
         );
         let secondary_fx_symbols = if secondary_fx_symbols.is_empty() {
             let legacy = get_env("SECONDARY_SYMBOLS", "");
             if !legacy.trim().is_empty() {
                 warn!("SECONDARY_SYMBOLS is deprecated; use SECONDARY_FX_SYMBOLS with provider|public|asset_type mappings");
             }
-            parse_symbol_mappings(&legacy, "forex", MAX_SYMBOLS_PER_API_KEY, true)
+            parse_symbol_mappings(&legacy, "forex", MAX_SYMBOLS_PER_API_KEY, false)
         } else {
             secondary_fx_symbols
         };
@@ -361,9 +361,9 @@ mod tests {
 
     #[test]
     fn parses_mappings_and_rejects_bare_symbols() {
-        let parsed = parse_symbol_mappings("FX:EURUSD|EURUSD|forex,SPX", "index", 100, true);
+        let parsed = parse_symbol_mappings("FX:EURUSD|EURUSD|forex,SPX", "index", 100, false);
         assert_eq!(parsed.len(), 1);
-        assert_eq!(parsed[0].provider_symbol, "FXEURUSD");
+        assert_eq!(parsed[0].provider_symbol, "FX:EURUSD");
         assert_eq!(parsed[0].public_symbol, "EURUSD");
         assert_eq!(parsed[0].asset_type, "forex");
     }

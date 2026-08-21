@@ -68,20 +68,49 @@ pub async fn fetch_quote(
 }
 
 async fn fetch_scanner_quote(client: &reqwest::Client, symbol: &str) -> anyhow::Result<Value> {
+    let ticker = if symbol.contains(':') {
+        symbol.to_string()
+    } else {
+        format!("{symbol}")
+    };
+
     let payload = serde_json::json!({
         "symbols": {
-            "tickers": [symbol],
+            "tickers": [ticker],
             "query": { "types": [] }
         },
-        "columns": ["close", "currency", "description", "exchange"]
+        "columns": ["close", "last", "lp", "price"]
     });
 
+    let scanner_url = if symbol.starts_with("IDX:") || symbol.ends_with(".JK") {
+        "https://scanner.tradingview.com/indonesia/scan"
+    } else if symbol.starts_with("NASDAQ:") || symbol.starts_with("NYSE:") || symbol.starts_with("AMEX:") {
+        "https://scanner.tradingview.com/america/scan"
+    } else {
+        "https://scanner.tradingview.com/global/scan"
+    };
+
     let res = client
-        .post("https://scanner.tradingview.com/global/scan")
+        .post(scanner_url)
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .header("Accept", "application/json")
         .json(&payload)
         .send()
         .await?;
     if !res.status().is_success() {
+        // Fallback to global scan if regional fails
+        if scanner_url != "https://scanner.tradingview.com/global/scan" {
+            let fallback_res = client
+                .post("https://scanner.tradingview.com/global/scan")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .header("Accept", "application/json")
+                .json(&payload)
+                .send()
+                .await?;
+            if fallback_res.status().is_success() {
+                return Ok(fallback_res.json().await?);
+            }
+        }
         anyhow::bail!("TradingView scanner HTTP status error: {}", res.status());
     }
 

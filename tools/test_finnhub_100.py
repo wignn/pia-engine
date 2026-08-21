@@ -268,8 +268,7 @@ def dedupe_and_cap(groups: tuple[list[Mapping], ...]) -> list[Mapping]:
 def candidate(mapping: Mapping) -> Candidate:
     provider = mapping.provider.strip().upper()
     if mapping.asset_type == "forex":
-        symbol = provider.replace(":", "")
-        return Candidate(mapping, symbol)
+        return Candidate(mapping, provider)
     if mapping.asset_type == "stock":
         exchange = provider.split(":", 1)[0] if ":" in provider else ""
         if exchange in {"NASDAQ", "NYSE", "NYSEARCA", "AMEX", "LSE"}:

@@ -142,7 +142,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn EventPublisher>, health: Heal
         for symbol in &cfg.primary_fx_symbols {
             let sub_msg = json!({
                 "type": "subscribe",
-                "symbol": symbol.provider_symbol.replace(':', "")
+                "symbol": symbol.provider_symbol
             });
 
             if let Err(e) = write.send(Message::Text(sub_msg.to_string())).await {
@@ -249,7 +249,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn EventPublisher>, health: Heal
         for symbol in &cfg.primary_fx_symbols {
             let unsub_msg = json!({
                 "type": "unsubscribe",
-                "symbol": symbol.provider_symbol.replace(':', "")
+                "symbol": symbol.provider_symbol
             });
             let _ = write.send(Message::Text(unsub_msg.to_string())).await;
         }
