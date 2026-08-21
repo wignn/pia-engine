@@ -84,7 +84,10 @@ async fn fetch_scanner_quote(client: &reqwest::Client, symbol: &str) -> anyhow::
 
     let scanner_url = if symbol.starts_with("IDX:") || symbol.ends_with(".JK") {
         "https://scanner.tradingview.com/indonesia/scan"
-    } else if symbol.starts_with("NASDAQ:") || symbol.starts_with("NYSE:") || symbol.starts_with("AMEX:") {
+    } else if symbol.starts_with("NASDAQ:")
+        || symbol.starts_with("NYSE:")
+        || symbol.starts_with("AMEX:")
+    {
         "https://scanner.tradingview.com/america/scan"
     } else {
         "https://scanner.tradingview.com/global/scan"
@@ -92,7 +95,10 @@ async fn fetch_scanner_quote(client: &reqwest::Client, symbol: &str) -> anyhow::
 
     let res = client
         .post(scanner_url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        )
         .header("Accept", "application/json")
         .json(&payload)
         .send()
@@ -102,7 +108,10 @@ async fn fetch_scanner_quote(client: &reqwest::Client, symbol: &str) -> anyhow::
         if scanner_url != "https://scanner.tradingview.com/global/scan" {
             let fallback_res = client
                 .post("https://scanner.tradingview.com/global/scan")
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .header(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                )
                 .header("Accept", "application/json")
                 .json(&payload)
                 .send()
