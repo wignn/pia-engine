@@ -16,6 +16,18 @@ const MARKET_DEDUP_MAX_BYTES: i64 = 1024 * 1024 * 1024;
 const NEWS_MAX_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 const INTELLIGENCE_MAX_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 const PLATFORM_MAX_AGE: Duration = Duration::from_secs(30 * 24 * 60 * 60);
+const MACRO_MAX_AGE: Duration = Duration::from_secs(30 * 24 * 60 * 60);
+const MACRO_DUPLICATE_WINDOW: Duration = Duration::from_secs(5 * 60);
+
+pub fn macro_stream_config() -> StreamConfig {
+    StreamConfig {
+        name: subjects::ATLSD_MACRO_STREAM.to_string(),
+        subjects: vec![subjects::MACRO_EVENTS_V1.to_string()],
+        duplicate_window: MACRO_DUPLICATE_WINDOW,
+        max_age: MACRO_MAX_AGE,
+        ..Default::default()
+    }
+}
 
 #[derive(Clone)]
 pub struct NatsPublisher {
@@ -89,6 +101,7 @@ pub async fn init_jetstream_streams(client: &async_nats::Client) -> anyhow::Resu
         news_stream_config(),
         intelligence_stream_config(),
         platform_stream_config(),
+        macro_stream_config(),
     ];
 
     for config in configs {

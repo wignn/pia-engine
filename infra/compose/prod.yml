@@ -117,24 +117,6 @@ services:
     networks:
       - private
 
-  scrapy:
-    container_name: scrapy
-    image: wign/atlsd-scrapy:${ATLSD_IMAGE_TAG:-latest}
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.scrapy
-      args:
-        - DOCKER_BUILD_TYPE=release
-    environment:
-      NATS_URL: nats://nats:4222
-    depends_on:
-      nats:
-        condition: service_started
-    restart: always
-    logging: *default-logging
-    networks:
-      - private
-
   db-migrate:
     image: wign/atlsd-db-migrate:${ATLSD_IMAGE_TAG:-latest}
     build:
@@ -231,6 +213,32 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
+      nats:
+        condition: service_started
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  sink-connector:
+    container_name: sink-connector
+    image: wign/atlsd-sink-connector:${ATLSD_IMAGE_TAG:-latest}
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.sink-connector
+      args:
+        - DOCKER_BUILD_TYPE=release
+    env_file:
+      - ../env/.env.market-data
+      - ../env/.env.datastores
+    environment:
+      EVENTBUS_MODE: nats
+      NATS_URL: nats://nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       nats:
         condition: service_started
     restart: always

@@ -1,6 +1,7 @@
 pub mod event_envelope;
 pub mod geosignal;
 pub mod intelligence;
+pub mod macro_data;
 pub mod market;
 pub mod news;
 pub mod platform;

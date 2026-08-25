@@ -1,0 +1,77 @@
+FROM lukemathwalker/cargo-chef:latest-rust-1.85-bookworm AS chef
+
+WORKDIR /app
+
+FROM chef AS planner
+
+COPY Cargo.toml Cargo.lock ./
+COPY services/api-gateway/Cargo.toml services/api-gateway/Cargo.toml
+COPY services/control-plane/Cargo.toml services/control-plane/Cargo.toml
+COPY services/ingestion-gateway/Cargo.toml services/ingestion-gateway/Cargo.toml
+COPY services/market-data/Cargo.toml services/market-data/Cargo.toml
+COPY services/realtime-gateway/Cargo.toml services/realtime-gateway/Cargo.toml
+COPY services/news-service/Cargo.toml services/news-service/Cargo.toml
+COPY services/sink-connector/Cargo.toml services/sink-connector/Cargo.toml
+COPY services/intelligence-service/Cargo.toml services/intelligence-service/Cargo.toml
+COPY services/bot/Cargo.toml services/bot/Cargo.toml
+COPY services/scrapy/Cargo.toml services/scrapy/Cargo.toml
+COPY services/db-migrate/Cargo.toml services/db-migrate/Cargo.toml
+COPY crates/ crates/
+
+RUN mkdir -p services/api-gateway/src services/control-plane/src services/ingestion-gateway/src services/market-data/src services/realtime-gateway/src services/news-service/src services/sink-connector/src services/intelligence-service/src services/bot/src && \
+    echo "fn main(){}" > services/api-gateway/src/main.rs && \
+    echo "fn main(){}" > services/control-plane/src/main.rs && \
+    echo "fn main(){}" > services/ingestion-gateway/src/main.rs && \
+    echo "fn main(){}" > services/market-data/src/main.rs && \
+    echo "fn main(){}" > services/realtime-gateway/src/main.rs && \
+    echo "fn main(){}" > services/news-service/src/main.rs && \
+    echo "fn main(){}" > services/sink-connector/src/main.rs && \
+    echo "fn main(){}" > services/intelligence-service/src/main.rs && \
+    echo "fn main(){}" > services/bot/src/main.rs
+
+RUN mkdir -p services/scrapy/src services/db-migrate/src && \
+    echo "fn main(){}" > services/scrapy/src/main.rs && \
+    echo "fn main(){}" > services/db-migrate/src/main.rs
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+
+ARG DOCKER_BUILD_TYPE=release
+
+ENV SQLX_OFFLINE=true
+
+COPY --from=planner /app/recipe.json recipe.json
+RUN if [ "$DOCKER_BUILD_TYPE" = "debug" ]; then \
+      cargo chef cook --recipe-path recipe.json; \
+    else \
+      cargo chef cook --release --recipe-path recipe.json; \
+    fi
+
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+COPY services/sink-connector/ services/sink-connector/
+
+RUN if [ "$DOCKER_BUILD_TYPE" = "debug" ]; then \
+      cargo build --bin sink-connector; \
+      cp target/debug/sink-connector /app/sink-connector; \
+    else \
+      cargo build --release --bin sink-connector; \
+      cp target/release/sink-connector /app/sink-connector; \
+    fi
+
+FROM debian:bookworm-slim AS runner
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/sink-connector /app/sink-connector
+
+ENV LOG_LEVEL=INFO
+
+CMD ["/app/sink-connector"]
