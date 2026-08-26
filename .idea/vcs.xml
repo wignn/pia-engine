@@ -2,6 +2,7 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/apps/admin-web" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/apps/pia" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/apps/public-web" vcs="Git" />
   </component>
