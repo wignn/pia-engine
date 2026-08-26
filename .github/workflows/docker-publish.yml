@@ -317,7 +317,7 @@ jobs:
 
             echo "pruning dangling images from previous deploys"
             docker image prune -f
-            echo "deploy of ${ATLSD_IMAGE_TAG} completed and verified"
+            echo "deploy completed and verified (commit $(git rev-parse --short HEAD))"
 
 
 
