@@ -13,11 +13,11 @@ COPY services/realtime-gateway/Cargo.toml services/realtime-gateway/Cargo.toml
 COPY services/news-service/Cargo.toml services/news-service/Cargo.toml
 COPY services/intelligence-service/Cargo.toml services/intelligence-service/Cargo.toml
 COPY services/bot/Cargo.toml services/bot/Cargo.toml
-COPY services/scrapy/Cargo.toml services/scrapy/Cargo.toml
+COPY services/sink-connector/Cargo.toml services/sink-connector/Cargo.toml
 COPY services/db-migrate/Cargo.toml services/db-migrate/Cargo.toml
 COPY crates/ crates/
 
-RUN mkdir -p services/api-gateway/src services/control-plane/src services/ingestion-gateway/src services/market-data/src services/realtime-gateway/src services/news-service/src services/intelligence-service/src services/bot/src services/scrapy/src services/db-migrate/src && \
+RUN mkdir -p services/api-gateway/src services/control-plane/src services/ingestion-gateway/src services/market-data/src services/realtime-gateway/src services/news-service/src services/intelligence-service/src services/bot/src services/sink-connector/src services/db-migrate/src && \
     echo "fn main(){}" > services/api-gateway/src/main.rs && \
     echo "fn main(){}" > services/control-plane/src/main.rs && \
     echo "fn main(){}" > services/ingestion-gateway/src/main.rs && \
@@ -26,7 +26,7 @@ RUN mkdir -p services/api-gateway/src services/control-plane/src services/ingest
     echo "fn main(){}" > services/news-service/src/main.rs && \
     echo "fn main(){}" > services/intelligence-service/src/main.rs && \
     echo "fn main(){}" > services/bot/src/main.rs && \
-    echo "fn main(){}" > services/scrapy/src/main.rs && \
+    echo "fn main(){}" > services/sink-connector/src/main.rs && \
     echo "fn main(){}" > services/db-migrate/src/main.rs
 
 RUN cargo chef prepare --recipe-path recipe.json

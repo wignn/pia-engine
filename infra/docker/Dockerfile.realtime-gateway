@@ -13,7 +13,7 @@ COPY services/realtime-gateway/Cargo.toml services/realtime-gateway/Cargo.toml
 COPY services/news-service/Cargo.toml services/news-service/Cargo.toml
 COPY services/intelligence-service/Cargo.toml services/intelligence-service/Cargo.toml
 COPY services/bot/Cargo.toml services/bot/Cargo.toml
-COPY services/scrapy/Cargo.toml services/scrapy/Cargo.toml
+COPY services/sink-connector/Cargo.toml services/sink-connector/Cargo.toml
 COPY services/db-migrate/Cargo.toml services/db-migrate/Cargo.toml
 COPY crates/ crates/
 
@@ -27,8 +27,8 @@ RUN mkdir -p services/api-gateway/src services/control-plane/src services/ingest
     echo "fn main(){}" > services/intelligence-service/src/main.rs && \
     echo "fn main(){}" > services/bot/src/main.rs
 
-RUN mkdir -p services/scrapy/src services/db-migrate/src && \
-    echo "fn main(){}" > services/scrapy/src/main.rs && \
+RUN mkdir -p services/sink-connector/src services/db-migrate/src && \
+    echo "fn main(){}" > services/sink-connector/src/main.rs && \
     echo "fn main(){}" > services/db-migrate/src/main.rs
 
 RUN cargo chef prepare --recipe-path recipe.json
@@ -51,7 +51,7 @@ COPY services/market-data/Cargo.toml services/market-data/Cargo.toml
 COPY services/news-service/Cargo.toml services/news-service/Cargo.toml
 COPY services/intelligence-service/Cargo.toml services/intelligence-service/Cargo.toml
 COPY services/bot/Cargo.toml services/bot/Cargo.toml
-COPY services/scrapy/Cargo.toml services/scrapy/Cargo.toml
+COPY services/sink-connector/Cargo.toml services/sink-connector/Cargo.toml
 COPY services/db-migrate/Cargo.toml services/db-migrate/Cargo.toml
 COPY crates/ crates/
 
@@ -64,7 +64,7 @@ RUN mkdir -p services/api-gateway/src services/control-plane/src services/ingest
     echo "fn main(){}" > services/intelligence-service/src/main.rs && \
     echo "fn main(){}" > services/bot/src/main.rs
 
-RUN mkdir -p services/scrapy/src services/db-migrate/src && echo "fn main(){}" > services/scrapy/src/main.rs && echo "fn main(){}" > services/db-migrate/src/main.rs
+RUN mkdir -p services/sink-connector/src services/db-migrate/src && echo "fn main(){}" > services/sink-connector/src/main.rs && echo "fn main(){}" > services/db-migrate/src/main.rs
 
 RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cargo build --release -p realtime-gateway; else cargo build -p realtime-gateway; fi
 RUN if [ "$DOCKER_BUILD_TYPE" = "release" ]; then cp /app/target/release/realtime-gateway /app/target/realtime-gateway; else cp /app/target/debug/realtime-gateway /app/target/realtime-gateway; fi
