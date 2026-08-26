@@ -141,11 +141,40 @@ deploy_color() {
         --env-file "$ROOT_DIR/infra/env/.env.$1" \
         pull --ignore-buildable
 
-    $COMPOSE -p "atlsd-$1" \
-        -f "$ROOT_DIR/infra/compose/prod.app.yml" \
-        --env-file "$ROOT_DIR/infra/env/.env.shared" \
-        --env-file "$ROOT_DIR/infra/env/.env.$1" \
-        up -d --wait || return 1
+    # Run migrations as an explicit one-shot FIRST: visible logs in CI,
+    # retried on transient datastore hiccups (the --rm one-shot inside
+    # `up --wait` hides its logs and one flaky connect kills the deploy).
+    local attempt
+    for attempt in 1 2 3; do
+        if $COMPOSE -p "atlsd-$1" \
+            -f "$ROOT_DIR/infra/compose/prod.app.yml" \
+            --env-file "$ROOT_DIR/infra/env/.env.shared" \
+            --env-file "$ROOT_DIR/infra/env/.env.$1" \
+            run --rm db-migrate; then
+            break
+        fi
+        if [ "$attempt" == "3" ]; then
+            echo "\u274c db-migrate failed after 3 attempts."
+            return 1
+        fi
+        echo "   [$1] db-migrate failed (attempt $attempt/3) \u2014 retrying in 10s..."
+        sleep 10
+    done
+
+    # `up -d --wait` re-checks migrations (idempotent) while starting the
+    # stack; retried too, since first-connect races have been observed.
+    for attempt in 1 2 3; do
+        if $COMPOSE -p "atlsd-$1" \
+            -f "$ROOT_DIR/infra/compose/prod.app.yml" \
+            --env-file "$ROOT_DIR/infra/env/.env.shared" \
+            --env-file "$ROOT_DIR/infra/env/.env.$1" \
+            up -d --wait; then
+            return 0
+        fi
+        echo "   [$1] stack up failed (attempt $attempt/3) \u2014 retrying in 10s..."
+        sleep 10
+    done
+    return 1
 }
 
 healthcheck_color() {
@@ -163,6 +192,17 @@ healthcheck_color() {
     done
     return 1
 }
+
+# ---------------------------------------------------------------------------
+# Singleton guard: two overlapping deployments would fight over colors,
+# ports and stacks (seen live: manual deploy stopping green mid-CI).
+# ---------------------------------------------------------------------------
+LOCK_FILE="/tmp/atlsd-deploy.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "\u274c Another deployment is already running (lock held). Aborting."
+    exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Determine colors
