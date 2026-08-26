@@ -140,6 +140,13 @@ jobs:
               - 'Cargo.lock'
               - 'infra/docker/Dockerfile.db-migrate'
               - '.dockerignore'
+            sink_connector:
+              - 'services/sink-connector/**'
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'infra/docker/Dockerfile.sink-connector'
+              - '.dockerignore'
 
       - name: Build Docker matrix
         id: matrix
@@ -159,6 +166,7 @@ jobs:
           PUBLIC_WEB_CHANGED: ${{ steps.filter.outputs.public_web }}
           SOCIAL_WORKER_CHANGED: ${{ steps.filter.outputs.social_worker }}
           DB_MIGRATE_CHANGED: ${{ steps.filter.outputs.db_migrate }}
+          SINK_CONNECTOR_CHANGED: ${{ steps.filter.outputs.sink_connector }}
         run: |
           json='{"include":['
           sep=''
@@ -218,6 +226,10 @@ jobs:
 
           if [[ "$BUILD_ALL" == "true" || "$DB_MIGRATE_CHANGED" == "true" ]]; then
             add '{"image":"atlsd-db-migrate","dockerfile":"infra/docker/Dockerfile.db-migrate"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$SINK_CONNECTOR_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-sink-connector","dockerfile":"infra/docker/Dockerfile.sink-connector"}'
           fi
           json="${json}]}";
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
