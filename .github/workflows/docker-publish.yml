@@ -133,12 +133,6 @@ jobs:
               - 'services/social-worker/**'
               - 'infra/docker/Dockerfile.social-worker'
               - '.dockerignore'
-            scrapy:
-              - 'services/scrapy/**'
-              - 'crates/**'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-              - 'infra/docker/Dockerfile.scrapy'
             db_migrate:
               - 'services/db-migrate/**'
               - 'crates/**'
@@ -151,9 +145,6 @@ jobs:
         id: matrix
         shell: bash
         env:
-          # Every push to main builds the FULL image set: the deploy job pins
-          # ATLSD_IMAGE_TAG to this commit's sha, and a pinned deploy requires
-          # every service image to exist at that exact tag.
           BUILD_ALL: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' }}
           CONTROL_PLANE_CHANGED: ${{ steps.filter.outputs.control_plane }}
           INGESTION_CHANGED: ${{ steps.filter.outputs.ingestion }}
@@ -167,7 +158,6 @@ jobs:
           PIA_CHANGED: ${{ steps.filter.outputs.pia }}
           PUBLIC_WEB_CHANGED: ${{ steps.filter.outputs.public_web }}
           SOCIAL_WORKER_CHANGED: ${{ steps.filter.outputs.social_worker }}
-          SCRAPY_CHANGED: ${{ steps.filter.outputs.scrapy }}
           DB_MIGRATE_CHANGED: ${{ steps.filter.outputs.db_migrate }}
         run: |
           json='{"include":['
@@ -224,10 +214,6 @@ jobs:
 
           if [[ "$BUILD_ALL" == "true" || "$SOCIAL_WORKER_CHANGED" == "true" ]]; then
             add '{"image":"atlsd-social-worker","dockerfile":"infra/docker/Dockerfile.social-worker"}'
-          fi
-
-          if [[ "$BUILD_ALL" == "true" || "$SCRAPY_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-scrapy","dockerfile":"infra/docker/Dockerfile.scrapy"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$DB_MIGRATE_CHANGED" == "true" ]]; then
