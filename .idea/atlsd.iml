@@ -1,8 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="JAVA_MODULE" version="4">
+  <component name="GoModuleSettings" enabled="true" />
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
-    <content url="file://$MODULE_DIR$" />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/crates/atlsd-auth/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/atlsd-common/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/atlsd-contracts/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/atlsd-domain/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/atlsd-eventbus/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/atlsd-observability/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/api-gateway/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/bot/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/control-plane/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/db-migrate/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/ingestion-gateway/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/intelligence-service/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/market-data/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/news-service/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/realtime-gateway/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/scrapy/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/sink-connector/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/target" />
+    </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
