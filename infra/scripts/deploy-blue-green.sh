@@ -5,11 +5,16 @@
 # Layout:
 #   prod.infra.yml  – singletons: postgres/clickhouse/redis/nats  (project: atlsd-infra)
 #   prod.edge.yml   – singletons: control-plane/analyzer/bot/...  (project: atlsd-edge)
-#   prod.app.yml    – the COLOR stack: api/market/realtime/news/intel/sink
+#   prod.app.yml    – the COLOR stack: api/market/realtime/news/intel/web/sink
 #                     (projects: atlsd-blue / atlsd-green)
 #
 # Flow: ensure infra+edge -> deploy INACTIVE color -> healthcheck it ->
-#       point router at new color -> switch ACTIVE marker -> stop old color.
+#       point traffic-router at the new color -> switch ACTIVE marker -> stop old.
+#
+# Public ports NEVER move, so the Cloudflare tunnel config never changes:
+#   host 8000 -> router :80 "/"      -> api-gateway        (active color)
+#   host 8020 -> router :80 "/ws*"   -> realtime-gateway   (active color)
+#   host 5173 -> router :81 "/"      -> public-web         (active color)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,17 +30,23 @@ COMPOSE="docker compose"
 # ---------------------------------------------------------------------------
 
 color_ports() {
-    # prints "<api> <rt>" for a given color from its env file
+    # prints "<api> <rt> <web>" for a given color from its env file
     local envf="$ROOT_DIR/infra/env/.env.$1"
-    local api rt
+    local api rt web
     api="$(grep -E '^API_GATEWAY_PORT=' "$envf" | tail -1 | cut -d= -f2 | tr -d '[:space:]')"
     rt="$(grep -E '^REALTIME_GATEWAY_PORT=' "$envf" | tail -1 | cut -d= -f2 | tr -d '[:space:]')"
-    echo "${api:-8000} ${rt:-8020}"
+    web="$(grep -E '^PUBLIC_WEB_PORT=' "$envf" | tail -1 | cut -d= -f2 | tr -d '[:space:]')"
+    echo "${api:-8000} ${rt:-8020} ${web:-5173}"
 }
 
 write_router_conf() {
-    # $1 = api host port, $2 = rt host port
+    # $1 = api host port, $2 = realtime host port, $3 = public-web host port.
+    # Unquoted EOF on purpose: $1/$2/$3 must expand NOW, while nginx vars
+    # stay escaped as \$ so they survive into the generated conf.
     cat > "$ROOT_DIR/infra/compose/router/default.conf" <<EOF
+# ATLSD traffic router — rewritten by deploy-blue-green.sh.
+# Active color ports: api=$1 ws=$2 web=$3 (public ports stay fixed).
+
 upstream api_gateway_backend {
     server 172.17.0.1:$1;
 }
@@ -44,6 +55,11 @@ upstream realtime_gateway_backend {
     server 172.17.0.1:$2;
 }
 
+upstream public_web_backend {
+    server 172.17.0.1:$3;
+}
+
+# ---- REST API + WebSocket (public hosts 8000 / 8020) ----------------------
 server {
     listen 80;
 
@@ -72,14 +88,28 @@ server {
         proxy_send_timeout 3600s;
     }
 }
+
+# ---- Frontend (public host 5173) ------------------------------------------
+server {
+    listen 81;
+
+    location / {
+        proxy_pass http://public_web_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_read_timeout 60s;
+    }
+}
 EOF
 }
 
 switch_traffic() {
     # $1 = color
-    read -r API_PORT RT_PORT <<< "$(color_ports "$1")"
-    echo "🔀  Pointing router at [$1] (api=$API_PORT, ws=$RT_PORT)..."
-    write_router_conf "$API_PORT" "$RT_PORT"
+    read -r API_PORT RT_PORT WEB_PORT <<< "$(color_ports "$1")"
+    echo "🔀  Pointing router at [$1] (api=$API_PORT, ws=$RT_PORT, web=$WEB_PORT)..."
+    write_router_conf "$API_PORT" "$RT_PORT" "$WEB_PORT"
     docker exec atlsd-traffic-router nginx -s reload
 }
 
@@ -93,7 +123,7 @@ stop_color() {
 }
 
 deploy_color() {
-    # $1 = color  -> pull images, run migrations, start stack
+    # $1 = color -> pull images (CI pushes them), run migrations, start stack
     $COMPOSE -p "atlsd-$1" \
         -f "$ROOT_DIR/infra/compose/prod.app.yml" \
         --env-file "$ROOT_DIR/infra/env/.env.shared" \
@@ -165,7 +195,7 @@ echo "🔌 2. Ensuring edge singletons..."
 $COMPOSE -p atlsd-edge -f "$ROOT_DIR/infra/compose/prod.edge.yml" \
     --env-file "$ROOT_DIR/infra/env/.env.shared" pull --ignore-buildable
 $COMPOSE -p atlsd-edge -f "$ROOT_DIR/infra/compose/prod.edge.yml" \
-    --env-file "$ROOT_DIR/infra/env/.env.shared" up -d
+    --env-file "$ROOT_DIR/infra/env/.env.shared" up -d --remove-orphans
 
 # First-ever deployment: router conf still points at default blue ports,
 # which is fine — we flip it after the target becomes healthy.

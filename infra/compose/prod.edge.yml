@@ -102,21 +102,8 @@ services:
     networks:
       - private
 
-  public-web:
-    container_name: atlsd-public-web
-    image: wign/atlsd-public-web:${ATLSD_IMAGE_TAG:-latest}
-    env_file:
-      - ../env/.env.public-web
-    environment:
-      NODE_ENV: production
-      HOST: 0.0.0.0
-      PORT: 5173
-    ports:
-      - "${PUBLIC_WEB_PORT:-5173}:5173"
-    restart: always
-    logging: *default-logging
-    networks:
-      - private
+  # NOTE: public-web (frontend) now ROTATES with the color stacks in
+  # prod.app.yml so deployments never leave the site down.
 
   # Routes public API/WS traffic to whichever color is ACTIVE.
   # Upstream file is rewritten + reloaded by deploy-blue-green.sh:
@@ -124,7 +111,14 @@ services:
   traffic-router:
     container_name: atlsd-traffic-router
     image: nginx:1.27-alpine
+    # Host ports are the PUBLIC tunnel targets and never move:
+    #   8000 -> api, 8020 -> ws (server block :80)
+    #   5173 -> frontend (server block :81)
+    #   8088 -> debug/direct view of server block :80
     ports:
+      - "8000:80"
+      - "8020:80"
+      - "5173:81"
       - "8088:80"
     volumes:
       - ./router:/etc/nginx/conf.d:ro

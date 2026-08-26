@@ -13,14 +13,15 @@
 #   * Only stateless, consumer-isolated services rotate here:
 #       api-gateway, market-data, realtime-gateway, news-service,
 #       intelligence-service, sink-connector (NATS consumer group suffixed
-#       per color via MACRO_SINK_CONSUMER in .env.blue / .env.green).
+#       per color via MACRO_SINK_CONSUMER in .env.blue / .env.green),
+#       public-web (frontend; reached by traffic-router "/fe").
 #   * Singletons (bot, social-worker, ingestion-gateway vendor WS sessions,
-#     control-plane, analyzer, public-web) intentionally do NOT rotate;
+#     control-plane, analyzer) intentionally do NOT rotate;
 #     they live in prod.infra.yml / prod.edge.yml.
 #
 # Host ports come from the selected color env file:
-#   blue  -> 8000 8010 8020 8030 8040
-#   green -> 8001 8011 8021 8031 8041
+#   blue  -> 8000 8010 8020 8030 8040 5173
+#   green -> 8001 8011 8021 8031 8041 5274
 x-default-logging: &default-logging
   driver: json-file
   options:
@@ -174,6 +175,33 @@ services:
       - ../env/.env.datastores
     ports:
       - "${INTELLIGENCE_SERVICE_PORT:-8040}:8040"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  # Frontend rotates WITH the color so a new build never leaves the site
+  # down: old color serves until the new one passes healthcheck. Public
+  # traffic reaches it via traffic-router port 81 (host 5173).
+  public-web:
+    image: wign/atlsd-public-web:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5173/"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    env_file:
+      - ../env/.env.public-web
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 5173
+    ports:
+      - "${PUBLIC_WEB_PORT:-5173}:5173"
     depends_on:
       db-migrate:
         condition: service_completed_successfully
