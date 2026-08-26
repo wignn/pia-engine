@@ -64,7 +64,10 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         };
         let message = result.map_err(|e| anyhow::anyhow!(e))?;
         match handle_message(&pool, &message).await {
-            Ok(()) => message.ack().await.map_err(|e| SinkError::Nats(e.to_string()))?,
+            Ok(()) => message
+                .ack()
+                .await
+                .map_err(|e| SinkError::Nats(e.to_string()))?,
             Err(SinkError::Validation(err)) => {
                 warn!(error = %err, subject = %message.subject, "poison macro event (validation), moving to DLQ");
                 if let Err(dlq_err) = dlq::publish(
@@ -79,7 +82,10 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
                 {
                     warn!(error = %dlq_err, "failed to publish macro DLQ event");
                 }
-                message.ack().await.map_err(|e| SinkError::Nats(e.to_string()))?;
+                message
+                    .ack()
+                    .await
+                    .map_err(|e| SinkError::Nats(e.to_string()))?;
             }
             Err(SinkError::Decode(err)) => {
                 warn!(error = %err, subject = %message.subject, "poison macro event (decode), moving to DLQ");
@@ -96,7 +102,10 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
                 {
                     warn!(error = %dlq_err, "failed to publish macro DLQ event");
                 }
-                message.ack().await.map_err(|e| SinkError::Nats(e.to_string()))?;
+                message
+                    .ack()
+                    .await
+                    .map_err(|e| SinkError::Nats(e.to_string()))?;
             }
             Err(err) => {
                 warn!(error = %err, subject = %message.subject, "transient sink error, nabbing for retry");
