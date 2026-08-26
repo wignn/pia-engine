@@ -107,7 +107,7 @@ pub async fn write_event(pool: &PgPool, event: &MacroEvent) -> anyhow::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
-    use atlsd_contracts::macro_data::{MacroEvent, MacroRate};
+    use atlsd_contracts::macro_data::MacroEvent;
     use chrono::NaiveDate;
 
     #[test]
