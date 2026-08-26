@@ -16,6 +16,9 @@ pub enum SinkError {
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 
+    #[error("nats error: {0}")]
+    Nats(String),
+
     #[error("other error: {0}")]
     Other(#[from] anyhow::Error),
 }
@@ -59,9 +62,9 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         let Some(result) = messages.next().await else {
             continue;
         };
-        let message = result?;
+        let message = result.map_err(|e| anyhow::anyhow!(e))?;
         match handle_message(&pool, &message).await {
-            Ok(()) => message.ack().await.map_err(SinkError::Other)?,
+            Ok(()) => message.ack().await.map_err(|e| SinkError::Nats(e.to_string()))?,
             Err(SinkError::Validation(err)) => {
                 warn!(error = %err, subject = %message.subject, "poison macro event (validation), moving to DLQ");
                 if let Err(dlq_err) = dlq::publish(
@@ -76,7 +79,7 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
                 {
                     warn!(error = %dlq_err, "failed to publish macro DLQ event");
                 }
-                message.ack().await.map_err(SinkError::Other)?;
+                message.ack().await.map_err(|e| SinkError::Nats(e.to_string()))?;
             }
             Err(SinkError::Decode(err)) => {
                 warn!(error = %err, subject = %message.subject, "poison macro event (decode), moving to DLQ");
@@ -93,14 +96,14 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
                 {
                     warn!(error = %dlq_err, "failed to publish macro DLQ event");
                 }
-                message.ack().await.map_err(SinkError::Other)?;
+                message.ack().await.map_err(|e| SinkError::Nats(e.to_string()))?;
             }
             Err(err) => {
                 warn!(error = %err, subject = %message.subject, "transient sink error, nabbing for retry");
                 message
                     .ack_with(AckKind::Nak(Some(Duration::from_secs(5))))
                     .await
-                    .map_err(SinkError::Other)?;
+                    .map_err(|e| SinkError::Nats(e.to_string()))?;
             }
         }
     }
