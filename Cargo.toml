@@ -5,9 +5,9 @@ members = [    "services/control-plane",
     "services/market-data",
     "services/realtime-gateway",
     "services/news-service",
+    "services/sink-connector",
     "services/intelligence-service",
     "services/bot",
-    "services/scrapy",
     "services/db-migrate",
     "crates/*"
 ]

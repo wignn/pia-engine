@@ -1,0 +1,152 @@
+# ATLSD EDGE/SINGLETON stack (never rotates with colors).
+#
+# These app services must exist exactly ONCE regardless of blue/green:
+#   * control-plane   – tenant/auth state owner, single writer
+#   * analyzer        – heavy Python model runtime (3GB image)
+#   * bot             – Discord gateway: one websocket session per token
+#   * social-worker   – X/Twitter poller with SQLite state
+#   * ingestion-gateway – vendor WS sessions (one connection per feed)
+#   * public-web      – static frontend
+#   * traffic-router  – tiny nginx that points api/realtime upstreams at the
+#                       ACTIVE color (rewritten by deploy-blue-green.sh)
+#
+# Colored stacks (prod.app.yml) reach these by stable DNS:
+#   control-plane:8080 / analyzer:5000 / ingestion-gateway:8091
+name: atlsd-edge
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  control-plane:
+    container_name: world-control-plane
+    image: wign/atlsd-control-plane:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    env_file:
+      - ../env/.env.control-plane
+    ports:
+      - "8081:8080"
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  analyzer:
+    container_name: world-analyzer-prod
+    image: wign/atlsd-analyzer:${ATLSD_IMAGE_TAG:-latest}
+    ports:
+      - "127.0.0.1:5000:5000"
+    env_file:
+      - ../env/.env.analyze
+    environment:
+      NATS_URL: nats://nats:4222
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  bot:
+    container_name: atlsd-bot
+    image: wign/atlsd-bot:${ATLSD_IMAGE_TAG:-latest}
+    env_file:
+      - ../env/.env.bot
+    environment:
+      # Via traffic-router: "/" -> api-gateway, "/ws*" -> realtime-gateway
+      API_GATEWAY_URL: http://traffic-router
+      REALTIME_GATEWAY_WS_URL: ws://traffic-router/ws/v1
+      DATABASE_PATH: /data/bot.db
+    volumes:
+      - bot_data:/data
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  social-worker:
+    container_name: atlsd-social-worker
+    image: wign/atlsd-social-worker:${ATLSD_IMAGE_TAG:-latest}
+    env_file:
+      - ../env/.env.social-worker
+    environment:
+      TWITTER_DB: /data/accounts.db
+      NATS_URL: nats://nats:4222
+      NATS_SUBJECT: social.posts
+    volumes:
+      - social_worker_data:/data
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  ingestion-gateway:
+    container_name: atlsd-ingestion
+    image: wign/atlsd-ingestion:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8091/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    env_file:
+      - ../env/.env.ingestion
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  public-web:
+    container_name: atlsd-public-web
+    image: wign/atlsd-public-web:${ATLSD_IMAGE_TAG:-latest}
+    env_file:
+      - ../env/.env.public-web
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 5173
+    ports:
+      - "${PUBLIC_WEB_PORT:-5173}:5173"
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  # Routes public API/WS traffic to whichever color is ACTIVE.
+  # Upstream file is rewritten + reloaded by deploy-blue-green.sh:
+  #   docker exec atlsd-traffic-router nginx -s reload
+  traffic-router:
+    container_name: atlsd-traffic-router
+    image: nginx:1.27-alpine
+    ports:
+      - "8088:80"
+    volumes:
+      - ./router:/etc/nginx/conf.d:ro
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+volumes:
+  bot_data:
+    name: compose_bot_data
+    external: true
+  social_worker_data:
+    name: compose_social_worker_data
+    external: true
+
+networks:
+  private:
+    name: atlsd_private
+    external: true

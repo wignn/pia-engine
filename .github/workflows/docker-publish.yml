@@ -313,30 +313,9 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            cd infra/compose
-            export ATLSD_IMAGE_TAG=latest
-
-            echo "deploying images: ${ATLSD_IMAGE_TAG}"
-            docker compose -f prod.yml pull --ignore-buildable
-            docker compose -f prod.yml up -d --remove-orphans
-
-            echo "waiting for healthchecks to settle..."
-            sleep 30
-            docker compose -f prod.yml ps
-
-            if docker compose -f prod.yml ps --format json | grep -q '"unhealthy"'; then
-              echo "::error::one or more services are UNHEALTHY after deploy"
-              echo "rollback: cd ${{ secrets.PROD_APP_DIR }}/infra/compose && ATLSD_IMAGE_TAG=latest docker compose -f prod.yml up -d"
-              exit 1
-            fi
-
-            for endpoint in http://127.0.0.1:8000/health http://127.0.0.1:8010/health http://127.0.0.1:8020/health http://127.0.0.1:8030/health; do
-              if ! curl -sf --max-time 5 "$endpoint" > /dev/null; then
-                echo "::error::endpoint failed after deploy: $endpoint"
-                echo "rollback: cd ${{ secrets.PROD_APP_DIR }}/infra/compose && ATLSD_IMAGE_TAG=latest docker compose -f prod.yml up -d"
-                exit 1
-              fi
-            done
+            # Execute Blue-Green Zero-Downtime Deployment
+            chmod +x infra/scripts/deploy-blue-green.sh
+            ./infra/scripts/deploy-blue-green.sh
 
             echo "pruning dangling images from previous deploys"
             docker image prune -f

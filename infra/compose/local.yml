@@ -106,23 +106,6 @@ services:
     networks:
       - private
 
-  scrapy:
-    container_name: scrapy
-    image: wign/atlsd-scrapy
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.scrapy
-      args:
-        - DOCKER_BUILD_TYPE=release
-    environment:
-      NATS_URL: nats://nats:4222
-    depends_on:
-      nats:
-        condition: service_started
-    restart: unless-stopped
-    networks:
-      - private
-
   db-migrate:
     image: wign/atlsd-db-migrate
     build:

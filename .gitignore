@@ -21,3 +21,5 @@ CLAUDE.*
 apps/uriel
 apps/worldmonitor
 docs
+# blue-green deployment state (host-local)
+infra/env/active_target

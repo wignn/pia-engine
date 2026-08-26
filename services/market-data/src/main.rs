@@ -150,7 +150,7 @@ async fn main() {
         alert_notifier::run(alert_state).await;
     });
 
-    if cfg.has_fred() {
+    if cfg.has_fred() && !cfg.disable_legacy_macro_sync {
         let econ_cfg = cfg.clone();
         let econ_pool = state.db.clone();
         tokio::spawn(async move {
@@ -164,6 +164,8 @@ async fn main() {
             rates::run_rates_sync(rates_cfg, rates_pool).await;
         });
         info!("rates data sync (FRED) enabled");
+    } else if cfg.disable_legacy_macro_sync {
+        info!("legacy FRED macro sync disabled (managed by macro-feed & sink-connector)");
     }
 
     if cfg.has_eia() {

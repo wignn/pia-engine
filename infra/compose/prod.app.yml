@@ -1,0 +1,188 @@
+# ATLSD Blue/Green APPLICATION stack (per-color).
+#
+# Deployed twice under DIFFERENT project names (see deploy-blue-green.sh):
+#   docker compose -p atlsd-blue  -f prod.app.yml --env-file .env.blue
+#   docker compose -p atlsd-green -f prod.app.yml --env-file .env.green
+#
+# Rules that make true blue/green work:
+#   * NO container_name anywhere -> each project gets its own containers.
+#   * NO build sections          -> images are pulled from the registry (CI builds).
+#   * Attaches to the SHARED external network `atlsd_private` created by
+#     prod.infra.yml, so colored services reach singletons by stable DNS:
+#     postgres / clickhouse / redis / nats / control-plane / analyzer.
+#   * Only stateless, consumer-isolated services rotate here:
+#       api-gateway, market-data, realtime-gateway, news-service,
+#       intelligence-service, sink-connector (NATS consumer group suffixed
+#       per color via MACRO_SINK_CONSUMER in .env.blue / .env.green).
+#   * Singletons (bot, social-worker, ingestion-gateway vendor WS sessions,
+#     control-plane, analyzer, public-web) intentionally do NOT rotate;
+#     they live in prod.infra.yml / prod.edge.yml.
+#
+# Host ports come from the selected color env file:
+#   blue  -> 8000 8010 8020 8030 8040
+#   green -> 8001 8011 8021 8031 8041
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db-migrate:
+    image: wign/atlsd-db-migrate:${ATLSD_IMAGE_TAG:-latest}
+    restart: "no"
+    logging: *default-logging
+    env_file:
+      - ../env/.env.db
+      - ../env/.env.datastores
+    environment:
+      MIGRATIONS_CORE_DIR: /migrations/core
+      MIGRATIONS_CLICKHOUSE_DIR: /migrations/clickhouse
+      CLICKHOUSE_URL: http://clickhouse:8123
+      # Baselines keep an already-migrated store from re-running old files;
+      # fresh installs apply everything from zero.
+      DB_MIGRATE_BASELINE_VERSION: "17"
+      DB_MIGRATE_CLICKHOUSE_BASELINE_VERSION: "1"
+    volumes:
+      - ../../db/migrations:/migrations:ro
+    networks:
+      - private
+
+  api-gateway:
+    image: wign/atlsd-api-gateway:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    env_file:
+      - ../env/.env.api-gateway
+    ports:
+      - "${API_GATEWAY_PORT:-8000}:8000"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      market-data:
+        condition: service_started
+      news-service:
+        condition: service_started
+      intelligence-service:
+        condition: service_started
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  market-data:
+    image: wign/atlsd-market-data:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8010/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    env_file:
+      - ../env/.env.market-data
+      - ../env/.env.datastores
+    environment:
+      EVENTBUS_MODE: nats
+      NATS_URL: nats://nats:4222
+    ports:
+      - "${MARKET_DATA_PORT:-8010}:8010"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  sink-connector:
+    image: wign/atlsd-sink-connector:${ATLSD_IMAGE_TAG:-latest}
+    env_file:
+      - ../env/.env.market-data
+      - ../env/.env.datastores
+      - ../env/.env.${DEPLOY_COLOR}
+    environment:
+      EVENTBUS_MODE: nats
+      NATS_URL: nats://nats:4222
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  realtime-gateway:
+    image: wign/atlsd-realtime-gateway:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8020/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    env_file:
+      - ../env/.env.realtime-gateway
+    environment:
+      EVENTBUS_MODE: nats
+      NATS_URL: nats://nats:4222
+    ports:
+      - "${REALTIME_GATEWAY_PORT:-8020}:8020"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  news-service:
+    image: wign/atlsd-news-service:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8030/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    env_file:
+      - ../env/.env.news-service
+    environment:
+      EVENTBUS_MODE: nats
+      NATS_URL: nats://nats:4222
+    ports:
+      - "${NEWS_SERVICE_PORT:-8030}:8030"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+  intelligence-service:
+    image: wign/atlsd-intelligence-service:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8040/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    env_file:
+      - ../env/.env.intelligence-service
+      - ../env/.env.datastores
+    ports:
+      - "${INTELLIGENCE_SERVICE_PORT:-8040}:8040"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
+networks:
+  private:
+    name: atlsd_private
+    external: true

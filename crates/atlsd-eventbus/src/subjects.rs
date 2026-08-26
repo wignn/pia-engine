@@ -14,6 +14,14 @@ pub const NEWS_FOREX_PROCESSED_V1: &str = "news.forex.processed.v1";
 pub const NEWS_STOCK_PROCESSED_V1: &str = "news.stock.processed.v1";
 pub const SOCIAL_POSTS: &str = "social.posts";
 
+pub const MACRO_RATES_V1: &str = "macro.feed.v1.rates.>";
+pub const MACRO_SPREADS_V1: &str = "macro.feed.v1.spreads.>";
+pub const MACRO_SERIES_V1: &str = "macro.feed.v1.series.>";
+pub const MACRO_BONDS_V1: &str = "macro.feed.v1.bonds.>";
+pub const MACRO_EVENTS_V1: &str = "macro.feed.v1.>";
+pub const ATLSD_MACRO_STREAM: &str = "ATLSD_MACRO";
+pub const MACRO_DLQ_V1: &str = "macro.feed.v1.dlq";
+
 pub const SCRAPE_JOBS: &str = "scrape.jobs";
 pub const SCRAPE_RESULTS: &str = "scrape.results";
 
