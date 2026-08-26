@@ -61,9 +61,25 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         };
         let message = result?;
         match handle_message(&pool, &message).await {
-            Ok(()) => message.ack().await?,
-            Err(SinkError::Validation(err)) | Err(SinkError::Decode(err)) => {
-                warn!(error = %err, subject = %message.subject, "poison macro event, moving to DLQ");
+            Ok(()) => message.ack().await.map_err(SinkError::Other)?,
+            Err(SinkError::Validation(err)) => {
+                warn!(error = %err, subject = %message.subject, "poison macro event (validation), moving to DLQ");
+                if let Err(dlq_err) = dlq::publish(
+                    &js,
+                    dlq::DeadLetter {
+                        source_subject: message.subject.as_str(),
+                        error: &err,
+                        payload: message.payload.as_ref(),
+                    },
+                )
+                .await
+                {
+                    warn!(error = %dlq_err, "failed to publish macro DLQ event");
+                }
+                message.ack().await.map_err(SinkError::Other)?;
+            }
+            Err(SinkError::Decode(err)) => {
+                warn!(error = %err, subject = %message.subject, "poison macro event (decode), moving to DLQ");
                 let error_text = err.to_string();
                 if let Err(dlq_err) = dlq::publish(
                     &js,
@@ -77,13 +93,14 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
                 {
                     warn!(error = %dlq_err, "failed to publish macro DLQ event");
                 }
-                message.ack().await?;
+                message.ack().await.map_err(SinkError::Other)?;
             }
             Err(err) => {
                 warn!(error = %err, subject = %message.subject, "transient sink error, nabbing for retry");
                 message
                     .ack_with(AckKind::Nak(Some(Duration::from_secs(5))))
-                    .await?;
+                    .await
+                    .map_err(SinkError::Other)?;
             }
         }
     }
