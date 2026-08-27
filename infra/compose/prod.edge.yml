@@ -1,17 +1,3 @@
-# ATLSD EDGE/SINGLETON stack (never rotates with colors).
-#
-# These app services must exist exactly ONCE regardless of blue/green:
-#   * control-plane   – tenant/auth state owner, single writer
-#   * analyzer        – heavy Python model runtime (3GB image)
-#   * bot             – Discord gateway: one websocket session per token
-#   * social-worker   – X/Twitter poller with SQLite state
-#   * ingestion-gateway – vendor WS sessions (one connection per feed)
-#   * public-web      – static frontend
-#   * traffic-router  – tiny nginx that points api/realtime upstreams at the
-#                       ACTIVE color (rewritten by deploy-blue-green.sh)
-#
-# Colored stacks (prod.app.yml) reach these by stable DNS:
-#   control-plane:8080 / analyzer:5000 / ingestion-gateway:8091
 name: atlsd-edge
 
 x-default-logging: &default-logging
@@ -102,19 +88,10 @@ services:
     networks:
       - private
 
-  # NOTE: public-web (frontend) now ROTATES with the color stacks in
-  # prod.app.yml so deployments never leave the site down.
 
-  # Routes public API/WS traffic to whichever color is ACTIVE.
-  # Upstream file is rewritten + reloaded by deploy-blue-green.sh:
-  #   docker exec atlsd-traffic-router nginx -s reload
   traffic-router:
     container_name: atlsd-traffic-router
     image: nginx:1.27-alpine
-    # Host ports are the PUBLIC tunnel targets and never move:
-    #   8000 -> api, 8020 -> ws (server block :80)
-    #   5173 -> frontend (server block :81)
-    #   8088 -> debug/direct view of server block :80
     ports:
       - "8000:80"
       - "8020:80"

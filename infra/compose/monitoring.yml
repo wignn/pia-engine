@@ -106,7 +106,8 @@ services:
 
 networks:
   private:
-    driver: bridge
+    name: atlsd_private
+    external: true
   monitoring:
     driver: bridge
 

@@ -21,6 +21,11 @@ if [ ! -f "$MONITORING_ENV" ]; then
     fi
 fi
 
+if ! docker network inspect atlsd_private >/dev/null 2>&1; then
+    echo "❌ atlsd_private network not found. Start the production infrastructure stack first."
+    exit 1
+fi
+
 echo "🚀 Starting Grafana, Prometheus, Alertmanager, Loki, Promtail, Node Exporter..."
 docker compose \
     -f "$ROOT_DIR/infra/compose/monitoring.yml" \

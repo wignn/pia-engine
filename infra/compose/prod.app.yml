@@ -1,27 +1,3 @@
-# ATLSD Blue/Green APPLICATION stack (per-color).
-#
-# Deployed twice under DIFFERENT project names (see deploy-blue-green.sh):
-#   docker compose -p atlsd-blue  -f prod.app.yml --env-file .env.blue
-#   docker compose -p atlsd-green -f prod.app.yml --env-file .env.green
-#
-# Rules that make true blue/green work:
-#   * NO container_name anywhere -> each project gets its own containers.
-#   * NO build sections          -> images are pulled from the registry (CI builds).
-#   * Attaches to the SHARED external network `atlsd_private` created by
-#     prod.infra.yml, so colored services reach singletons by stable DNS:
-#     postgres / clickhouse / redis / nats / control-plane / analyzer.
-#   * Only stateless, consumer-isolated services rotate here:
-#       api-gateway, market-data, realtime-gateway, news-service,
-#       intelligence-service, sink-connector (NATS consumer group suffixed
-#       per color via MACRO_SINK_CONSUMER in .env.blue / .env.green),
-#       public-web (frontend; reached by traffic-router "/fe").
-#   * Singletons (bot, social-worker, ingestion-gateway vendor WS sessions,
-#     control-plane, analyzer) intentionally do NOT rotate;
-#     they live in prod.infra.yml / prod.edge.yml.
-#
-# Host ports come from the selected color env file:
-#   blue  -> 8000 8010 8020 8030 8040 5173
-#   green -> 8001 8011 8021 8031 8041 5274
 x-default-logging: &default-logging
   driver: json-file
   options:
@@ -40,8 +16,6 @@ services:
       MIGRATIONS_CORE_DIR: /migrations/core
       MIGRATIONS_CLICKHOUSE_DIR: /migrations/clickhouse
       CLICKHOUSE_URL: http://clickhouse:8123
-      # Baselines keep an already-migrated store from re-running old files;
-      # fresh installs apply everything from zero.
       DB_MIGRATE_BASELINE_VERSION: "17"
       DB_MIGRATE_CLICKHOUSE_BASELINE_VERSION: "1"
     volumes:
@@ -183,9 +157,6 @@ services:
     networks:
       - private
 
-  # Frontend rotates WITH the color so a new build never leaves the site
-  # down: old color serves until the new one passes healthcheck. Public
-  # traffic reaches it via traffic-router port 81 (host 5173).
   public-web:
     image: wign/atlsd-public-web:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:

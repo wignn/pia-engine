@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-#
-# ATLSD Blue/Green deployment (CI-built images, VPS only pulls).
-#
 # Layout:
 #   prod.infra.yml  – singletons: postgres/clickhouse/redis/nats  (project: atlsd-infra)
 #   prod.edge.yml   – singletons: control-plane/analyzer/bot/...  (project: atlsd-edge)
