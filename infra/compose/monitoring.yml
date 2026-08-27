@@ -63,6 +63,7 @@ services:
     pid: host
     volumes:
       - /:/host:ro,rslave
+      # Host-generated docker_stats.prom must persist across monitoring recreates.
       - ../monitoring/textfile:/textfile:ro
     networks:
       - monitoring

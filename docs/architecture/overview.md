@@ -1,53 +1,104 @@
-# ATLSD Architecture Overview
+# ATLSD architecture overview
 
-ATLSD is an event-driven, multi-tenant market intelligence platform. The
-authoritative plan for ongoing work is `docs/architecture/REMEDIATION_PLAN.md`;
-the target-state design lives in `target-institutional-platform.md`.
+ATLSD is an event-driven, multi-tenant market intelligence platform. The current runtime is split into domain services and workers, connected by versioned contracts and NATS JetStream. Long-term institutional design remains documented separately in [`target-institutional-platform.md`](target-institutional-platform.md); this file describes the current system rather than every roadmap item.
 
-## Architecture Layers
+## Runtime layers
 
-1. **Frontend Applications (`apps/`)** — both are git submodules:
-   - `pia`: Next.js dashboard for SaaS tenant control.
-   - `public-web`: SvelteKit public marketing site.
-2. **Rust services (`services/`)**:
-   - `ingestion-gateway`: vendor feeds (FX/crypto/index/options) → normalized
-     `md.raw.*` events on NATS JetStream.
-   - `market-data`: consumes raw ticks, dedup + monotonic guard, persists to
-     Postgres (latest prices) and ClickHouse (tick tape), builds candles
-     (in-memory engine + ClickHouse materialized views), serves market REST.
-   - `news-service`: RSS/vendor news pipeline, economic calendar, scrapes via
-     `scrapy`, publishes domain events through the transactional outbox.
-   - `intelligence-service`: sentiment, Why-Did-It-Move, factor analysis;
-     calls the Python `analyzer` runtime.
-   - `realtime-gateway`: WebSocket fanout to clients; durable JetStream
-     consumers, catch-up snapshots, Redis-backed single-use tickets.
-   - `api-gateway`: public REST entrypoint (API keys, quotas, proxy to domain
-     services with the internal shared secret).
-   - `control-plane`: SaaS users, plans, API keys, OAuth.
-   - `scrapy`: article extraction worker (NATS `scrape.jobs` → `scrape.results`).
-   - `bot`: Discord delivery.
-   - `db-migrate`: versioned migration runner (Postgres + ClickHouse) with
-     schema history, checksums, and baselining.
-3. **Python services**:
-   - `analyzer`: FinBERT/sentiment runtime (internal, called by intelligence-service).
-   - `social-worker`: Twitter/TruthSocial poller → `social.posts`.
-4. **Shared crates (`crates/`)**: `atlsd-contracts` (event contracts),
-   `atlsd-eventbus` (JetStream publishers/streams/consumers), `atlsd-auth`
-   (internal auth, JWT, API keys), `atlsd-common`, `atlsd-domain`,
-   `atlsd-observability` (tracing + Prometheus metrics registry).
+### Frontends
 
-## Datastores
+- `apps/public-web` — SvelteKit public market dashboard for prices, charts, options, macro signals, sentiment, news, and calendar views.
+- `apps/pia/pia` — Next.js portal/admin surface for product, tenant, usage, account, and operational administration.
 
-- **PostgreSQL** (`core`): SaaS state, news, market latest prices, outbox,
-  dead-letter batches.
-- **ClickHouse** (`market`): tick tape (`price_ticks`), OHLCV materialized
-  from ticks (`ohlcv_1m` + 5m/15m/1h rollups).
-- **NATS JetStream**: durable domain events (market raw, market dedup +
-  candles, news, intelligence, platform).
-- **Redis**: cache, counters, WS tickets, compatibility pub/sub.
+Both applications are maintained as separate Git submodules with their own package manifests and lockfiles.
 
-## Entry points
+### Rust services
 
-Public REST: api-gateway (`:8000`) · WebSocket: realtime-gateway (`:8020`) ·
-Admin: control-plane (`:8081`) · Public site: public-web (`:5173`).
-All other services and datastores are internal-only.
+- `api-gateway` — authenticated REST entrypoint, routing, API-key usage logging, and quota middleware.
+- `realtime-gateway` — authenticated WebSocket connections, subscriptions, snapshots, durable consumers, fanout, and backpressure handling.
+- `market-data` — prices, history, sessions, data quality, spikes, rates, economic indicators, energy, COT, options, and Fear & Greed APIs.
+- `news-service` — forex/stock news, calendar, source status, macro dashboard, geopolitical signals, SEC data, and central-bank documents.
+- `intelligence-service` — text analysis, sentiment, Why Did It Move, factor outputs, and analyzer orchestration.
+- `ingestion-gateway` — vendor market-feed sessions, normalization, bounded event publishing, and raw market events.
+- `sink-connector` — durable macro-event consumer that materializes rates, spreads, series, bonds, and scraped-news updates into PostgreSQL.
+- `control-plane` — users, authentication, plans, API keys, tenant configuration, quotas, and usage.
+- `bot` — Discord integration and delivery.
+- `db-migrate` — ordered PostgreSQL, ClickHouse, and bot migration runner with checksums and baselining.
+
+### Go and Python workers
+
+- `macro-feed` — FRED rates/spreads and TradingEconomics bond snapshot collection; publishes macro events to NATS.
+- `analyzer` — internal FinBERT/language/model runtime used by intelligence workflows.
+- `social-worker` — social/X-compatible polling and `social.posts` publishing.
+
+### Shared crates
+
+`crates/` contains authentication/security helpers, common configuration/errors, domain models, versioned event contracts, event-bus adapters, and tracing/observability helpers.
+
+## Current data flow
+
+```mermaid
+flowchart LR
+    providers[External providers]
+    ingest[ingestion-gateway]
+    macro[macro-feed]
+    nats[(NATS JetStream)]
+    market[market-data]
+    news[news-service]
+    intel[intelligence-service]
+    sink[sink-connector]
+    pg[(PostgreSQL)]
+    ch[(ClickHouse)]
+    redis[(Redis)]
+    api[api-gateway]
+    rt[realtime-gateway]
+    clients[Web · Portal · Bot · API clients]
+
+    providers --> ingest --> nats
+    providers --> macro --> nats
+    nats --> market
+    nats --> news
+    nats --> intel
+    nats --> sink --> pg
+    market --> pg
+    market --> ch
+    news --> pg
+    intel --> pg
+    intel --> ch
+    api --> market
+    api --> news
+    api --> intel
+    rt --> clients
+    api --> clients
+    redis -. cache · quota · ticket state .- api
+    redis -. hot state .- rt
+```
+
+## Storage responsibilities
+
+- PostgreSQL stores tenant/SaaS state, news, latest prices, macro rates/spreads/series, Fear & Greed records, materialized state, and migration metadata.
+- ClickHouse stores market ticks, OHLCV/time-series workloads, volatility data, and analytical reads.
+- NATS JetStream provides durable events, consumer acknowledgements, replay, and DLQ workflows.
+- Redis provides cache, counters, quota state, short-lived WebSocket tickets, hot state, and transitional compatibility pub/sub.
+
+## Current deployment
+
+Docker Compose is the supported production deployment model. Stacks are separated by lifecycle:
+
+```text
+prod.infra.yml  -> datastores and external network atlsd_private
+prod.edge.yml   -> edge router and singleton services
+prod.app.yml    -> blue/green application services
+monitoring.yml  -> monitoring and diagnostics services
+```
+
+The application stack rotates stateless services between blue and green Compose projects. The stacks share the external Docker network `atlsd_private`; monitoring joins that network for service discovery and a separate monitoring network for observability components. Kubernetes manifests are not maintained as part of the current runtime.
+
+## Service entrypoints
+
+- REST: `api-gateway`.
+- WebSocket: `realtime-gateway`.
+- Authentication and tenant administration: `control-plane`.
+- Public market dashboard: `public-web`.
+- Internal service-to-service traffic and data stores: private network only.
+
+See [`events.md`](events.md), [`ingestion.md`](ingestion.md), [`realtime.md`](realtime.md), and the root [`README.md`](../../README.md) for contracts, operations, and API details.

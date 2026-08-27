@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-OUT_DIR="${1:-/home/wign/atlsd/infra/monitoring/textfile}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MONITORING_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+OUT_DIR="${1:-$MONITORING_DIR/textfile}"
 TMP_FILE="$OUT_DIR/docker_stats.prom.$$"
+
+if ! mkdir -p "$OUT_DIR"; then
+    printf 'cannot create metrics directory: %s\n' "$OUT_DIR" >&2
+    exit 1
+fi
 OUT_FILE="$OUT_DIR/docker_stats.prom"
-mkdir -p "$OUT_DIR"
 
 escape_label() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'

@@ -226,10 +226,20 @@ echo "=============================================="
 
 LEGACY_IDS="$(docker ps -q --filter 'label=com.docker.compose.project=compose')"
 if [ -n "$LEGACY_IDS" ]; then
-    echo "🧟 0. Legacy stack detected (project 'compose'). Stopping it once..."
-    docker compose -p compose -f "$ROOT_DIR/infra/compose/prod.yml" down --remove-orphans || \
-        docker stop $LEGACY_IDS || true
-    echo "   Legacy stack retired. Blue/green takes over from here."
+    echo "🧟 0. Legacy stack detected (project 'compose'). Stopping legacy application services only..."
+    # Never run `compose down` here: an older monitoring deployment may share
+    # the same project label and must survive application deployments. Select
+    # only services declared by the legacy production file and stop those IDs.
+    LEGACY_SERVICES="$(docker compose -p compose -f "$ROOT_DIR/infra/compose/prod.yml" ps -q \
+        api-gateway market-data sink-connector realtime-gateway news-service \
+        intelligence-service control-plane ingestion-gateway bot analyzer \
+        public-web social-worker 2>/dev/null || true)"
+    if [ -n "$LEGACY_SERVICES" ]; then
+        docker stop $LEGACY_SERVICES >/dev/null
+        docker rm $LEGACY_SERVICES >/dev/null 2>&1 || true
+    fi
+    echo "   Legacy application services retired. Blue/green takes over from here."
+    echo "   Monitoring containers are intentionally left untouched."
 fi
 
 # ---------------------------------------------------------------------------

@@ -28,6 +28,7 @@ fi
 
 echo "🚀 Starting Grafana, Prometheus, Alertmanager, Loki, Promtail, Node Exporter..."
 docker compose \
+    -p atlsd-monitoring \
     -f "$ROOT_DIR/infra/compose/monitoring.yml" \
     --env-file "$MONITORING_ENV" \
     up -d --remove-orphans

@@ -2192,7 +2192,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "topk(12, atlsd_docker_container_cpu_percent)",
+          "expr": "topk(12, max by (container) (atlsd_docker_container_cpu_percent))",
           "instant": true,
           "legendFormat": "{{container}}",
           "range": false,
@@ -2260,7 +2260,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "topk(12, atlsd_docker_container_memory_usage_bytes)",
+          "expr": "topk(12, max by (container) (atlsd_docker_container_memory_usage_bytes))",
           "instant": true,
           "legendFormat": "{{container}}",
           "range": false,
