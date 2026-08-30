@@ -18,7 +18,7 @@ type Config struct {
 	FredInterval time.Duration `envconfig:"FRED_INTERVAL" default:"1h"`
 
 	NatsURL    string `envconfig:"NATS_URL" default:"nats://localhost:4222"`
-	StreamName string `envconfig:"STREAM_NAME" default:"MACRO_FEED"`
+	StreamName string `envconfig:"STREAM_NAME" default:"ATLSD_MACRO"`
 }
 
 func (c *Config) HasFred() bool {
