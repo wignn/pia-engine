@@ -365,6 +365,7 @@ impl Hub {
         total
     }
 
+    #[cfg(test)]
     pub async fn user_connection_count(&self, user_id: &Uuid) -> usize {
         let mut total = 0;
         for shard_idx in 0..SHARD_COUNT {
