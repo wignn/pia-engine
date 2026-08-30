@@ -28,6 +28,33 @@ services:
     networks:
       - private
 
+  pgbouncer:
+    container_name: pgbouncer-prod
+    image: edoburu/pgbouncer:v1.22.1
+    restart: always
+    environment:
+      - DB_USER=${POSTGRES_USER:-postgres}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-core}
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=500
+      - DEFAULT_POOL_SIZE=30
+      - MIN_POOL_SIZE=5
+      - RESERVE_POOL_SIZE=5
+      - MAX_DB_CONNECTIONS=60
+      - SERVER_IDLE_TIMEOUT=30
+      - AUTH_TYPE=scram-sha-256
+    ports:
+      - "127.0.0.1:6432:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - private
+
   clickhouse:
     container_name: clickhouse-prod
     image: clickhouse/clickhouse-server:24.8-alpine

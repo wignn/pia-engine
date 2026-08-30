@@ -43,10 +43,7 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
             },
         )
         .await?;
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&config.database_url)
-        .await?;
+    let pool = atlsd_common::db::create_resilient_pool(&config.database_url, 8, 2).await?;
 
     info!(
         stream = atlsd_eventbus::subjects::ATLSD_MACRO_STREAM,

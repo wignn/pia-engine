@@ -36,9 +36,8 @@ impl Hub {
 
     pub fn new(redis_client: Option<redis::Client>, redis_channel_prefix: String) -> Arc<Self> {
         // Initialize an array of 32 independent RwLock shards
-        const INIT: RwLock<HashMap<ClientId, ClientHandle>> = RwLock::const_new(HashMap::new());
         Arc::new(Self {
-            shards: [INIT; SHARD_COUNT],
+            shards: std::array::from_fn(|_| RwLock::new(HashMap::new())),
             next_id: Arc::new(RwLock::new(1)),
             redis_client,
             redis_channel_prefix,

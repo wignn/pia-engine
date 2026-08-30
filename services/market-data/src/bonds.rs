@@ -42,18 +42,18 @@ struct StoredBondDashboard {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct StoredBondQuote {
-    symbol: String,
-    name: String,
+pub struct StoredBondQuote {
+    pub symbol: String,
+    pub name: String,
     #[serde(rename = "yield")]
-    yield_value: f64,
+    pub yield_value: f64,
     #[serde(rename = "dayChange")]
-    day_change: f64,
+    pub day_change: f64,
     #[serde(rename = "monthChange")]
-    month_change: f64,
+    pub month_change: f64,
     #[serde(rename = "yearChange")]
-    year_change: f64,
-    date: String,
+    pub year_change: f64,
+    pub date: String,
 }
 
 #[derive(Debug, Deserialize)]
