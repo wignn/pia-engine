@@ -115,6 +115,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/rates/yield-curve",
             any(crate::proxy::proxy_request),
         )
+        .route(
+            "/api/v1/bonds/yield-curve",
+            any(crate::proxy::proxy_request),
+        )
         .route("/api/v1/rates/spreads", any(crate::proxy::proxy_request))
         .route(
             "/api/v1/rates/history/{tenor}",

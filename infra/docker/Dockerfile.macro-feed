@@ -1,0 +1,17 @@
+FROM golang:1.25-bookworm AS builder
+
+WORKDIR /src
+
+COPY services/macro-feed/go.mod services/macro-feed/go.sum ./services/macro-feed/
+WORKDIR /src/services/macro-feed
+RUN go mod download
+
+COPY services/macro-feed/ ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/macro-feed ./cmd/main.go
+
+FROM gcr.io/distroless/static-debian12:nonroot
+
+COPY --from=builder /out/macro-feed /usr/local/bin/macro-feed
+
+USER nonroot:nonroot
+ENTRYPOINT ["/usr/local/bin/macro-feed"]

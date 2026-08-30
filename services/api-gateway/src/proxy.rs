@@ -66,6 +66,7 @@ fn target_base_for_path<'a>(path: &str, config: &'a crate::config::Config) -> Op
         Some(config.intelligence_service_url.as_str())
     } else if path.starts_with("/api/v1/market/")
         || path.starts_with("/api/v1/rates/")
+        || path.starts_with("/api/v1/bonds/")
         || path.starts_with("/api/v1/energy/")
         || path.starts_with("/api/v1/cot/")
         || path.starts_with("/api/v1/fear-greed")

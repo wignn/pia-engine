@@ -10,8 +10,10 @@ use crate::{client::ClientHandle, streams};
 
 pub type ClientId = u64;
 
+const SHARD_COUNT: usize = 32;
+
 pub struct Hub {
-    clients: Arc<RwLock<HashMap<ClientId, ClientHandle>>>,
+    shards: [RwLock<HashMap<ClientId, ClientHandle>>; SHARD_COUNT],
     next_id: Arc<RwLock<u64>>,
     redis_client: Option<redis::Client>,
     redis_channel_prefix: String,
@@ -19,6 +21,11 @@ pub struct Hub {
 }
 
 impl Hub {
+    #[inline]
+    fn shard_idx(id: ClientId) -> usize {
+        (id as usize) % SHARD_COUNT
+    }
+
     pub const fn connection_counter_ttl_sec() -> i64 {
         120
     }
@@ -28,8 +35,10 @@ impl Hub {
     }
 
     pub fn new(redis_client: Option<redis::Client>, redis_channel_prefix: String) -> Arc<Self> {
+        // Initialize an array of 32 independent RwLock shards
+        const INIT: RwLock<HashMap<ClientId, ClientHandle>> = RwLock::const_new(HashMap::new());
         Arc::new(Self {
-            clients: Arc::new(RwLock::new(HashMap::new())),
+            shards: [INIT; SHARD_COUNT],
             next_id: Arc::new(RwLock::new(1)),
             redis_client,
             redis_channel_prefix,
@@ -62,6 +71,7 @@ impl Hub {
         let mut next = self.next_id.write().await;
         let id = *next;
         *next += 1;
+        drop(next);
 
         let (tx, rx) = mpsc::channel::<Vec<u8>>(256);
 
@@ -74,9 +84,10 @@ impl Hub {
             sender: tx,
         };
 
-        self.clients.write().await.insert(id, handle);
+        let shard_idx = Self::shard_idx(id);
+        self.shards[shard_idx].write().await.insert(id, handle);
         self.metrics.connection_opened();
-        let count = self.clients.read().await.len();
+        let count = self.client_count().await;
         info!(bot_id = %bot_id, user_id = ?user_id, total = count, "ws client connected");
 
         let welcome = serde_json::to_vec(&json!({
@@ -88,7 +99,7 @@ impl Hub {
         }))
         .unwrap_or_default();
 
-        if let Some(client) = self.clients.read().await.get(&id) {
+        if let Some(client) = self.shards[shard_idx].read().await.get(&id) {
             let _ = client.sender.try_send(welcome);
         }
 
@@ -192,20 +203,22 @@ impl Hub {
     }
 
     pub async fn unregister(&self, id: ClientId) {
-        let removed = self.clients.write().await.remove(&id);
+        let shard_idx = Self::shard_idx(id);
+        let removed = self.shards[shard_idx].write().await.remove(&id);
         if let Some(client) = removed {
             self.metrics.connection_closed();
             if let Some(api_key_id) = &client.api_key_id {
                 self.release_api_key_slot(api_key_id).await;
             }
-            let count = self.clients.read().await.len();
+            let count = self.client_count().await;
             info!(bot_id = %client.bot_id, total = count, "ws client disconnected");
         }
     }
 
     pub async fn push_to_client(&self, id: ClientId, payload: Vec<u8>) -> bool {
-        let clients = self.clients.read().await;
-        match clients.get(&id) {
+        let shard_idx = Self::shard_idx(id);
+        let shard = self.shards[shard_idx].read().await;
+        match shard.get(&id) {
             Some(client) => client.sender.try_send(payload).is_ok(),
             None => false,
         }
@@ -234,40 +247,43 @@ impl Hub {
             }
         };
 
-        let clients = self.clients.read().await;
-        let mut count = 0;
-        let mut slow: Vec<ClientId> = Vec::new();
-
         let candidate_streams = streams::candidate_streams(channel, &data);
+        let mut count = 0;
 
-        for (id, client) in clients.iter() {
-            if candidate_streams.is_disjoint(&client.streams) {
-                continue;
+        // Iterate independently over each of the 32 shards
+        for shard_idx in 0..SHARD_COUNT {
+            let shard = self.shards[shard_idx].read().await;
+            let mut slow_in_shard: Vec<ClientId> = Vec::new();
+
+            for (id, client) in shard.iter() {
+                if candidate_streams.is_disjoint(&client.streams) {
+                    continue;
+                }
+
+                match client.sender.try_send(payload.clone()) {
+                    Ok(()) => count += 1,
+                    // Full buffer = slow consumer, Closed = socket task gone.
+                    // Client will be evicted from its shard without blocking others.
+                    Err(_) => {
+                        self.metrics.send_failure();
+                        slow_in_shard.push(*id);
+                    }
+                }
             }
+            drop(shard);
 
-            match client.sender.try_send(payload.clone()) {
-                Ok(()) => count += 1,
-                // Full buffer = slow consumer, Closed = socket task gone.
-                // Either way the client is disconnected explicitly instead of
-                // silently accumulating a stale view.
-                Err(_) => {
-                    self.metrics.send_failure();
-                    slow.push(*id);
+            if !slow_in_shard.is_empty() {
+                let mut shard_mut = self.shards[shard_idx].write().await;
+                for id in slow_in_shard {
+                    if shard_mut.remove(&id).is_some() {
+                        self.metrics.connection_closed();
+                        warn!(client = id, shard = shard_idx, "slow consumer disconnected (send buffer full)");
+                    }
                 }
             }
         }
-        drop(clients);
+
         self.metrics.broadcast(count);
-
-        if !slow.is_empty() {
-            let mut clients = self.clients.write().await;
-            for id in slow {
-                if clients.remove(&id).is_some() {
-                    self.metrics.connection_closed();
-                    warn!(client = id, "slow consumer disconnected (send buffer full)");
-                }
-            }
-        }
 
         if let Some(redis_client) = &self.redis_client {
             let payload_text = String::from_utf8_lossy(&payload).to_string();
@@ -310,8 +326,9 @@ impl Hub {
     }
 
     pub async fn subscribe(&self, id: ClientId, streams: HashSet<String>) -> bool {
-        let mut clients = self.clients.write().await;
-        let Some(client) = clients.get_mut(&id) else {
+        let shard_idx = Self::shard_idx(id);
+        let mut shard = self.shards[shard_idx].write().await;
+        let Some(client) = shard.get_mut(&id) else {
             return false;
         };
         client.streams.extend(streams);
@@ -319,8 +336,9 @@ impl Hub {
     }
 
     pub async fn unsubscribe(&self, id: ClientId, streams: &HashSet<String>) -> bool {
-        let mut clients = self.clients.write().await;
-        let Some(client) = clients.get_mut(&id) else {
+        let shard_idx = Self::shard_idx(id);
+        let mut shard = self.shards[shard_idx].write().await;
+        let Some(client) = shard.get_mut(&id) else {
             return false;
         };
         client.streams.retain(|stream| !streams.contains(stream));
@@ -328,38 +346,49 @@ impl Hub {
     }
 
     pub async fn list_subscriptions(&self, id: ClientId) -> Option<Vec<String>> {
-        let clients = self.clients.read().await;
-        let mut streams: Vec<String> = clients.get(&id)?.streams.iter().cloned().collect();
+        let shard_idx = Self::shard_idx(id);
+        let shard = self.shards[shard_idx].read().await;
+        let mut streams: Vec<String> = shard.get(&id)?.streams.iter().cloned().collect();
         streams.sort();
         Some(streams)
     }
 
-    /// Get the number of connected clients.
-    #[allow(dead_code)]
+    /// Get the number of connected clients across all shards.
     pub async fn client_count(&self) -> usize {
-        self.clients.read().await.len()
+        let mut total = 0;
+        for shard_idx in 0..SHARD_COUNT {
+            total += self.shards[shard_idx].read().await.len();
+        }
+        total
     }
 
-    #[allow(dead_code)]
     pub async fn user_connection_count(&self, user_id: &Uuid) -> usize {
-        let clients = self.clients.read().await;
-        clients
-            .values()
-            .filter(|c| c.user_id.as_ref() == Some(user_id))
-            .count()
+        let mut total = 0;
+        for shard_idx in 0..SHARD_COUNT {
+            let shard = self.shards[shard_idx].read().await;
+            total += shard
+                .values()
+                .filter(|c| c.user_id.as_ref() == Some(user_id))
+                .count();
+        }
+        total
     }
 
-    #[allow(dead_code)]
     pub async fn api_key_connection_count(&self, api_key_id: &str) -> usize {
-        let clients = self.clients.read().await;
-        clients
-            .values()
-            .filter(|c| c.api_key_id.as_deref() == Some(api_key_id))
-            .count()
+        let mut total = 0;
+        for shard_idx in 0..SHARD_COUNT {
+            let shard = self.shards[shard_idx].read().await;
+            total += shard
+                .values()
+                .filter(|c| c.api_key_id.as_deref() == Some(api_key_id))
+                .count();
+        }
+        total
     }
 
     pub async fn client_api_key_id(&self, id: ClientId) -> Option<String> {
-        self.clients.read().await.get(&id)?.api_key_id.clone()
+        let shard_idx = Self::shard_idx(id);
+        self.shards[shard_idx].read().await.get(&id)?.api_key_id.clone()
     }
 }
 

@@ -61,12 +61,17 @@ impl UsageTracker {
         let Some(redis_client) = &self.redis_client else {
             return true;
         };
-        let key = format!(
+        let minute_key = format!(
+            "rate:min:{}:{}",
+            tenant.user_id,
+            Utc::now().format("%Y%m%d%H%M")
+        );
+        let daily_key = format!(
             "usage:daily:{}:{}",
             tenant.user_id,
             Utc::now().format("%Y-%m-%d")
         );
-        let ttl = seconds_until_next_utc_day();
+        let daily_ttl = seconds_until_next_utc_day();
         let mut conn = match redis_client.get_multiplexed_tokio_connection().await {
             Ok(conn) => conn,
             Err(err) => {
@@ -74,15 +79,45 @@ impl UsageTracker {
                 return true;
             }
         };
-        let count: i64 = match redis::Script::new("local v=redis.call('INCR', KEYS[1]); if v==1 then redis.call('EXPIRE', KEYS[1], ARGV[1]); end; return v")
-            .key(&key).arg(ttl).invoke_async(&mut conn).await {
+
+        // Dual-tier rate limiter (per-minute limit + daily quota)
+        let script = r#"
+            local min_val = redis.call('INCR', KEYS[1])
+            if min_val == 1 then
+                redis.call('EXPIRE', KEYS[1], 60)
+            end
+            if min_val > tonumber(ARGV[1]) then
+                return -1
+            end
+
+            local day_val = redis.call('INCR', KEYS[2])
+            if day_val == 1 then
+                redis.call('EXPIRE', KEYS[2], tonumber(ARGV[3]))
+            end
+            if day_val > tonumber(ARGV[2]) then
+                return -2
+            end
+
+            return 0
+        "#;
+
+        let res: i64 = match redis::Script::new(script)
+            .key(&minute_key)
+            .key(&daily_key)
+            .arg(i64::from(tenant.rate_limit_per_min))
+            .arg(i64::from(tenant.requests_per_day))
+            .arg(daily_ttl)
+            .invoke_async(&mut conn)
+            .await
+        {
             Ok(value) => value,
             Err(err) => {
                 tracing::warn!(error = %err, "quota redis script failed; fail-open");
                 return true;
             }
         };
-        count <= i64::from(tenant.requests_per_day)
+
+        res == 0
     }
 }
 

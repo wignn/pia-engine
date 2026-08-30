@@ -36,3 +36,32 @@ func TestDashboardDataValidate(t *testing.T) {
 		t.Errorf("expected deterministic msgID, got %s and %s", msgID1, msgID2)
 	}
 }
+
+func TestDashboardDataToMacroEventWrapsSnapshot(t *testing.T) {
+	data := &model.DashboardData{
+		Source:    "test-source",
+		FetchedAt: "2026-08-27T12:30:00Z",
+		Bonds: []model.Bond{{
+			Symbol: "USGG10YR:IND",
+			Name:   "United States 10 Year Bond Yield",
+			Yield:  4.25,
+		}},
+		HistoryAvailable: true,
+		HistoryKind:      "provider",
+		Histories: map[string][]model.HistoryPoint{
+			"USGG10YR:IND": []model.HistoryPoint{{Date: "2026-08-27", Value: 4.25}},
+		},
+	}
+
+	event := data.ToMacroEvent()
+	payload, ok := event.Payload.(model.BondSnapshotPayload)
+	if !ok {
+		t.Fatalf("expected bond snapshot payload, got %T", event.Payload)
+	}
+	if payload.Country != "US" || payload.AsOf != "2026-08-27" {
+		t.Fatalf("unexpected snapshot metadata: %+v", payload)
+	}
+	if payload.Raw != data || payload.Raw.HistoryKind != "provider" {
+		t.Fatal("expected raw dashboard data to be preserved")
+	}
+}

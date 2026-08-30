@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -30,8 +32,9 @@ func NewNewsScraper(timeout time.Duration) *NewsScraper {
 	if timeout <= 0 {
 		timeout = 20 * time.Second
 	}
+	insecure := strings.EqualFold(os.Getenv("SCRAPER_ALLOW_INSECURE_TLS"), "true")
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 	}
 	return &NewsScraper{
 		httpClient: &http.Client{
@@ -127,6 +130,26 @@ func (s *NewsScraper) ParseHTML(articleID, targetURL string, body []byte) (model
 		if article.Title == "" {
 			article.Title = strings.TrimSpace(doc.Find("title").First().Text())
 		}
+	}
+
+	// Parsing Health & Drift Telemetry
+	contentLen := len(article.Content)
+	hasImage := article.MediaURL != ""
+	hasAuthor := article.Author != ""
+	if contentLen < 100 || article.Title == "" {
+		slog.Warn("scraper: degraded extraction quality detected",
+			slog.String("url", targetURL),
+			slog.Int("content_len", contentLen),
+			slog.Bool("has_title", article.Title != ""),
+			slog.Bool("has_image", hasImage),
+			slog.Bool("has_author", hasAuthor),
+		)
+	} else {
+		slog.Debug("scraper: article extracted successfully",
+			slog.String("url", targetURL),
+			slog.Int("content_len", contentLen),
+			slog.Bool("has_image", hasImage),
+		)
 	}
 
 	return article, nil

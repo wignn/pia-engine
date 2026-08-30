@@ -78,6 +78,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/rates/yield-curve",
             get(crate::rates::get_yield_curve),
         )
+        .route(
+            "/api/v1/bonds/yield-curve",
+            get(crate::bonds::get_yield_curve),
+        )
         .route("/api/v1/rates/spreads", get(crate::rates::get_spreads))
         .route(
             "/api/v1/rates/history/{tenor}",

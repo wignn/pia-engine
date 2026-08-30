@@ -51,10 +51,26 @@ type DashboardData struct {
 	History          []HistoryPoint            `json:"history"`
 	Histories        map[string][]HistoryPoint `json:"histories,omitempty"`
 	HistoryAvailable bool                      `json:"historyAvailable"`
+	HistoryKind      string                    `json:"historyKind"`
 	HistoryMessage   string                    `json:"historyMessage,omitempty"`
 }
 
-// Validate checks for data sanity and non-empty bond records
+type BondSnapshotPayload struct {
+	Country string         `json:"country"`
+	AsOf    string         `json:"as_of"`
+	Raw     *DashboardData `json:"raw"`
+}
+
+func (d *DashboardData) BondSnapshotPayload() BondSnapshotPayload {
+	observedAt := parseObservedAt(d.FetchedAt)
+	return BondSnapshotPayload{
+		Country: "US",
+		AsOf:    observedAt.Format("2006-01-02"),
+		Raw:     d,
+	}
+}
+
+// Validate checks for data sanity and non-empty bond records.
 func (d *DashboardData) Validate() error {
 	if len(d.Bonds) == 0 {
 		return errors.New("sanity check failed: bonds list is empty")
@@ -72,7 +88,8 @@ func (d *DashboardData) Validate() error {
 	return nil
 }
 
-// MsgID produces a deterministic hash for NATS JetStream deduplication window
+// ToMacroEvent wraps the scraped dashboard in the versioned bond snapshot
+// payload expected by the Rust sink connector.
 func (d *DashboardData) ToMacroEvent() MacroEvent {
 	return MacroEvent{
 		EventID:       d.MsgID(),
@@ -81,7 +98,7 @@ func (d *DashboardData) ToMacroEvent() MacroEvent {
 		ObservedAt:    parseObservedAt(d.FetchedAt),
 		PublishedAt:   time.Now().UTC(),
 		FeedType:      "bond",
-		Payload:       d,
+		Payload:       d.BondSnapshotPayload(),
 	}
 }
 

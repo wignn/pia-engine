@@ -89,23 +89,16 @@ func (s *BondScraper) Fetch(ctx context.Context) (model.DashboardData, error) {
 		}
 	}
 
-	// Fallback calculation from delta yield
-	if len(data.Histories) == 0 {
-		for _, bond := range data.Bonds {
-			derived := generateDerivedHistory(bond.Yield, bond.DayChange, bond.MonthChange, bond.YearChange)
-			if len(derived) > 0 {
-				data.Histories[bond.Symbol] = derived
-			}
-		}
-		if tenYr, ok := data.Histories["USGG10YR:IND"]; ok {
-			data.History = tenYr
-		} else if len(data.Bonds) > 0 {
-			data.History = data.Histories[data.Bonds[0].Symbol]
-		}
-		data.HistoryMessage = "Riwayat dihitung otomatis dari delta perubahan yield (1 Thn, 1 Bln, 1 Hari lalu)."
+	if len(data.Histories) > 0 {
+		data.HistoryKind = "provider"
+		data.HistoryAvailable = true
+		data.History = data.Histories["USGG10YR:IND"]
+	} else {
+		data.HistoryKind = "unavailable"
+		data.HistoryAvailable = false
+		data.History = []model.HistoryPoint{}
+		data.HistoryMessage = "Historical provider data is unavailable."
 	}
-
-	data.HistoryAvailable = len(data.Histories) > 0
 	data.FetchedAt = time.Now().UTC().Format(time.RFC3339)
 	return data, nil
 }
@@ -215,18 +208,8 @@ func (s *BondScraper) fetchHistory(ctx context.Context, template, symbol string)
 	return points, ""
 }
 
-func generateDerivedHistory(currentYield, dayChg, monthChg, yearChg float64) []model.HistoryPoint {
-	if currentYield == 0 {
-		return []model.HistoryPoint{}
-	}
-	t := time.Now().UTC()
-	return []model.HistoryPoint{
-		{Date: t.AddDate(-1, 0, 0).Format("2006-01-02"), Value: currentYield - yearChg},
-		{Date: t.AddDate(0, -1, 0).Format("2006-01-02"), Value: currentYield - monthChg},
-		{Date: t.AddDate(0, 0, -1).Format("2006-01-02"), Value: currentYield - dayChg},
-		{Date: t.Format("2006-01-02"), Value: currentYield},
-	}
-}
+// Historical values are accepted only when returned by the configured provider.
+
 
 func parseNumber(text string) float64 {
 	matches := numberPattern.FindString(strings.ReplaceAll(cleanText(text), ",", ""))

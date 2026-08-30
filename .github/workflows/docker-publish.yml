@@ -147,6 +147,11 @@ jobs:
               - 'Cargo.lock'
               - 'infra/docker/Dockerfile.sink-connector'
               - '.dockerignore'
+            macro_feed:
+              - 'services/macro-feed/**'
+              - 'infra/docker/Dockerfile.macro-feed'
+              - 'infra/compose/prod.edge.yml'
+              - '.dockerignore'
 
       - name: Build Docker matrix
         id: matrix
@@ -167,6 +172,7 @@ jobs:
           SOCIAL_WORKER_CHANGED: ${{ steps.filter.outputs.social_worker }}
           DB_MIGRATE_CHANGED: ${{ steps.filter.outputs.db_migrate }}
           SINK_CONNECTOR_CHANGED: ${{ steps.filter.outputs.sink_connector }}
+          MACRO_FEED_CHANGED: ${{ steps.filter.outputs.macro_feed }}
         run: |
           json='{"include":['
           sep=''
@@ -230,6 +236,10 @@ jobs:
 
           if [[ "$BUILD_ALL" == "true" || "$SINK_CONNECTOR_CHANGED" == "true" ]]; then
             add '{"image":"atlsd-sink-connector","dockerfile":"infra/docker/Dockerfile.sink-connector"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$MACRO_FEED_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-macro-feed","dockerfile":"infra/docker/Dockerfile.macro-feed"}'
           fi
           json="${json}]}";
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
