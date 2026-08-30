@@ -32,6 +32,17 @@ pub enum UsageKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ApiUsageRequestedEvent {
+    pub user_id: uuid::Uuid,
+    pub api_key_id: uuid::Uuid,
+    pub endpoint: String,
+    pub method: String,
+    pub status_code: i32,
+    pub response_ms: i32,
+    pub requested_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AuditEvent {
     pub actor_id: String,
     pub tenant_id: Option<String>,

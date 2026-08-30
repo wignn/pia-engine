@@ -8,13 +8,21 @@ pub struct DeadLetter<'a> {
     pub payload: &'a [u8],
 }
 
-pub async fn publish(context: &Context, item: DeadLetter<'_>) -> anyhow::Result<()> {
+pub async fn publish_dlq(
+    context: &Context,
+    dlq_subject: &str,
+    source_subject: &str,
+    error: &str,
+    payload: &[u8],
+) -> anyhow::Result<()> {
+    let item = DeadLetter {
+        source_subject,
+        error,
+        payload,
+    };
     let body = serde_json::to_vec(&item)?;
     context
-        .publish(
-            atlsd_eventbus::subjects::MACRO_DLQ_V1.to_string(),
-            body.into(),
-        )
+        .publish(dlq_subject.to_string(), body.into())
         .await?
         .await?;
     Ok(())

@@ -1,5 +1,6 @@
+use async_nats::jetstream::{self, Context as JetStreamContext};
+use atlsd_contracts::platform::ApiUsageRequestedEvent;
 use chrono::Utc;
-use sqlx::{PgPool, Postgres, QueryBuilder};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -22,19 +23,19 @@ pub struct UsageTracker {
 }
 
 impl UsageTracker {
-    pub fn new(db: Option<PgPool>, redis_client: Option<redis::Client>) -> Self {
+    pub fn new(js: Option<JetStreamContext>, redis_client: Option<redis::Client>) -> Self {
         let (tx, mut rx) = mpsc::channel::<UsageEvent>(8_192);
         tokio::spawn(async move {
             let mut batch = Vec::with_capacity(200);
-            let mut ticker = tokio::time::interval(std::time::Duration::from_millis(750));
+            let mut ticker = tokio::time::interval(std::time::Duration::from_millis(500));
             loop {
                 tokio::select! {
                     maybe_evt = rx.recv() => match maybe_evt {
                         Some(evt) => {
                             batch.push(evt);
                             if batch.len() >= 200 {
-                                if let Some(pool) = &db {
-                                    flush_batch(pool, &mut batch).await;
+                                if let Some(context) = &js {
+                                    flush_to_jetstream(context, &mut batch).await;
                                 } else {
                                     batch.clear();
                                 }
@@ -42,8 +43,8 @@ impl UsageTracker {
                         }
                         None => {
                             if !batch.is_empty() {
-                                if let Some(pool) = &db {
-                                    flush_batch(pool, &mut batch).await;
+                                if let Some(context) = &js {
+                                    flush_to_jetstream(context, &mut batch).await;
                                 } else {
                                     batch.clear();
                                 }
@@ -53,8 +54,8 @@ impl UsageTracker {
                     },
                     _ = ticker.tick() => {
                         if !batch.is_empty() {
-                            if let Some(pool) = &db {
-                                flush_batch(pool, &mut batch).await;
+                            if let Some(context) = &js {
+                                flush_to_jetstream(context, &mut batch).await;
                             } else {
                                 batch.clear();
                             }
@@ -139,22 +140,31 @@ impl UsageTracker {
     }
 }
 
-async fn flush_batch(db: &PgPool, batch: &mut Vec<UsageEvent>) {
-    let mut builder: QueryBuilder<'_, Postgres> = QueryBuilder::new(
-        "INSERT INTO usage_logs (user_id, api_key_id, endpoint, method, status_code, response_ms) ",
-    );
-    builder.push_values(batch.iter(), |mut b, evt| {
-        b.push_bind(evt.user_id)
-            .push_bind(Some(evt.api_key_id))
-            .push_bind(&evt.endpoint)
-            .push_bind(&evt.method)
-            .push_bind(evt.status_code)
-            .push_bind(Some(evt.response_ms));
-    });
-    if let Err(err) = builder.build().execute(db).await {
-        tracing::warn!(error = %err, size = batch.len(), "usage batch flush failed");
+async fn flush_to_jetstream(js: &jetstream::Context, batch: &mut Vec<UsageEvent>) {
+    let now = Utc::now();
+    for evt in batch.drain(..) {
+        let contract_event = ApiUsageRequestedEvent {
+            user_id: evt.user_id,
+            api_key_id: evt.api_key_id,
+            endpoint: evt.endpoint,
+            method: evt.method,
+            status_code: evt.status_code,
+            response_ms: evt.response_ms,
+            requested_at: now,
+        };
+
+        if let Ok(payload) = serde_json::to_vec(&contract_event) {
+            if let Err(err) = js
+                .publish(
+                    atlsd_eventbus::subjects::USAGE_API_REQUESTED_V1.to_string(),
+                    payload.into(),
+                )
+                .await
+            {
+                tracing::warn!(error = %err, "failed to publish usage telemetry event to NATS");
+            }
+        }
     }
-    batch.clear();
 }
 
 fn seconds_until_next_utc_day() -> i64 {

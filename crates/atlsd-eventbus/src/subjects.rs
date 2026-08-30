@@ -13,6 +13,7 @@ pub const MARKET_OPTIONS_CHAIN_V1: &str = "market.options.chain";
 pub const NEWS_FOREX_PROCESSED_V1: &str = "news.forex.processed.v1";
 pub const NEWS_STOCK_PROCESSED_V1: &str = "news.stock.processed.v1";
 pub const NEWS_ARTICLE_ENRICHED_V1: &str = "news.article.enriched.v1";
+pub const NEWS_DLQ_V1: &str = "news.article.enriched.v1.dlq";
 pub const SOCIAL_POSTS: &str = "social.posts";
 
 pub const MACRO_RATES_V1: &str = "macro.feed.v1.rates.>";
@@ -28,6 +29,7 @@ pub const SCRAPE_RESULTS: &str = "scrape.results";
 
 pub const TENANT_CONFIG_CHANGED_V1: &str = "tenant.config.changed.v1";
 pub const USAGE_API_REQUESTED_V1: &str = "usage.api.requested.v1";
+pub const USAGE_DLQ_V1: &str = "usage.api.requested.v1.dlq";
 pub const USAGE_QUOTA_EXCEEDED_V1: &str = "usage.quota.exceeded.v1";
 pub const AUDIT_EVENT_RECORDED_V1: &str = "audit.event.recorded.v1";
 pub const PLATFORM_DEADLETTER_EVENTS_V1: &str = "platform.deadletter.events.v1";

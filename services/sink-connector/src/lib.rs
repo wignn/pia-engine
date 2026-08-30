@@ -1,4 +1,4 @@
 pub mod config;
 pub mod dlq;
-pub mod sink;
+pub mod workers;
 pub mod writer;

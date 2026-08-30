@@ -5,6 +5,7 @@ pub struct Config {
     pub bind_addr: String,
     pub database_url: String,
     pub redis_url: String,
+    pub nats_url: String,
     pub api_keys: Vec<String>,
     pub admin_api_key: String,
     pub log_level: String,
@@ -17,11 +18,13 @@ impl Config {
     pub fn load() -> Self {
         let mut database_url = get_env(
             "DATABASE_URL",
-            "postgres://postgres:postgres@localhost:5432/forex",
+            "",
         );
-        database_url = database_url.replace("postgresql+asyncpg://", "postgres://");
-        database_url = database_url.replace("postgresql://", "postgres://");
-        database_url = sanitize_database_url(&database_url);
+        if !database_url.trim().is_empty() {
+            database_url = database_url.replace("postgresql+asyncpg://", "postgres://");
+            database_url = database_url.replace("postgresql://", "postgres://");
+            database_url = sanitize_database_url(&database_url);
+        }
 
         let bind_addr = get_env("API_GATEWAY_BIND_ADDR", "");
         let bind_addr = if bind_addr.trim().is_empty() {
@@ -40,6 +43,7 @@ impl Config {
             bind_addr,
             database_url,
             redis_url: get_env("REDIS_URL", ""),
+            nats_url: get_env("NATS_URL", "nats://localhost:4222"),
             api_keys,
             admin_api_key: get_env("ADMIN_API_KEY", ""),
             log_level: get_env("LOG_LEVEL", "INFO"),
@@ -51,5 +55,9 @@ impl Config {
 
     pub fn has_redis(&self) -> bool {
         !self.redis_url.trim().is_empty()
+    }
+
+    pub fn has_nats(&self) -> bool {
+        !self.nats_url.trim().is_empty()
     }
 }

@@ -78,8 +78,10 @@ name = "api-gateway"
 version = "0.1.1"
 dependencies = [
  "anyhow",
+ "async-nats",
  "atlsd-auth",
  "atlsd-common",
+ "atlsd-contracts",
  "atlsd-domain",
  "atlsd-eventbus",
  "atlsd-observability",

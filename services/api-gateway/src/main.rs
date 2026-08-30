@@ -32,6 +32,18 @@ async fn main() {
         }
     };
 
+    let js = if cfg.has_nats() {
+        match async_nats::connect(&cfg.nats_url).await {
+            Ok(client) => Some(async_nats::jetstream::new(client)),
+            Err(err) => {
+                warn!(error = %err, "nats connection failed; usage telemetry will be dropped");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     let redis_client = if cfg.has_redis() {
         match redis::Client::open(cfg.redis_url.clone()) {
             Ok(client) => Some(client),
@@ -63,7 +75,7 @@ async fn main() {
         warn!("api-gateway Redis config sync disabled; REDIS_URL is empty");
     }
 
-    let usage_tracker = std::sync::Arc::new(UsageTracker::new(pool.clone(), redis_client));
+    let usage_tracker = std::sync::Arc::new(UsageTracker::new(js, redis_client));
     let http = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()

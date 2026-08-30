@@ -12,9 +12,11 @@ path = "src/main.rs"
 [dependencies]
 atlsd-auth = { path = "../../crates/atlsd-auth" }
 atlsd-common = { path = "../../crates/atlsd-common" }
+atlsd-contracts = { path = "../../crates/atlsd-contracts" }
 atlsd-domain = { path = "../../crates/atlsd-domain" }
 atlsd-eventbus = { path = "../../crates/atlsd-eventbus" }
 atlsd-observability = { path = "../../crates/atlsd-observability" }
+async-nats = "0.42"
 tokio = { workspace = true }
 axum = { workspace = true }
 tower = { workspace = true }

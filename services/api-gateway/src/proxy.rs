@@ -104,6 +104,7 @@ mod tests {
             bind_addr: "127.0.0.1:0".to_string(),
             database_url: "postgres://postgres:postgres@localhost/test".to_string(),
             redis_url: String::new(),
+            nats_url: "nats://localhost:4222".to_string(),
             api_keys: vec!["legacy-admin".to_string()],
             admin_api_key: "admin-secret".to_string(),
             log_level: "INFO".to_string(),
