@@ -17,11 +17,13 @@ async fn main() {
 
     info!(port = cfg.port, "control-plane starting");
 
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(10)
-        .connect(&cfg.database_url)
-        .await
-        .expect("failed to connect to database");
+    let pool = match atlsd_common::db::create_resilient_pool(&cfg.database_url, 8, 2).await {
+        Ok(pool) => pool,
+        Err(err) => {
+            tracing::error!(error = %err, "failed to connect to database");
+            std::process::exit(1);
+        }
+    };
 
     info!("database connected");
 

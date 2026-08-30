@@ -1,4 +1,4 @@
--- 024_schema_partitioning_and_dual_views.sql
+-- 025_schema_partitioning_and_dual_views.sql
 -- Strategic Database Decoupling: Logical Schema Partitioning with Backward-Compatible Dual Views
 
 -- 1. Create Core Domain Schemas

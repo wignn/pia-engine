@@ -126,7 +126,7 @@ func (p *JetStreamPublisher) publishWithMsgID(ctx context.Context, subject, msgI
 		Header:  nats.Header{},
 	}
 	if msgID != "" {
-		msg.Header.Set(jetstream.MsgIdHeader, msgID)
+		msg.Header.Set(jetstream.MsgIDHeader, msgID)
 	}
 
 	ack, err := p.js.PublishMsg(ctx, msg)

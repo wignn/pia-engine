@@ -1,4 +1,4 @@
--- 025_rbac_and_service_grants.sql
+-- 026_rbac_and_service_grants.sql
 -- Role-Based Access Control (RBAC) and Least Privilege Service Grants
 
 -- 1. Create Dedicated Service Roles If Not Exists
