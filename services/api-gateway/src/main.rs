@@ -19,11 +19,7 @@ async fn main() {
     let cfg = Config::load();
     atlsd_observability::init_tracing("api-gateway", &cfg.log_level);
 
-    let pool = match sqlx::postgres::PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&cfg.database_url)
-        .await
-    {
+    let pool = match atlsd_common::db::create_resilient_pool(&cfg.database_url, 5, 1).await {
         Ok(pool) => pool,
         Err(err) => {
             error!(error = %err, "database connection failed");

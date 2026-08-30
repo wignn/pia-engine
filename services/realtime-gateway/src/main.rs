@@ -33,11 +33,7 @@ async fn main() {
     let tenant_registry = if cfg.database_url.trim().is_empty() {
         None
     } else {
-        match sqlx::postgres::PgPoolOptions::new()
-            .max_connections(5)
-            .connect(&cfg.database_url)
-            .await
-        {
+        match atlsd_common::db::create_resilient_pool(&cfg.database_url, 5, 1).await {
             Ok(pool) => {
                 let registry = TenantRegistry::new(pool);
                 registry.reload().await;
