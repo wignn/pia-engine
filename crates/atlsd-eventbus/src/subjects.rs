@@ -12,6 +12,7 @@ pub const MARKET_OPTIONS_SUMMARY_V1: &str = "market.options.summary";
 pub const MARKET_OPTIONS_CHAIN_V1: &str = "market.options.chain";
 pub const NEWS_FOREX_PROCESSED_V1: &str = "news.forex.processed.v1";
 pub const NEWS_STOCK_PROCESSED_V1: &str = "news.stock.processed.v1";
+pub const NEWS_ARTICLE_ENRICHED_V1: &str = "news.article.enriched.v1";
 pub const SOCIAL_POSTS: &str = "social.posts";
 
 pub const MACRO_RATES_V1: &str = "macro.feed.v1.rates.>";

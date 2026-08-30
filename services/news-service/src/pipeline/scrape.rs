@@ -70,43 +70,76 @@ pub async fn run_consumer(cfg: Config, pool: PgPool) {
 async fn subscribe_loop(nats_url: &str, pool: &PgPool) -> anyhow::Result<()> {
     use futures_util::StreamExt;
     let client = async_nats::connect(nats_url).await?;
-    let mut sub = client
+    let mut sub_legacy = client
         .subscribe(subjects::SCRAPE_RESULTS.to_string())
         .await?;
+    let mut sub_enriched = client
+        .subscribe(subjects::NEWS_ARTICLE_ENRICHED_V1.to_string())
+        .await?;
     info!(
-        subject = subjects::SCRAPE_RESULTS,
-        "news-service subscribed to scrape results"
+        legacy_subject = subjects::SCRAPE_RESULTS,
+        enriched_subject = subjects::NEWS_ARTICLE_ENRICHED_V1,
+        "news-service subscribed to scrape and enrichment results"
     );
 
-    while let Some(message) = sub.next().await {
-        let result: ScrapeResult = match serde_json::from_slice(&message.payload) {
-            Ok(result) => result,
-            Err(err) => {
-                warn!(error = %err, "failed to parse scrape result");
-                continue;
+    loop {
+        tokio::select! {
+            Some(message) = sub_legacy.next() => {
+                let result: ScrapeResult = match serde_json::from_slice(&message.payload) {
+                    Ok(result) => result,
+                    Err(err) => {
+                        warn!(error = %err, "failed to parse legacy scrape result");
+                        continue;
+                    }
+                };
+                if !result.ok {
+                    warn!(id = %result.id, error = ?result.error, "scrape job reported failure");
+                    continue;
+                }
+                let Some(content) = result
+                    .news
+                    .and_then(|n| n.content)
+                    .filter(|c| !c.trim().is_empty())
+                else {
+                    continue;
+                };
+                let updated = sqlx::query(
+                    "UPDATE news.forex_news_articles SET original_content = $1 WHERE content_hash = $2",
+                )
+                .bind(&content)
+                .bind(&result.id)
+                .execute(pool)
+                .await?
+                .rows_affected();
+                if updated > 0 {
+                    info!(content_hash = %result.id, "backfilled article content from legacy scrape");
+                }
             }
-        };
-        if !result.ok {
-            warn!(id = %result.id, error = ?result.error, "scrape job reported failure");
-            continue;
-        }
-        let Some(content) = result
-            .news
-            .and_then(|n| n.content)
-            .filter(|c| !c.trim().is_empty())
-        else {
-            continue;
-        };
-        let updated = sqlx::query(
-            "UPDATE news.forex_news_articles SET original_content = $1 WHERE content_hash = $2",
-        )
-        .bind(&content)
-        .bind(&result.id)
-        .execute(pool)
-        .await?
-        .rows_affected();
-        if updated > 0 {
-            info!(content_hash = %result.id, "backfilled article content from scrapy");
+            Some(message) = sub_enriched.next() => {
+                let news: atlsd_contracts::macro_data::MacroNewsScraped = match serde_json::from_slice(&message.payload) {
+                    Ok(item) => item,
+                    Err(err) => {
+                        warn!(error = %err, "failed to parse enriched news event");
+                        continue;
+                    }
+                };
+                let updated = sqlx::query(
+                    r#"UPDATE news.forex_news_articles
+                       SET original_content = COALESCE(NULLIF($1, ''), original_content),
+                           media_url = COALESCE(NULLIF($2, ''), media_url)
+                       WHERE content_hash = $3"#,
+                )
+                .bind(news.content.as_deref().unwrap_or(""))
+                .bind(news.media_url.as_deref().unwrap_or(""))
+                .bind(&news.id)
+                .execute(pool)
+                .await?
+                .rows_affected();
+                if updated > 0 {
+                    info!(content_hash = %news.id, "enriched article content and media_url from JetStream");
+                }
+            }
+            else => break,
         }
     }
     Ok(())

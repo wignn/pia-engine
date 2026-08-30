@@ -60,7 +60,7 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
             continue;
         };
         let message = result.map_err(|e| anyhow::anyhow!(e))?;
-        match handle_message(&pool, &message).await {
+        match handle_message(&pool, &js, &message).await {
             Ok(()) => message
                 .ack()
                 .await
@@ -117,10 +117,11 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
 
 async fn handle_message(
     pool: &sqlx::PgPool,
+    js: &jetstream::Context,
     message: &jetstream::Message,
 ) -> Result<(), SinkError> {
     let event: MacroEvent = serde_json::from_slice(&message.payload)?;
     event.validate().map_err(SinkError::Validation)?;
-    writer::write_event(pool, &event).await?;
+    writer::write_event(pool, js, &event).await?;
     Ok(())
 }

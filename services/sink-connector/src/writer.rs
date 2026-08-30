@@ -1,12 +1,19 @@
+use async_nats::jetstream::Context as JetStreamContext;
 use atlsd_contracts::macro_data::{MacroEvent, MacroPayload};
+use atlsd_eventbus::subjects;
 use chrono::Utc;
 use sqlx::PgPool;
+use tracing::info;
 
-pub async fn write_event(pool: &PgPool, event: &MacroEvent) -> anyhow::Result<()> {
+pub async fn write_event(
+    pool: &PgPool,
+    js: &JetStreamContext,
+    event: &MacroEvent,
+) -> anyhow::Result<()> {
     match event.decode_payload()? {
         MacroPayload::Rate(rate) => {
             sqlx::query(
-                r#"INSERT INTO macro_rates
+                r#"INSERT INTO macro.macro_rates
                    (source, country, tenor, date, value, unit, raw_series_id, created_at, updated_at)
                    VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())
                    ON CONFLICT (source,country,tenor,date) DO UPDATE SET
@@ -24,7 +31,7 @@ pub async fn write_event(pool: &PgPool, event: &MacroEvent) -> anyhow::Result<()
         }
         MacroPayload::Spread(spread) => {
             sqlx::query(
-                r#"INSERT INTO macro_rate_spreads
+                r#"INSERT INTO macro.macro_rate_spreads
                    (country, spread, date, value, created_at, updated_at)
                    VALUES ($1,$2,$3,$4,NOW(),NOW())
                    ON CONFLICT (country,spread,date) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()"#,
@@ -39,7 +46,7 @@ pub async fn write_event(pool: &PgPool, event: &MacroEvent) -> anyhow::Result<()
         MacroPayload::Series(series) => {
             let mut tx = pool.begin().await?;
             sqlx::query(
-                r#"INSERT INTO macro_series
+                r#"INSERT INTO macro.macro_series
                    (id, provider, title, category, units, frequency, last_synced_at, created_at, updated_at)
                    VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())
                    ON CONFLICT (id) DO UPDATE SET title=EXCLUDED.title, category=EXCLUDED.category,
@@ -56,7 +63,7 @@ pub async fn write_event(pool: &PgPool, event: &MacroEvent) -> anyhow::Result<()
             .execute(&mut *tx)
             .await?;
             sqlx::query(
-                r#"INSERT INTO macro_observations
+                r#"INSERT INTO macro.macro_observations
                    (series_id, observation_date, value, raw_value, created_at, updated_at)
                    VALUES ($1,$2,$3,$4,NOW(),NOW())
                    ON CONFLICT (series_id,observation_date) DO UPDATE SET value=EXCLUDED.value,
@@ -73,7 +80,7 @@ pub async fn write_event(pool: &PgPool, event: &MacroEvent) -> anyhow::Result<()
         MacroPayload::Bond(bond) => {
             let id = format!("{}_{}", bond.country.to_lowercase(), bond.as_of);
             sqlx::query(
-                r#"INSERT INTO macro_bonds
+                r#"INSERT INTO macro.macro_bonds
                    (id, country, as_of, raw_json, created_at, updated_at)
                    VALUES ($1, $2, $3, $4, NOW(), NOW())
                    ON CONFLICT (id) DO UPDATE SET
@@ -87,17 +94,19 @@ pub async fn write_event(pool: &PgPool, event: &MacroEvent) -> anyhow::Result<()
             .await?;
         }
         MacroPayload::NewsScraped(news) => {
-            sqlx::query(
-                r#"UPDATE forex_news_articles
-                   SET original_content = COALESCE(NULLIF($1, ''), original_content),
-                       media_url = COALESCE(NULLIF($2, ''), media_url)
-                   WHERE content_hash = $3"#,
+            // Decoupled: Publish to NATS JetStream for news-service domain owner to consume and update
+            let payload = serde_json::to_vec(&news)?;
+            js.publish(
+                subjects::NEWS_ARTICLE_ENRICHED_V1.to_string(),
+                payload.into(),
             )
-            .bind(news.content.as_deref().unwrap_or(""))
-            .bind(news.media_url.as_deref().unwrap_or(""))
-            .bind(&news.id)
-            .execute(pool)
+            .await?
             .await?;
+            info!(
+                article_id = %news.id,
+                subject = subjects::NEWS_ARTICLE_ENRICHED_V1,
+                "dispatched news enrichment event to news-service"
+            );
         }
     }
     let _ = Utc::now();
