@@ -1,7 +1,6 @@
 mod config;
 mod dlq;
 mod workers;
-mod writer;
 
 use anyhow::Result;
 use config::Config;
