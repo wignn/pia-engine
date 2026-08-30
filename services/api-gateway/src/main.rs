@@ -19,11 +19,16 @@ async fn main() {
     let cfg = Config::load();
     atlsd_observability::init_tracing("api-gateway", &cfg.log_level);
 
-    let pool = match atlsd_common::db::create_resilient_pool(&cfg.database_url, 5, 1).await {
-        Ok(pool) => pool,
-        Err(err) => {
-            error!(error = %err, "database connection failed");
-            std::process::exit(1);
+    let pool = if cfg.database_url.trim().is_empty() {
+        info!("api-gateway running in zero-DB mode (Redis & memory backed)");
+        None
+    } else {
+        match atlsd_common::db::create_resilient_pool(&cfg.database_url, 5, 1).await {
+            Ok(pool) => Some(pool),
+            Err(err) => {
+                warn!(error = %err, "database connection failed; falling back to zero-DB mode");
+                None
+            }
         }
     };
 

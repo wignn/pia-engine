@@ -22,7 +22,7 @@ pub struct UsageTracker {
 }
 
 impl UsageTracker {
-    pub fn new(db: PgPool, redis_client: Option<redis::Client>) -> Self {
+    pub fn new(db: Option<PgPool>, redis_client: Option<redis::Client>) -> Self {
         let (tx, mut rx) = mpsc::channel::<UsageEvent>(8_192);
         tokio::spawn(async move {
             let mut batch = Vec::with_capacity(200);
@@ -32,15 +32,33 @@ impl UsageTracker {
                     maybe_evt = rx.recv() => match maybe_evt {
                         Some(evt) => {
                             batch.push(evt);
-                            if batch.len() >= 200 { flush_batch(&db, &mut batch).await; }
+                            if batch.len() >= 200 {
+                                if let Some(pool) = &db {
+                                    flush_batch(pool, &mut batch).await;
+                                } else {
+                                    batch.clear();
+                                }
+                            }
                         }
                         None => {
-                            if !batch.is_empty() { flush_batch(&db, &mut batch).await; }
+                            if !batch.is_empty() {
+                                if let Some(pool) = &db {
+                                    flush_batch(pool, &mut batch).await;
+                                } else {
+                                    batch.clear();
+                                }
+                            }
                             break;
                         }
                     },
                     _ = ticker.tick() => {
-                        if !batch.is_empty() { flush_batch(&db, &mut batch).await; }
+                        if !batch.is_empty() {
+                            if let Some(pool) = &db {
+                                flush_batch(pool, &mut batch).await;
+                            } else {
+                                batch.clear();
+                            }
+                        }
                     }
                 }
             }

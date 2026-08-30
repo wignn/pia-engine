@@ -34,7 +34,7 @@ struct UserConfig {
 pub struct TenantRegistry {
     keys: Arc<RwLock<HashMap<String, CachedKey>>>,
     configs: Arc<RwLock<HashMap<Uuid, UserConfig>>>,
-    db: PgPool,
+    db: Option<PgPool>,
 }
 
 type TenantRow = (
@@ -58,7 +58,7 @@ pub fn reload_interval() -> Duration {
 }
 
 impl TenantRegistry {
-    pub fn new(db: PgPool) -> Arc<Self> {
+    pub fn new(db: Option<PgPool>) -> Arc<Self> {
         Arc::new(Self {
             keys: Arc::new(RwLock::new(HashMap::new())),
             configs: Arc::new(RwLock::new(HashMap::new())),
@@ -67,10 +67,14 @@ impl TenantRegistry {
     }
 
     pub async fn reload(&self) {
+        let Some(db) = &self.db else {
+            return;
+        };
+
         let rows: Result<Vec<TenantRow>, _> = sqlx::query_as(
             "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, COALESCE(p.can_scrape, FALSE), COALESCE(p.requests_per_day, 100), COALESCE(p.ws_connections, 1), COALESCE(p.x_usernames_max, 1), COALESCE(p.tv_symbols_max, 3), COALESCE(p.rate_limit_per_min, 10), k.expires_at FROM api_keys k JOIN users u ON u.id = k.user_id LEFT JOIN plans p ON p.id = u.plan",
         )
-        .fetch_all(&self.db)
+        .fetch_all(db)
         .await;
 
         match rows {
@@ -119,7 +123,7 @@ impl TenantRegistry {
 
         let cfg_rows: Result<Vec<(Uuid, String, serde_json::Value)>, _> =
             sqlx::query_as("SELECT user_id, config_key, config_value FROM tenant_configs")
-                .fetch_all(&self.db)
+                .fetch_all(db)
                 .await;
         if let Ok(rows) = cfg_rows {
             let mut map: HashMap<Uuid, UserConfig> = HashMap::new();
