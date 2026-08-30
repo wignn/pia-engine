@@ -54,6 +54,9 @@ pub async fn create_resilient_pool(
         e
     })?;
 
-    info!(max_conns, min_conns, is_pgbouncer, "database pool initialized and verified");
+    info!(
+        max_conns,
+        min_conns, is_pgbouncer, "database pool initialized and verified"
+    );
     Ok(pool)
 }
