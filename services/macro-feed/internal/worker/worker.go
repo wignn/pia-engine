@@ -13,7 +13,6 @@ import (
 
 	"macro-feed/internal/collector"
 	"macro-feed/internal/config"
-	"macro-feed/internal/model"
 	"macro-feed/internal/publisher"
 	"macro-feed/internal/scraper"
 )

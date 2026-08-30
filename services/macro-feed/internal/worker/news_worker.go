@@ -29,7 +29,7 @@ func NewNewsWorker(s *scraper.NewsScraper, p *publisher.JetStreamPublisher, l *s
 	}
 }
 
-func (w *NewsWorker) ProcessJob(ctx context.Context, msg jetstream.Message) error {
+func (w *NewsWorker) ProcessJob(ctx context.Context, msg jetstream.Msg) error {
 	var job model.ScrapeJob
 	if err := json.Unmarshal(msg.Data(), &job); err != nil {
 		w.logger.Error("Failed to unmarshal scrape job", "error", err)
