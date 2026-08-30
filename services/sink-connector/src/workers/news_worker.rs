@@ -85,7 +85,9 @@ pub async fn run(pool: PgPool, js: jetstream::Context, config: Config) -> anyhow
         if let Err(err) = flush_news_batch(&pool, &batch).await {
             error!(error = %err, count = batch.len(), "failed to flush news batch to postgres, nacking batch");
             for (_, msg) in batch {
-                let _ = msg.ack_with(AckKind::Nak(Some(Duration::from_secs(3)))).await;
+                let _ = msg
+                    .ack_with(AckKind::Nak(Some(Duration::from_secs(3))))
+                    .await;
             }
         } else {
             for (_, msg) in batch {

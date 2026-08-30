@@ -16,10 +16,7 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Self {
-        let mut database_url = get_env(
-            "DATABASE_URL",
-            "",
-        );
+        let mut database_url = get_env("DATABASE_URL", "");
         if !database_url.trim().is_empty() {
             database_url = database_url.replace("postgresql+asyncpg://", "postgres://");
             database_url = database_url.replace("postgresql://", "postgres://");

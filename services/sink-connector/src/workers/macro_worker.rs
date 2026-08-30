@@ -87,7 +87,9 @@ pub async fn run(pool: PgPool, js: jetstream::Context, config: Config) -> anyhow
                 }
                 Err(err) => {
                     error!(error = %err, subject = %message.subject, "transient macro DB write failure, nacking");
-                    let _ = message.ack_with(AckKind::Nak(Some(Duration::from_secs(5)))).await;
+                    let _ = message
+                        .ack_with(AckKind::Nak(Some(Duration::from_secs(5))))
+                        .await;
                 }
             }
         }
