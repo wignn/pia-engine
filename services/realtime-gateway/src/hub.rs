@@ -277,7 +277,11 @@ impl Hub {
                 for id in slow_in_shard {
                     if shard_mut.remove(&id).is_some() {
                         self.metrics.connection_closed();
-                        warn!(client = id, shard = shard_idx, "slow consumer disconnected (send buffer full)");
+                        warn!(
+                            client = id,
+                            shard = shard_idx,
+                            "slow consumer disconnected (send buffer full)"
+                        );
                     }
                 }
             }
@@ -388,7 +392,12 @@ impl Hub {
 
     pub async fn client_api_key_id(&self, id: ClientId) -> Option<String> {
         let shard_idx = Self::shard_idx(id);
-        self.shards[shard_idx].read().await.get(&id)?.api_key_id.clone()
+        self.shards[shard_idx]
+            .read()
+            .await
+            .get(&id)?
+            .api_key_id
+            .clone()
     }
 }
 

@@ -146,7 +146,11 @@ pub async fn get_yield_curve(
 fn parse_window_days(window: Option<&str>) -> i64 {
     let Some(window) = window else { return 7 };
     let value = window.trim().strip_suffix('d').unwrap_or(window.trim());
-    value.parse::<i64>().ok().filter(|days| (1..=31).contains(days)).unwrap_or(7)
+    value
+        .parse::<i64>()
+        .ok()
+        .filter(|days| (1..=31).contains(days))
+        .unwrap_or(7)
 }
 
 fn build_response(
@@ -173,14 +177,21 @@ fn build_response(
                     if date < window_from || date > window_to || !point.value.is_finite() {
                         return None;
                     }
-                    Some(BondHistoryPoint { date, value: point.value })
+                    Some(BondHistoryPoint {
+                        date,
+                        value: point.value,
+                    })
                 })
                 .collect();
             filtered.sort_by_key(|point| point.date);
             filtered.dedup_by_key(|point| point.date);
             if !filtered.is_empty() {
                 history.push(BondHistorySeries {
-                    name: names.get(symbol.as_str()).copied().unwrap_or(symbol.as_str()).to_string(),
+                    name: names
+                        .get(symbol.as_str())
+                        .copied()
+                        .unwrap_or(symbol.as_str())
+                        .to_string(),
                     symbol,
                     points: filtered,
                 });
@@ -193,13 +204,11 @@ fn build_response(
     let history_message = if history_available {
         None
     } else {
-        Some(
-            if dashboard.history_message.trim().is_empty() {
-                "Authentic provider history is unavailable for this window.".to_string()
-            } else {
-                dashboard.history_message
-            },
-        )
+        Some(if dashboard.history_message.trim().is_empty() {
+            "Authentic provider history is unavailable for this window.".to_string()
+        } else {
+            dashboard.history_message
+        })
     };
     let fetched_at = (!dashboard.fetched_at.trim().is_empty()).then_some(dashboard.fetched_at);
     let stale = row.updated_at < Utc::now() - Duration::hours(24);
@@ -234,7 +243,11 @@ fn parse_history_date(value: &str) -> Option<NaiveDate> {
     let value = value.trim();
     NaiveDate::parse_from_str(value, "%Y-%m-%d")
         .ok()
-        .or_else(|| DateTime::parse_from_rfc3339(value).ok().map(|date| date.date_naive()))
+        .or_else(|| {
+            DateTime::parse_from_rfc3339(value)
+                .ok()
+                .map(|date| date.date_naive())
+        })
         .or_else(|| NaiveDate::parse_from_str(value, "%m/%d/%Y").ok())
 }
 
@@ -251,11 +264,17 @@ mod tests {
 
     #[test]
     fn parses_provider_dates() {
-        assert_eq!(parse_history_date("2026-08-27"), NaiveDate::from_ymd_opt(2026, 8, 27));
+        assert_eq!(
+            parse_history_date("2026-08-27"),
+            NaiveDate::from_ymd_opt(2026, 8, 27)
+        );
         assert_eq!(
             parse_history_date("2026-08-27T12:30:00Z"),
             NaiveDate::from_ymd_opt(2026, 8, 27)
         );
-        assert_eq!(parse_history_date("8/27/2026"), NaiveDate::from_ymd_opt(2026, 8, 27));
+        assert_eq!(
+            parse_history_date("8/27/2026"),
+            NaiveDate::from_ymd_opt(2026, 8, 27)
+        );
     }
 }
