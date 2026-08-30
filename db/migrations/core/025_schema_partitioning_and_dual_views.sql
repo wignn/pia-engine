@@ -26,6 +26,8 @@ BEGIN
         ) INTO has_table;
 
         IF has_table THEN
+            -- Drop legacy compatibility view in target schema if exists (created in 005_schema_foundation.sql)
+            EXECUTE format('DROP VIEW IF EXISTS auth.%I CASCADE', t_name);
             EXECUTE format('ALTER TABLE public.%I SET SCHEMA auth', t_name);
         END IF;
 
@@ -56,6 +58,8 @@ BEGIN
         ) INTO has_table;
 
         IF has_table THEN
+            -- Drop legacy compatibility view in target schema if exists (created in 005_schema_foundation.sql)
+            EXECUTE format('DROP VIEW IF EXISTS market.%I CASCADE', t_name);
             EXECUTE format('ALTER TABLE public.%I SET SCHEMA market', t_name);
         END IF;
 
@@ -84,6 +88,8 @@ BEGIN
         ) INTO has_table;
 
         IF has_table THEN
+            -- Drop legacy compatibility view in target schema if exists (created in 005_schema_foundation.sql)
+            EXECUTE format('DROP VIEW IF EXISTS news.%I CASCADE', t_name);
             EXECUTE format('ALTER TABLE public.%I SET SCHEMA news', t_name);
         END IF;
 
@@ -112,6 +118,8 @@ BEGIN
         ) INTO has_table;
 
         IF has_table THEN
+            -- Drop legacy compatibility view in target schema if exists (created in 005_schema_foundation.sql)
+            EXECUTE format('DROP VIEW IF EXISTS macro.%I CASCADE', t_name);
             EXECUTE format('ALTER TABLE public.%I SET SCHEMA macro', t_name);
         END IF;
 
