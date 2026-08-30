@@ -157,7 +157,7 @@ jobs:
         id: matrix
         shell: bash
         env:
-          BUILD_ALL: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' }}
+          BUILD_ALL: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
           CONTROL_PLANE_CHANGED: ${{ steps.filter.outputs.control_plane }}
           INGESTION_CHANGED: ${{ steps.filter.outputs.ingestion }}
           BOT_CHANGED: ${{ steps.filter.outputs.bot }}
