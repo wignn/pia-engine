@@ -708,7 +708,7 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 8,
+        "h": 6,
         "w": 24,
         "x": 0,
         "y": 7
@@ -763,7 +763,7 @@
           "showLegend": false
         },
         "mergeValues": false,
-        "rowHeight": 0.62,
+        "rowHeight": 0.85,
         "showValue": "never",
         "tooltip": {
           "mode": "single",
@@ -778,7 +778,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max by (service) (min_over_time(probe_success{group=\"atlsd-services\",job=\"service-health\"}[1m]))",
+          "expr": "max by (service) (probe_success{group=\"atlsd-services\"})",
           "instant": false,
           "legendFormat": "{{service}}",
           "range": true,
