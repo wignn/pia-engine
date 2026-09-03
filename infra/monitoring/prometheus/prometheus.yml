@@ -77,6 +77,16 @@ scrape_configs:
           group: atlsd-services
           service: realtime-gateway
       - targets:
+          - http://172.17.0.1:5173/
+        labels:
+          group: atlsd-services
+          service: public-web
+      - targets:
+          - https://atlsd.wign.dev/
+        labels:
+          group: atlsd-services
+          service: public-domain
+      - targets:
           - http://world-control-plane:8080/health
         labels:
           group: atlsd-services
@@ -86,6 +96,16 @@ scrape_configs:
         labels:
           group: atlsd-services
           service: ingestion-gateway
+      - targets:
+          - http://clickhouse-prod:8123/ping
+        labels:
+          group: atlsd-services
+          service: clickhouse-prod
+      - targets:
+          - http://172.17.0.1:8000/healthz
+        labels:
+          group: atlsd-services
+          service: router-healthz
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
