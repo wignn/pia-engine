@@ -39,7 +39,7 @@ scrape_configs:
   - job_name: news-service
     metrics_path: /metrics
     static_configs:
-      - targets: ["172.17.0.1:8000"]
+      - targets: ["news-service:8030"]
 
   - job_name: ingestion-gateway
     metrics_path: /metrics
@@ -52,26 +52,63 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
-          # Active Color Services via Router (Host 172.17.0.1 or Router bridge)
           - http://172.17.0.1:8000/health
+        labels:
+          group: atlsd-services
+          service: api-gateway
+      - targets:
+          - http://172.17.0.1:8000/health
+        labels:
+          group: atlsd-services
+          service: market-data
+      - targets:
+          - http://172.17.0.1:8000/health
+        labels:
+          group: atlsd-services
+          service: news-service
+      - targets:
+          - http://172.17.0.1:8000/health
+        labels:
+          group: atlsd-services
+          service: intelligence-service
+      - targets:
           - http://172.17.0.1:8020/health
+        labels:
+          group: atlsd-services
+          service: realtime-gateway
+      - targets:
           - http://172.17.0.1:5173/
-          # Public Domain Health
+        labels:
+          group: atlsd-services
+          service: public-web
+      - targets:
           - https://atlsd.wign.dev/
-          # Edge & Core Services Direct Health
+        labels:
+          group: atlsd-services
+          service: public-domain
+      - targets:
           - http://world-control-plane:8080/health
+        labels:
+          group: atlsd-services
+          service: world-control-plane
+      - targets:
           - http://ingestion-gateway:8091/health
+        labels:
+          group: atlsd-services
+          service: ingestion-gateway
+      - targets:
           - http://clickhouse-prod:8123/ping
-          # Router Healthz
+        labels:
+          group: atlsd-services
+          service: clickhouse-prod
+      - targets:
           - http://172.17.0.1:8000/healthz
         labels:
           group: atlsd-services
+          service: router-healthz
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
-      - source_labels: [__param_target]
-        regex: https?://([^:/]+).*
-        target_label: service
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
