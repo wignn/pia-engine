@@ -57,14 +57,13 @@ services:
     container_name: node-exporter
     restart: unless-stopped
     command:
-      - --path.rootfs=/host
       - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
       - --collector.textfile.directory=/textfile
-    pid: host
     volumes:
-      - /:/host:ro,rslave
-      # Host-generated docker_stats.prom must persist across monitoring recreates.
-      - ../monitoring/textfile:/textfile:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro,rslave
+      - /home/wign/atlsd/infra/monitoring/textfile:/textfile
     networks:
       - monitoring
 
