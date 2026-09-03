@@ -778,12 +778,11 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_success",
+          "expr": "max by (service) (probe_success)",
           "instant": false,
           "legendFormat": "{{service}}",
           "range": true,
-          "refId": "A",
-          "interval": "2m"
+          "refId": "A"
         }
       ],
       "maxDataPoints": 80,
