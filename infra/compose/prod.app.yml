@@ -26,7 +26,7 @@ services:
   api-gateway:
     image: wign/atlsd-api-gateway:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8000/health"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8000/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 6
@@ -52,7 +52,7 @@ services:
   market-data:
     image: wign/atlsd-market-data:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8010/health"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8010/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -93,7 +93,7 @@ services:
   realtime-gateway:
     image: wign/atlsd-realtime-gateway:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8020/health"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8020/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -116,7 +116,7 @@ services:
   news-service:
     image: wign/atlsd-news-service:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8030/health"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8030/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -139,7 +139,7 @@ services:
   intelligence-service:
     image: wign/atlsd-intelligence-service:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8040/health"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8040/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -160,7 +160,7 @@ services:
   public-web:
     image: wign/atlsd-public-web:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5173/"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 6

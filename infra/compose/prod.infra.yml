@@ -35,11 +35,13 @@ services:
     env_file:
       - ../env/.env.db
     environment:
-      - DB_USER=$POSTGRES_USER
+      - DB_USER=atlsd
       - DB_PASSWORD=$POSTGRES_PASSWORD
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=$POSTGRES_DB
+      - DB_NAME=core
+      - AUTH_USER=atlsd
+      - AUTH_TYPE=scram-sha-256
       - POOL_MODE=transaction
       - MAX_CLIENT_CONN=500
       - DEFAULT_POOL_SIZE=30
@@ -47,7 +49,6 @@ services:
       - RESERVE_POOL_SIZE=5
       - MAX_DB_CONNECTIONS=60
       - SERVER_IDLE_TIMEOUT=30
-      - AUTH_TYPE=scram-sha-256
       - LISTEN_PORT=6432
       - UNIX_SOCKET_DIR=/tmp
     ports:
