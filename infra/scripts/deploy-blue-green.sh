@@ -65,6 +65,12 @@ server {
         return 200 "router-ok\n";
     }
 
+    location /metrics {
+        proxy_pass http://realtime_gateway_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+    }
+
     # Realtime HTTP API (ticket issuance) + WS endpoints under /api/v1/ws
     location /api/v1/ws {
         proxy_pass http://realtime_gateway_backend;
