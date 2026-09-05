@@ -1,0 +1,16 @@
+{
+  "name": "atlsd-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "bun --filter public-web dev",
+    "dev:pia": "bun --filter pia dev",
+    "build:web": "bun --filter public-web build",
+    "build:pia": "bun --filter pia build",
+    "check:web": "bun --filter public-web check"
+  }
+}
