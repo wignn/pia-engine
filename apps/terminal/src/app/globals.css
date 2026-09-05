@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --tv-bg: #131722;
+  --tv-panel: #1e222d;
+  --tv-border: #2a2e39;
+  --tv-hover: #2a2e39;
+  --tv-text: #d1d4dc;
+  --tv-muted: #787b86;
+  --tv-green: #089981;
+  --tv-red: #f23645;
+  --tv-blue: #2962ff;
+}
+
+body {
+  background-color: var(--tv-bg);
+  color: var(--tv-text);
+  overflow: hidden;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif;
+}
+
+/* Custom Scrollbar for TradingView Look */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #131722;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2e39;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #363c4e;
+}
