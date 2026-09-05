@@ -214,7 +214,6 @@ async fn handle_payload(
     if let Some(current) = current {
         let received_at = parse_received_at(current.received_at.as_deref());
         persist_latest_price(&state.db, &current, received_at).await;
-        persist_clickhouse_price_tick(state, &current, received_at).await;
         let session = crate::session::session_status(
             &current.symbol,
             &current.asset_type,
@@ -222,9 +221,10 @@ async fn handle_payload(
             Some(&state.calendar),
         );
         if session.is_open {
+            persist_clickhouse_price_tick(state, &current, received_at).await;
             persist_ohlcv_candle(&state.db, &current, received_at).await;
         } else {
-            debug!(symbol = %current.symbol, state = %session.state, reason = %session.reason, "skipped ohlcv candle outside open session");
+            debug!(symbol = %current.symbol, state = %session.state, reason = %session.reason, "skipped tick and ohlcv candle outside open session");
         }
     }
     debug!(symbol = %symbol, "updated market-data price cache");
