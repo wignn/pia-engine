@@ -259,7 +259,7 @@ fn latest_history_sql(database: &str, symbol: &str, resolution: &str, limit: usi
     let bucket_interval = clickhouse_bucket_interval(bucket_minutes);
     let lookback_minutes = history_lookback_minutes(bucket_minutes, limit);
     format!(
-        "SELECT toUnixTimestamp(bucket_time) AS time, argMax(price, time) AS value, argMin(price, time) AS open, max(price) AS high, min(price) AS low, argMax(price, time) AS close, sum(volume) AS volume, count() AS tick_count, toString(max(time)) AS latest_at, 'clickhouse_price_ticks' AS source FROM (SELECT toStartOfInterval(time, {}) AS bucket_time, time, price, volume FROM {}.price_ticks WHERE symbol = {} AND price > 0 AND time >= now() - INTERVAL {} MINUTE) GROUP BY bucket_time ORDER BY bucket_time DESC LIMIT {} FORMAT JSONEachRow",
+        "SELECT toUnixTimestamp(bucket_time) AS time, argMax(price, tick_time) AS value, argMin(price, tick_time) AS open, max(price) AS high, min(price) AS low, argMax(price, tick_time) AS close, sum(volume) AS volume, count() AS tick_count, toString(max(tick_time)) AS latest_at, 'clickhouse_price_ticks' AS source FROM (SELECT toStartOfInterval(time, {}) AS bucket_time, time AS tick_time, price, volume FROM {}.price_ticks WHERE symbol = {} AND price > 0 AND time >= now() - INTERVAL {} MINUTE) GROUP BY bucket_time ORDER BY bucket_time DESC LIMIT {} FORMAT JSONEachRow",
         bucket_interval,
         ident(database),
         string_literal(symbol),
@@ -353,10 +353,10 @@ mod tests {
 
         assert!(sql.contains("FROM market.price_ticks"));
         assert!(sql.contains("toStartOfInterval(time, INTERVAL 5 MINUTE) AS bucket_time"));
-        assert!(sql.contains("argMin(price, time) AS open"));
+        assert!(sql.contains("argMin(price, tick_time) AS open"));
         assert!(sql.contains("max(price) AS high"));
         assert!(sql.contains("min(price) AS low"));
-        assert!(sql.contains("argMax(price, time) AS close"));
+        assert!(sql.contains("argMax(price, tick_time) AS close"));
         assert!(sql.contains("sum(volume) AS volume"));
         assert!(sql.contains("count() AS tick_count"));
         assert!(sql.contains("'clickhouse_price_ticks' AS source"));
