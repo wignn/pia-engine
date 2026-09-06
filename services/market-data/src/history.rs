@@ -25,7 +25,10 @@ pub async fn get_history(
     let limit = query.limit.unwrap_or(120).clamp(1, 1000);
 
     if let Some(clickhouse) = &state.clickhouse {
-        match clickhouse.latest_history(&symbol, &resolution, limit, query.before).await {
+        match clickhouse
+            .latest_history(&symbol, &resolution, limit, query.before)
+            .await
+        {
             Ok(history) if !history.is_empty() => {
                 return Json(json!(history));
             }
