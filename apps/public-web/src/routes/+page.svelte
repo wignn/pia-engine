@@ -21,6 +21,7 @@
 	import CalendarTable from '$lib/components/CalendarTable.svelte';
 	import SentimentDashboard from '$lib/components/SentimentDashboard.svelte';
 	import OptionsDashboard from '$lib/components/OptionsDashboard.svelte';
+	import SocialFeed from '$lib/components/SocialFeed.svelte';
 	import logoUrl from '$lib/assets/logo.png';
 	import { reveal } from '$lib/actions/reveal';
 
@@ -458,6 +459,12 @@
 				<CalendarTable />
 			</div>
 		</div>
+	</section>
+
+	<div class="h-px w-full bg-border"></div>
+
+	<section id="social" class="border-b border-border bg-bg px-3 py-12 md:px-5 lg:px-8" use:reveal={{ y: 40 }}>
+		<div class="mx-auto max-w-[1600px]"><SocialFeed /></div>
 	</section>
 
 	<div class="h-px w-full bg-border"></div>
