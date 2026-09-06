@@ -28,6 +28,8 @@ interface TopBarProps {
   changePercent: number;
   digits: number;
   onSearchClick: () => void;
+  chartType?: "candlestick" | "bar" | "line" | "area" | "heikin_ashi";
+  onChartTypeChange?: (type: "candlestick" | "bar" | "line" | "area" | "heikin_ashi") => void;
   onToggleIndicator?: (indicator: "sma20" | "ema50") => void;
   indicators?: { sma20: boolean; ema50: boolean };
   onFullscreen?: () => void;
@@ -44,6 +46,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   changePercent,
   digits,
   onSearchClick,
+  chartType = "candlestick",
+  onChartTypeChange,
   onToggleIndicator,
   indicators = { sma20: false, ema50: false },
   onFullscreen,
@@ -94,11 +98,20 @@ export const TopBar: React.FC<TopBarProps> = ({
         <div className="h-4 w-px bg-[#2a2e39] mx-1" />
 
         {/* Chart Style (Candles) */}
-        <button className="flex items-center gap-1 px-2 py-1 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]">
-          <BarChart2 className="w-3.5 h-3.5" />
-          <span className="hidden lg:inline text-xs font-medium">Candles</span>
-          <ChevronDown className="w-3 h-3" />
-        </button>
+        <div className="relative group">
+          <button className="flex items-center gap-1 px-2 py-1 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]">
+            <BarChart2 className="w-3.5 h-3.5" />
+            <span className="hidden lg:inline text-xs font-medium">{chartType === "heikin_ashi" ? "Heikin Ashi" : chartType[0].toUpperCase() + chartType.slice(1)}</span>
+            <ChevronDown className="w-3 h-3" />
+          </button>
+          <div className="hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-36 flex-col rounded border border-[#2a2e39] bg-[#1e222d] p-1 shadow-xl">
+            {(["candlestick", "bar", "line", "area", "heikin_ashi"] as const).map((type) => (
+              <button key={type} onClick={() => onChartTypeChange?.(type)} className={`rounded px-2 py-1.5 text-left text-xs capitalize hover:bg-[#2a2e39] ${chartType === type ? "text-[#2962ff]" : "text-[#d1d4dc]"}`}>
+                {type === "heikin_ashi" ? "Heikin Ashi" : type}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Indicators */}
         <div className="relative group">

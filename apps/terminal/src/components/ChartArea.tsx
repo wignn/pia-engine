@@ -9,6 +9,7 @@ interface ChartAreaProps {
   symbol: string;
   provider: string;
   timeframe: Timeframe;
+  chartType?: "candlestick" | "bar" | "line" | "area" | "heikin_ashi";
   indicators?: { sma20: boolean; ema50: boolean };
   digits: number;
   candles: CandleData[];
@@ -25,6 +26,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   symbol,
   provider,
   timeframe,
+  chartType = "candlestick",
   indicators = { sma20: false, ema50: false },
   digits,
   candles,
@@ -39,6 +41,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const areaRef = useRef<ISeriesApi<"Area"> | null>(null);
+  const barRef = useRef<ISeriesApi<"Bar"> | null>(null);
   const smaRef = useRef<ISeriesApi<"Line"> | null>(null);
   const emaRef = useRef<ISeriesApi<"Line"> | null>(null);
   const hoveringRef = useRef(false);
@@ -86,12 +91,18 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       wickUpColor: "#089981",
       wickDownColor: "#f23645",
     });
+    const lineSeries = chart.addLineSeries({ color: "#d1d4dc", lineWidth: 2, priceLineVisible: false });
+    const areaSeries = chart.addAreaSeries({ lineColor: "#2962ff", topColor: "#2962ff55", bottomColor: "#2962ff05", lineWidth: 2, priceLineVisible: false });
+    const barSeries = chart.addBarSeries({ upColor: "#089981", downColor: "#f23645", openVisible: true, thinBars: false });
 
     const smaSeries = chart.addLineSeries({ color: "#f5b942", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
     const emaSeries = chart.addLineSeries({ color: "#2962ff", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
 
     chartRef.current = chart;
     seriesRef.current = candlestickSeries;
+    lineRef.current = lineSeries;
+    areaRef.current = areaSeries;
+    barRef.current = barSeries;
     smaRef.current = smaSeries;
     emaRef.current = emaSeries;
 
@@ -121,6 +132,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      lineRef.current = null;
+      areaRef.current = null;
+      barRef.current = null;
       smaRef.current = null;
       emaRef.current = null;
     };
@@ -169,7 +183,17 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       ? Math.max(0, candles.length - previousCandleCountRef.current)
       : 0;
 
-    seriesRef.current.setData(data);
+    const lineData: LineData<Time>[] = candles.map((c) => ({ time: c.time as Time, value: c.close }));
+    const heikinData: CandlestickData<Time>[] = candles.reduce<CandlestickData<Time>[]>((result, c, index) => {
+      const close = (c.open + c.high + c.low + c.close) / 4;
+      const open = index === 0 ? (c.open + c.close) / 2 : ((result[index - 1].open as number) + (result[index - 1].close as number)) / 2;
+      result.push({ time: c.time as Time, open, high: Math.max(c.high, open, close), low: Math.min(c.low, open, close), close });
+      return result;
+    }, []);
+    seriesRef.current.setData(chartType === "heikin_ashi" ? heikinData : chartType === "candlestick" ? data : []);
+    barRef.current?.setData(chartType === "bar" ? data : []);
+    lineRef.current?.setData(chartType === "line" ? lineData : []);
+    areaRef.current?.setData(chartType === "area" ? lineData : []);
     const movingAverage = (period: number, exponential: boolean): LineData<Time>[] => {
       const output: LineData<Time>[] = [];
       let previous: number | null = null;
@@ -208,7 +232,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       const chp = last.open ? (ch / last.open) * 100 : 0;
       setOhlc({ open: last.open, high: last.high, low: last.low, close: last.close, change: ch, changePercent: chp });
     }
-  }, [candles, indicators.sma20, indicators.ema50, symbol, timeframe]);
+  }, [candles, chartType, indicators.sma20, indicators.ema50, symbol, timeframe]);
 
   // Live tick: update the last candle in-place.
   useEffect(() => {

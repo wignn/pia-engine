@@ -11,7 +11,7 @@ import { ChartTabs } from "@/components/ChartTabs";
 import { SymbolSearchModal } from "@/components/SymbolSearchModal";
 import { INITIAL_WATCHLIST } from "@/lib/constants";
 import { useMarketFeed } from "@/lib/useMarketFeed";
-import { WatchlistItem, Timeframe, TabItem } from "@/types";
+import { WatchlistItem, Timeframe, TabItem, ChartType } from "@/types";
 
 export default function TerminalPage() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(INITIAL_WATCHLIST);
@@ -20,6 +20,7 @@ export default function TerminalPage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<SidebarTab>("watchlist");
   const [indicators, setIndicators] = useState({ sma20: false, ema50: false });
+  const [chartType, setChartType] = useState<ChartType>("candlestick");
 
   // Real market feed for the active symbol + timeframe.
   const { candles, livePrice, connected, loading, loadingOlder, hasMoreHistory, loadOlder } = useMarketFeed(selectedItem.symbol, timeframe); // live + paginated history
@@ -138,6 +139,8 @@ export default function TerminalPage() {
         digits={selectedItem.digits}
         onSearchClick={() => setIsSearchOpen(true)}
         indicators={indicators}
+        chartType={chartType}
+        onChartTypeChange={setChartType}
         onToggleIndicator={(indicator) => setIndicators((current) => ({ ...current, [indicator]: !current[indicator] }))}
         onFullscreen={toggleFullscreen}
       />
@@ -158,6 +161,7 @@ export default function TerminalPage() {
             symbol={selectedItem.symbol}
             provider={selectedItem.provider}
             timeframe={timeframe}
+            chartType={chartType}
             indicators={indicators}
             digits={selectedItem.digits}
             candles={candles}
