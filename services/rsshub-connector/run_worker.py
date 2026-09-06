@@ -12,7 +12,6 @@ async def main() -> None:
     config = Config.from_env()
     logging.basicConfig(level="INFO")
     worker = PollingWorker(config)
-    await worker.start()
     try:
         await publish_worker(config, worker)
     finally:

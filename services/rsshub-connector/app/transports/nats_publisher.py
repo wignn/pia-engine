@@ -16,8 +16,10 @@ async def publish_worker(config: Config, worker: PollingWorker) -> None:
     if config.nats_creds:
         options["user_credentials"] = config.nats_creds
     nc = await nats.connect(**options)
+    stream = worker.subscribe()
+    await worker.start()
     try:
-        async for record in worker.subscribe():
+        async for record in stream:
             await nc.publish(config.nats_subject, json.dumps(record.as_dict(), ensure_ascii=False).encode())
     finally:
         await nc.drain()
