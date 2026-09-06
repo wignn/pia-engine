@@ -130,7 +130,9 @@ jobs:
               - '.dockerignore'
             social_worker:
               - 'services/social-worker/**'
+              - 'services/twitkit/**'
               - 'infra/docker/Dockerfile.social-worker'
+              - 'infra/docker/Dockerfile.twitkit'
               - '.dockerignore'
             db_migrate:
               - 'services/db-migrate/**'
@@ -231,7 +233,7 @@ jobs:
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$SOCIAL_WORKER_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-social-worker","dockerfile":"infra/docker/Dockerfile.social-worker"}'
+            add '{"image":"atlsd-twitkit","dockerfile":"infra/docker/Dockerfile.twitkit"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$DB_MIGRATE_CHANGED" == "true" ]]; then

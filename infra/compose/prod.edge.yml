@@ -58,17 +58,19 @@ services:
 
   social-worker:
     container_name: atlsd-social-worker
-    image: wign/atlsd-social-worker:${ATLSD_IMAGE_TAG:-latest}
+    image: wign/atlsd-twitkit:${ATLSD_IMAGE_TAG:-latest}
+    user: "0:0"
     env_file:
       - ../env/.env.social-worker
     environment:
-      TWITTER_DB: /data/accounts.db
-      SOCIAL_ACCOUNTS: twitter:macropaperr,twitter:BullTheoryio,twitter:WhaleInsider,twitter:coinbureau
+      TWIKIT_COOKIES_FILE: /data/cookies.json
+      SOCIAL_ACCOUNTS: macropaperr,BullTheoryio,WhaleInsider,coinbureau
       NATS_URL: nats://nats:4222
       NATS_SUBJECT: social.posts
-      NATS_CREDS: ""
+      TWIKIT_TARGET_DELAY: "15"
+      TWITTER_TWEET_LIMIT: "20"
     volumes:
-      - social_worker_data:/data
+      - ${TWIKIT_COOKIES_HOST_FILE:-/opt/atlsd/secrets/twitkit/cookies.json}:/data/cookies.json:ro
     restart: always
     logging: *default-logging
     networks:

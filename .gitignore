@@ -24,3 +24,8 @@ docs
 # blue-green deployment state (host-local)
 infra/env/active_target
 infra/monitoring/textfile/
+# Twikit session credentials (local only)
+services/twitkit/cookies.json
+services/twitkit/.venv/
+services/twitkit/**/__pycache__/
+services/twitkit/**/*.pyc

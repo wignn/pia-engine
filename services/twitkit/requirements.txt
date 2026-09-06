@@ -1,0 +1,9 @@
+beautifulsoup4>=4.12
+colorama>=0.4
+filetype>=1.2
+httpx>=0.27
+lxml>=5.0
+js2py>=0.74
+m3u8>=6.0
+pyotp>=2.9
+webvtt-py>=0.5
