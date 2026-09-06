@@ -29,6 +29,8 @@ export interface MarketFeedState {
   livePrice: number | null;
   connected: boolean;
   loading: boolean;
+  loadingOlder: boolean;
+  hasMoreHistory: boolean;
   usingRealData: boolean;
   loadOlder: () => Promise<CandleData[]>;
 }
@@ -45,6 +47,8 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
   const [loading, setLoading] = useState(true);
   const [usingRealData, setUsingRealData] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const loadingOlderRef = useRef(false);
   const oldestTimeRef = useRef<number | null>(null);
   const hasMoreHistoryRef = useRef(true);
 
@@ -73,6 +77,11 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadingOlder(false);
+    setHasMoreHistory(true);
+    loadingOlderRef.current = false;
+    oldestTimeRef.current = null;
+    hasMoreHistoryRef.current = true;
     intervalSecRef.current = tfSeconds(timeframe);
 
     (async () => {
@@ -102,6 +111,7 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
           setCandles(mapped);
           oldestTimeRef.current = mapped[0]?.time ?? null;
           hasMoreHistoryRef.current = mapped.length > 0;
+          setHasMoreHistory(mapped.length > 0);
           setLivePrice(mapped[mapped.length - 1]?.close ?? null);
           setUsingRealData(true);
           setLoadingOlder(false);
@@ -127,7 +137,8 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
   // Fetch an older page when the chart viewport reaches its left edge.
   const loadOlder = useCallback(async (): Promise<CandleData[]> => {
     const before = oldestTimeRef.current;
-    if (loadingOlder || before == null || !hasMoreHistoryRef.current) return [];
+    if (loadingOlderRef.current || before == null || !hasMoreHistoryRef.current) return [];
+    loadingOlderRef.current = true;
     setLoadingOlder(true);
     try {
       const res = await fetch(
@@ -141,7 +152,10 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
         high: Number(r.high ?? r.value), low: Number(r.low ?? r.value),
         close: Number(r.close ?? r.value), volume: Number(r.volume ?? 0),
       })).filter((c) => Number.isFinite(c.time) && c.time > 0 && Number.isFinite(c.close));
-      if (older.length === 0) hasMoreHistoryRef.current = false;
+      if (older.length === 0) {
+        hasMoreHistoryRef.current = false;
+        setHasMoreHistory(false);
+      }
       if (older.length > 0) {
         oldestTimeRef.current = Math.min(...older.map((c) => c.time));
         setCandles((current) => {
@@ -152,9 +166,10 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
       }
       return older;
     } finally {
+      loadingOlderRef.current = false;
       setLoadingOlder(false);
     }
-  }, [loadingOlder, timeframe]);
+  }, [timeframe]);
 
   // ---- Apply a live tick to the last candle (or roll a new one) ----
   const applyTick = useCallback((price: number, tsMs: number) => {
@@ -271,5 +286,14 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
     };
   }, [applyTick]);
 
-  return { candles, livePrice, connected, loading: loading || loadingOlder, usingRealData, loadOlder };
+  return {
+    candles,
+    livePrice,
+    connected,
+    loading,
+    loadingOlder,
+    hasMoreHistory,
+    usingRealData,
+    loadOlder,
+  };
 }

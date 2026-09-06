@@ -14,6 +14,8 @@ interface ChartAreaProps {
   livePrice?: number | null;
   connected?: boolean;
   loading?: boolean;
+  loadingOlder?: boolean;
+  hasMoreHistory?: boolean;
   usingRealData?: boolean;
   onLoadOlder?: () => Promise<CandleData[]>;
 }
@@ -27,6 +29,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   livePrice,
   connected = false,
   loading = false,
+  loadingOlder = false,
+  hasMoreHistory = true,
   usingRealData = false,
   onLoadOlder,
 }) => {
@@ -214,11 +218,21 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       </div>
 
       {/* Loading / empty overlays */}
-      {loading && (
+      {loading && !loadingOlder && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#131722]/60 pointer-events-none">
           <div className="flex items-center gap-2 text-[#787b86] text-sm">
             <Loader2 className="w-4 h-4 animate-spin" /> Loading {symbol} history…
           </div>
+        </div>
+      )}
+      {loadingOlder && (
+        <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2 flex items-center gap-2 rounded bg-[#1e222d] border border-[#2a2e39] px-3 py-1.5 text-[11px] text-[#d1d4dc] shadow-lg pointer-events-none">
+          <Loader2 className="w-3 h-3 animate-spin" /> Loading older candles…
+        </div>
+      )}
+      {!loading && !loadingOlder && !hasMoreHistory && hasData && (
+        <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded bg-[#1e222d]/90 border border-[#2a2e39] px-2.5 py-1 text-[10px] text-[#787b86] pointer-events-none">
+          No more historical data
         </div>
       )}
       {!loading && !hasData && (
