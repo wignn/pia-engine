@@ -5,7 +5,6 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::prices::{load_latest_price, CachedPrice};
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -51,132 +50,9 @@ pub fn normalize_resolution(raw: &str) -> String {
     }
 }
 
-fn resolution_bucket_seconds(resolution: &str) -> i64 {
-    match resolution {
-        "5m" => 5 * 60,
-        "15m" => 15 * 60,
-        "1h" => 60 * 60,
-        _ => 60,
-    }
-}
-
-async fn postgres_history(
-    pool: &sqlx::PgPool,
-    symbol: &str,
-    resolution: &str,
-    limit: usize,
-) -> Result<Vec<Value>, sqlx::Error> {
-    let rows: Vec<(chrono::DateTime<chrono::Utc>, f64, f64, f64, f64)> = if resolution == "1m" {
-        sqlx::query_as(
-            "SELECT time, open, high, low, close FROM market.ohlcv_candles WHERE symbol = $1 AND resolution = '1m' AND time >= NOW() - INTERVAL '1 day' ORDER BY time DESC LIMIT $2",
-        )
-        .bind(symbol)
-        .bind(limit as i64)
-        .fetch_all(pool)
-        .await?
-    } else {
-        let bucket_seconds = resolution_bucket_seconds(resolution);
-        sqlx::query_as(
-            "WITH bucketed AS (
-                SELECT to_timestamp(floor(extract(epoch from time) / $2) * $2) AS bucket_time, time, open, high, low, close
-                FROM market.ohlcv_candles
-                WHERE symbol = $1 AND resolution = '1m' AND time >= NOW() - INTERVAL '7 days'
-            ), ranked AS (
-                SELECT
-                    bucket_time,
-                    first_value(open) OVER (PARTITION BY bucket_time ORDER BY time ASC) AS open,
-                    max(high) OVER (PARTITION BY bucket_time) AS high,
-                    min(low) OVER (PARTITION BY bucket_time) AS low,
-                    first_value(close) OVER (PARTITION BY bucket_time ORDER BY time DESC) AS close,
-                    row_number() OVER (PARTITION BY bucket_time ORDER BY time DESC) AS rn
-                FROM bucketed
-            )
-            SELECT bucket_time, open, high, low, close FROM ranked WHERE rn = 1 ORDER BY bucket_time DESC LIMIT $3",
-        )
-        .bind(symbol)
-        .bind(bucket_seconds as f64)
-        .bind(limit as i64)
-        .fetch_all(pool)
-        .await?
-    };
-
-    Ok(rows
-        .into_iter()
-        .rev()
-        .map(|(time, open, high, low, close)| {
-            json!({
-                "time": time.timestamp(),
-                "value": close,
-                "open": open,
-                "high": high,
-                "low": low,
-                "close": close,
-                "tick_count": null,
-                "source": "postgres_ohlcv_candles"
-            })
-        })
-        .collect())
-}
-
-async fn latest_price_history_fallback(
-    state: &AppState,
-    symbol: &str,
-    resolution: &str,
-) -> Vec<Value> {
-    if resolution != "1m" {
-        return Vec::new();
-    }
-
-    match load_latest_price(&state.db, symbol).await {
-        Ok(Some(price)) if should_emit_last_known_fallback(&price, &state.calendar) => {
-            let now = chrono::Utc::now().timestamp();
-            let start = now - (119 * 60);
-            (0..120)
-                .map(|i| {
-                    json!({
-                        "time": start + (i * 60),
-                        "value": price.price,
-                        "open": price.price,
-                        "high": price.price,
-                        "low": price.price,
-                        "close": price.price,
-                        "tick_count": 0,
-                        "source": "last_known"
-                    })
-                })
-                .collect()
-        }
-        Ok(_) => Vec::new(),
-        Err(err) => {
-            tracing::warn!(error = %err, symbol = %symbol, "failed to load latest price for history fallback");
-            Vec::new()
-        }
-    }
-}
-
-fn should_emit_last_known_fallback(
-    price: &CachedPrice,
-    calendar: &crate::calendar::CalendarCache,
-) -> bool {
-    should_emit_last_known_fallback_at(price, calendar, chrono::Utc::now())
-}
-
-fn should_emit_last_known_fallback_at(
-    price: &CachedPrice,
-    calendar: &crate::calendar::CalendarCache,
-    now: chrono::DateTime<chrono::Utc>,
-) -> bool {
-    if price.price <= 0.0 {
-        return false;
-    }
-
-    crate::session::session_status(&price.symbol, &price.asset_type, now, Some(calendar)).is_open
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
 
     #[test]
     fn normalizes_supported_resolutions() {
@@ -184,52 +60,5 @@ mod tests {
         assert_eq!(normalize_resolution("5"), "5m");
         assert_eq!(normalize_resolution("h1"), "1h");
         assert_eq!(normalize_resolution("bad"), "1m");
-        assert_eq!(resolution_bucket_seconds("5m"), 300);
-        assert_eq!(resolution_bucket_seconds("15m"), 900);
-        assert_eq!(resolution_bucket_seconds("1h"), 3600);
-    }
-
-    #[test]
-    fn suppresses_last_known_fallback_for_closed_sessions() {
-        let calendar = crate::calendar::CalendarCache::default();
-        let price = CachedPrice {
-            symbol: "SPX".to_string(),
-            price: 7519.11,
-            bid: None,
-            ask: None,
-            volume: None,
-            source: "market_data".to_string(),
-            asset_type: "index".to_string(),
-            received_at: None,
-            timestamp_ms: None,
-            feed: None,
-        };
-
-        let after_close = chrono::Utc.with_ymd_and_hms(2026, 5, 27, 22, 0, 0).unwrap();
-
-        assert!(!should_emit_last_known_fallback_at(
-            &price,
-            &calendar,
-            after_close
-        ));
-    }
-
-    #[test]
-    fn allows_last_known_fallback_for_crypto_sessions() {
-        let calendar = crate::calendar::CalendarCache::default();
-        let price = CachedPrice {
-            symbol: "BTCUSDT".to_string(),
-            price: 100_000.0,
-            bid: None,
-            ask: None,
-            volume: None,
-            source: "market_data".to_string(),
-            asset_type: "crypto".to_string(),
-            received_at: None,
-            timestamp_ms: None,
-            feed: None,
-        };
-
-        assert!(should_emit_last_known_fallback(&price, &calendar));
     }
 }
