@@ -157,8 +157,9 @@ impl ClickHouseClient {
         symbol: &str,
         resolution: &str,
         limit: usize,
+        before: Option<i64>,
     ) -> anyhow::Result<Vec<Value>> {
-        let sql = latest_history_sql(&self.database, symbol, resolution, limit);
+        let sql = latest_history_sql(&self.database, symbol, resolution, limit, before);
         let mut rows: Vec<Value> = self.query_json_each_row(&sql).await?;
         rows.reverse();
         Ok(rows)
@@ -254,16 +255,25 @@ fn history_lookback_minutes(bucket_minutes: u32, limit: usize) -> u32 {
     requested.clamp(240, 43_200) as u32
 }
 
-fn latest_history_sql(database: &str, symbol: &str, resolution: &str, limit: usize) -> String {
+fn latest_history_sql(
+    database: &str,
+    symbol: &str,
+    resolution: &str,
+    limit: usize,
+    before: Option<i64>,
+) -> String {
     let bucket_minutes = history_bucket_minutes(resolution);
     let bucket_interval = clickhouse_bucket_interval(bucket_minutes);
     let lookback_minutes = history_lookback_minutes(bucket_minutes, limit);
+    let time_window = before
+        .map(|ts| format!("time >= toDateTime({ts}) - INTERVAL {lookback_minutes} MINUTE AND time < toDateTime({ts})"))
+        .unwrap_or_else(|| format!("time >= now() - INTERVAL {lookback_minutes} MINUTE"));
     format!(
-        "SELECT toUnixTimestamp(bucket_time) AS time, argMax(price, tick_time) AS value, argMin(price, tick_time) AS open, max(price) AS high, min(price) AS low, argMax(price, tick_time) AS close, sum(volume) AS volume, count() AS tick_count, toString(max(tick_time)) AS latest_at, 'clickhouse_price_ticks' AS source FROM (SELECT toStartOfInterval(time, {}) AS bucket_time, time AS tick_time, price, volume FROM {}.price_ticks WHERE symbol = {} AND price > 0 AND time >= now() - INTERVAL {} MINUTE) GROUP BY bucket_time ORDER BY bucket_time DESC LIMIT {} FORMAT JSONEachRow",
+        "SELECT toUnixTimestamp(bucket_time) AS time, argMax(price, tick_time) AS value, argMin(price, tick_time) AS open, max(price) AS high, min(price) AS low, argMax(price, tick_time) AS close, sum(volume) AS volume, count() AS tick_count, toString(max(tick_time)) AS latest_at, 'clickhouse_price_ticks' AS source FROM (SELECT toStartOfInterval(time, {}) AS bucket_time, time AS tick_time, price, volume FROM {}.price_ticks WHERE symbol = {} AND price > 0 AND {}) GROUP BY bucket_time ORDER BY bucket_time DESC LIMIT {} FORMAT JSONEachRow",
         bucket_interval,
         ident(database),
         string_literal(symbol),
-        lookback_minutes,
+        time_window,
         limit.clamp(1, 1000)
     )
 }
@@ -349,7 +359,7 @@ mod tests {
 
     #[test]
     fn latest_history_query_aggregates_ohlc_from_raw_ticks() {
-        let sql = latest_history_sql("market", "BTCUSDT", "5m", 120);
+        let sql = latest_history_sql("market", "BTCUSDT", "5m", 120, None);
 
         assert!(sql.contains("FROM market.price_ticks"));
         assert!(sql.contains("toStartOfInterval(time, INTERVAL 5 MINUTE) AS bucket_time"));
@@ -361,6 +371,15 @@ mod tests {
         assert!(sql.contains("count() AS tick_count"));
         assert!(sql.contains("'clickhouse_price_ticks' AS source"));
         assert!(!sql.contains("FROM market.ohlcv_candles"));
+    }
+
+    #[test]
+    fn latest_history_query_paginates_before_cursor_window() {
+        let sql = latest_history_sql("market", "ETHUSDT", "15m", 240, Some(1_700_000_000));
+        assert!(sql.contains("time >= toDateTime(1700000000) - INTERVAL"));
+        assert!(sql.contains("time < toDateTime(1700000000)"));
+        assert!(sql.contains("argMin(price, tick_time) AS open"));
+        assert!(sql.contains("argMax(price, tick_time) AS close"));
     }
 
     #[test]

@@ -30,6 +30,7 @@ export interface MarketFeedState {
   connected: boolean;
   loading: boolean;
   usingRealData: boolean;
+  loadOlder: () => Promise<CandleData[]>;
 }
 
 /**
@@ -43,6 +44,9 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [usingRealData, setUsingRealData] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const oldestTimeRef = useRef<number | null>(null);
+  const hasMoreHistoryRef = useRef(true);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,8 +100,11 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
             .sort((a, b) => a.time - b.time);
 
           setCandles(mapped);
+          oldestTimeRef.current = mapped[0]?.time ?? null;
+          hasMoreHistoryRef.current = mapped.length > 0;
           setLivePrice(mapped[mapped.length - 1]?.close ?? null);
           setUsingRealData(true);
+          setLoadingOlder(false);
         } else {
           setCandles([]);
           setUsingRealData(false);
@@ -116,6 +123,38 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
       cancelled = true;
     };
   }, [symbol, timeframe]);
+
+  // Fetch an older page when the chart viewport reaches its left edge.
+  const loadOlder = useCallback(async (): Promise<CandleData[]> => {
+    const before = oldestTimeRef.current;
+    if (loadingOlder || before == null || !hasMoreHistoryRef.current) return [];
+    setLoadingOlder(true);
+    try {
+      const res = await fetch(
+        `/api/market/history/${encodeURIComponent(symbolRef.current)}?resolution=${RESOLUTION_MAP[timeframe]}&limit=240&before=${before}`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) return [];
+      const rows: HistoryRow[] = await res.json();
+      const older = rows.map((r) => ({
+        time: Math.floor(Number(r.time)), open: Number(r.open ?? r.value),
+        high: Number(r.high ?? r.value), low: Number(r.low ?? r.value),
+        close: Number(r.close ?? r.value), volume: Number(r.volume ?? 0),
+      })).filter((c) => Number.isFinite(c.time) && c.time > 0 && Number.isFinite(c.close));
+      if (older.length === 0) hasMoreHistoryRef.current = false;
+      if (older.length > 0) {
+        oldestTimeRef.current = Math.min(...older.map((c) => c.time));
+        setCandles((current) => {
+          const merged = [...older, ...current].sort((a, b) => a.time - b.time);
+          const unique = merged.filter((c, i, all) => i === 0 || c.time !== all[i - 1].time);
+          return unique;
+        });
+      }
+      return older;
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [loadingOlder, timeframe]);
 
   // ---- Apply a live tick to the last candle (or roll a new one) ----
   const applyTick = useCallback((price: number, tsMs: number) => {
@@ -232,5 +271,5 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
     };
   }, [applyTick]);
 
-  return { candles, livePrice, connected, loading, usingRealData };
+  return { candles, livePrice, connected, loading: loading || loadingOlder, usingRealData, loadOlder };
 }

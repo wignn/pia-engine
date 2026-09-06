@@ -21,7 +21,7 @@ export default function TerminalPage() {
   const [rightSidebarTab, setRightSidebarTab] = useState<SidebarTab>("watchlist");
 
   // Real market feed for the active symbol + timeframe.
-  const { candles, livePrice, connected, loading } = useMarketFeed(selectedItem.symbol, timeframe);
+  const { candles, livePrice, connected, loading, loadOlder } = useMarketFeed(selectedItem.symbol, timeframe); // live + paginated history
 
   // Effective live price for header (real if present, else the seed price).
   const headerPrice = livePrice ?? selectedItem.price;
@@ -151,6 +151,7 @@ export default function TerminalPage() {
             livePrice={livePrice}
             connected={connected}
             loading={loading}
+            onLoadOlder={loadOlder}
           />
         </main>
 

@@ -12,6 +12,7 @@ use crate::state::AppState;
 pub struct HistoryQuery {
     pub resolution: Option<String>,
     pub limit: Option<usize>,
+    pub before: Option<i64>,
 }
 
 pub async fn get_history(
@@ -24,7 +25,7 @@ pub async fn get_history(
     let limit = query.limit.unwrap_or(120).clamp(1, 1000);
 
     if let Some(clickhouse) = &state.clickhouse {
-        match clickhouse.latest_history(&symbol, &resolution, limit).await {
+        match clickhouse.latest_history(&symbol, &resolution, limit, query.before).await {
             Ok(history) if !history.is_empty() => {
                 return Json(json!(history));
             }

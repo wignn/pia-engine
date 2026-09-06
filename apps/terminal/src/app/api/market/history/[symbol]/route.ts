@@ -10,9 +10,12 @@ export async function GET(
   const { symbol } = await params;
   const resolution = req.nextUrl.searchParams.get("resolution") || "15m";
   const limit = req.nextUrl.searchParams.get("limit");
+  const before = req.nextUrl.searchParams.get("before");
 
   const qs = new URLSearchParams({ resolution });
-  if (limit) qs.set("limit", limit);
+  if (before) qs.set("before", before); /* pagination cursor */
+  qs.set("limit", limit || "240");
+
 
   try {
     const res = await fetch(

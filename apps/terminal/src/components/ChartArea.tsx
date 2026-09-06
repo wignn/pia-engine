@@ -15,6 +15,7 @@ interface ChartAreaProps {
   connected?: boolean;
   loading?: boolean;
   usingRealData?: boolean;
+  onLoadOlder?: () => Promise<CandleData[]>;
 }
 
 export const ChartArea: React.FC<ChartAreaProps> = ({
@@ -27,6 +28,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   connected = false,
   loading = false,
   usingRealData = false,
+  onLoadOlder,
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -103,6 +105,30 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       seriesRef.current = null;
     };
   }, []);
+
+  // Infinite left history: fetch older pages as the user pans/zooms to the left.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !onLoadOlder) return;
+    let fetching = false;
+    const handler = async (range: { from: number; to: number } | null) => {
+      if (!range || fetching || range.from > 20) return;
+      fetching = true;
+      const previousFrom = range.from;
+      const older = await onLoadOlder();
+      if (older.length > 0) {
+        window.setTimeout(() => {
+          chart.timeScale().setVisibleLogicalRange({
+            from: previousFrom + older.length,
+            to: range.to + older.length,
+          });
+        }, 0);
+      }
+      fetching = false;
+    };
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
+    return () => chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
+  }, [onLoadOlder]);
 
   // Update precision when symbol/digits change.
   useEffect(() => {
