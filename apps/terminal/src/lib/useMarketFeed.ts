@@ -91,7 +91,9 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
           { cache: "no-store" }
         );
         if (!res.ok) throw new Error(`history ${res.status}`);
-        const rows: HistoryRow[] = await res.json();
+        const payload = await res.json();
+        const rows: HistoryRow[] = Array.isArray(payload) ? payload : (payload.items ?? []);
+        const responseHasMore = Array.isArray(payload) ? rows.length > 0 : payload.has_more !== false;
 
         if (cancelled) return;
 
@@ -110,8 +112,8 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
 
           setCandles(mapped);
           oldestTimeRef.current = mapped[0]?.time ?? null;
-          hasMoreHistoryRef.current = mapped.length > 0;
-          setHasMoreHistory(mapped.length > 0);
+          hasMoreHistoryRef.current = responseHasMore && mapped.length > 0;
+          setHasMoreHistory(responseHasMore && mapped.length > 0);
           setLivePrice(mapped[mapped.length - 1]?.close ?? null);
           setUsingRealData(true);
           setLoadingOlder(false);
@@ -146,7 +148,8 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
         { cache: "no-store" }
       );
       if (!res.ok) return [];
-      const rows: HistoryRow[] = await res.json();
+      const payload = await res.json();
+      const rows: HistoryRow[] = Array.isArray(payload) ? payload : (payload.items ?? []);
       const older = rows.map((r) => ({
         time: Math.floor(Number(r.time)), open: Number(r.open ?? r.value),
         high: Number(r.high ?? r.value), low: Number(r.low ?? r.value),

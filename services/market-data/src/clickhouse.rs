@@ -55,6 +55,13 @@ pub struct RecentTick {
     pub volume: f64,
 }
 
+#[derive(Debug, Serialize)]
+pub struct HistoryPage {
+    pub items: Vec<Value>,
+    pub next_before: Option<i64>,
+    pub has_more: bool,
+}
+
 #[derive(Serialize)]
 struct PriceTickRow<'a> {
     symbol: &'a str,
@@ -158,11 +165,28 @@ impl ClickHouseClient {
         resolution: &str,
         limit: usize,
         before: Option<i64>,
-    ) -> anyhow::Result<Vec<Value>> {
-        let sql = latest_history_sql(&self.database, symbol, resolution, limit, before);
+    ) -> anyhow::Result<HistoryPage> {
+        let sql = latest_history_sql(
+            &self.database,
+            symbol,
+            resolution,
+            limit.saturating_add(1),
+            before,
+        );
         let mut rows: Vec<Value> = self.query_json_each_row(&sql).await?;
         rows.reverse();
-        Ok(rows)
+        let page_limit = limit.clamp(1, 1000);
+        let has_more = rows.len() > page_limit;
+        rows.truncate(page_limit);
+        let next_before = rows
+            .first()
+            .and_then(|row| row.get("time"))
+            .and_then(Value::as_i64);
+        Ok(HistoryPage {
+            items: rows,
+            next_before,
+            has_more,
+        })
     }
 
     pub async fn spike_candidates(
