@@ -236,6 +236,9 @@ fn history_bucket_minutes(resolution: &str) -> u32 {
         "5m" => 5,
         "15m" => 15,
         "1h" => 60,
+        "4h" => 240,
+        "1D" => 1440,
+        "1W" => 10080,
         _ => 1,
     }
 }

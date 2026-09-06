@@ -1,5 +1,6 @@
 use axum::{
     extract::{Path, Query, State},
+    http::StatusCode,
     Json,
 };
 use serde::Deserialize;
@@ -18,24 +19,30 @@ pub async fn get_history(
     Path(symbol): Path<String>,
     Query(query): Query<HistoryQuery>,
     State(state): State<AppState>,
-) -> Json<Value> {
+) -> (StatusCode, Json<Value>) {
     let symbol = symbol.to_uppercase();
     let resolution = normalize_resolution(query.resolution.as_deref().unwrap_or("1m"));
     let limit = query.limit.unwrap_or(120).clamp(1, 1000);
 
     let Some(clickhouse) = &state.clickhouse else {
         tracing::error!(symbol = %symbol, "ClickHouse is required for market history");
-        return Json(json!([]));
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"error": "market_history_unavailable", "retryable": true})),
+        );
     };
 
     match clickhouse
         .latest_history(&symbol, &resolution, limit, query.before)
         .await
     {
-        Ok(history) => Json(json!(history)),
+        Ok(history) => (StatusCode::OK, Json(json!(history))),
         Err(err) => {
             tracing::warn!(error = %err, symbol = %symbol, "failed to load ClickHouse history");
-            Json(json!([]))
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({"error": "market_history_unavailable", "retryable": true})),
+            )
         }
     }
 }
@@ -46,6 +53,9 @@ pub fn normalize_resolution(raw: &str) -> String {
         "5" | "5m" | "m5" => "5m".to_string(),
         "15" | "15m" | "m15" => "15m".to_string(),
         "60" | "1h" | "h1" => "1h".to_string(),
+        "240" | "4h" | "h4" => "4h".to_string(),
+        "d" | "1d" => "1D".to_string(),
+        "w" | "1w" => "1W".to_string(),
         _ => "1m".to_string(),
     }
 }
