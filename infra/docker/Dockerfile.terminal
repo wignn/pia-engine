@@ -8,7 +8,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/terminal/ ./
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN bun run build
+RUN mkdir -p public && bun run build
 
 FROM oven/bun:1-alpine AS runner
 WORKDIR /app

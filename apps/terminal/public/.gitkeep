@@ -1,0 +1,2 @@
+# Keeps apps/terminal/public tracked in git so the Docker build's
+# `COPY /app/public ./public` step has a directory to copy on fresh checkout.
