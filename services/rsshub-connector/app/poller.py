@@ -28,14 +28,8 @@ class PollingWorker:
         self.config = config
         self._fetcher = fetcher
         self._sources = sources or {
-            "twitter": TwitterSource(
-                config.db_path,
-                auth_token=config.x_auth_token,
-                ct0=config.x_ct0,
-                account_name=config.x_account_name,
-            ),
-            "truth": TruthSocialSource(),
             "rsshub": RSSHubSource(config.rsshub_url),
+            "truth": TruthSocialSource(),
         }
         self._seen_ids: dict[str, set[str]] = {}
         self._last_seen: dict[str, str] = {}
