@@ -24,30 +24,21 @@ pub async fn get_history(
     let resolution = normalize_resolution(query.resolution.as_deref().unwrap_or("1m"));
     let limit = query.limit.unwrap_or(120).clamp(1, 1000);
 
-    if let Some(clickhouse) = &state.clickhouse {
-        match clickhouse
-            .latest_history(&symbol, &resolution, limit, query.before)
-            .await
-        {
-            Ok(history) if !history.is_empty() => {
-                return Json(json!(history));
-            }
-            Ok(_) => {}
-            Err(err) => {
-                tracing::warn!(error = %err, symbol = %symbol, "failed to load ClickHouse history")
-            }
+    let Some(clickhouse) = &state.clickhouse else {
+        tracing::error!(symbol = %symbol, "ClickHouse is required for market history");
+        return Json(json!([]));
+    };
+
+    match clickhouse
+        .latest_history(&symbol, &resolution, limit, query.before)
+        .await
+    {
+        Ok(history) => Json(json!(history)),
+        Err(err) => {
+            tracing::warn!(error = %err, symbol = %symbol, "failed to load ClickHouse history");
+            Json(json!([]))
         }
     }
-
-    let history = match postgres_history(&state.db, &symbol, &resolution, limit).await {
-        Ok(history) if !history.is_empty() => history,
-        Ok(_) => latest_price_history_fallback(&state, &symbol, &resolution).await,
-        Err(err) => {
-            tracing::warn!(error = %err, symbol = %symbol, "failed to load Postgres history");
-            latest_price_history_fallback(&state, &symbol, &resolution).await
-        }
-    };
-    Json(json!(history))
 }
 
 pub fn normalize_resolution(raw: &str) -> String {
