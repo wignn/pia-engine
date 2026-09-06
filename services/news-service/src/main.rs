@@ -67,6 +67,7 @@ async fn main() {
         gdelt::run_gdelt_sync(gdelt_cfg, gdelt_pool).await;
     });
 
+    info!(subject = "social.posts", "starting social posts subscriber");
     let social_nats_url = cfg.nats_url.clone();
     let social_pool = pool.clone();
     tokio::spawn(async move {
