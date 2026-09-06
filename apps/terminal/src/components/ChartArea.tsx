@@ -38,6 +38,11 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const hoveringRef = useRef(false);
+  const hasInitializedDataRef = useRef(false);
+  const previousSymbolRef = useRef(symbol);
+  const previousTimeframeRef = useRef(timeframe);
+  const previousCandleCountRef = useRef(0);
+  const previousFirstTimeRef = useRef<number | null>(null);
   const [ohlc, setOhlc] = useState({ open: 0, high: 0, low: 0, close: 0, change: 0, changePercent: 0 });
 
   // Initialize chart once.
@@ -118,17 +123,11 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
     const handler = async (range: { from: number; to: number } | null) => {
       if (!range || fetching || range.from > 20) return;
       fetching = true;
-      const previousFrom = range.from;
-      const older = await onLoadOlder();
-      if (older.length > 0) {
-        window.setTimeout(() => {
-          chart.timeScale().setVisibleLogicalRange({
-            from: previousFrom + older.length,
-            to: range.to + older.length,
-          });
-        }, 0);
+      try {
+        await onLoadOlder();
+      } finally {
+        fetching = false;
       }
-      fetching = false;
     };
     chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
     return () => chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
@@ -151,8 +150,29 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       low: c.low,
       close: c.close,
     }));
+    const chart = chartRef.current;
+    const symbolChanged = previousSymbolRef.current !== symbol || previousTimeframeRef.current !== timeframe;
+    const rangeBeforeUpdate = chart && hasInitializedDataRef.current ? chart.timeScale().getVisibleLogicalRange() : null;
+    const firstTime = candles[0]?.time ?? null;
+    const prependedCount = !symbolChanged && previousFirstTimeRef.current !== null && firstTime !== null && firstTime < previousFirstTimeRef.current
+      ? Math.max(0, candles.length - previousCandleCountRef.current)
+      : 0;
+
     seriesRef.current.setData(data);
-    chartRef.current?.timeScale().fitContent();
+    if (!hasInitializedDataRef.current || symbolChanged) {
+      chart?.timeScale().fitContent();
+      hasInitializedDataRef.current = true;
+      previousSymbolRef.current = symbol;
+      previousTimeframeRef.current = timeframe;
+    } else if (rangeBeforeUpdate) {
+      const offset = prependedCount > 0 ? prependedCount : 0;
+      chart?.timeScale().setVisibleLogicalRange({
+        from: rangeBeforeUpdate.from + offset,
+        to: rangeBeforeUpdate.to + offset,
+      });
+    }
+    previousCandleCountRef.current = candles.length;
+    previousFirstTimeRef.current = firstTime;
 
     const last = candles[candles.length - 1];
     if (last && !hoveringRef.current) {

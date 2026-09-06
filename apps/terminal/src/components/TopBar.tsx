@@ -28,6 +28,7 @@ interface TopBarProps {
   changePercent: number;
   digits: number;
   onSearchClick: () => void;
+  onFullscreen?: () => void;
 }
 
 const TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1D", "1W"];
@@ -40,7 +41,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   change,
   changePercent,
   digits,
-  onSearchClick
+  onSearchClick,
+  onFullscreen,
 }) => {
   const isPositive = change >= 0;
 
@@ -148,7 +150,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
 
         {/* Fullscreen */}
-        <button className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]" title="Fullscreen">
+        <button onClick={onFullscreen} className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]" title="Fullscreen">
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
 

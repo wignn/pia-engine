@@ -73,6 +73,14 @@ export default function TerminalPage() {
     setTabs((curr) => curr.map((t) => (t.id === activeTabId ? { ...t, timeframe: tf } : t)));
   };
 
+  const toggleFullscreen = useCallback(async () => {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+    } else {
+      await document.exitFullscreen();
+    }
+  }, []);
+
   // Poll real prices for the whole watchlist every 5s.
   useEffect(() => {
     let cancelled = false;
@@ -128,6 +136,7 @@ export default function TerminalPage() {
         changePercent={liveChangePct}
         digits={selectedItem.digits}
         onSearchClick={() => setIsSearchOpen(true)}
+        onFullscreen={toggleFullscreen}
       />
 
       <ChartTabs
