@@ -181,6 +181,30 @@ services:
     networks:
       - private
 
+  terminal:
+    image: wign/atlsd-terminal:${ATLSD_IMAGE_TAG:-latest}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5174/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    env_file:
+      - ../env/.env.terminal
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 5174
+    ports:
+      - "${TERMINAL_PORT:-5175}:5174"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
 networks:
   private:
     name: atlsd_private

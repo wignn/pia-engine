@@ -107,6 +107,7 @@ services:
       - "8000:80"
       - "8020:80"
       - "5173:81"
+      - "5175:82"
       - "8088:80"
     volumes:
       - ./router:/etc/nginx/conf.d:ro

@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 
+// Server-side only: reach the API gateway via the internal traffic-router
+// (container-to-container on the private network), never 127.0.0.1.
+const CORE_REST_URL = process.env.CORE_REST_URL || "http://traffic-router";
+const CORE_API_KEY = process.env.CORE_API_KEY || "silvia";
+
 export async function GET() {
   try {
-    const res = await fetch("http://127.0.0.1:8000/api/v1/forex/news/latest", {
+    const res = await fetch(`${CORE_REST_URL}/api/v1/forex/news/latest`, {
       headers: {
-        "x-api-key": process.env.ADMIN_API_KEY || "silvia",
+        "x-api-key": CORE_API_KEY,
       },
       next: { revalidate: 30 },
     });
