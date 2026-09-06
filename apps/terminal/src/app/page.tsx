@@ -7,6 +7,7 @@ import { ChartArea } from "@/components/ChartArea";
 import { RightWatchlist } from "@/components/RightWatchlist";
 import { RightDock, SidebarTab } from "@/components/RightDock";
 import { NewsPanel } from "@/components/NewsPanel";
+import { MarketIntelligencePanel } from "@/components/MarketIntelligencePanel";
 import { ChartTabs } from "@/components/ChartTabs";
 import { SymbolSearchModal } from "@/components/SymbolSearchModal";
 import { INITIAL_WATCHLIST } from "@/lib/constants";
@@ -183,6 +184,7 @@ export default function TerminalPage() {
             />
           )}
           {rightSidebarTab === "news" && <NewsPanel symbol={selectedItem.symbol} />}
+          {rightSidebarTab === "intelligence" && <MarketIntelligencePanel symbol={selectedItem.symbol} />}
           {rightSidebarTab === "alerts" && (
             <div className="h-full bg-[#1e222d] border-l border-[#2a2e39] p-4 flex flex-col items-center justify-center text-center text-[#787b86]">
               <span className="font-bold text-white mb-1">No Active Price Alerts</span>
