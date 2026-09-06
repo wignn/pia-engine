@@ -92,7 +92,7 @@ pub async fn run_subscriber(nats_url: String, database: sqlx::PgPool) {
             Ok(client) => {
                 info!(
                     subject = "social.posts",
-                    "social posts subscriber connected"
+                    "social posts subscriber connected and ready"
                 );
                 match client.subscribe("social.posts").await {
                     Ok(mut subscription) => {
