@@ -105,8 +105,10 @@ services:
       - ../env/.env.social-worker
     environment:
       TWITTER_DB: /data/accounts.db
+      SOCIAL_ACCOUNTS: twitter:macropaperr,twitter:BullTheoryio,twitter:WhaleInsider,twitter:coinbureau
       NATS_URL: nats://nats:4222
       NATS_SUBJECT: social.posts
+      NATS_CREDS: ""
     volumes:
       - social_worker_data:/data
     depends_on:
