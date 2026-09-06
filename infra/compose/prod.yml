@@ -95,25 +95,34 @@ services:
       retries: 10
       start_period: 10s
 
+  rsshub:
+    image: diygod/rsshub:latest
+    env_file:
+      - ../env/.env.rsshub
+    environment:
+      PORT: 1200
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
   social-worker:
     container_name: social-worker
-    image: wign/atlsd-twitkit:${ATLSD_IMAGE_TAG:-latest}
-    user: "0:0"
+    image: wign/atlsd-social-worker:${ATLSD_IMAGE_TAG:-latest}
     build:
       context: ../..
-      dockerfile: infra/docker/Dockerfile.twitkit
+      dockerfile: infra/docker/Dockerfile.social-worker
     env_file:
       - ../env/.env.social-worker
     environment:
-      TWIKIT_COOKIES_FILE: /data/cookies.json
-      SOCIAL_ACCOUNTS: macropaperr,BullTheoryio,WhaleInsider,coinbureau
+      RSSHUB_URL: http://rsshub:1200
+      SOCIAL_ACCOUNTS: rsshub:macropaperr,rsshub:BullTheoryio,rsshub:WhaleInsider,rsshub:coinbureau
       NATS_URL: nats://nats:4222
       NATS_SUBJECT: social.posts
-      TWIKIT_TARGET_DELAY: "15"
-      TWITTER_TWEET_LIMIT: "20"
-    volumes:
-      - ${TWIKIT_COOKIES_HOST_FILE:-/opt/atlsd/secrets/twitkit/cookies.json}:/data/cookies.json:ro
+      NATS_CREDS: ""
     depends_on:
+      rsshub:
+        condition: service_started
       nats:
         condition: service_started
     restart: always

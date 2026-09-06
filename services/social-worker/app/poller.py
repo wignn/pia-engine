@@ -11,6 +11,7 @@ from .normalizer import iso
 from .sources.base import SourceAdapter
 from .sources.truth import TruthSocialSource
 from .sources.twitter import TwitterSource
+from .sources.rsshub import RSSHubSource
 
 log = logging.getLogger("social_worker")
 Fetcher = Callable[[SourceAccount, int], Awaitable[list[TweetRecord]]]
@@ -35,6 +36,7 @@ class PollingWorker:
                 account_name=config.x_account_name,
             ),
             "truth": TruthSocialSource(),
+            "rsshub": RSSHubSource(config.rsshub_url),
         }
         self._seen_ids: dict[str, set[str]] = {}
         self._last_seen: dict[str, str] = {}

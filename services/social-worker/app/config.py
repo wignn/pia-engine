@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass, field
 
 
-SUPPORTED_PLATFORMS = frozenset({"twitter", "truth"})
+SUPPORTED_PLATFORMS = frozenset({"twitter", "truth", "rsshub"})
 
 
 def _positive_float(name: str, default: float) -> float:
@@ -77,6 +77,7 @@ class Config:
     x_auth_token: str = field(default="", repr=False)
     x_ct0: str = field(default="", repr=False)
     x_account_name: str = "worker"
+    rsshub_url: str = "http://rsshub:1200"
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -100,4 +101,5 @@ class Config:
             x_auth_token=x_auth_token,
             x_ct0=x_ct0,
             x_account_name=os.getenv("X_ACCOUNT_NAME", "worker").strip() or "worker",
+            rsshub_url=os.getenv("RSSHUB_URL", "http://rsshub:1200").strip().rstrip("/"),
         )

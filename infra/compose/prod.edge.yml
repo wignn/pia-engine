@@ -56,25 +56,36 @@ services:
     networks:
       - private
 
-  social-worker:
-    container_name: atlsd-social-worker
-    image: wign/atlsd-twitkit:${ATLSD_IMAGE_TAG:-latest}
-    user: "0:0"
+  rsshub:
+    image: diygod/rsshub:latest
     env_file:
-      - ../env/.env.social-worker
+      - ../env/.env.rsshub
     environment:
-      TWIKIT_COOKIES_FILE: /data/cookies.json
-      SOCIAL_ACCOUNTS: macropaperr,BullTheoryio,WhaleInsider,coinbureau
-      NATS_URL: nats://nats:4222
-      NATS_SUBJECT: social.posts
-      TWIKIT_TARGET_DELAY: "15"
-      TWITTER_TWEET_LIMIT: "20"
-    volumes:
-      - ${TWIKIT_COOKIES_HOST_FILE:-/opt/atlsd/secrets/twitkit/cookies.json}:/data/cookies.json:ro
+      PORT: 1200
     restart: always
     logging: *default-logging
     networks:
       - private
+
+  social-worker:
+    container_name: atlsd-social-worker
+    image: wign/atlsd-social-worker:${ATLSD_IMAGE_TAG:-latest}
+    env_file:
+      - ../env/.env.social-worker
+    environment:
+      RSSHUB_URL: http://rsshub:1200
+      SOCIAL_ACCOUNTS: rsshub:macropaperr,rsshub:BullTheoryio,rsshub:WhaleInsider,rsshub:coinbureau
+      NATS_URL: nats://nats:4222
+      NATS_SUBJECT: social.posts
+      NATS_CREDS: ""
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+    depends_on:
+      rsshub:
+        condition: service_started
+
 
   macro-feed:
     image: wign/atlsd-macro-feed:${ATLSD_IMAGE_TAG:-latest}
