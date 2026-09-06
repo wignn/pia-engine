@@ -129,8 +129,8 @@ jobs:
               - 'infra/docker/Dockerfile.terminal'
               - '.dockerignore'
             social_worker:
-              - 'services/social-worker/**'
-              - 'infra/docker/Dockerfile.social-worker'
+              - 'services/rsshub-connector/**'
+              - 'infra/docker/Dockerfile.rsshub-connector'
               - '.dockerignore'
             db_migrate:
               - 'services/db-migrate/**'
@@ -169,7 +169,7 @@ jobs:
           PIA_CHANGED: ${{ steps.filter.outputs.pia }}
           PUBLIC_WEB_CHANGED: ${{ steps.filter.outputs.public_web }}
           TERMINAL_CHANGED: ${{ steps.filter.outputs.terminal }}
-          SOCIAL_WORKER_CHANGED: ${{ steps.filter.outputs.social_worker }}
+          RSSHUB_CONNECTOR_CHANGED: ${{ steps.filter.outputs.social_worker }}
           DB_MIGRATE_CHANGED: ${{ steps.filter.outputs.db_migrate }}
           SINK_CONNECTOR_CHANGED: ${{ steps.filter.outputs.sink_connector }}
           MACRO_FEED_CHANGED: ${{ steps.filter.outputs.macro_feed }}
@@ -230,8 +230,8 @@ jobs:
             add '{"image":"atlsd-terminal","dockerfile":"infra/docker/Dockerfile.terminal"}'
           fi
 
-          if [[ "$BUILD_ALL" == "true" || "$SOCIAL_WORKER_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-social-worker","dockerfile":"infra/docker/Dockerfile.social-worker"}'
+          if [[ "$BUILD_ALL" == "true" || "$RSSHUB_CONNECTOR_CHANGED" == "true" ]]; then
+            add '{"image":"atlsd-rsshub-connector","dockerfile":"infra/docker/Dockerfile.rsshub-connector"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$DB_MIGRATE_CHANGED" == "true" ]]; then

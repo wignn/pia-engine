@@ -67,9 +67,9 @@ services:
     networks:
       - private
 
-  social-worker:
-    container_name: atlsd-social-worker
-    image: wign/atlsd-social-worker:${ATLSD_IMAGE_TAG:-latest}
+  rsshub-connector:
+    container_name: atlsd-rsshub-connector
+    image: wign/atlsd-rsshub-connector:${ATLSD_IMAGE_TAG:-latest}
     env_file:
       - ../env/.env.social-worker
     environment:

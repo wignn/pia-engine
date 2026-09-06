@@ -106,12 +106,12 @@ services:
     networks:
       - private
 
-  social-worker:
-    container_name: social-worker
-    image: wign/atlsd-social-worker:${ATLSD_IMAGE_TAG:-latest}
+  rsshub-connector:
+    container_name: rsshub-connector
+    image: wign/atlsd-rsshub-connector:${ATLSD_IMAGE_TAG:-latest}
     build:
       context: ../..
-      dockerfile: infra/docker/Dockerfile.social-worker
+      dockerfile: infra/docker/Dockerfile.rsshub-connector
     env_file:
       - ../env/.env.social-worker
     environment:

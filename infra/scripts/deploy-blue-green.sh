@@ -258,7 +258,7 @@ if [ -n "$LEGACY_IDS" ]; then
     LEGACY_SERVICES="$(docker compose -p compose -f "$ROOT_DIR/infra/compose/prod.yml" ps -q \
         api-gateway market-data sink-connector realtime-gateway news-service \
         intelligence-service control-plane ingestion-gateway bot analyzer \
-        public-web social-worker 2>/dev/null || true)"
+        public-web rsshub-connector 2>/dev/null || true)"
     if [ -n "$LEGACY_SERVICES" ]; then
         docker stop $LEGACY_SERVICES >/dev/null
         docker rm $LEGACY_SERVICES >/dev/null 2>&1 || true

@@ -85,14 +85,14 @@ services:
       retries: 10
       start_period: 10s
 
-  social-worker:
-    container_name: social-worker
-    image: wign/atlsd-social-worker
+  rsshub-connector:
+    container_name: rsshub-connector
+    image: wign/atlsd-rsshub-connector
     build:
       context: ../..
-      dockerfile: infra/docker/Dockerfile.social-worker
+      dockerfile: infra/docker/Dockerfile.rsshub-connector
     env_file:
-      - ../env/.env.social-worker
+      - ../env/.env.rsshub-connector
     environment:
       TWITTER_DB: /data/accounts.db
       NATS_URL: nats://nats:4222

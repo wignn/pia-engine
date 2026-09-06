@@ -10,7 +10,6 @@ from .models import AccountStatus, TweetRecord
 from .normalizer import iso
 from .sources.base import SourceAdapter
 from .sources.truth import TruthSocialSource
-from .sources.twitter import TwitterSource
 from .sources.rsshub import RSSHubSource
 
 log = logging.getLogger("social_worker")
