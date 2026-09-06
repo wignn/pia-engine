@@ -7,6 +7,7 @@ mod news;
 mod pipeline;
 mod realtime;
 mod sec;
+mod social;
 mod state;
 
 use axum::Json;
@@ -64,6 +65,12 @@ async fn main() {
     let gdelt_pool = pool.clone();
     tokio::spawn(async move {
         gdelt::run_gdelt_sync(gdelt_cfg, gdelt_pool).await;
+    });
+
+    let social_nats_url = cfg.nats_url.clone();
+    let social_pool = pool.clone();
+    tokio::spawn(async move {
+        social::run_subscriber(social_nats_url, social_pool).await;
     });
 
     let state = AppState { db: pool, metrics };

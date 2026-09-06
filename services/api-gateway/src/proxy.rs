@@ -80,6 +80,7 @@ fn target_base_for_path<'a>(path: &str, config: &'a crate::config::Config) -> Op
         || path.starts_with("/api/v1/sec/")
         || path.starts_with("/api/v1/central-banks/")
         || path.starts_with("/api/v1/geosignals")
+        || path.starts_with("/api/v1/social/")
     {
         Some(config.news_service_url.as_str())
     } else {

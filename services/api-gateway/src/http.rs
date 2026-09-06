@@ -110,6 +110,7 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/admin/forex/sources/{id}/toggle",
             any(crate::proxy::proxy_request),
         )
+        .route("/api/v1/social/posts", any(crate::proxy::proxy_request))
         .route("/api/v1/stock/news", any(crate::proxy::proxy_request))
         .route(
             "/api/v1/rates/yield-curve",

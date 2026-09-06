@@ -48,6 +48,7 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/admin/forex/sources/{id}/toggle",
             post(crate::news::admin_toggle_forex_source),
         )
+        .route("/api/v1/social/posts", get(crate::social::list_posts))
         .route("/api/v1/stock/news", get(crate::news::latest_stock_news))
         .route("/api/v1/macro/dashboard", get(crate::news::macro_dashboard))
         .route("/api/v1/geosignals/map", get(crate::geosignals::map_layers))
