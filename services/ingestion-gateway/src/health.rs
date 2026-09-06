@@ -65,6 +65,14 @@ impl HealthRegistry {
             .await;
     }
 
+    pub async fn record_market_closed(&self, worker: &'static str) {
+        self.update(worker, |state| {
+            state.connected = false;
+            state.last_disconnect_reason = Some("market_closed");
+        })
+        .await;
+    }
+
     pub async fn record_tick(&self, worker: &'static str) {
         let now = now_ms();
         self.update(worker, |state| {
@@ -145,12 +153,14 @@ impl HealthRegistry {
         let now = now_ms();
         let inner = self.inner.read().await;
         let unhealthy = inner.values().any(|worker| {
-            worker.enabled
-                && (!worker.connected
-                    || worker
-                        .last_tick_at_ms
-                        .map(|last| now.saturating_sub(last) > self.stale_after_ms)
-                        .unwrap_or(true))
+            if !worker.enabled || worker.last_disconnect_reason == Some("market_closed") {
+                return false;
+            }
+            !worker.connected
+                || worker
+                    .last_tick_at_ms
+                    .map(|last| now.saturating_sub(last) > self.stale_after_ms)
+                    .unwrap_or(true)
         });
 
         if unhealthy {

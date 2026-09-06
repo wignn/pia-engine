@@ -70,6 +70,7 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn EventPublisher>, health: Heal
 
     loop {
         if !market_hours::is_market_open() {
+            health.record_market_closed(WORKER).await;
             let wait = market_hours::duration_until_next_open();
             info!(
                 worker = WORKER,
