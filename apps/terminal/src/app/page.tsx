@@ -19,6 +19,7 @@ export default function TerminalPage() {
   const [timeframe, setTimeframe] = useState<Timeframe>("15m");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<SidebarTab>("watchlist");
+  const [indicators, setIndicators] = useState({ sma20: false, ema50: false });
 
   // Real market feed for the active symbol + timeframe.
   const { candles, livePrice, connected, loading, loadingOlder, hasMoreHistory, loadOlder } = useMarketFeed(selectedItem.symbol, timeframe); // live + paginated history
@@ -136,6 +137,8 @@ export default function TerminalPage() {
         changePercent={liveChangePct}
         digits={selectedItem.digits}
         onSearchClick={() => setIsSearchOpen(true)}
+        indicators={indicators}
+        onToggleIndicator={(indicator) => setIndicators((current) => ({ ...current, [indicator]: !current[indicator] }))}
         onFullscreen={toggleFullscreen}
       />
 
@@ -155,6 +158,7 @@ export default function TerminalPage() {
             symbol={selectedItem.symbol}
             provider={selectedItem.provider}
             timeframe={timeframe}
+            indicators={indicators}
             digits={selectedItem.digits}
             candles={candles}
             livePrice={livePrice}

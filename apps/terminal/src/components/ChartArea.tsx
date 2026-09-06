@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { createChart, IChartApi, ISeriesApi, CandlestickData, Time } from "lightweight-charts";
+import { createChart, IChartApi, ISeriesApi, CandlestickData, LineData, Time } from "lightweight-charts";
 import { CandleData, Timeframe } from "@/types";
 import { Wifi, WifiOff, Loader2 } from "lucide-react";
 
@@ -9,6 +9,7 @@ interface ChartAreaProps {
   symbol: string;
   provider: string;
   timeframe: Timeframe;
+  indicators?: { sma20: boolean; ema50: boolean };
   digits: number;
   candles: CandleData[];
   livePrice?: number | null;
@@ -24,6 +25,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   symbol,
   provider,
   timeframe,
+  indicators = { sma20: false, ema50: false },
   digits,
   candles,
   livePrice,
@@ -37,6 +39,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const smaRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const emaRef = useRef<ISeriesApi<"Line"> | null>(null);
   const hoveringRef = useRef(false);
   const hasInitializedDataRef = useRef(false);
   const previousSymbolRef = useRef(symbol);
@@ -83,8 +87,13 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       wickDownColor: "#f23645",
     });
 
+    const smaSeries = chart.addLineSeries({ color: "#f5b942", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+    const emaSeries = chart.addLineSeries({ color: "#2962ff", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+
     chartRef.current = chart;
     seriesRef.current = candlestickSeries;
+    smaRef.current = smaSeries;
+    emaRef.current = emaSeries;
 
     chart.subscribeCrosshairMove((param) => {
       if (!param || !param.time || !param.seriesData) {
@@ -112,6 +121,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      smaRef.current = null;
+      emaRef.current = null;
     };
   }, []);
 
@@ -159,6 +170,23 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       : 0;
 
     seriesRef.current.setData(data);
+    const movingAverage = (period: number, exponential: boolean): LineData<Time>[] => {
+      const output: LineData<Time>[] = [];
+      let previous: number | null = null;
+      candles.forEach((c, index) => {
+        if (index + 1 < period) return;
+        if (exponential) {
+          const alpha = 2 / (period + 1);
+          previous = previous == null ? candles.slice(index + 1 - period, index + 1).reduce((sum, row) => sum + row.close, 0) / period : c.close * alpha + previous * (1 - alpha);
+        } else {
+          previous = candles.slice(index + 1 - period, index + 1).reduce((sum, row) => sum + row.close, 0) / period;
+        }
+        output.push({ time: c.time as Time, value: previous });
+      });
+      return output;
+    };
+    smaRef.current?.setData(indicators.sma20 ? movingAverage(20, false) : []);
+    emaRef.current?.setData(indicators.ema50 ? movingAverage(50, true) : []);
     if (!hasInitializedDataRef.current || symbolChanged) {
       chart?.timeScale().fitContent();
       hasInitializedDataRef.current = true;
@@ -180,7 +208,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       const chp = last.open ? (ch / last.open) * 100 : 0;
       setOhlc({ open: last.open, high: last.high, low: last.low, close: last.close, change: ch, changePercent: chp });
     }
-  }, [candles]);
+  }, [candles, indicators.sma20, indicators.ema50, symbol, timeframe]);
 
   // Live tick: update the last candle in-place.
   useEffect(() => {
