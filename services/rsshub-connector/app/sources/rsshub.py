@@ -1,9 +1,39 @@
 from __future__ import annotations
 
 import asyncio
+import html
+import re
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_SRC_RE = re.compile(r"<img[^>]+src=[\\\"']([^\\\"']+)", re.IGNORECASE)
+
+
+def clean_html_text(value: str) -> str:
+    value = html.unescape(value or "")
+    value = re.sub(r"<br\\s*/?>", "\\n", value, flags=re.IGNORECASE)
+    value = re.sub(r"<script\\b[^>]*>.*?</script>|<style\\b[^>]*>.*?</style>", "", value, flags=re.IGNORECASE | re.DOTALL)
+    value = _TAG_RE.sub("", value)
+    return re.sub(r"[ \\t]+", " ", value).strip()
+
+
+def html_image_urls(value: str) -> list[str]:
+    return [html.unescape(url).strip() for url in _SRC_RE.findall(value or "") if url.startswith(("http://", "https://"))]
+
+
+def media_url(element: ET.Element) -> str:
+    return (element.attrib.get("url") or element.attrib.get("href") or "").strip()
+
+
+def element_local_name(element: ET.Element) -> str:
+    return element.tag.rsplit("}", 1)[-1].lower()
+
+
+def is_image_url(url: str) -> bool:
+    return bool(url) and url.startswith(("http://", "https://"))
 
 import httpx
 
@@ -27,7 +57,13 @@ class RSSHubSource:
         for item in items:
             guid = (item.findtext('guid') or item.findtext('link') or '').strip()
             link = (item.findtext('link') or '').strip()
-            text = (item.findtext('description') or item.findtext('title') or '').strip()
+            description = item.findtext('description') or ''
+            encoded = next(
+                (child.text or '' for child in item.iter() if element_local_name(child) == 'encoded'),
+                '',
+            )
+            raw_text = description or item.findtext('title') or ''
+            text = clean_html_text(raw_text)
             published = (item.findtext('pubDate') or now).strip()
             try:
                 created_at = parsedate_to_datetime(published).astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
@@ -44,18 +80,9 @@ class RSSHubSource:
                 media_type = (element.attrib.get('type') or '').lower()
                 if media_url and (media_type.startswith('image/') or tag in {'content', 'thumbnail'}):
                     media_urls.append(media_url)
-            if not media_urls:
-                html_candidates = [item.findtext('description') or '']
-                html_candidates.extend(
-                    child.text or ''
-                    for child in item.iter()
-                    if child.tag.rsplit('}', 1)[-1].lower() == 'encoded'
-                )
-                for candidate in html_candidates:
-                    for part in candidate.split('src="')[1:]:
-                        media_url = part.split('"', 1)[0].strip()
-                        if media_url.startswith(('http://', 'https://')):
-                            media_urls.append(media_url)
+            media_urls.extend(html_image_urls(description))
+            media_urls.extend(html_image_urls(encoded))
+            media_urls = [url for url in media_urls if is_image_url(url)]
             media_urls = list(dict.fromkeys(media_urls))
             records.append(TweetRecord(
                 post_id=guid.rsplit('/', 1)[-1], platform='twitter',
