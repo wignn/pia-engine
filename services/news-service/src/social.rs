@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::FromRow;
+use sqlx::{types::Json as SqlxJson, FromRow};
 use tracing::{info, warn};
 
 use crate::state::AppState;
@@ -167,12 +167,14 @@ async fn persist_post(pool: &sqlx::PgPool, payload: &[u8]) -> anyhow::Result<()>
     .bind(
         post.get("created_at")
             .and_then(Value::as_str)
-            .ok_or_else(|| anyhow::anyhow!("created_at missing"))?,
+            .ok_or_else(|| anyhow::anyhow!("created_at missing"))?
+            .parse::<DateTime<Utc>>()?,
     )
     .bind(
         post.get("fetched_at")
             .and_then(Value::as_str)
-            .ok_or_else(|| anyhow::anyhow!("fetched_at missing"))?,
+            .ok_or_else(|| anyhow::anyhow!("fetched_at missing"))?
+            .parse::<DateTime<Utc>>()?,
     )
     .bind(
         post.get("reply_count")
@@ -199,11 +201,11 @@ async fn persist_post(pool: &sqlx::PgPool, payload: &[u8]) -> anyhow::Result<()>
             .and_then(Value::as_str)
             .unwrap_or_default(),
     )
-    .bind(
+    .bind(SqlxJson(
         post.get("media_urls")
             .cloned()
             .unwrap_or_else(|| serde_json::json!([])),
-    )
+    ))
     .execute(pool)
     .await?;
     Ok(())
