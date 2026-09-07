@@ -14,21 +14,55 @@
 		reply_count: number;
 	};
 
+	type SocialPage = {
+		items?: Post[];
+		next_before?: string | null;
+		has_more?: boolean;
+		error?: string;
+	};
+
+	const pageSize = 20;
 	let items = $state<Post[]>([]);
 	let loading = $state(true);
+	let loadingMore = $state(false);
 	let error = $state('');
+	let hasMore = $state(false);
+	let nextBefore = $state<string | null>(null);
 
-	onMount(async () => {
+	function mergePosts(posts: Post[]) {
+		const existing = new Set(items.map((post) => post.event_id));
+		items = [...items, ...posts.filter((post) => post.event_id && !existing.has(post.event_id))];
+	}
+
+	async function loadPage(append = false) {
+		if (append) {
+			if (loadingMore || !hasMore) return;
+			loadingMore = true;
+		} else {
+			loading = true;
+			error = '';
+		}
+
 		try {
-			const response = await apiFetch('/api/v1/social/posts?platform=twitter&limit=20');
-			if (!response.ok) throw new Error('Social feed unavailable');
-			const payload = await response.json();
-			items = Array.isArray(payload.items) ? payload.items : [];
+			const params = new URLSearchParams({ platform: 'twitter', limit: String(pageSize) });
+			if (append && nextBefore) params.set('before', nextBefore);
+			const response = await apiFetch(`/api/v1/social/posts?${params}`);
+			if (!response.ok) throw new Error('Social history unavailable');
+			const payload: SocialPage = await response.json();
+			if (payload.error) throw new Error('Social history unavailable');
+			mergePosts(Array.isArray(payload.items) ? payload.items : []);
+			nextBefore = payload.next_before ?? null;
+			hasMore = Boolean(payload.has_more && nextBefore);
 		} catch (cause) {
-			error = cause instanceof Error ? cause.message : 'Social feed unavailable';
+			error = cause instanceof Error ? cause.message : 'Social history unavailable';
 		} finally {
 			loading = false;
+			loadingMore = false;
 		}
+	}
+
+	onMount(() => {
+		void loadPage();
 	});
 </script>
 
@@ -41,8 +75,8 @@
 		<span class="rounded border border-border bg-surface-2 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">X / Twitter</span>
 	</div>
 	{#if loading}
-		<div class="py-8 text-center text-sm text-text-muted">Loading social posts…</div>
-	{:else if error}
+		<div class="py-8 text-center text-sm text-text-muted">Loading social history…</div>
+	{:else if error && items.length === 0}
 		<div class="rounded border border-border bg-surface-2 p-4 text-sm text-text-muted">{error}</div>
 	{:else if items.length === 0}
 		<div class="rounded border border-border bg-surface-2 p-4 text-sm text-text-muted">No social posts available.</div>
@@ -58,6 +92,18 @@
 					<div class="mt-3 flex gap-4 text-xs text-text-muted"><span>♡ {post.like_count}</span><span>↻ {post.retweet_count}</span><span>▢ {post.reply_count}</span></div>
 				</article>
 			{/each}
+		</div>
+		<div class="mt-5 flex flex-col items-center gap-2">
+			{#if error}
+				<p class="text-xs text-red-400">{error}</p>
+			{/if}
+			{#if hasMore}
+				<button class="rounded border border-border bg-surface-2 px-4 py-2 text-xs font-bold text-text transition-colors hover:border-accent/50 disabled:opacity-50" disabled={loadingMore} onclick={() => loadPage(true)}>
+					{loadingMore ? 'Loading history…' : 'Load older posts'}
+				</button>
+			{:else}
+				<span class="text-xs text-text-dim">End of social history</span>
+			{/if}
 		</div>
 	{/if}
 </div>
