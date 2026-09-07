@@ -98,7 +98,11 @@ pub async fn run_subscriber(nats_url: String, database: sqlx::PgPool) {
                     Ok(mut subscription) => {
                         while let Some(message) = subscription.next().await {
                             if let Err(error) = persist_post(&database, &message.payload).await {
-                                warn!(%error, "failed to persist social post");
+                                warn!(
+                                    error = ?error,
+                                    payload_bytes = message.payload.len(),
+                                    "failed to persist social post"
+                                );
                             }
                         }
                     }
