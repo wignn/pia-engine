@@ -94,7 +94,7 @@
 						<div class="mt-3 grid gap-2 {post.media_urls.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}">
 							{#each post.media_urls.slice(0, 4) as mediaUrl}
 								<a href={mediaUrl} target="_blank" rel="noreferrer" class="block overflow-hidden rounded border border-border bg-bg">
-									<img src={mediaUrl} alt="Media attached to social post" loading="lazy" class="max-h-72 w-full object-cover transition-transform hover:scale-[1.02]" />
+									<img src={mediaUrl} alt="Media attached to social post" loading="lazy" referrerpolicy="no-referrer" class="max-h-72 w-full object-cover transition-transform hover:scale-[1.02]" />
 								</a>
 							{/each}
 						</div>
