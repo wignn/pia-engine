@@ -35,12 +35,35 @@ class RSSHubSource:
                 created_at = now
             if not guid:
                 continue
+            media_urls = []
+            for element in item.iter():
+                tag = element.tag.rsplit('}', 1)[-1].lower()
+                if tag not in {'content', 'thumbnail', 'enclosure'}:
+                    continue
+                media_url = (element.attrib.get('url') or element.attrib.get('href') or '').strip()
+                media_type = (element.attrib.get('type') or '').lower()
+                if media_url and (media_type.startswith('image/') or tag in {'content', 'thumbnail'}):
+                    media_urls.append(media_url)
+            if not media_urls:
+                html_candidates = [item.findtext('description') or '']
+                html_candidates.extend(
+                    child.text or ''
+                    for child in item.iter()
+                    if child.tag.rsplit('}', 1)[-1].lower() == 'encoded'
+                )
+                for candidate in html_candidates:
+                    for part in candidate.split('src="')[1:]:
+                        media_url = part.split('"', 1)[0].strip()
+                        if media_url.startswith(('http://', 'https://')):
+                            media_urls.append(media_url)
+            media_urls = list(dict.fromkeys(media_urls))
             records.append(TweetRecord(
                 post_id=guid.rsplit('/', 1)[-1], platform='twitter',
                 source_account=account.username, author_username=account.username,
                 author_display_name=account.username, text=text, url=link,
-                created_at=created_at, fetched_at=now,
+                created_at=created_at, fetched_at=now, media_urls=tuple(media_urls),
             ))
+
         return records
 
     async def close(self) -> None:

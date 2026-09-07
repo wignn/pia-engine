@@ -12,6 +12,7 @@
 		like_count: number;
 		retweet_count: number;
 		reply_count: number;
+		media_urls?: string[];
 	};
 
 	type SocialPage = {
@@ -88,8 +89,17 @@
 						<div><div class="font-bold text-text">{post.author_display_name || post.author_username}</div><div class="text-xs text-text-muted">@{post.author_username} · {new Date(post.created_at).toLocaleString()}</div></div>
 						<a class="text-xs font-bold text-accent hover:underline" href={post.url} target="_blank" rel="noreferrer">Open ↗</a>
 					</div>
-					<p class="mt-3 whitespace-pre-wrap text-sm leading-6 text-text">{post.text}</p>
-					<div class="mt-3 flex gap-4 text-xs text-text-muted"><span>♡ {post.like_count}</span><span>↻ {post.retweet_count}</span><span>▢ {post.reply_count}</span></div>
+					<p class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-text">{post.text}</p>
+					{#if post.media_urls?.length}
+						<div class="mt-3 grid gap-2 {post.media_urls.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}">
+							{#each post.media_urls.slice(0, 4) as mediaUrl}
+								<a href={mediaUrl} target="_blank" rel="noreferrer" class="block overflow-hidden rounded border border-border bg-bg">
+									<img src={mediaUrl} alt="Media attached to social post" loading="lazy" class="max-h-72 w-full object-cover transition-transform hover:scale-[1.02]" />
+								</a>
+							{/each}
+						</div>
+					{/if}
+					<div class="mt-3 flex gap-4 border-t border-border/60 pt-3 text-xs text-text-muted"><span>♡ {post.like_count ?? 0}</span><span>↻ {post.retweet_count ?? 0}</span><span>▢ {post.reply_count ?? 0}</span></div>
 				</article>
 			{/each}
 		</div>
