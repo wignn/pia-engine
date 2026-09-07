@@ -9,13 +9,13 @@ from email.utils import parsedate_to_datetime
 
 
 _TAG_RE = re.compile(r"<[^>]+>")
-_SRC_RE = re.compile(r"<img[^>]+src=[\\\"']([^\\\"']+)", re.IGNORECASE)
+_SRC_RE = re.compile(r'''<img[^>]+src=["']([^"']+)''', re.IGNORECASE)
 
 
 def clean_html_text(value: str) -> str:
     value = html.unescape(value or "")
-    value = re.sub(r"<br\\s*/?>", "\\n", value, flags=re.IGNORECASE)
-    value = re.sub(r"<script\\b[^>]*>.*?</script>|<style\\b[^>]*>.*?</style>", "", value, flags=re.IGNORECASE | re.DOTALL)
+    value = re.sub(r"<br\s*/?>", "\n", value, flags=re.IGNORECASE)
+    value = re.sub(r"<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>", "", value, flags=re.IGNORECASE | re.DOTALL)
     value = _TAG_RE.sub("", value)
     return re.sub(r"[ \\t]+", " ", value).strip()
 

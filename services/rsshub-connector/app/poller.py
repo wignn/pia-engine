@@ -32,6 +32,7 @@ class PollingWorker:
             "truth": TruthSocialSource(),
         }
         self._seen_ids: dict[str, set[str]] = {}
+        self._seen_signatures: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {}
         self._last_seen: dict[str, str] = {}
         self._max_seen_ids = 5000
         self._status = {account.key: AccountStatus() for account in config.accounts}
@@ -45,11 +46,21 @@ class PollingWorker:
 
     def _new_records(self, key: str, records: list[TweetRecord]) -> list[TweetRecord]:
         seen = self._seen_ids.setdefault(key, set())
-        new_records = [record for record in records if record.event_id not in seen]
-        seen.update(record.event_id for record in records)
+        signatures = self._seen_signatures.setdefault(key, {})
+        changed_records = []
+        for record in records:
+            signature = (record.text, record.media_urls)
+            if record.event_id not in seen or signatures.get(record.event_id) != signature:
+                changed_records.append(record)
+            seen.add(record.event_id)
+            signatures[record.event_id] = signature
         if len(seen) > self._max_seen_ids:
-            self._seen_ids[key] = {record.event_id for record in records}
-        return new_records
+            keep = {record.event_id for record in records}
+            self._seen_ids[key] = keep
+            self._seen_signatures[key] = {
+                record.event_id: (record.text, record.media_urls) for record in records
+            }
+        return changed_records
 
     def _update_last_seen(self, key: str, records: list[TweetRecord]) -> None:
         if records:
