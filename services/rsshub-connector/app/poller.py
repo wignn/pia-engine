@@ -83,6 +83,7 @@ class PollingWorker:
         try:
             records = sorted(await self._fetch(account), key=self._record_sort_key)
             new_records = self._new_records(key, records)
+            log.info("poll account=%s records=%d new=%d", key, len(records), len(new_records))
             self._update_last_seen(key, records)
             status = self._status[key]
             status.last_seen_post_id = self._last_seen.get(key, "")
