@@ -17,7 +17,7 @@ import {
   Redo2,
   Plus
 } from "lucide-react";
-import { Timeframe } from "@/types";
+import { Timeframe, IndicatorState } from "@/types";
 
 interface TopBarProps {
   symbol: string;
@@ -30,9 +30,10 @@ interface TopBarProps {
   onSearchClick: () => void;
   chartType?: "candlestick" | "bar" | "line" | "area" | "heikin_ashi";
   onChartTypeChange?: (type: "candlestick" | "bar" | "line" | "area" | "heikin_ashi") => void;
-  onToggleIndicator?: (indicator: "sma20" | "ema50") => void;
-  indicators?: { sma20: boolean; ema50: boolean };
+  onToggleIndicator?: (indicator: keyof IndicatorState) => void;
+  indicators?: IndicatorState;
   onFullscreen?: () => void;
+  onAlertClick?: () => void;
 }
 
 const TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1D", "1W"];
@@ -49,8 +50,9 @@ export const TopBar: React.FC<TopBarProps> = ({
   chartType = "candlestick",
   onChartTypeChange,
   onToggleIndicator,
-  indicators = { sma20: false, ema50: false },
+  indicators = { sma20: false, ema50: false, bollinger: false, rsi: false },
   onFullscreen,
+  onAlertClick,
 }) => {
   const isPositive = change >= 0;
 
@@ -119,17 +121,25 @@ export const TopBar: React.FC<TopBarProps> = ({
             <TrendingUp className="w-3.5 h-3.5 text-[#2962ff]" />
             <span>Indicators</span>
           </button>
-          <div className="hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-36 flex-col rounded border border-[#2a2e39] bg-[#1e222d] p-1 shadow-xl">
-            {([['sma20', 'SMA 20'], ['ema50', 'EMA 50']] as const).map(([id, label]) => (
+          <div className="hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-44 flex-col rounded border border-[#2a2e39] bg-[#1e222d] p-1 shadow-xl">
+            {([
+              ['sma20', 'SMA 20'],
+              ['ema50', 'EMA 50'],
+              ['bollinger', 'Bollinger Bands (20, 2)'],
+              ['rsi', 'RSI (14)']
+            ] as const).map(([id, label]) => (
               <button key={id} onClick={() => onToggleIndicator?.(id)} className="flex items-center justify-between rounded px-2 py-1.5 text-left text-xs text-[#d1d4dc] hover:bg-[#2a2e39]">
-                <span>{label}</span><span className={indicators[id] ? "text-[#2962ff]" : "text-[#787b86]"}>{indicators[id] ? "ON" : "OFF"}</span>
+                <span>{label}</span><span className={indicators[id] ? "text-[#2962ff] font-bold" : "text-[#787b86]"}>{indicators[id] ? "ON" : "OFF"}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Templates / Alerts */}
-        <button className="hidden xl:flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]">
+        <button
+          onClick={onAlertClick}
+          className="hidden xl:flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc] transition-colors"
+        >
           <Clock className="w-3.5 h-3.5" />
           <span>Alert</span>
         </button>

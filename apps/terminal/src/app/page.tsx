@@ -9,11 +9,12 @@ import { RightDock, SidebarTab } from "@/components/RightDock";
 import { NewsPanel } from "@/components/NewsPanel";
 import { MarketIntelligencePanel } from "@/components/MarketIntelligencePanel";
 import { SocialPanel } from "@/components/SocialPanel";
+import { AlertsPanel } from "@/components/AlertsPanel";
 import { ChartTabs } from "@/components/ChartTabs";
 import { SymbolSearchModal } from "@/components/SymbolSearchModal";
 import { INITIAL_WATCHLIST } from "@/lib/constants";
 import { useMarketFeed } from "@/lib/useMarketFeed";
-import { WatchlistItem, Timeframe, TabItem, ChartType } from "@/types";
+import { WatchlistItem, Timeframe, TabItem, ChartType, DrawingTool, IndicatorState } from "@/types";
 
 export default function TerminalPage() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(INITIAL_WATCHLIST);
@@ -21,11 +22,21 @@ export default function TerminalPage() {
   const [timeframe, setTimeframe] = useState<Timeframe>("15m");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<SidebarTab>("watchlist");
-  const [indicators, setIndicators] = useState({ sma20: false, ema50: false });
+  const [indicators, setIndicators] = useState<IndicatorState>({
+    sma20: false,
+    ema50: false,
+    bollinger: false,
+    rsi: false,
+  });
   const [chartType, setChartType] = useState<ChartType>("candlestick");
 
+  // Interactive Drawing Tools
+  const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
+  const [drawingsCount, setDrawingsCount] = useState(0);
+  const [clearDrawingsTrigger, setClearDrawingsTrigger] = useState(0);
+
   // Real market feed for the active symbol + timeframe.
-  const { candles, livePrice, connected, loading, loadingOlder, hasMoreHistory, loadOlder } = useMarketFeed(selectedItem.symbol, timeframe); // live + paginated history
+  const { candles, livePrice, connected, loading, loadingOlder, hasMoreHistory, loadOlder } = useMarketFeed(selectedItem.symbol, timeframe);
 
   // Effective live price for header (real if present, else the seed price).
   const headerPrice = livePrice ?? selectedItem.price;
@@ -145,6 +156,7 @@ export default function TerminalPage() {
         onChartTypeChange={setChartType}
         onToggleIndicator={(indicator) => setIndicators((current) => ({ ...current, [indicator]: !current[indicator] }))}
         onFullscreen={toggleFullscreen}
+        onAlertClick={() => setRightSidebarTab("alerts")}
       />
 
       <ChartTabs
@@ -156,7 +168,12 @@ export default function TerminalPage() {
       />
 
       <div className="flex-1 flex w-full overflow-hidden">
-        <LeftToolbar />
+        <LeftToolbar
+          activeTool={activeTool}
+          setActiveTool={setActiveTool}
+          drawingsCount={drawingsCount}
+          onClearDrawings={() => setClearDrawingsTrigger((c) => c + 1)}
+        />
 
         <main className="flex-1 h-full overflow-hidden relative">
           <ChartArea
@@ -165,6 +182,7 @@ export default function TerminalPage() {
             timeframe={timeframe}
             chartType={chartType}
             indicators={indicators}
+            activeTool={activeTool}
             digits={selectedItem.digits}
             candles={candles}
             livePrice={livePrice}
@@ -173,6 +191,8 @@ export default function TerminalPage() {
             loadingOlder={loadingOlder}
             hasMoreHistory={hasMoreHistory}
             onLoadOlder={loadOlder}
+            onDrawingsCountChange={setDrawingsCount}
+            clearDrawingsTrigger={clearDrawingsTrigger}
           />
         </main>
 
@@ -188,26 +208,33 @@ export default function TerminalPage() {
           {rightSidebarTab === "intelligence" && <MarketIntelligencePanel symbol={selectedItem.symbol} />}
           {rightSidebarTab === "social" && <SocialPanel />}
           {rightSidebarTab === "alerts" && (
-            <div className="h-full bg-[#1e222d] border-l border-[#2a2e39] p-4 flex flex-col items-center justify-center text-center text-[#787b86]">
-              <span className="font-bold text-white mb-1">No Active Price Alerts</span>
-              <p className="text-xs">Set triggers on {selectedItem.symbol} to receive Telegram / Discord notifications.</p>
-            </div>
+            <AlertsPanel
+              symbol={selectedItem.symbol}
+              livePrice={livePrice}
+              digits={selectedItem.digits}
+            />
           )}
           {rightSidebarTab === "calendar" && (
             <div className="h-full bg-[#1e222d] border-l border-[#2a2e39] p-4 flex flex-col gap-3">
               <span className="font-bold text-white text-sm">Upcoming Macro Events</span>
               <div className="flex flex-col gap-2 text-xs">
-                <div className="p-2 rounded bg-[#181b27] border border-[#2a2e39]">
+                <div className="p-2.5 rounded bg-[#181b27] border border-[#2a2e39]">
                   <div className="flex justify-between font-bold text-[#f23645]">
                     <span>USD Non-Farm Payrolls</span><span>19:30 UTC</span>
                   </div>
                   <div className="text-[11px] text-[#787b86] mt-1">Forecast: 165K | Previous: 142K</div>
                 </div>
-                <div className="p-2 rounded bg-[#181b27] border border-[#2a2e39]">
+                <div className="p-2.5 rounded bg-[#181b27] border border-[#2a2e39]">
                   <div className="flex justify-between font-bold text-[#2962ff]">
                     <span>USD CPI (MoM)</span><span>Tomorrow</span>
                   </div>
                   <div className="text-[11px] text-[#787b86] mt-1">Forecast: 0.2% | Previous: 0.2%</div>
+                </div>
+                <div className="p-2.5 rounded bg-[#181b27] border border-[#2a2e39]">
+                  <div className="flex justify-between font-bold text-[#f5b942]">
+                    <span>FOMC Rate Decision</span><span>Wed 18:00 UTC</span>
+                  </div>
+                  <div className="text-[11px] text-[#787b86] mt-1">Target: 5.25% - 5.50%</div>
                 </div>
               </div>
             </div>

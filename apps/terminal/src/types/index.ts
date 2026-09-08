@@ -21,6 +21,35 @@ export interface CandleData {
 export type Timeframe = "1m" | "5m" | "15m" | "1h" | "4h" | "1D" | "1W";
 export type ChartType = "candlestick" | "bar" | "line" | "area" | "heikin_ashi";
 
+export type DrawingTool = "cursor" | "trendline" | "horizontal" | "fibonacci" | "measure";
+
+export interface DrawingItem {
+  id: string;
+  type: "trendline" | "horizontal" | "fibonacci" | "measure";
+  symbol: string;
+  p1: { x: number; y: number; price?: number };
+  p2?: { x: number; y: number; price?: number };
+  color?: string;
+}
+
+export interface IndicatorState {
+  sma20: boolean;
+  ema50: boolean;
+  bollinger: boolean;
+  rsi: boolean;
+}
+
+export interface PriceAlert {
+  id: string;
+  symbol: string;
+  targetPrice: number;
+  condition: "crossing_up" | "crossing_down";
+  createdPrice: number;
+  createdAt: number;
+  triggered: boolean;
+  triggeredAt?: number;
+}
+
 export interface TabItem {
   id: string;
   symbol: string;
