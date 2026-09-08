@@ -13,11 +13,24 @@ _SRC_RE = re.compile(r'''<img[^>]+src=["']([^"']+)''', re.IGNORECASE)
 
 
 def clean_html_text(value: str) -> str:
-    value = html.unescape(value or "")
+    if not value:
+        return ""
     value = re.sub(r"<br\s*/?>", "\n", value, flags=re.IGNORECASE)
     value = re.sub(r"<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>", "", value, flags=re.IGNORECASE | re.DOTALL)
     value = _TAG_RE.sub("", value)
-    return re.sub(r"[ \\t]+", " ", value).strip()
+    value = html.unescape(value)
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in value.split("\n")]
+    result: list[str] = []
+    blank_count = 0
+    for line in lines:
+        if not line:
+            blank_count += 1
+            if blank_count <= 2:
+                result.append("")
+        else:
+            blank_count = 0
+            result.append(line)
+    return "\n".join(result).strip()
 
 
 def html_image_urls(value: str) -> list[str]:

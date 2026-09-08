@@ -30,6 +30,21 @@
 	let hasMore = $state(false);
 	let nextBefore = $state<string | null>(null);
 
+	function formatDate(isoString: string): string {
+		try {
+			const d = new Date(isoString);
+			if (isNaN(d.getTime())) return isoString;
+			return new Intl.DateTimeFormat(undefined, {
+				month: 'short',
+				day: 'numeric',
+				hour: '2-digit',
+				minute: '2-digit'
+			}).format(d);
+		} catch {
+			return isoString;
+		}
+	}
+
 	function mergePosts(posts: Post[]) {
 		const existing = new Set(items.map((post) => post.event_id));
 		items = [...items, ...posts.filter((post) => post.event_id && !existing.has(post.event_id))];
@@ -86,7 +101,7 @@
 			{#each items as post (post.event_id)}
 				<article class="rounded border border-border bg-surface-2 p-4 transition-colors hover:border-accent/50">
 					<div class="flex items-start justify-between gap-3">
-						<div><div class="font-bold text-text">{post.author_display_name || post.author_username}</div><div class="text-xs text-text-muted">@{post.author_username} · {new Date(post.created_at).toLocaleString()}</div></div>
+						<div><div class="font-bold text-text">{post.author_display_name || post.author_username}</div><div class="text-xs text-text-muted">@{post.author_username} · {formatDate(post.created_at)}</div></div>
 						<a class="text-xs font-bold text-accent hover:underline" href={post.url} target="_blank" rel="noreferrer">Open ↗</a>
 					</div>
 					<p class="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-text">{post.text}</p>
