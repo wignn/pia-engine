@@ -30,6 +30,7 @@ export interface DrawingItem {
   p1: { x: number; y: number; price?: number };
   p2?: { x: number; y: number; price?: number };
   color?: string;
+  strokeWidth?: number;
 }
 
 export interface IndicatorState {

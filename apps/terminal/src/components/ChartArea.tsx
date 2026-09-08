@@ -1,16 +1,16 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import {
   createChart,
   IChartApi,
   ISeriesApi,
   CandlestickData,
   LineData,
-  Time
+  Time,
 } from "lightweight-charts";
 import { CandleData, Timeframe, DrawingTool, DrawingItem, IndicatorState } from "@/types";
-import { Wifi, WifiOff, Loader2 } from "lucide-react";
+import { Wifi, WifiOff, Loader2, Trash2, X, Eye } from "lucide-react";
 import { OscillatorPane } from "./OscillatorPane";
 
 interface ChartAreaProps {
@@ -32,6 +32,7 @@ interface ChartAreaProps {
   onDrawingsCountChange?: (count: number) => void;
   clearDrawingsTrigger?: number;
   snapshotTrigger?: number;
+  onToggleIndicator?: (indicator: keyof IndicatorState) => void;
 }
 
 export const ChartArea: React.FC<ChartAreaProps> = ({
@@ -52,6 +53,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   onDrawingsCountChange,
   clearDrawingsTrigger = 0,
   snapshotTrigger = 0,
+  onToggleIndicator,
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -78,6 +80,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
 
   // Drawings State
   const [drawings, setDrawings] = useState<DrawingItem[]>([]);
+  const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
+  const [draggingAnchor, setDraggingAnchor] = useState<{ id: string; point: "p1" | "p2" } | null>(null);
   const [currentDrawing, setCurrentDrawing] = useState<{
     type: DrawingItem["type"];
     p1: { x: number; y: number };
@@ -102,6 +106,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   useEffect(() => {
     if (clearDrawingsTrigger > 0) {
       setDrawings([]);
+      setSelectedDrawingId(null);
       localStorage.removeItem(`atlsd_drawings_${symbol}`);
       onDrawingsCountChange?.(0);
     }
@@ -145,7 +150,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
     }
   }, [snapshotTrigger, symbol, timeframe]);
 
-  const saveDrawings = (newDrawings: DrawingItem[]) => {
+  const saveDrawings = useCallback((newDrawings: DrawingItem[]) => {
     setDrawings(newDrawings);
     onDrawingsCountChange?.(newDrawings.length);
     try {
@@ -153,7 +158,19 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
     } catch {
       // Ignore write errors
     }
-  };
+  }, [symbol, onDrawingsCountChange]);
+
+  // Delete selected drawing on Backspace / Delete
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedDrawingId) {
+        saveDrawings(drawings.filter((d) => d.id !== selectedDrawingId));
+        setSelectedDrawingId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedDrawingId, drawings, saveDrawings]);
 
   // Initialize chart
   useEffect(() => {
@@ -183,6 +200,17 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
         scaleMargins: { top: 0.12, bottom: 0.15 },
       },
       timeScale: { borderColor: "#2a2e39", timeVisible: true, secondsVisible: false },
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: true,
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: true,
+      },
     });
 
     const candlestickSeries = chart.addCandlestickSeries({
@@ -431,7 +459,12 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
 
   // Drawing Canvas Handlers
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (activeTool === "cursor") return;
+    if (draggingAnchor) return;
+    if (activeTool === "cursor") {
+      // Click on background deselects drawing
+      setSelectedDrawingId(null);
+      return;
+    }
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -445,10 +478,25 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!isDrawingRef.current || !currentDrawing) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    if (draggingAnchor) {
+      setDrawings((prev) =>
+        prev.map((d) => {
+          if (d.id !== draggingAnchor.id) return d;
+          if (draggingAnchor.point === "p1") {
+            return { ...d, p1: { x, y } };
+          } else {
+            return { ...d, p2: { x, y } };
+          }
+        })
+      );
+      return;
+    }
+
+    if (!isDrawingRef.current || !currentDrawing) return;
 
     setCurrentDrawing({
       ...currentDrawing,
@@ -457,13 +505,18 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   };
 
   const handleMouseUp = () => {
+    if (draggingAnchor) {
+      setDraggingAnchor(null);
+      saveDrawings(drawings);
+      return;
+    }
+
     if (!isDrawingRef.current || !currentDrawing) return;
     isDrawingRef.current = false;
 
     if (currentDrawing.p2) {
       const dx = Math.abs(currentDrawing.p1.x - currentDrawing.p2.x);
       const dy = Math.abs(currentDrawing.p1.y - currentDrawing.p2.y);
-      // Ignore accidental micro clicks
       if (dx > 4 || dy > 4 || currentDrawing.type === "horizontal") {
         const item: DrawingItem = {
           id: "draw_" + Date.now(),
@@ -471,12 +524,31 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           symbol,
           p1: currentDrawing.p1,
           p2: currentDrawing.p2,
+          color: currentDrawing.type === "horizontal" ? "#f5b942" : "#2962ff",
+          strokeWidth: 2,
         };
         saveDrawings([...drawings, item]);
+        setSelectedDrawingId(item.id);
       }
     }
     setCurrentDrawing(null);
   };
+
+  const handleUpdateDrawingStyle = (updates: Partial<DrawingItem>) => {
+    if (!selectedDrawingId) return;
+    const updated = drawings.map((d) => (d.id === selectedDrawingId ? { ...d, ...updates } : d));
+    saveDrawings(updated);
+  };
+
+  const selectedDrawing = drawings.find((d) => d.id === selectedDrawingId);
+  const actionPos = useMemo(() => {
+    if (!selectedDrawing) return null;
+    const p1 = selectedDrawing.p1;
+    const p2 = selectedDrawing.p2 || p1;
+    const top = Math.max(12, Math.min(p1.y, p2.y) - 42);
+    const left = Math.max(12, (p1.x + p2.x) / 2 - 80);
+    return { top, left };
+  }, [selectedDrawing]);
 
   const isUp = ohlc.close >= ohlc.open;
   const hasData = candles.length > 0;
@@ -484,8 +556,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   return (
     <div className="relative w-full h-full flex flex-col bg-[#131722] overflow-hidden select-none">
       {/* Chart Legend Overlay */}
-      <div className="absolute top-3 left-3 z-10 pointer-events-none flex flex-col gap-1.5">
-        <div className="flex items-center gap-2">
+      <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 pointer-events-none">
+        <div className="flex flex-wrap items-center gap-1.5 pointer-events-auto">
           <span className="font-bold text-sm text-white tracking-wide">{symbol}</span>
           <span className="text-xs text-[#787b86] font-medium">{timeframe}</span>
           <span className="text-[10px] text-[#787b86] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded">
@@ -500,24 +572,66 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
             {connected ? "LIVE" : "OFFLINE"}
           </span>
 
-          {/* Indicators Badges */}
-          {indicators.bollinger && (
-            <span className="text-[10px] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded text-[#f5b942]">
-              BB(20,2)
-            </span>
+          {/* Interactive Indicator Pills with Remove 'X' Button */}
+          {indicators.sma20 && (
+            <div className="group flex items-center gap-1 text-[10px] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded text-[#f5b942]">
+              <span>SMA 20</span>
+              <button
+                onClick={() => onToggleIndicator?.("sma20")}
+                className="opacity-0 group-hover:opacity-100 hover:text-white"
+                title="Remove SMA 20"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
           )}
-          {indicators.rsi && rsiValue !== null && (
-            <span
-              className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${
-                rsiValue >= 70
-                  ? "bg-[#f23645]/20 border-[#f23645]/40 text-[#f23645]"
-                  : rsiValue <= 30
-                  ? "bg-[#089981]/20 border-[#089981]/40 text-[#089981]"
-                  : "bg-[#1e222d] border-[#2a2e39] text-[#2962ff]"
-              }`}
-            >
-              RSI(14): {rsiValue.toFixed(1)} {rsiValue >= 70 ? "OVERBOUGHT" : rsiValue <= 30 ? "OVERSOLD" : "NEUTRAL"}
-            </span>
+          {indicators.ema50 && (
+            <div className="group flex items-center gap-1 text-[10px] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded text-[#2962ff]">
+              <span>EMA 50</span>
+              <button
+                onClick={() => onToggleIndicator?.("ema50")}
+                className="opacity-0 group-hover:opacity-100 hover:text-white"
+                title="Remove EMA 50"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          )}
+          {indicators.bollinger && (
+            <div className="group flex items-center gap-1 text-[10px] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded text-[#089981]">
+              <span>BB(20,2)</span>
+              <button
+                onClick={() => onToggleIndicator?.("bollinger")}
+                className="opacity-0 group-hover:opacity-100 hover:text-white"
+                title="Remove Bollinger Bands"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          )}
+          {indicators.rsi && (
+            <div className="group flex items-center gap-1 text-[10px] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded text-[#ab47bc]">
+              <span>RSI 14</span>
+              <button
+                onClick={() => onToggleIndicator?.("rsi")}
+                className="opacity-0 group-hover:opacity-100 hover:text-white"
+                title="Remove RSI"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          )}
+          {indicators.macd && (
+            <div className="group flex items-center gap-1 text-[10px] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded text-[#2962ff]">
+              <span>MACD</span>
+              <button
+                onClick={() => onToggleIndicator?.("macd")}
+                className="opacity-0 group-hover:opacity-100 hover:text-white"
+                title="Remove MACD"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
           )}
         </div>
 
@@ -565,6 +679,58 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       {/* Oscillator Sub-pane (RSI / MACD) */}
       <OscillatorPane candles={candles} indicators={indicators} />
 
+      {/* Floating Action Pill for Selected Drawing */}
+      {selectedDrawing && actionPos && (
+        <div
+          style={{ top: `${actionPos.top}px`, left: `${actionPos.left}px` }}
+          className="absolute z-30 flex items-center gap-2 rounded-lg border border-[#2a2e39] bg-[#1e222d] px-2.5 py-1.5 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Colors */}
+          <div className="flex items-center gap-1 pr-1 border-r border-[#2a2e39]">
+            {["#2962ff", "#f5b942", "#089981", "#f23645", "#ffffff"].map((col) => (
+              <button
+                key={col}
+                onClick={() => handleUpdateDrawingStyle({ color: col })}
+                style={{ backgroundColor: col }}
+                className={`w-3.5 h-3.5 rounded-full border border-black/40 transition-transform ${
+                  selectedDrawing.color === col ? "scale-125 ring-1 ring-white" : "hover:scale-110"
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Width */}
+          <div className="flex items-center gap-1 pr-1 border-r border-[#2a2e39]">
+            {[1, 2, 3].map((w) => (
+              <button
+                key={w}
+                onClick={() => handleUpdateDrawingStyle({ strokeWidth: w })}
+                className={`px-1.5 py-0.5 rounded font-mono text-[9px] font-bold ${
+                  (selectedDrawing.strokeWidth || 2) === w
+                    ? "bg-[#2962ff] text-white"
+                    : "text-[#787b86] hover:text-white"
+                }`}
+              >
+                {w}px
+              </button>
+            ))}
+          </div>
+
+          {/* Delete */}
+          <button
+            onClick={() => {
+              saveDrawings(drawings.filter((d) => d.id !== selectedDrawing.id));
+              setSelectedDrawingId(null);
+            }}
+            className="p-1 rounded text-[#787b86] hover:text-[#f23645] hover:bg-[#2a2e39]"
+            title="Delete Drawing (Del)"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Interactive SVG Drawing Overlay */}
       <svg
         className={`absolute inset-0 w-full h-full z-15 ${
@@ -576,36 +742,123 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       >
         {/* Render Saved Drawings */}
         {drawings.map((d) => {
+          const isSelected = d.id === selectedDrawingId;
+          const strokeColor = d.color || (d.type === "horizontal" ? "#f5b942" : "#2962ff");
+          const width = d.strokeWidth || 2;
+
           if (d.type === "trendline" && d.p2) {
             return (
-              <g key={d.id}>
+              <g
+                key={d.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedDrawingId(d.id);
+                }}
+                className="pointer-events-auto"
+              >
+                {/* Wide invisible stroke for easy click selection */}
                 <line
                   x1={d.p1.x}
                   y1={d.p1.y}
                   x2={d.p2.x}
                   y2={d.p2.y}
-                  stroke="#2962ff"
-                  strokeWidth="2"
+                  stroke="transparent"
+                  strokeWidth="16"
+                  className="cursor-pointer"
+                />
+                <line
+                  x1={d.p1.x}
+                  y1={d.p1.y}
+                  x2={d.p2.x}
+                  y2={d.p2.y}
+                  stroke={strokeColor}
+                  strokeWidth={width}
                   strokeLinecap="round"
                 />
-                <circle cx={d.p1.x} cy={d.p1.y} r="3.5" fill="#2962ff" />
-                <circle cx={d.p2.x} cy={d.p2.y} r="3.5" fill="#2962ff" />
+                {/* Anchor handles when selected */}
+                {isSelected ? (
+                  <>
+                    <circle
+                      cx={d.p1.x}
+                      cy={d.p1.y}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#2962ff"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingAnchor({ id: d.id, point: "p1" });
+                      }}
+                    />
+                    <circle
+                      cx={d.p2.x}
+                      cy={d.p2.y}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#2962ff"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingAnchor({ id: d.id, point: "p2" });
+                      }}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <circle cx={d.p1.x} cy={d.p1.y} r="3" fill={strokeColor} />
+                    <circle cx={d.p2.x} cy={d.p2.y} r="3" fill={strokeColor} />
+                  </>
+                )}
               </g>
             );
           }
           if (d.type === "horizontal") {
             return (
-              <g key={d.id}>
+              <g
+                key={d.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedDrawingId(d.id);
+                }}
+                className="pointer-events-auto"
+              >
                 <line
                   x1={0}
                   y1={d.p1.y}
                   x2="100%"
                   y2={d.p1.y}
-                  stroke="#f5b942"
-                  strokeWidth="1.5"
+                  stroke="transparent"
+                  strokeWidth="16"
+                  className="cursor-pointer"
+                />
+                <line
+                  x1={0}
+                  y1={d.p1.y}
+                  x2="100%"
+                  y2={d.p1.y}
+                  stroke={strokeColor}
+                  strokeWidth={width}
                   strokeDasharray="4 2"
                 />
-                <circle cx={d.p1.x} cy={d.p1.y} r="3.5" fill="#f5b942" />
+                {isSelected ? (
+                  <circle
+                    cx={d.p1.x}
+                    cy={d.p1.y}
+                    r="5.5"
+                    fill="#ffffff"
+                    stroke="#f5b942"
+                    strokeWidth="2"
+                    className="cursor-move pointer-events-auto"
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      setDraggingAnchor({ id: d.id, point: "p1" });
+                    }}
+                  />
+                ) : (
+                  <circle cx={d.p1.x} cy={d.p1.y} r="3" fill={strokeColor} />
+                )}
               </g>
             );
           }
@@ -615,29 +868,81 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
             const height = yMax - yMin;
             const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
             return (
-              <g key={d.id}>
+              <g
+                key={d.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedDrawingId(d.id);
+                }}
+                className="pointer-events-auto"
+              >
+                <rect
+                  x={Math.min(d.p1.x, d.p2.x)}
+                  y={yMin}
+                  width={Math.abs(d.p2.x - d.p1.x)}
+                  height={Math.max(1, height)}
+                  fill="transparent"
+                  className="cursor-pointer"
+                />
                 {levels.map((lvl) => {
                   const y = yMin + height * lvl;
                   return (
                     <g key={lvl}>
-                      <line x1={0} y1={y} x2="100%" y2={y} stroke="#2962ff88" strokeWidth="1" />
+                      <line x1={0} y1={y} x2="100%" y2={y} stroke={strokeColor} strokeWidth={lvl === 0 || lvl === 1 ? 1.5 : 1} strokeOpacity={0.8} />
                       <text x={10} y={y - 3} fill="#787b86" fontSize="9" fontFamily="monospace">
                         {(lvl * 100).toFixed(1)}%
                       </text>
                     </g>
                   );
                 })}
+                {isSelected && (
+                  <>
+                    <circle
+                      cx={d.p1.x}
+                      cy={d.p1.y}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#2962ff"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingAnchor({ id: d.id, point: "p1" });
+                      }}
+                    />
+                    <circle
+                      cx={d.p2.x}
+                      cy={d.p2.y}
+                      r="5.5"
+                      fill="#ffffff"
+                      stroke="#2962ff"
+                      strokeWidth="2"
+                      className="cursor-move pointer-events-auto"
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setDraggingAnchor({ id: d.id, point: "p2" });
+                      }}
+                    />
+                  </>
+                )}
               </g>
             );
           }
           if (d.type === "measure" && d.p2) {
-            const width = Math.abs(d.p2.x - d.p1.x);
-            const height = Math.abs(d.p2.y - d.p1.y);
+            const widthBox = Math.abs(d.p2.x - d.p1.x);
+            const heightBox = Math.abs(d.p2.y - d.p1.y);
             const x = Math.min(d.p1.x, d.p2.x);
             const y = Math.min(d.p1.y, d.p2.y);
             return (
-              <g key={d.id}>
-                <rect x={x} y={y} width={width} height={height} fill="#2962ff15" stroke="#2962ff" strokeWidth="1" strokeDasharray="3 3" />
+              <g
+                key={d.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedDrawingId(d.id);
+                }}
+                className="pointer-events-auto"
+              >
+                <rect x={x} y={y} width={widthBox} height={heightBox} fill="#2962ff15" stroke="#2962ff" strokeWidth="1" strokeDasharray="3 3" />
               </g>
             );
           }

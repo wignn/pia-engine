@@ -15,6 +15,7 @@ interface ChartPaneWrapperProps {
   onDrawingsCountChange?: (count: number) => void;
   digits: number;
   provider: string;
+  onToggleIndicator?: (indicator: keyof ChartPaneConfig["indicators"]) => void;
 }
 
 export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
@@ -27,6 +28,7 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
   onDrawingsCountChange,
   digits,
   provider,
+  onToggleIndicator,
 }) => {
   const {
     candles,
@@ -65,6 +67,7 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
         onDrawingsCountChange={isActive ? onDrawingsCountChange : undefined}
         clearDrawingsTrigger={isActive ? clearDrawingsTrigger : 0}
         snapshotTrigger={isActive ? snapshotTrigger : 0}
+        onToggleIndicator={isActive ? onToggleIndicator : undefined}
       />
     </div>
   );

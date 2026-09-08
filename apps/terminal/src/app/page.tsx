@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { X } from "lucide-react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { LeftToolbar } from "@/components/LeftToolbar";
 import { ChartPaneWrapper } from "@/components/ChartPaneWrapper";
@@ -33,6 +33,11 @@ export default function TerminalPage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<SidebarTab>("watchlist");
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+
+  // Desktop Resizable & Collapsible Sidebar State
+  const [sidebarWidth, setSidebarWidth] = useState(330);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isDraggingSplitter, setIsDraggingSplitter] = useState(false);
 
   // Multi-Chart Grid Layout State
   const [layout, setLayout] = useState<ChartLayout>("1x1");
@@ -182,21 +187,24 @@ export default function TerminalPage() {
     );
   };
 
-  const handleToggleIndicator = (indicator: keyof IndicatorState) => {
-    setPanes((curr) =>
-      curr.map((p) =>
-        p.id === activePaneId
-          ? {
-              ...p,
-              indicators: {
-                ...p.indicators,
-                [indicator]: !p.indicators[indicator],
-              },
-            }
-          : p
-      )
-    );
-  };
+  const handleToggleIndicator = useCallback(
+    (indicator: keyof IndicatorState) => {
+      setPanes((curr) =>
+        curr.map((p) =>
+          p.id === activePaneId
+            ? {
+                ...p,
+                indicators: {
+                  ...p.indicators,
+                  [indicator]: !p.indicators[indicator],
+                },
+              }
+            : p
+        )
+      );
+    },
+    [activePaneId]
+  );
 
   const toggleFullscreen = useCallback(async () => {
     if (!document.fullscreenElement) {
@@ -209,7 +217,35 @@ export default function TerminalPage() {
   const handleTabChangeFromDock = (tab: SidebarTab) => {
     setRightSidebarTab(tab);
     setIsMobileDrawerOpen(true);
+    setIsSidebarCollapsed(false);
   };
+
+  // Draggable Splitter Handler
+  const handleSplitterMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDraggingSplitter(true);
+  };
+
+  useEffect(() => {
+    if (!isDraggingSplitter) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = window.innerWidth - 45 - e.clientX;
+      setSidebarWidth(Math.max(250, Math.min(540, newWidth)));
+      if (isSidebarCollapsed) setIsSidebarCollapsed(false);
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingSplitter(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDraggingSplitter, isSidebarCollapsed]);
 
   // Pro Keyboard Shortcuts
   useEffect(() => {
@@ -228,25 +264,32 @@ export default function TerminalPage() {
         return;
       }
 
+      // Toggle Sidebar Collapse: Alt+S
+      if (e.altKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        setIsSidebarCollapsed((c) => !c);
+        return;
+      }
+
       // Drawing Tool Shortcuts
       if (e.key === "Escape" || e.key.toLowerCase() === "v") {
         setActiveTool("cursor");
         setIsMobileDrawerOpen(false);
         return;
       }
-      if (e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey) {
+      if (e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         setActiveTool("trendline");
         return;
       }
-      if (e.key.toLowerCase() === "h" && !e.ctrlKey && !e.metaKey) {
+      if (e.key.toLowerCase() === "h" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         setActiveTool("horizontal");
         return;
       }
-      if (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey) {
+      if (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         setActiveTool("fibonacci");
         return;
       }
-      if (e.key.toLowerCase() === "m" && !e.ctrlKey && !e.metaKey) {
+      if (e.key.toLowerCase() === "m" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         setActiveTool("measure");
         return;
       }
@@ -373,11 +416,36 @@ export default function TerminalPage() {
                   clearDrawingsTrigger={clearDrawingsTrigger}
                   snapshotTrigger={pane.id === activePaneId ? snapshotTrigger : 0}
                   onDrawingsCountChange={setDrawingsCount}
+                  onToggleIndicator={handleToggleIndicator}
                 />
               );
             })}
           </div>
         </main>
+
+        {/* Desktop Splitter & Collapse Button */}
+        <div
+          onMouseDown={handleSplitterMouseDown}
+          className={`hidden lg:flex relative w-1 hover:w-1.5 cursor-col-resize bg-[#2a2e39] hover:bg-[#2962ff] transition-all items-center justify-center select-none z-20 group shrink-0 ${
+            isDraggingSplitter ? "bg-[#2962ff] w-1.5" : ""
+          }`}
+          title="Drag to resize width"
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsSidebarCollapsed((c) => !c);
+            }}
+            className="absolute -left-2.5 top-1/2 -translate-y-1/2 w-5 h-7 rounded bg-[#1e222d] border border-[#2a2e39] text-[#787b86] hover:text-white hover:border-[#363a45] flex items-center justify-center shadow-md z-30 transition-all cursor-pointer"
+            title={isSidebarCollapsed ? "Expand Panel (Alt+S)" : "Collapse Panel (Alt+S)"}
+          >
+            {isSidebarCollapsed ? (
+              <ChevronLeft className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )}
+          </button>
+        </div>
 
         {/* Mobile Backdrop */}
         {isMobileDrawerOpen && (
@@ -387,13 +455,15 @@ export default function TerminalPage() {
           />
         )}
 
-        {/* Right Dock Sidebar: Sliding Drawer on Mobile/Tablet (< lg), Docked Panel on Desktop (lg:) */}
+        {/* Right Dock Sidebar: Sliding Drawer on Mobile/Tablet (< lg), Resizable/Collapsible Docked Panel on Desktop (lg:) */}
         <aside
+          style={{ width: isSidebarCollapsed ? 0 : `${sidebarWidth}px` }}
           className={`
-            fixed inset-y-0 right-0 z-50 w-[85vw] max-w-[340px] bg-[#1e222d] shadow-2xl transition-transform duration-300 ease-in-out
-            lg:static lg:z-auto lg:w-[330px] lg:shadow-none lg:translate-x-0
+            fixed inset-y-0 right-0 z-50 w-[85vw] max-w-[360px] bg-[#1e222d] shadow-2xl transition-transform duration-300 ease-in-out
+            lg:static lg:z-auto lg:shadow-none lg:translate-x-0 lg:transition-none
             ${isMobileDrawerOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
-            flex flex-col h-full overflow-hidden border-l border-[#2a2e39]
+            ${isSidebarCollapsed ? "lg:hidden" : "lg:flex"}
+            flex flex-col h-full overflow-hidden border-l border-[#2a2e39] shrink-0
           `}
         >
           {/* Mobile Drawer Close Header */}
