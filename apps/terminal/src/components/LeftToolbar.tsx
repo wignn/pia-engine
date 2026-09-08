@@ -35,7 +35,7 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
   ];
 
   return (
-    <aside className="w-[48px] bg-[#1e222d] border-r border-[#2a2e39] flex flex-col items-center py-2 justify-between select-none z-10">
+    <aside className="hidden md:flex w-[48px] bg-[#1e222d] border-r border-[#2a2e39] flex-col items-center py-2 justify-between select-none z-10 shrink-0">
       {/* Drawing Tools */}
       <div className="flex flex-col items-center gap-1.5 w-full">
         {tools.map((t) => {

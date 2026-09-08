@@ -33,7 +33,7 @@ export const RightDock: React.FC<RightDockProps> = ({ activeTab, setActiveTab })
   ];
 
   return (
-    <div className="w-[45px] bg-[#1e222d] border-l border-[#2a2e39] flex flex-col items-center py-2 justify-between select-none z-10">
+    <div className="hidden lg:flex w-[45px] bg-[#1e222d] border-l border-[#2a2e39] flex-col items-center py-2 justify-between select-none z-10 shrink-0">
       <div className="flex flex-col items-center gap-1 w-full">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;

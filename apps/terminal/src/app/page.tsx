@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { X } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { LeftToolbar } from "@/components/LeftToolbar";
 import { ChartPaneWrapper } from "@/components/ChartPaneWrapper";
@@ -12,6 +13,7 @@ import { SocialPanel } from "@/components/SocialPanel";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { CalendarPanel } from "@/components/CalendarPanel";
 import { OrderBookPanel } from "@/components/OrderBookPanel";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { ChartTabs } from "@/components/ChartTabs";
 import { SymbolSearchModal } from "@/components/SymbolSearchModal";
 import { INITIAL_WATCHLIST } from "@/lib/constants";
@@ -30,6 +32,7 @@ export default function TerminalPage() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(INITIAL_WATCHLIST);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<SidebarTab>("watchlist");
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   // Multi-Chart Grid Layout State
   const [layout, setLayout] = useState<ChartLayout>("1x1");
@@ -97,11 +100,11 @@ export default function TerminalPage() {
   const gridClass = useMemo(() => {
     switch (layout) {
       case "1x2":
-        return "grid grid-cols-2 gap-0.5 h-full w-full bg-[#1e222d]";
+        return "grid grid-cols-1 md:grid-cols-2 gap-0.5 h-full w-full bg-[#1e222d]";
       case "2x1":
         return "grid grid-rows-2 gap-0.5 h-full w-full bg-[#1e222d]";
       case "2x2":
-        return "grid grid-cols-2 grid-rows-2 gap-0.5 h-full w-full bg-[#1e222d]";
+        return "grid grid-cols-1 sm:grid-cols-2 grid-rows-2 gap-0.5 h-full w-full bg-[#1e222d]";
       default:
         return "h-full w-full";
     }
@@ -143,6 +146,7 @@ export default function TerminalPage() {
           t.id === activeTabId ? { ...t, symbol: item.symbol, name: item.name } : t
         )
       );
+      setIsMobileDrawerOpen(false);
     },
     [activePaneId, activeTabId]
   );
@@ -202,6 +206,11 @@ export default function TerminalPage() {
     }
   }, []);
 
+  const handleTabChangeFromDock = (tab: SidebarTab) => {
+    setRightSidebarTab(tab);
+    setIsMobileDrawerOpen(true);
+  };
+
   // Pro Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -222,6 +231,7 @@ export default function TerminalPage() {
       // Drawing Tool Shortcuts
       if (e.key === "Escape" || e.key.toLowerCase() === "v") {
         setActiveTool("cursor");
+        setIsMobileDrawerOpen(false);
         return;
       }
       if (e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey) {
@@ -323,10 +333,11 @@ export default function TerminalPage() {
         onChartTypeChange={handleChartTypeChange}
         onToggleIndicator={handleToggleIndicator}
         onFullscreen={toggleFullscreen}
-        onAlertClick={() => setRightSidebarTab("alerts")}
+        onAlertClick={() => handleTabChangeFromDock("alerts")}
         layout={layout}
         onLayoutChange={setLayout}
         onSnapshot={() => setSnapshotTrigger((c) => c + 1)}
+        onToggleSidebar={() => setIsMobileDrawerOpen((prev) => !prev)}
       />
 
       <ChartTabs
@@ -337,7 +348,7 @@ export default function TerminalPage() {
         onNewTab={handleCreateNewTab}
       />
 
-      <div className="flex-1 flex w-full overflow-hidden">
+      <div className="flex-1 flex w-full overflow-hidden relative">
         <LeftToolbar
           activeTool={activeTool}
           setActiveTool={setActiveTool}
@@ -368,39 +379,83 @@ export default function TerminalPage() {
           </div>
         </main>
 
-        {/* Right Dock Sidebar */}
-        <div className="w-[330px] h-full flex flex-col overflow-hidden">
-          {rightSidebarTab === "watchlist" && (
-            <RightWatchlist
-              items={watchlist}
-              selectedSymbol={selectedItem.symbol}
-              onSelectSymbol={handleSelectSymbol}
-            />
-          )}
-          {rightSidebarTab === "orderbook" && (
-            <OrderBookPanel
-              symbol={selectedItem.symbol}
-              livePrice={selectedItem.price}
-              digits={selectedItem.digits}
-            />
-          )}
-          {rightSidebarTab === "news" && <NewsPanel symbol={selectedItem.symbol} />}
-          {rightSidebarTab === "intelligence" && (
-            <MarketIntelligencePanel symbol={selectedItem.symbol} />
-          )}
-          {rightSidebarTab === "social" && <SocialPanel />}
-          {rightSidebarTab === "alerts" && (
-            <AlertsPanel
-              symbol={selectedItem.symbol}
-              livePrice={selectedItem.price}
-              digits={selectedItem.digits}
-            />
-          )}
-          {rightSidebarTab === "calendar" && <CalendarPanel />}
-        </div>
+        {/* Mobile Backdrop */}
+        {isMobileDrawerOpen && (
+          <div
+            onClick={() => setIsMobileDrawerOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 lg:hidden"
+          />
+        )}
 
-        <RightDock activeTab={rightSidebarTab} setActiveTab={setRightSidebarTab} />
+        {/* Right Dock Sidebar: Sliding Drawer on Mobile/Tablet (< lg), Docked Panel on Desktop (lg:) */}
+        <aside
+          className={`
+            fixed inset-y-0 right-0 z-50 w-[85vw] max-w-[340px] bg-[#1e222d] shadow-2xl transition-transform duration-300 ease-in-out
+            lg:static lg:z-auto lg:w-[330px] lg:shadow-none lg:translate-x-0
+            ${isMobileDrawerOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
+            flex flex-col h-full overflow-hidden border-l border-[#2a2e39]
+          `}
+        >
+          {/* Mobile Drawer Close Header */}
+          <div className="flex items-center justify-between px-3 py-2.5 border-b border-[#2a2e39] lg:hidden bg-[#141722] shrink-0">
+            <span className="font-bold text-xs uppercase tracking-wider text-white">
+              {rightSidebarTab}
+            </span>
+            <button
+              onClick={() => setIsMobileDrawerOpen(false)}
+              className="p-1 rounded text-[#787b86] hover:text-white hover:bg-[#2a2e39] transition-colors"
+              title="Close Drawer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-hidden">
+            {rightSidebarTab === "watchlist" && (
+              <RightWatchlist
+                items={watchlist}
+                selectedSymbol={selectedItem.symbol}
+                onSelectSymbol={handleSelectSymbol}
+              />
+            )}
+            {rightSidebarTab === "orderbook" && (
+              <OrderBookPanel
+                symbol={selectedItem.symbol}
+                livePrice={selectedItem.price}
+                digits={selectedItem.digits}
+              />
+            )}
+            {rightSidebarTab === "news" && <NewsPanel symbol={selectedItem.symbol} />}
+            {rightSidebarTab === "intelligence" && (
+              <MarketIntelligencePanel symbol={selectedItem.symbol} />
+            )}
+            {rightSidebarTab === "social" && <SocialPanel />}
+            {rightSidebarTab === "alerts" && (
+              <AlertsPanel
+                symbol={selectedItem.symbol}
+                livePrice={selectedItem.price}
+                digits={selectedItem.digits}
+              />
+            )}
+            {rightSidebarTab === "calendar" && <CalendarPanel />}
+          </div>
+        </aside>
+
+        <RightDock activeTab={rightSidebarTab} setActiveTab={handleTabChangeFromDock} />
       </div>
+
+      {/* Mobile Bottom Navigation (< md) */}
+      <MobileBottomNav
+        activeTab={rightSidebarTab}
+        setActiveTab={(tab) => {
+          setRightSidebarTab(tab);
+          setIsMobileDrawerOpen(true);
+        }}
+        isDrawerOpen={isMobileDrawerOpen}
+        setIsDrawerOpen={setIsMobileDrawerOpen}
+        activeTool={activeTool}
+        setActiveTool={setActiveTool}
+      />
 
       <SymbolSearchModal
         isOpen={isSearchOpen}

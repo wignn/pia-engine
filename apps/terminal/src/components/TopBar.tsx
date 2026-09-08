@@ -37,6 +37,7 @@ interface TopBarProps {
   layout?: ChartLayout;
   onLayoutChange?: (layout: ChartLayout) => void;
   onSnapshot?: () => void;
+  onToggleSidebar?: () => void;
 }
 
 const TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1D", "1W"];
@@ -59,6 +60,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   layout = "1x1",
   onLayoutChange,
   onSnapshot,
+  onToggleSidebar,
 }) => {
   const isPositive = change >= 0;
 
