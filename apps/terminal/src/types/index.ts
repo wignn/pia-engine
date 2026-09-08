@@ -37,6 +37,17 @@ export interface IndicatorState {
   ema50: boolean;
   bollinger: boolean;
   rsi: boolean;
+  macd: boolean;
+}
+
+export type ChartLayout = "1x1" | "1x2" | "2x1" | "2x2";
+
+export interface ChartPaneConfig {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  chartType: ChartType;
+  indicators: IndicatorState;
 }
 
 export interface PriceAlert {

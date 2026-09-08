@@ -17,7 +17,7 @@ import {
   Redo2,
   Plus
 } from "lucide-react";
-import { Timeframe, IndicatorState } from "@/types";
+import { Timeframe, IndicatorState, ChartLayout } from "@/types";
 
 interface TopBarProps {
   symbol: string;
@@ -34,6 +34,8 @@ interface TopBarProps {
   indicators?: IndicatorState;
   onFullscreen?: () => void;
   onAlertClick?: () => void;
+  layout?: ChartLayout;
+  onLayoutChange?: (layout: ChartLayout) => void;
 }
 
 const TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1D", "1W"];
@@ -50,9 +52,11 @@ export const TopBar: React.FC<TopBarProps> = ({
   chartType = "candlestick",
   onChartTypeChange,
   onToggleIndicator,
-  indicators = { sma20: false, ema50: false, bollinger: false, rsi: false },
+  indicators = { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
   onFullscreen,
   onAlertClick,
+  layout = "1x1",
+  onLayoutChange,
 }) => {
   const isPositive = change >= 0;
 
@@ -121,12 +125,13 @@ export const TopBar: React.FC<TopBarProps> = ({
             <TrendingUp className="w-3.5 h-3.5 text-[#2962ff]" />
             <span>Indicators</span>
           </button>
-          <div className="hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-44 flex-col rounded border border-[#2a2e39] bg-[#1e222d] p-1 shadow-xl">
+          <div className="hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-48 flex-col rounded border border-[#2a2e39] bg-[#1e222d] p-1 shadow-xl">
             {([
               ['sma20', 'SMA 20'],
               ['ema50', 'EMA 50'],
               ['bollinger', 'Bollinger Bands (20, 2)'],
-              ['rsi', 'RSI (14)']
+              ['rsi', 'RSI (14) Oscillator'],
+              ['macd', 'MACD (12, 26, 9)']
             ] as const).map(([id, label]) => (
               <button key={id} onClick={() => onToggleIndicator?.(id)} className="flex items-center justify-between rounded px-2 py-1.5 text-left text-xs text-[#d1d4dc] hover:bg-[#2a2e39]">
                 <span>{label}</span><span className={indicators[id] ? "text-[#2962ff] font-bold" : "text-[#787b86]"}>{indicators[id] ? "ON" : "OFF"}</span>
@@ -170,9 +175,29 @@ export const TopBar: React.FC<TopBarProps> = ({
         </div>
 
         {/* Layout Mode */}
-        <button className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]" title="Select Layout">
-          <LayoutGrid className="w-3.5 h-3.5" />
-        </button>
+        <div className="relative group">
+          <button className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc] transition-colors" title={`Select Grid Layout (${layout})`}>
+            <LayoutGrid className="w-3.5 h-3.5" />
+          </button>
+          <div className="hidden group-hover:flex absolute top-full right-0 z-30 mt-1 w-36 flex-col rounded border border-[#2a2e39] bg-[#1e222d] p-1 shadow-xl">
+            {([
+              ["1x1", "Single (1x1)"],
+              ["1x2", "Dual Horizontal (1x2)"],
+              ["2x1", "Dual Vertical (2x1)"],
+              ["2x2", "Quad Grid (2x2)"],
+            ] as const).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => onLayoutChange?.(id)}
+                className={`rounded px-2 py-1.5 text-left text-xs hover:bg-[#2a2e39] ${
+                  layout === id ? "text-[#2962ff] font-bold" : "text-[#d1d4dc]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Quick Save */}
         <button className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold text-[#d1d4dc] hover:bg-[#2a2e39]">

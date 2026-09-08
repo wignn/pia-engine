@@ -11,6 +11,7 @@ import {
 } from "lightweight-charts";
 import { CandleData, Timeframe, DrawingTool, DrawingItem, IndicatorState } from "@/types";
 import { Wifi, WifiOff, Loader2 } from "lucide-react";
+import { OscillatorPane } from "./OscillatorPane";
 
 interface ChartAreaProps {
   symbol: string;
@@ -37,7 +38,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   provider,
   timeframe,
   chartType = "candlestick",
-  indicators = { sma20: false, ema50: false, bollinger: false, rsi: false },
+  indicators = { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
   activeTool = "cursor",
   digits,
   candles,
@@ -520,6 +521,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
 
       {/* Chart Canvas */}
       <div ref={chartContainerRef} className="w-full flex-1" />
+
+      {/* Oscillator Sub-pane (RSI / MACD) */}
+      <OscillatorPane candles={candles} indicators={indicators} />
 
       {/* Interactive SVG Drawing Overlay */}
       <svg
