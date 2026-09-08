@@ -36,6 +36,7 @@ interface TopBarProps {
   onAlertClick?: () => void;
   layout?: ChartLayout;
   onLayoutChange?: (layout: ChartLayout) => void;
+  onSnapshot?: () => void;
 }
 
 const TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1D", "1W"];
@@ -57,6 +58,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onAlertClick,
   layout = "1x1",
   onLayoutChange,
+  onSnapshot,
 }) => {
   const isPositive = change >= 0;
 
@@ -216,7 +218,11 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
 
         {/* Snapshot */}
-        <button className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]" title="Take a snapshot">
+        <button
+          onClick={onSnapshot}
+          className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc] transition-colors"
+          title="Take a snapshot (PNG)"
+        >
           <Camera className="w-3.5 h-3.5" />
         </button>
 

@@ -31,6 +31,7 @@ interface ChartAreaProps {
   onLoadOlder?: () => Promise<CandleData[]>;
   onDrawingsCountChange?: (count: number) => void;
   clearDrawingsTrigger?: number;
+  snapshotTrigger?: number;
 }
 
 export const ChartArea: React.FC<ChartAreaProps> = ({
@@ -50,6 +51,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   onLoadOlder,
   onDrawingsCountChange,
   clearDrawingsTrigger = 0,
+  snapshotTrigger = 0,
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -104,6 +106,44 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       onDrawingsCountChange?.(0);
     }
   }, [clearDrawingsTrigger, symbol, onDrawingsCountChange]);
+
+  // Snapshot trigger effect
+  useEffect(() => {
+    if (snapshotTrigger > 0 && chartRef.current) {
+      try {
+        const canvas = chartRef.current.takeScreenshot();
+        const watermarked = document.createElement("canvas");
+        watermarked.width = canvas.width;
+        watermarked.height = canvas.height;
+        const ctx = watermarked.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(canvas, 0, 0);
+
+          // Dark footer bar
+          ctx.fillStyle = "rgba(19, 23, 34, 0.88)";
+          ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+
+          // Brand Watermark
+          ctx.font = "bold 15px -apple-system, sans-serif";
+          ctx.fillStyle = "#2962ff";
+          ctx.fillText("ATLSD TERMINAL", 20, canvas.height - 16);
+
+          // Meta watermark
+          ctx.font = "12px monospace";
+          ctx.fillStyle = "#d1d4dc";
+          ctx.fillText(`${symbol} · ${timeframe} · ${new Date().toISOString().replace("T", " ").substring(0, 19)} UTC`, 175, canvas.height - 16);
+
+          const url = watermarked.toDataURL("image/png");
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `ATLSD_${symbol}_${timeframe}_${Date.now()}.png`;
+          a.click();
+        }
+      } catch (err) {
+        console.warn("[ChartArea] Snapshot export failed:", err);
+      }
+    }
+  }, [snapshotTrigger, symbol, timeframe]);
 
   const saveDrawings = (newDrawings: DrawingItem[]) => {
     setDrawings(newDrawings);

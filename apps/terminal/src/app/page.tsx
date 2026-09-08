@@ -10,6 +10,8 @@ import { NewsPanel } from "@/components/NewsPanel";
 import { MarketIntelligencePanel } from "@/components/MarketIntelligencePanel";
 import { SocialPanel } from "@/components/SocialPanel";
 import { AlertsPanel } from "@/components/AlertsPanel";
+import { CalendarPanel } from "@/components/CalendarPanel";
+import { OrderBookPanel } from "@/components/OrderBookPanel";
 import { ChartTabs } from "@/components/ChartTabs";
 import { SymbolSearchModal } from "@/components/SymbolSearchModal";
 import { INITIAL_WATCHLIST } from "@/lib/constants";
@@ -83,6 +85,7 @@ export default function TerminalPage() {
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [drawingsCount, setDrawingsCount] = useState(0);
   const [clearDrawingsTrigger, setClearDrawingsTrigger] = useState(0);
+  const [snapshotTrigger, setSnapshotTrigger] = useState(0);
 
   // Visible panes based on current layout
   const visiblePanes = useMemo(() => {
@@ -130,16 +133,19 @@ export default function TerminalPage() {
     if (activeTabId === tabId) handleSelectTab(remaining[remaining.length - 1].id);
   };
 
-  const handleSelectSymbol = (item: WatchlistItem) => {
-    setPanes((curr) =>
-      curr.map((p) => (p.id === activePaneId ? { ...p, symbol: item.symbol } : p))
-    );
-    setTabs((curr) =>
-      curr.map((t) =>
-        t.id === activeTabId ? { ...t, symbol: item.symbol, name: item.name } : t
-      )
-    );
-  };
+  const handleSelectSymbol = useCallback(
+    (item: WatchlistItem) => {
+      setPanes((curr) =>
+        curr.map((p) => (p.id === activePaneId ? { ...p, symbol: item.symbol } : p))
+      );
+      setTabs((curr) =>
+        curr.map((t) =>
+          t.id === activeTabId ? { ...t, symbol: item.symbol, name: item.name } : t
+        )
+      );
+    },
+    [activePaneId, activeTabId]
+  );
 
   const handleCreateNewTab = () => {
     const newId = `tab-${Date.now()}`;
@@ -154,14 +160,17 @@ export default function TerminalPage() {
     );
   };
 
-  const handleTimeframe = (tf: Timeframe) => {
-    setPanes((curr) =>
-      curr.map((p) => (p.id === activePaneId ? { ...p, timeframe: tf } : p))
-    );
-    setTabs((curr) =>
-      curr.map((t) => (t.id === activeTabId ? { ...t, timeframe: tf } : t))
-    );
-  };
+  const handleTimeframe = useCallback(
+    (tf: Timeframe) => {
+      setPanes((curr) =>
+        curr.map((p) => (p.id === activePaneId ? { ...p, timeframe: tf } : p))
+      );
+      setTabs((curr) =>
+        curr.map((t) => (t.id === activeTabId ? { ...t, timeframe: tf } : t))
+      );
+    },
+    [activePaneId, activeTabId]
+  );
 
   const handleChartTypeChange = (ct: ChartType) => {
     setPanes((curr) =>
@@ -192,6 +201,72 @@ export default function TerminalPage() {
       await document.exitFullscreen();
     }
   }, []);
+
+  // Pro Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Scoped cleanly away from inputs, textareas, or modals
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
+        return;
+      }
+
+      // Quick Search Modal: '/'
+      if (e.key === "/") {
+        e.preventDefault();
+        setIsSearchOpen(true);
+        return;
+      }
+
+      // Drawing Tool Shortcuts
+      if (e.key === "Escape" || e.key.toLowerCase() === "v") {
+        setActiveTool("cursor");
+        return;
+      }
+      if (e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey) {
+        setActiveTool("trendline");
+        return;
+      }
+      if (e.key.toLowerCase() === "h" && !e.ctrlKey && !e.metaKey) {
+        setActiveTool("horizontal");
+        return;
+      }
+      if (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey) {
+        setActiveTool("fibonacci");
+        return;
+      }
+      if (e.key.toLowerCase() === "m" && !e.ctrlKey && !e.metaKey) {
+        setActiveTool("measure");
+        return;
+      }
+
+      // Space -> Next Symbol in Watchlist
+      if (e.code === "Space") {
+        e.preventDefault();
+        setWatchlist((list) => {
+          const currentIndex = list.findIndex((w) => w.symbol === activePane.symbol);
+          const nextIndex = (currentIndex + 1) % list.length;
+          const nextItem = list[nextIndex];
+          if (nextItem) {
+            handleSelectSymbol(nextItem);
+          }
+          return list;
+        });
+        return;
+      }
+
+      // Quick Timeframe Keys
+      if (e.key === "1") handleTimeframe("1m");
+      else if (e.key === "5") handleTimeframe("5m");
+      else if (e.key === "0") handleTimeframe("15m");
+      else if (e.key === "6") handleTimeframe("1h");
+      else if (e.key.toLowerCase() === "d" && !e.ctrlKey && !e.metaKey) handleTimeframe("1D");
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activePane.symbol, handleSelectSymbol, handleTimeframe]);
 
   // Poll real prices for the whole watchlist every 5s
   useEffect(() => {
@@ -251,6 +326,7 @@ export default function TerminalPage() {
         onAlertClick={() => setRightSidebarTab("alerts")}
         layout={layout}
         onLayoutChange={setLayout}
+        onSnapshot={() => setSnapshotTrigger((c) => c + 1)}
       />
 
       <ChartTabs
@@ -284,6 +360,7 @@ export default function TerminalPage() {
                   digits={meta.digits}
                   provider={meta.provider}
                   clearDrawingsTrigger={clearDrawingsTrigger}
+                  snapshotTrigger={pane.id === activePaneId ? snapshotTrigger : 0}
                   onDrawingsCountChange={setDrawingsCount}
                 />
               );
@@ -300,6 +377,13 @@ export default function TerminalPage() {
               onSelectSymbol={handleSelectSymbol}
             />
           )}
+          {rightSidebarTab === "orderbook" && (
+            <OrderBookPanel
+              symbol={selectedItem.symbol}
+              livePrice={selectedItem.price}
+              digits={selectedItem.digits}
+            />
+          )}
           {rightSidebarTab === "news" && <NewsPanel symbol={selectedItem.symbol} />}
           {rightSidebarTab === "intelligence" && (
             <MarketIntelligencePanel symbol={selectedItem.symbol} />
@@ -312,34 +396,7 @@ export default function TerminalPage() {
               digits={selectedItem.digits}
             />
           )}
-          {rightSidebarTab === "calendar" && (
-            <div className="h-full bg-[#1e222d] border-l border-[#2a2e39] p-4 flex flex-col gap-3">
-              <span className="font-bold text-white text-sm">Upcoming Macro Events</span>
-              <div className="flex flex-col gap-2 text-xs">
-                <div className="p-2.5 rounded bg-[#181b27] border border-[#2a2e39]">
-                  <div className="flex justify-between font-bold text-[#f23645]">
-                    <span>USD Non-Farm Payrolls</span>
-                    <span>19:30 UTC</span>
-                  </div>
-                  <div className="text-[11px] text-[#787b86] mt-1">Forecast: 165K | Previous: 142K</div>
-                </div>
-                <div className="p-2.5 rounded bg-[#181b27] border border-[#2a2e39]">
-                  <div className="flex justify-between font-bold text-[#2962ff]">
-                    <span>USD CPI (MoM)</span>
-                    <span>Tomorrow</span>
-                  </div>
-                  <div className="text-[11px] text-[#787b86] mt-1">Forecast: 0.2% | Previous: 0.2%</div>
-                </div>
-                <div className="p-2.5 rounded bg-[#181b27] border border-[#2a2e39]">
-                  <div className="flex justify-between font-bold text-[#f5b942]">
-                    <span>FOMC Rate Decision</span>
-                    <span>Wed 18:00 UTC</span>
-                  </div>
-                  <div className="text-[11px] text-[#787b86] mt-1">Target: 5.25% - 5.50%</div>
-                </div>
-              </div>
-            </div>
-          )}
+          {rightSidebarTab === "calendar" && <CalendarPanel />}
         </div>
 
         <RightDock activeTab={rightSidebarTab} setActiveTab={setRightSidebarTab} />

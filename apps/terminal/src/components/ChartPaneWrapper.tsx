@@ -11,6 +11,7 @@ interface ChartPaneWrapperProps {
   onActivate: () => void;
   activeTool: DrawingTool;
   clearDrawingsTrigger?: number;
+  snapshotTrigger?: number;
   onDrawingsCountChange?: (count: number) => void;
   digits: number;
   provider: string;
@@ -22,6 +23,7 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
   onActivate,
   activeTool,
   clearDrawingsTrigger = 0,
+  snapshotTrigger = 0,
   onDrawingsCountChange,
   digits,
   provider,
@@ -62,6 +64,7 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
         onLoadOlder={loadOlder}
         onDrawingsCountChange={isActive ? onDrawingsCountChange : undefined}
         clearDrawingsTrigger={isActive ? clearDrawingsTrigger : 0}
+        snapshotTrigger={isActive ? snapshotTrigger : 0}
       />
     </div>
   );

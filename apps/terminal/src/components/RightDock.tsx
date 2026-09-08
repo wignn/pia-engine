@@ -14,7 +14,7 @@ import {
   Settings2 
 } from "lucide-react";
 
-export type SidebarTab = "watchlist" | "news" | "alerts" | "calendar" | "intelligence" | "social";
+export type SidebarTab = "watchlist" | "news" | "alerts" | "calendar" | "intelligence" | "social" | "orderbook";
 
 interface RightDockProps {
   activeTab: SidebarTab;
@@ -24,6 +24,7 @@ interface RightDockProps {
 export const RightDock: React.FC<RightDockProps> = ({ activeTab, setActiveTab }) => {
   const tabs: { id: SidebarTab; label: string; icon: React.ReactNode }[] = [
     { id: "watchlist", label: "Watchlist & Details", icon: <Bookmark className="w-4 h-4" /> },
+    { id: "orderbook", label: "Order Book & Trades", icon: <Layers className="w-4 h-4" /> },
     { id: "news", label: "News Headlines", icon: <Newspaper className="w-4 h-4" /> },
     { id: "alerts", label: "Price Alerts", icon: <Bell className="w-4 h-4" /> },
     { id: "calendar", label: "Economic Calendar", icon: <Calendar className="w-4 h-4" /> },
