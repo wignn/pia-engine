@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { onMount, onDestroy, untrack } from 'svelte';
-	import { createChart, AreaSeries, type IChartApi, type ISeriesApi } from 'lightweight-charts';
+	import {
+		createChart,
+		CandlestickSeries,
+		AreaSeries,
+		type IChartApi,
+		type ISeriesApi
+	} from 'lightweight-charts';
 	import { marketStore } from '$lib/stores/websocket.svelte';
 	import type { PriceData } from '$lib/types';
 	import { apiFetch } from '$lib/api';
@@ -16,31 +22,49 @@
 
 	let chartContainer = $state<HTMLDivElement | null>(null);
 	let chart: IChartApi | null = null;
+	let candlestickSeries: ISeriesApi<'Candlestick'> | null = null;
 	let areaSeries: ISeriesApi<'Area'> | null = null;
 
-	type ChartResolution = '1m' | '5m' | '15m' | '1h';
-	type ChartPoint = { time: number; value: number; source?: string };
-	const chartResolutions: ChartResolution[] = ['1m', '5m', '15m', '1h'];
+	type ChartResolution = '1m' | '5m' | '15m' | '1h' | '4h' | '1D';
+	type ChartType = 'candlestick' | 'area';
+	const chartResolutions: ChartResolution[] = ['1m', '5m', '15m', '1h', '4h', '1D'];
 
 	let selectedResolution = $state<ChartResolution>('1m');
-	let historyData = $state<ChartPoint[]>([]);
+	let userChartType = $state<ChartType | null>(null);
+	let chartType = $derived<ChartType>(userChartType ?? (compact ? 'area' : 'candlestick'));
+
+	interface CandlePoint {
+		time: number;
+		open: number;
+		high: number;
+		low: number;
+		close: number;
+		value: number;
+		source?: string;
+	}
+
+	let historyData = $state<CandlePoint[]>([]);
 	let historySource = $state<'history' | 'last_known' | 'empty'>('empty');
 	let loading = $state(true);
-	let errorMsg = $state('');
 	let liveData = $derived(marketStore.getPrice(symbol));
-	let currentPrice = $derived(liveData?.price ?? 0);
-	let firstPrice = $derived(historyData.length > 0 ? historyData[0].value : currentPrice);
+	let currentPrice = $derived(
+		Number(liveData?.price) || (historyData.length > 0 ? historyData[historyData.length - 1].close : 0)
+	);
+	let firstPrice = $derived(
+		historyData.length > 0
+			? historyData[0].open || historyData[0].close || historyData[0].value
+			: currentPrice
+	);
 	let priceChange = $derived(currentPrice - firstPrice);
 	let percentChange = $derived(firstPrice > 0 ? (priceChange / firstPrice) * 100 : 0);
 	let direction = $derived(priceChange > 0 ? 'up' : priceChange < 0 ? 'down' : 'none');
-	let lastChartTime = $derived(
-		historyData.length > 0 ? historyData[historyData.length - 1].time : 0
-	);
 
 	function resolutionSeconds(resolution: ChartResolution) {
 		if (resolution === '5m') return 5 * 60;
 		if (resolution === '15m') return 15 * 60;
 		if (resolution === '1h') return 60 * 60;
+		if (resolution === '4h') return 4 * 60 * 60;
+		if (resolution === '1D') return 24 * 60 * 60;
 		return 60;
 	}
 
@@ -110,19 +134,41 @@
 
 	let freshness = $derived(getFreshness(liveData));
 
-	function sanitizeChartData(data: unknown): ChartPoint[] {
-		if (!Array.isArray(data)) return [];
+	function sanitizeChartData(data: unknown): CandlePoint[] {
+		const rawItems = Array.isArray(data)
+			? data
+			: data && typeof data === 'object' && 'items' in data && Array.isArray((data as any).items)
+				? (data as any).items
+				: [];
 
-		const points = new Map<number, ChartPoint>();
-		for (const point of data) {
+		const points = new Map<number, CandlePoint>();
+		for (const point of rawItems) {
 			if (!point || typeof point !== 'object') continue;
-			const row = point as { time?: unknown; value?: unknown; source?: unknown };
+			const row = point as {
+				time?: unknown;
+				open?: unknown;
+				high?: unknown;
+				low?: unknown;
+				close?: unknown;
+				value?: unknown;
+				source?: unknown;
+			};
 			const time = Number(row.time);
-			const value = Number(row.value);
-			if (!Number.isFinite(time) || !Number.isFinite(value) || time <= 0 || value <= 0) continue;
+			const val = Number(row.close ?? row.value);
+			if (!Number.isFinite(time) || !Number.isFinite(val) || time <= 0 || val <= 0) continue;
+
+			const open = Number(row.open ?? val);
+			const high = Number(row.high ?? val);
+			const low = Number(row.low ?? val);
+			const close = Number(row.close ?? val);
+
 			points.set(Math.floor(time), {
 				time: Math.floor(time),
-				value,
+				open: Number.isFinite(open) && open > 0 ? open : val,
+				high: Number.isFinite(high) && high > 0 ? Math.max(high, open, close) : val,
+				low: Number.isFinite(low) && low > 0 ? Math.min(low, open, close) : val,
+				close: Number.isFinite(close) && close > 0 ? close : val,
+				value: val,
 				source: typeof row.source === 'string' ? row.source : undefined
 			});
 		}
@@ -133,10 +179,10 @@
 	async function loadHistoricalData(
 		sym: string,
 		resolution: ChartResolution
-	): Promise<ChartPoint[]> {
+	): Promise<CandlePoint[]> {
 		const upperSym = sym.toUpperCase();
 		try {
-			const params = new URLSearchParams({ resolution });
+			const params = new URLSearchParams({ resolution, limit: '240' });
 			const res = await apiFetch(`/api/v1/market/history/${upperSym}?${params}`);
 			if (res.ok) {
 				return sanitizeChartData(await res.json());
@@ -151,8 +197,7 @@
 	}
 
 	function updateChartColors() {
-		if (!areaSeries || !chart) return;
-
+		if (!chart) return;
 		const theme = getChartTheme(isDarkMode());
 
 		chart.applyOptions({
@@ -160,16 +205,66 @@
 			grid: { vertLines: { color: theme.gridColor }, horzLines: { color: theme.gridColor } }
 		});
 
-		const colorLine = direction === 'up' ? theme.up : direction === 'down' ? theme.down : theme.neutral;
-		const colorTop = theme.areaFillTop(colorLine);
-		const colorBottom = theme.areaFillBottom(colorLine);
+		if (candlestickSeries) {
+			candlestickSeries.applyOptions({
+				upColor: theme.up,
+				downColor: theme.down,
+				borderVisible: false,
+				wickUpColor: theme.up,
+				wickDownColor: theme.down
+			});
+		}
 
-		areaSeries.applyOptions({ lineColor: colorLine, topColor: colorTop, bottomColor: colorBottom });
+		if (areaSeries) {
+			const colorLine =
+				direction === 'up' ? theme.up : direction === 'down' ? theme.down : theme.neutral;
+			const colorTop = theme.areaFillTop(colorLine);
+			const colorBottom = theme.areaFillBottom(colorLine);
+			areaSeries.applyOptions({
+				lineColor: colorLine,
+				topColor: colorTop,
+				bottomColor: colorBottom
+			});
+		}
+	}
+
+	function applySeriesData(data: CandlePoint[]) {
+		if (!chart) return;
+		if (chartType === 'candlestick') {
+			if (areaSeries) areaSeries.setData([]);
+			if (candlestickSeries) {
+				candlestickSeries.setData(
+					data.map((p) => ({
+						time: p.time as any,
+						open: p.open,
+						high: p.high,
+						low: p.low,
+						close: p.close
+					}))
+				);
+			}
+		} else {
+			if (candlestickSeries) candlestickSeries.setData([]);
+			if (areaSeries) {
+				areaSeries.setData(
+					data.map((p) => ({
+						time: p.time as any,
+						value: p.close || p.value
+					}))
+				);
+			}
+		}
+		if (data.length > 0) chart.timeScale().fitContent();
+	}
+
+	function setChartType(type: ChartType) {
+		userChartType = type;
+		applySeriesData(historyData);
+		updateChartColors();
 	}
 
 	function initChart() {
 		if (!chartContainer) return;
-
 		const theme = getChartTheme(isDarkMode());
 
 		chart = createChart(chartContainer, {
@@ -206,6 +301,14 @@
 			}
 		});
 
+		candlestickSeries = chart.addSeries(CandlestickSeries, {
+			upColor: theme.up,
+			downColor: theme.down,
+			borderVisible: false,
+			wickUpColor: theme.up,
+			wickDownColor: theme.down
+		});
+
 		areaSeries = chart.addSeries(AreaSeries, {
 			lineColor: '#2962FF',
 			topColor: 'rgba(41, 98, 255, 0.28)',
@@ -234,14 +337,14 @@
 
 	$effect(() => {
 		if (!symbol) return;
-		selectedResolution;
+		const currSym = symbol;
+		const currRes = selectedResolution;
 
 		let active = true;
 		loading = true;
-		errorMsg = '';
 
 		async function fetchAndPopulate() {
-			const data = await loadHistoricalData(symbol, selectedResolution);
+			const data = await loadHistoricalData(currSym, currRes);
 			if (!active) return;
 
 			historyData = data;
@@ -252,10 +355,7 @@
 						? 'last_known'
 						: 'history';
 
-			if (areaSeries) {
-				areaSeries.setData(data as any);
-				if (data.length > 0) chart?.timeScale().fitContent();
-			}
+			applySeriesData(data);
 			loading = false;
 			updateChartColors();
 		}
@@ -267,9 +367,9 @@
 	});
 
 	$effect(() => {
-		if (liveData && areaSeries && !loading) {
-			const value = Number(liveData.price);
-			if (!Number.isFinite(value) || value <= 0) return;
+		if (liveData && !loading) {
+			const price = Number(liveData.price);
+			if (!Number.isFinite(price) || price <= 0) return;
 
 			let rawTimeMs = Number(liveData.updated_at);
 			if (liveData.received_at) {
@@ -287,16 +387,63 @@
 				currentHistory.length > 0 ? currentHistory[currentHistory.length - 1].time : 0;
 			if (roundedTime < lastTime) roundedTime = lastTime;
 
-			const normalizedTick: ChartPoint = { time: roundedTime, value, source: 'realtime' };
+			const lastCandle =
+				currentHistory.length > 0 ? currentHistory[currentHistory.length - 1] : null;
 
-			areaSeries.update(normalizedTick as any);
-			if (currentHistory.length === 0) {
-				historyData = [normalizedTick];
+			let updatedPoint: CandlePoint;
+			let nextHistory: CandlePoint[];
+
+			if (!lastCandle) {
+				updatedPoint = {
+					time: roundedTime,
+					open: price,
+					high: price,
+					low: price,
+					close: price,
+					value: price,
+					source: 'realtime'
+				};
+				nextHistory = [updatedPoint];
 				historySource = 'history';
-			} else if (roundedTime > lastTime) {
-				historyData = [...currentHistory.slice(-299), normalizedTick];
+			} else if (roundedTime === lastCandle.time) {
+				updatedPoint = {
+					...lastCandle,
+					high: Math.max(lastCandle.high, price),
+					low: Math.min(lastCandle.low, price),
+					close: price,
+					value: price,
+					source: 'realtime'
+				};
+				nextHistory = [...currentHistory.slice(0, -1), updatedPoint];
 			} else {
-				historyData = [...currentHistory.slice(0, -1), normalizedTick];
+				// Roll a new candle
+				updatedPoint = {
+					time: roundedTime,
+					open: lastCandle.close,
+					high: Math.max(lastCandle.close, price),
+					low: Math.min(lastCandle.close, price),
+					close: price,
+					value: price,
+					source: 'realtime'
+				};
+				nextHistory = [...currentHistory.slice(-299), updatedPoint];
+			}
+
+			historyData = nextHistory;
+
+			if (chartType === 'candlestick' && candlestickSeries) {
+				candlestickSeries.update({
+					time: updatedPoint.time as any,
+					open: updatedPoint.open,
+					high: updatedPoint.high,
+					low: updatedPoint.low,
+					close: updatedPoint.close
+				});
+			} else if (chartType === 'area' && areaSeries) {
+				areaSeries.update({
+					time: updatedPoint.time as any,
+					value: updatedPoint.close
+				});
 			}
 			updateChartColors();
 		}
@@ -317,7 +464,6 @@
 	});
 </script>
 
-<!-- Template tidak berubah sama sekali -->
 <div class="flex flex-col">
 	{#if compact}
 		<div class="flex items-center justify-between border-b border-border bg-surface px-4 py-2.5">
@@ -361,7 +507,7 @@
 			<div class="flex items-center gap-1.5 text-right">
 				<span class="font-mono text-xs font-bold text-text">
 					{meta.format(
-						currentPrice || (historyData.length > 0 ? historyData[historyData.length - 1].value : 0)
+						currentPrice || (historyData.length > 0 ? historyData[historyData.length - 1].close : 0)
 					)}
 				</span>
 				<span
@@ -421,7 +567,7 @@
 					<div class="font-mono text-2xl font-bold text-text">
 						{meta.format(
 							currentPrice ||
-								(historyData.length > 0 ? historyData[historyData.length - 1].value : 0)
+								(historyData.length > 0 ? historyData[historyData.length - 1].close : 0)
 						)}
 					</div>
 					<div
@@ -440,19 +586,44 @@
 						>
 					</div>
 				</div>
-				<div class="flex rounded-lg border border-border bg-surface-2 p-0.5">
-					{#each chartResolutions as resolution}
+				<div class="flex flex-wrap items-center gap-2">
+					<div class="flex rounded-lg border border-border bg-surface-2 p-0.5">
 						<button
 							type="button"
-							class="rounded-md px-2 py-1 text-[10px] font-bold tracking-wide uppercase transition-colors {selectedResolution ===
-							resolution
+							class="rounded-md px-2 py-1 text-[10px] font-bold tracking-wide uppercase transition-colors {chartType ===
+							'candlestick'
 								? 'bg-accent text-white shadow-sm'
 								: 'text-text-dim hover:bg-surface hover:text-text'}"
-							onclick={() => (selectedResolution = resolution)}
+							onclick={() => setChartType('candlestick')}
 						>
-							{resolution}
+							Candles
 						</button>
-					{/each}
+						<button
+							type="button"
+							class="rounded-md px-2 py-1 text-[10px] font-bold tracking-wide uppercase transition-colors {chartType ===
+							'area'
+								? 'bg-accent text-white shadow-sm'
+								: 'text-text-dim hover:bg-surface hover:text-text'}"
+							onclick={() => setChartType('area')}
+						>
+							Area
+						</button>
+					</div>
+
+					<div class="flex rounded-lg border border-border bg-surface-2 p-0.5">
+						{#each chartResolutions as resolution}
+							<button
+								type="button"
+								class="rounded-md px-2 py-1 text-[10px] font-bold tracking-wide uppercase transition-colors {selectedResolution ===
+								resolution
+									? 'bg-accent text-white shadow-sm'
+									: 'text-text-dim hover:bg-surface hover:text-text'}"
+								onclick={() => (selectedResolution = resolution)}
+							>
+								{resolution}
+							</button>
+						{/each}
+					</div>
 				</div>
 			</div>
 		</div>

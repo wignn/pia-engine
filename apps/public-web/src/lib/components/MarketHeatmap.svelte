@@ -101,15 +101,21 @@
 			const res = await apiFetch(`/api/v1/market/history/${upperSym}`);
 			if (res.ok) {
 				const data = await res.json();
-				if (Array.isArray(data) && data.length > 0) {
+				const rows = Array.isArray(data)
+					? data
+					: data && typeof data === 'object' && 'items' in data && Array.isArray((data as any).items)
+						? (data as any).items
+						: [];
+				if (Array.isArray(rows) && rows.length > 0) {
 					// Use recent history data points
-					const sliceData = data.slice(-limit);
+					const sliceData = rows.slice(-limit);
 					if (sliceData.length > 0) {
 						// Store the first historical price as the base price for more accurate % change calculations
-						if (sliceData[0].value > 0) {
-							initialPrices.set(upperSym, sliceData[0].value);
+						const firstVal = Number(sliceData[0].close ?? sliceData[0].value ?? 0);
+						if (firstVal > 0) {
+							initialPrices.set(upperSym, firstVal);
 						}
-						return sliceData.map((item: any) => item.value);
+						return sliceData.map((item: any) => Number(item.close ?? item.value ?? 0));
 					}
 				}
 			}
