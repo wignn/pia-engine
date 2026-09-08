@@ -55,7 +55,7 @@ pub struct RecentTick {
     pub volume: f64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HistoryPage {
     pub items: Vec<Value>,
     pub next_before: Option<i64>,
@@ -275,13 +275,6 @@ fn clickhouse_bucket_interval(bucket_minutes: u32) -> String {
     }
 }
 
-fn history_lookback_minutes(bucket_minutes: u32, limit: usize) -> u32 {
-    let requested = (bucket_minutes as usize)
-        .saturating_mul(limit.clamp(1, 1000))
-        .saturating_mul(3);
-    requested.clamp(240, 43_200) as u32
-}
-
 fn latest_history_sql(
     database: &str,
     symbol: &str,
@@ -291,30 +284,32 @@ fn latest_history_sql(
 ) -> String {
     let bucket_minutes = history_bucket_minutes(resolution);
     let bucket_interval = clickhouse_bucket_interval(bucket_minutes);
-    let lookback_minutes = history_lookback_minutes(bucket_minutes, limit);
-    let time_window = before
-        .map(|ts| {
-            format!(
-                "time >= toDateTime({ts}) - INTERVAL {lookback_minutes} MINUTE AND time < toDateTime({ts})"
-            )
-        })
-        .unwrap_or_else(|| {
-            format!(
-                "time >= (SELECT max(time) FROM {}.price_ticks WHERE symbol = {}) - INTERVAL {lookback_minutes} MINUTE AND time <= (SELECT max(time) FROM {}.price_ticks WHERE symbol = {})",
-                ident(database),
-                string_literal(symbol),
-                ident(database),
-                string_literal(symbol)
-            )
-        });
-    format!(
-        "SELECT toUnixTimestamp(bucket_time) AS time, argMax(price, tick_time) AS value, argMin(price, tick_time) AS open, max(price) AS high, min(price) AS low, argMax(price, tick_time) AS close, sum(volume) AS volume, count() AS tick_count, toString(max(tick_time)) AS latest_at, 'clickhouse_price_ticks' AS source FROM (SELECT toStartOfInterval(time, {}) AS bucket_time, time AS tick_time, price, volume FROM {}.price_ticks WHERE symbol = {} AND price > 0 AND {}) GROUP BY bucket_time ORDER BY bucket_time DESC LIMIT {} FORMAT JSONEachRow",
-        bucket_interval,
-        ident(database),
-        string_literal(symbol),
-        time_window,
-        limit.clamp(1, 1000)
-    )
+    let bounded_limit = limit.clamp(1, 1000);
+
+    let where_clause = match before {
+        Some(ts) => format!(
+            "symbol = {} AND bucket_time < toDateTime({ts})",
+            string_literal(symbol)
+        ),
+        None => format!("symbol = {}", string_literal(symbol)),
+    };
+
+    if bucket_minutes == 1 {
+        format!(
+            "SELECT toUnixTimestamp(bucket_time) AS time, argMaxMerge(close_state) AS value, argMinMerge(open_state) AS open, max(high_state) AS high, min(low_state) AS low, argMaxMerge(close_state) AS close, sum(volume_state) AS volume, sum(tick_count) AS tick_count, toString(max(bucket_time)) AS latest_at, 'clickhouse_candles_1m' AS source FROM {}.candles_1m_v2 WHERE {} GROUP BY bucket_time ORDER BY bucket_time DESC LIMIT {} FORMAT JSONEachRow",
+            ident(database),
+            where_clause,
+            bounded_limit
+        )
+    } else {
+        format!(
+            "SELECT toUnixTimestamp(toStartOfInterval(bucket_time, {})) AS time, argMaxMerge(close_state) AS value, argMinMerge(open_state) AS open, max(high_state) AS high, min(low_state) AS low, argMaxMerge(close_state) AS close, sum(volume_state) AS volume, sum(tick_count) AS tick_count, toString(max(bucket_time)) AS latest_at, 'clickhouse_candles_rollup' AS source FROM {}.candles_1m_v2 WHERE {} GROUP BY time ORDER BY time DESC LIMIT {} FORMAT JSONEachRow",
+            bucket_interval,
+            ident(database),
+            where_clause,
+            bounded_limit
+        )
+    }
 }
 
 fn ident(value: &str) -> String {
@@ -392,33 +387,32 @@ mod tests {
         assert_eq!(history_bucket_minutes("1h"), 60);
         assert_eq!(clickhouse_bucket_interval(15), "INTERVAL 15 MINUTE");
         assert_eq!(clickhouse_bucket_interval(60), "INTERVAL 1 HOUR");
-        assert_eq!(history_lookback_minutes(1, 120), 360);
-        assert_eq!(history_lookback_minutes(60, 1000), 43_200);
     }
 
     #[test]
-    fn latest_history_query_aggregates_ohlc_from_raw_ticks() {
+    fn latest_history_query_aggregates_ohlc_from_preaggregated_candles() {
         let sql = latest_history_sql("market", "BTCUSDT", "5m", 120, None);
 
-        assert!(sql.contains("FROM market.price_ticks"));
-        assert!(sql.contains("toStartOfInterval(time, INTERVAL 5 MINUTE) AS bucket_time"));
-        assert!(sql.contains("argMin(price, tick_time) AS open"));
-        assert!(sql.contains("max(price) AS high"));
-        assert!(sql.contains("min(price) AS low"));
-        assert!(sql.contains("argMax(price, tick_time) AS close"));
-        assert!(sql.contains("sum(volume) AS volume"));
-        assert!(sql.contains("count() AS tick_count"));
-        assert!(sql.contains("'clickhouse_price_ticks' AS source"));
-        assert!(!sql.contains("FROM market.ohlcv_candles"));
+        assert!(sql.contains("FROM market.candles_1m_v2"));
+        assert!(sql.contains(
+            "toUnixTimestamp(toStartOfInterval(bucket_time, INTERVAL 5 MINUTE)) AS time"
+        ));
+        assert!(sql.contains("argMinMerge(open_state) AS open"));
+        assert!(sql.contains("max(high_state) AS high"));
+        assert!(sql.contains("min(low_state) AS low"));
+        assert!(sql.contains("argMaxMerge(close_state) AS close"));
+        assert!(sql.contains("sum(volume_state) AS volume"));
+        assert!(sql.contains("sum(tick_count) AS tick_count"));
+        assert!(sql.contains("'clickhouse_candles_rollup' AS source"));
+        assert!(!sql.contains("FROM market.price_ticks"));
     }
 
     #[test]
     fn latest_history_query_paginates_before_cursor_window() {
         let sql = latest_history_sql("market", "ETHUSDT", "15m", 240, Some(1_700_000_000));
-        assert!(sql.contains("time >= toDateTime(1700000000) - INTERVAL"));
-        assert!(sql.contains("time < toDateTime(1700000000)"));
-        assert!(sql.contains("argMin(price, tick_time) AS open"));
-        assert!(sql.contains("argMax(price, tick_time) AS close"));
+        assert!(sql.contains("bucket_time < toDateTime(1700000000)"));
+        assert!(sql.contains("argMinMerge(open_state) AS open"));
+        assert!(sql.contains("argMaxMerge(close_state) AS close"));
     }
 
     #[test]

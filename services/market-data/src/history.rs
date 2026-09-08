@@ -6,6 +6,8 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use crate::cache::HistoryCacheKey;
+use crate::prices::CachedPrice;
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -32,11 +34,39 @@ pub async fn get_history(
         );
     };
 
-    match clickhouse
-        .latest_history(&symbol, &resolution, limit, query.before)
-        .await
-    {
-        Ok(history) => (StatusCode::OK, Json(json!(history))),
+    let key = HistoryCacheKey {
+        symbol: symbol.clone(),
+        resolution: resolution.clone(),
+        limit,
+        before: query.before,
+    };
+
+    let clickhouse = clickhouse.clone();
+    let symbol_fetch = symbol.clone();
+    let res_fetch = resolution.clone();
+    let before_fetch = query.before;
+
+    let history_res = state
+        .history_cache
+        .get_or_fetch(key, move || async move {
+            clickhouse
+                .latest_history(&symbol_fetch, &res_fetch, limit, before_fetch)
+                .await
+        })
+        .await;
+
+    match history_res {
+        Ok(cached_page) => {
+            if query.before.is_none() && resolution == "1m" {
+                let live_opt = state.prices.read().get(&symbol).cloned();
+                if let Some(live) = live_opt {
+                    let mut page = (*cached_page).clone();
+                    stitch_active_candle(&mut page.items, &live);
+                    return (StatusCode::OK, Json(json!(page)));
+                }
+            }
+            (StatusCode::OK, Json(json!(*cached_page)))
+        }
         Err(err) => {
             tracing::warn!(error = %err, symbol = %symbol, "failed to load ClickHouse history");
             (
@@ -44,6 +74,68 @@ pub async fn get_history(
                 Json(json!({"error": "market_history_unavailable", "retryable": true})),
             )
         }
+    }
+}
+
+pub fn stitch_active_candle(items: &mut Vec<Value>, live: &CachedPrice) {
+    let now_ts = live
+        .timestamp_ms
+        .map(|ms| ms / 1000)
+        .unwrap_or_else(|| chrono::Utc::now().timestamp());
+    let current_bucket = (now_ts / 60) * 60;
+
+    if let Some(latest) = items.last_mut() {
+        if let Some(candle_time) = latest.get("time").and_then(Value::as_i64) {
+            if candle_time == current_bucket {
+                if let Some(obj) = latest.as_object_mut() {
+                    let high = obj
+                        .get("high")
+                        .and_then(Value::as_f64)
+                        .unwrap_or(live.price);
+                    let low = obj.get("low").and_then(Value::as_f64).unwrap_or(live.price);
+                    obj.insert("close".to_string(), json!(live.price));
+                    obj.insert("value".to_string(), json!(live.price));
+                    obj.insert("high".to_string(), json!(high.max(live.price)));
+                    obj.insert("low".to_string(), json!(low.min(live.price)));
+                    if let Some(v) = live.volume {
+                        let existing_vol = obj.get("volume").and_then(Value::as_f64).unwrap_or(0.0);
+                        obj.insert("volume".to_string(), json!(existing_vol + v));
+                    }
+                    if let Some(rec) = &live.received_at {
+                        obj.insert("latest_at".to_string(), json!(rec));
+                    }
+                }
+            } else if current_bucket > candle_time {
+                let new_candle = json!({
+                    "time": current_bucket,
+                    "open": live.price,
+                    "high": live.price,
+                    "low": live.price,
+                    "close": live.price,
+                    "value": live.price,
+                    "volume": live.volume.unwrap_or(0.0),
+                    "tick_count": 1,
+                    "latest_at": live.received_at.clone().unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+                    "source": "live_buffer"
+                });
+                items.push(new_candle);
+            }
+        }
+    } else {
+        // Items was completely empty: create the active candle as first candle
+        let new_candle = json!({
+            "time": current_bucket,
+            "open": live.price,
+            "high": live.price,
+            "low": live.price,
+            "close": live.price,
+            "value": live.price,
+            "volume": live.volume.unwrap_or(0.0),
+            "tick_count": 1,
+            "latest_at": live.received_at.clone().unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+            "source": "live_buffer"
+        });
+        items.push(new_candle);
     }
 }
 
@@ -70,5 +162,74 @@ mod tests {
         assert_eq!(normalize_resolution("5"), "5m");
         assert_eq!(normalize_resolution("h1"), "1h");
         assert_eq!(normalize_resolution("bad"), "1m");
+    }
+
+    #[test]
+    fn test_stitch_active_candle_updates_existing_bucket() {
+        let mut items = vec![json!({
+            "time": 1700000040,
+            "open": 50000.0,
+            "high": 50100.0,
+            "low": 49900.0,
+            "close": 50050.0,
+            "value": 50050.0,
+            "volume": 10.0,
+            "source": "clickhouse_candles_1m"
+        })];
+
+        let live = CachedPrice {
+            symbol: "BTCUSDT".to_string(),
+            price: 50200.0,
+            bid: None,
+            ask: None,
+            volume: Some(2.5),
+            source: "binance".to_string(),
+            asset_type: "crypto".to_string(),
+            received_at: Some("2023-11-14T22:14:00Z".to_string()),
+            timestamp_ms: Some((1700000040 + 20) * 1000), // within minute 1700000040
+            feed: None,
+        };
+
+        stitch_active_candle(&mut items, &live);
+
+        let latest = items.last().unwrap();
+        assert_eq!(latest["close"], 50200.0);
+        assert_eq!(latest["high"], 50200.0);
+        assert_eq!(latest["volume"], 12.5);
+    }
+
+    #[test]
+    fn test_stitch_active_candle_appends_new_bucket() {
+        let mut items = vec![json!({
+            "time": 1700000040,
+            "open": 50000.0,
+            "high": 50100.0,
+            "low": 49900.0,
+            "close": 50050.0,
+            "value": 50050.0,
+            "volume": 10.0,
+            "source": "clickhouse_candles_1m"
+        })];
+
+        let live = CachedPrice {
+            symbol: "BTCUSDT".to_string(),
+            price: 50300.0,
+            bid: None,
+            ask: None,
+            volume: Some(1.0),
+            source: "binance".to_string(),
+            asset_type: "crypto".to_string(),
+            received_at: Some("2023-11-14T22:15:10Z".to_string()),
+            timestamp_ms: Some((1700000040 + 60 + 10) * 1000), // next minute 1700000100
+            feed: None,
+        };
+
+        stitch_active_candle(&mut items, &live);
+
+        assert_eq!(items.len(), 2);
+        let latest = items.last().unwrap();
+        assert_eq!(latest["time"], 1700000100);
+        assert_eq!(latest["close"], 50300.0);
+        assert_eq!(latest["source"], "live_buffer");
     }
 }

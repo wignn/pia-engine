@@ -21,6 +21,7 @@ pub struct AppState {
     pub metrics: Arc<atlsd_observability::MetricsRegistry>,
     pub prices: Arc<RwLock<HashMap<String, CachedPrice>>>,
     pub calendar: CalendarCache,
+    pub history_cache: crate::cache::MarketHistoryCache,
 }
 
 impl AppState {
@@ -41,6 +42,7 @@ impl AppState {
             metrics,
             prices: Arc::new(RwLock::new(HashMap::new())),
             calendar: CalendarCache::new(),
+            history_cache: crate::cache::MarketHistoryCache::new(),
         }
     }
 }

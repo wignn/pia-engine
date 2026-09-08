@@ -2,6 +2,7 @@ mod alert_notifier;
 mod alerts;
 mod batcher;
 mod bonds;
+mod cache;
 mod calendar;
 mod candle_engine;
 mod clickhouse;
