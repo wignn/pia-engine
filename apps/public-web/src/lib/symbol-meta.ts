@@ -6,6 +6,7 @@
  */
 
 import { getLocalLogo } from '$lib/logo';
+import { getCompanyInfo } from '$lib/market-companies';
 
 export type AssetCategory = 'stocks' | 'forex' | 'indices' | 'crypto' | 'commodities' | 'other';
 
@@ -17,6 +18,9 @@ export interface SymbolMeta {
 	format: (val: number) => string;
 	logo: { type: 'img' | 'svg'; url: string };
 	displaySymbol: string;
+	sector?: string;
+	marketCap?: number;
+	svgLogo?: string;
 }
 
 export function getAssetCategory(itemOrSymbol: { symbol: string; asset_type?: string | null } | string): AssetCategory {
@@ -30,9 +34,9 @@ export function getAssetCategory(itemOrSymbol: { symbol: string; asset_type?: st
 
 	const sym = symbol.toUpperCase();
 	if (sym.endsWith('USDT')) return 'crypto';
-	if (sym === 'XAUUSD' || sym.startsWith('XAU') || sym === 'WTI' || sym === 'BRENT') return 'commodities';
+	if (sym === 'XAUUSD' || sym.startsWith('XAU') || sym === 'WTI' || sym === 'BRENT' || sym === 'USOIL' || sym === 'UKOIL' || sym === 'NATGAS') return 'commodities';
 	if (/^[A-Z]{6}$/.test(sym)) return 'forex';
-	if (['SPX', 'DXY', 'IHSG', 'HSI', 'KOSPI', 'NIFTY', 'SSEC', 'STI', 'ASX', 'SANSEX', 'JCI'].includes(sym))
+	if (['SPX', 'DXY', 'IHSG', 'HSI', 'KOSPI', 'NIFTY', 'NIFTY50', 'SSEC', 'STI', 'ASX', 'ASX200', 'SANSEX', 'SENSEX', 'JCI', 'DJI', 'NDX', 'RUT', 'FTSE', 'GDAXI', 'FCHI', 'N225', 'VIX'].includes(sym))
 		return 'indices';
 	return 'stocks';
 }
@@ -60,88 +64,81 @@ const BADGE_BLUE = 'bg-blue/10 text-blue border border-blue/20';
 export function getSymbolMeta(symbol: string): SymbolMeta {
 	const sym = symbol.toUpperCase();
 	const category = getAssetCategory(sym);
+	const company = getCompanyInfo(sym);
 
-	let name = sym;
+	let name = company ? company.name : sym;
 	let badge = sym.substring(0, 4);
 	let badgeClass = BADGE_ACCENT;
 	let unit: string =
 		category === 'forex' ? 'RATE' : category === 'stocks' ? 'EQTY' : category === 'indices' ? 'IDX' : 'USD';
 	let format = (val: number) => formatPrice(val, category, sym);
 	let logo: { type: 'img' | 'svg'; url: string } = { type: 'svg', url: '' };
-	let displaySymbol = sym;
+	let displaySymbol = company?.displaySymbol || sym;
+	let sector = company?.sector;
+	let marketCap = company?.marketCapBillion;
+	let svgLogo = company?.svgLogo;
 
 	const usd = (digits: number) => (val: number) =>
 		`$${val.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 
 	switch (sym) {
 		case 'BTCUSDT':
-			name = 'Bitcoin';
 			badge = 'BTC';
 			unit = 'USD';
 			format = usd(2);
 			break;
 		case 'ETHUSDT':
-			name = 'Ethereum';
 			badge = 'ETH';
 			unit = 'USD';
 			format = usd(2);
 			break;
 		case 'SOLUSDT':
-			name = 'Solana';
 			badge = 'SOL';
 			unit = 'USD';
 			format = usd(2);
 			break;
 		case 'BNBUSDT':
-			name = 'BNB';
 			badge = 'BNB';
 			unit = 'USD';
 			format = usd(2);
 			break;
 		case 'PAXGUSDT':
-			name = 'PAX Gold';
 			badge = 'PAXG';
 			displaySymbol = 'PAXG';
 			unit = 'USD';
 			format = usd(1);
 			break;
 		case 'XAUUSD':
-			name = 'Gold Spot / US Dollar';
 			badge = 'GOLD';
 			badgeClass = BADGE_GREEN;
 			unit = 'USD';
 			format = usd(2);
 			break;
 		case 'EURUSD':
-			name = 'Euro / US Dollar';
 			badge = 'EUR';
 			badgeClass = BADGE_BLUE;
 			unit = 'RATE';
 			format = (val) => val.toFixed(5);
 			break;
 		case 'GBPUSD':
-			name = 'Pound Sterling / US Dollar';
 			badge = 'GBP';
 			badgeClass = BADGE_BLUE;
 			unit = 'RATE';
 			format = (val) => val.toFixed(5);
 			break;
 		case 'USDJPY':
-			name = 'US Dollar / Japanese Yen';
 			badge = 'JPY';
 			badgeClass = BADGE_BLUE;
 			unit = 'JPY';
 			format = (val) => val.toFixed(3);
 			break;
 		case 'AUDUSD':
-			name = 'Australian Dollar / US Dollar';
 			badge = 'AUD';
 			badgeClass = BADGE_BLUE;
 			unit = 'RATE';
 			format = (val) => val.toFixed(5);
 			break;
 		case 'SPX':
-			name = 'S&P 500 Index';
 			badge = 'SPX';
 			badgeClass = BADGE_BLUE;
 			unit = 'USD';
@@ -149,27 +146,23 @@ export function getSymbolMeta(symbol: string): SymbolMeta {
 				val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 			break;
 		case 'DXY':
-			name = 'US Dollar Index';
 			badge = 'DXY';
 			badgeClass = BADGE_GREEN;
 			unit = 'RATE';
 			format = (val) => val.toFixed(3);
 			break;
 		case 'WTI':
-			name = 'WTI Crude Oil';
+		case 'USOIL':
 			badge = 'WTI';
 			unit = 'USD';
 			format = usd(2);
 			break;
 		default:
 			if (category === 'stocks') {
-				name = `${sym} Equity`;
 				badge = sym.slice(0, 4);
 			} else if (category === 'indices') {
-				name = `${sym} Index`;
 				badge = sym.slice(0, 5);
 			} else if (category === 'forex') {
-				name = sym.length === 6 ? `${sym.slice(0, 3)} / ${sym.slice(3)}` : sym;
 				badge = sym.slice(0, 3);
 			}
 			break;
@@ -180,5 +173,5 @@ export function getSymbolMeta(symbol: string): SymbolMeta {
 		logo = { type: 'img', url: localLogoUrl };
 	}
 
-	return { name, badge, badgeClass, unit, format, logo, displaySymbol };
+	return { name, badge, badgeClass, unit, format, logo, displaySymbol, sector, marketCap, svgLogo };
 }

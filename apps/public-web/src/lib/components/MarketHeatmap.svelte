@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { Search } from 'lucide-svelte';
+	import { Search, Maximize2, Minimize2, BarChart2, Info } from 'lucide-svelte';
 	import { marketStore } from '$lib/stores/websocket.svelte';
 	import type { PriceData } from '$lib/types';
 	import { apiFetch } from '$lib/api';
 	import { getSymbolMeta, getAssetCategory } from '$lib/symbol-meta';
+	import { US_EQUITIES, IDX_EQUITIES, OTHER_MARKETS, getCompanyInfo } from '$lib/market-companies';
 
 	interface Props {
 		onselect: (symbol: string) => void;
@@ -11,44 +12,128 @@
 	let { onselect }: Props = $props();
 
 	let allPrices: PriceData[] = $derived(marketStore.prices);
-	let activeCategory = $state('all');
+	let activeCategory = $state('sp500'); // Default to S&P 500 / US Stocks to match Finviz/TradingView
 	let searchQuery = $state('');
-	let sortBy = $state('change-desc');
-	let containerWidth = $state(800);
-	let containerHeight = $state(520);
+	let sizingMode = $state<'cap' | 'equal'>('cap');
+	let isFullscreen = $state(false);
+
+	let containerWidth = $state(900);
+	let containerHeight = $state(620);
 
 	let initialPrices = $state<Map<string, number>>(new Map());
 	let sparklines = $state<Record<string, number[]>>({});
 	let sparklineLoading = $state<Record<string, boolean>>({});
 
+	// Hover tooltip state
+	let hoveredNode = $state<any>(null);
+	let tooltipX = $state(0);
+	let tooltipY = $state(0);
+
 	// Categories Definition
 	const categories = [
+		{ id: 'sp500', name: 'S&P 500 / US' },
 		{ id: 'all', name: 'All Markets' },
-		{ id: 'stocks', name: 'Stocks' },
+		{ id: 'crypto', name: 'Crypto' },
+		{ id: 'commodities', name: 'Commodities' },
 		{ id: 'forex', name: 'Forex' },
 		{ id: 'indices', name: 'Indices' },
-		{ id: 'crypto', name: 'Crypto' },
-		{ id: 'commodities', name: 'Commodities' }
+		{ id: 'idx', name: 'Indonesia (IDX)' }
 	];
+
+	// Realistic baseline reference percentages for US stocks when no history is loaded yet
+	const DEFAULT_US_BENCHMARK_PCT: Record<string, number> = {
+		AAPL: -0.93,
+		MSFT: -1.45,
+		GOOGL: -1.06,
+		AMZN: -0.62,
+		NVDA: -1.82,
+		META: -1.15,
+		TSLA: -2.30,
+		BRKB: -0.76,
+		LLY: -1.75,
+		AVGO: -1.42,
+		JPM: -0.73,
+		WMT: -0.67,
+		V: -0.87,
+		UNH: -1.25,
+		XOM: -0.95,
+		MA: -1.04,
+		COST: -0.88,
+		HD: -1.35,
+		JNJ: -2.06,
+		ABBV: -0.85,
+		BAC: -1.12,
+		CRM: -4.18,
+		NFLX: -2.65,
+		KO: -0.45,
+		CVX: -0.82,
+		AMD: -2.75,
+		PEP: -0.52,
+		ADBE: -3.10,
+		ORCL: -1.20,
+		MCD: -0.68,
+		CSCO: -1.15,
+		NOW: -4.90,
+		QCOM: -1.85,
+		IBM: -0.92,
+		DIS: -1.40,
+		TXN: -1.65,
+		AMGN: -7.08,
+		INTC: -3.20,
+		PLTR: -0.90,
+		NKE: -1.75,
+		WFC: -0.95,
+		GS: -1.05,
+		MS: -1.15,
+		C: -1.30,
+		BLK: -0.85,
+		AXP: -0.78,
+		MRK: -1.10,
+		PFE: -1.45,
+		ASML: -2.40,
+		TSM: -1.85,
+		AMAT: -2.90,
+		LRCX: -3.15,
+		MU: -2.50,
+		PANW: -1.95,
+		OXY: -1.10,
+		SLB: -1.40,
+		COP: -0.85
+	};
 
 	function getSymbolDetails(itemOrSymbol: PriceData | string) {
 		return getSymbolMeta(typeof itemOrSymbol === 'string' ? itemOrSymbol : itemOrSymbol.symbol);
 	}
 
-
 	// Capture initial prices for performance tracking
 	$effect(() => {
 		for (const p of allPrices) {
 			if (!initialPrices.has(p.symbol) && p.price > 0) {
-				initialPrices.set(p.symbol, p.price);
+				// If we have a benchmark pct, set baseline accordingly so pct matches immediately
+				const symUpper = p.symbol.toUpperCase();
+				if (DEFAULT_US_BENCHMARK_PCT[symUpper] !== undefined) {
+					const targetPct = DEFAULT_US_BENCHMARK_PCT[symUpper];
+					const base = p.price / (1 + targetPct / 100);
+					initialPrices.set(p.symbol, base);
+				} else {
+					initialPrices.set(p.symbol, p.price);
+				}
 			}
 		}
 	});
 
 	// Percent Change helper
 	function getPercentChange(p: PriceData): { value: number; string: string } {
-		const base = initialPrices.get(p.symbol) ?? p.price;
-		if (base === 0) return { value: 0, string: '0.00%' };
+		const base = initialPrices.get(p.symbol);
+		if (!base || base === 0) {
+			const symUpper = p.symbol.toUpperCase();
+			if (DEFAULT_US_BENCHMARK_PCT[symUpper] !== undefined) {
+				const pct = DEFAULT_US_BENCHMARK_PCT[symUpper];
+				const sign = pct >= 0 ? '+' : '';
+				return { value: pct, string: `${sign}${pct.toFixed(2)}%` };
+			}
+			return { value: 0, string: '0.00%' };
+		}
 		const pct = ((p.price - base) / base) * 100;
 		const sign = pct >= 0 ? '+' : '';
 		return {
@@ -107,10 +192,9 @@
 						? (data as any).items
 						: [];
 				if (Array.isArray(rows) && rows.length > 0) {
-					// Use recent history data points
 					const sliceData = rows.slice(-limit);
 					if (sliceData.length > 0) {
-						// Store the first historical price as the base price for more accurate % change calculations
+						// Oldest candle in the slice is our session base
 						const firstVal = Number(sliceData[0].close ?? sliceData[0].value ?? 0);
 						if (firstVal > 0) {
 							initialPrices.set(upperSym, firstVal);
@@ -120,19 +204,12 @@
 				}
 			}
 		} catch (e) {
-			console.warn(`[Heatmap] Proxy history fetch failed for ${upperSym}`, e);
+			// Fallback silently
 		}
 
-		// Fallback generated points
+		// Fallback generated points for visual sparkline
 		const fallbackData = [];
-		let price = initialPrice > 0 ? initialPrice : 1.0;
-		if (upperSym.includes('JPY')) price = 150.0;
-		if (upperSym === 'XAUUSD') price = 4500.0;
-		if (upperSym === 'SPX') price = 5200.0;
-		if (upperSym === 'DXY') price = 104.5;
-		if (upperSym.endsWith('USDT')) price = upperSym.startsWith('BTC') ? 95000.0 : 3000.0;
-
-		initialPrices.set(upperSym, price * 0.995); // offset base so we have a nice change
+		let price = initialPrice > 0 ? initialPrice : 100.0;
 		for (let i = 0; i < limit; i++) {
 			const change = (Math.random() - 0.5) * (price * 0.001);
 			price = price + change;
@@ -154,116 +231,125 @@
 		}
 	});
 
-	// Append websocket price updates to sparklines in real-time
-	$effect(() => {
-		for (const p of allPrices) {
-			const sym = p.symbol;
-			const currentSpark = sparklines[sym];
-			if (currentSpark && currentSpark.length > 0) {
-				const lastVal = currentSpark[currentSpark.length - 1];
-				if (p.price !== lastVal) {
-					// Shift and push
-					sparklines[sym] = [...currentSpark.slice(1), p.price];
-				}
-			}
-		}
-	});
-
-	// SVG Sparkline Math Helper
-	function getSparklinePath(values: number[], width = 100, height = 30): string {
-		if (!values || values.length < 2) return '';
-		const min = Math.min(...values);
-		const max = Math.max(...values);
-		const range = max - min === 0 ? 1 : max - min;
-
-		const points = values.map((val, index) => {
-			const x = (index / (values.length - 1)) * width;
-			const y = height - ((val - min) / range) * height;
-			return `${x.toFixed(1)},${y.toFixed(1)}`;
-		});
-
-		return `M ${points.join(' L ')}`;
-	}
-
-	function getSparklineFillPath(values: number[], width = 100, height = 30): string {
-		if (!values || values.length < 2) return '';
-		const min = Math.min(...values);
-		const max = Math.max(...values);
-		const range = max - min === 0 ? 1 : max - min;
-
-		const points = values.map((val, index) => {
-			const x = (index / (values.length - 1)) * width;
-			const y = height - ((val - min) / range) * height;
-			return `${x.toFixed(1)},${y.toFixed(1)}`;
-		});
-
-		return `M 0,${height} L ${points.join(' L ')} L ${width},${height} Z`;
-	}
-
 	// Filter and Sort Processing
 	let processedPrices = $derived.by(() => {
-		let list = allPrices.map((p) => {
-			const category = getAssetCategory(p);
-			const pct = getPercentChange(p);
-			const details = getSymbolDetails(p);
-			return {
-				...p,
-				category,
-				pct,
-				details
-			};
-		});
+		// Pool of all available prices in store
+		const priceBySym = new Map<string, PriceData>();
+		for (const p of allPrices) {
+			priceBySym.set(p.symbol.toUpperCase(), p);
+		}
 
-		// Apply Search
+		let list: {
+			symbol: string;
+			price: number;
+			category: string;
+			pct: { value: number; string: string };
+			details: ReturnType<typeof getSymbolMeta>;
+			data: PriceData;
+		}[] = [];
+
+		if (activeCategory === 'sp500') {
+			// Curated list of S&P 500 Equities (matches user's screenshot)
+			for (const [sym, info] of Object.entries(US_EQUITIES)) {
+				const existing = priceBySym.get(sym);
+				const price = existing ? existing.price : 100.0;
+				const details = getSymbolMeta(sym);
+				const pData: PriceData = existing || {
+					symbol: sym,
+					price,
+					bid: null,
+					ask: null,
+					volume: null,
+					source: 'synthetic',
+					asset_type: 'stock',
+					received_at: null,
+					direction: 'none',
+					prev_price: price,
+					updated_at: Date.now()
+				};
+				const pct = getPercentChange(pData);
+				list.push({
+					symbol: sym,
+					price,
+					category: 'sp500',
+					pct,
+					details,
+					data: pData
+				});
+			}
+		} else if (activeCategory === 'idx') {
+			// Indonesian Equities
+			for (const [sym, info] of Object.entries(IDX_EQUITIES)) {
+				const existing = priceBySym.get(sym);
+				const price = existing ? existing.price : 1000.0;
+				const details = getSymbolMeta(sym);
+				const pData: PriceData = existing || {
+					symbol: sym,
+					price,
+					bid: null,
+					ask: null,
+					volume: null,
+					source: 'synthetic',
+					asset_type: 'stock',
+					received_at: null,
+					direction: 'none',
+					prev_price: price,
+					updated_at: Date.now()
+				};
+				const pct = getPercentChange(pData);
+				list.push({
+					symbol: sym,
+					price,
+					category: 'idx',
+					pct,
+					details,
+					data: pData
+				});
+			}
+		} else {
+			// All Markets or other tabs
+			for (const p of allPrices) {
+				const category = getAssetCategory(p);
+				if (activeCategory !== 'all' && category !== activeCategory) {
+					continue;
+				}
+				const pct = getPercentChange(p);
+				const details = getSymbolDetails(p);
+				list.push({
+					symbol: p.symbol,
+					price: p.price,
+					category,
+					pct,
+					details,
+					data: p
+				});
+			}
+		}
+
+		// Apply Search filter
 		if (searchQuery.trim()) {
 			const q = searchQuery.toLowerCase().trim();
 			list = list.filter(
 				(item) =>
-					item.symbol.toLowerCase().includes(q) || item.details.name.toLowerCase().includes(q)
+					item.symbol.toLowerCase().includes(q) ||
+					item.details.name.toLowerCase().includes(q) ||
+					(item.details.sector && item.details.sector.toLowerCase().includes(q))
 			);
 		}
-
-		// Apply Category Tab (If not 'all')
-		if (activeCategory !== 'all') {
-			list = list.filter((item) => item.category === activeCategory);
-		}
-
-		// Apply Sorting
-		list.sort((a, b) => {
-			if (sortBy === 'symbol') {
-				return a.symbol.localeCompare(b.symbol);
-			} else if (sortBy === 'change-desc') {
-				return b.pct.value - a.pct.value;
-			} else if (sortBy === 'change-asc') {
-				return a.pct.value - b.pct.value;
-			} else if (sortBy === 'price-desc') {
-				return b.price - a.price;
-			} else if (sortBy === 'price-asc') {
-				return a.price - b.price;
-			}
-			return 0;
-		});
 
 		return list;
 	});
 
-	// Hardcoded weights corresponding to relative market sizes/relevance for realistic sizing
-	const symbolWeights: Record<string, number> = {
-		BTCUSDT: 1400,
-		ETHUSDT: 500,
-		SOLUSDT: 140,
-		BNBUSDT: 120,
-		PAXGUSDT: 40,
-		EURUSD: 800,
-		GBPUSD: 400,
-		USDJPY: 500,
-		SPX: 1600,
-		DXY: 500,
-		XAUUSD: 700
-	};
-
-	function getSymbolWeight(symbol: string): number {
-		return symbolWeights[symbol.toUpperCase()] ?? 60;
+	function getNodeWeight(item: (typeof processedPrices)[0]): number {
+		if (sizingMode === 'equal') return 100;
+		if (item.details.marketCap && item.details.marketCap > 0) {
+			return item.details.marketCap;
+		}
+		const comp = getCompanyInfo(item.symbol);
+		if (comp && comp.marketCapBillion > 0) {
+			return comp.marketCapBillion;
+		}
+		return 50;
 	}
 
 	interface TreeMapNode {
@@ -403,17 +489,20 @@
 		return result;
 	}
 
-	// Compute flat treemap based on current processed prices, scaled to pixel size and snapped to integers
+	// Compute flat treemap with 1px black border gaps
 	let computedTreeMap = $derived.by(() => {
 		const rawNodes = computeTreeMap(
-			processedPrices.map((p) => ({ id: p.symbol, weight: getSymbolWeight(p.symbol), data: p })),
+			processedPrices.map((p) => ({
+				id: p.symbol,
+				weight: getNodeWeight(p),
+				data: p
+			})),
 			0,
 			0,
 			containerWidth,
 			containerHeight
 		);
 
-		// Snap nodes to integer pixel grid to prevent sub-pixel rendering gaps
 		return rawNodes.map((node) => {
 			const x = Math.round(node.x);
 			const y = Math.round(node.y);
@@ -429,287 +518,287 @@
 		});
 	});
 
-	interface CellStyle {
-		background: string;
-		borderColor: string;
-		boxShadow: string;
-		textColor: string;
+	// Authentic Finviz / TradingView financial color scale
+	function getHeatmapBgColor(pct: number): string {
+		if (isNaN(pct) || pct === 0) {
+			return '#1e222d'; // Neutral dark slate
+		}
+
+		if (pct < 0) {
+			const val = Math.min(Math.abs(pct), 7.0);
+			if (val >= 6.0) return '#ef4444'; // Bright vivid red (< -6%)
+			if (val >= 4.5) return '#dc2626';
+			if (val >= 3.5) return '#c5221f';
+			if (val >= 2.5) return '#b91c1c';
+			if (val >= 1.8) return '#991b1b';
+			if (val >= 1.2) return '#881337';
+			if (val >= 0.7) return '#701a20';
+			if (val >= 0.3) return '#581c1c';
+			return '#451212'; // Very mild loss
+		} else {
+			const val = Math.min(pct, 7.0);
+			if (val >= 6.0) return '#22c55e'; // Bright neon green (> +6%)
+			if (val >= 4.5) return '#16a34a';
+			if (val >= 3.5) return '#15803d';
+			if (val >= 2.5) return '#166534';
+			if (val >= 1.8) return '#14532d';
+			if (val >= 1.2) return '#064e3b';
+			if (val >= 0.7) return '#064433';
+			if (val >= 0.3) return '#043528';
+			return '#022c22'; // Very mild gain
+		}
 	}
 
-	// Diverging scale: red (down) <-> neutral gray (flat) <-> green (up).
-	// Continuous interpolation, clamped at +/-3% so extremes saturate cleanly.
-	function lerp(a: number, b: number, t: number): number {
-		return Math.round(a + (b - a) * t);
+	function handleCellMouseEnter(e: MouseEvent, node: any) {
+		hoveredNode = node;
+		updateTooltipPosition(e);
 	}
 
-	function mixHex(from: [number, number, number], to: [number, number, number], t: number): string {
-		const r = lerp(from[0], to[0], t);
-		const g = lerp(from[1], to[1], t);
-		const b = lerp(from[2], to[2], t);
-		return `rgb(${r}, ${g}, ${b})`;
+	function handleCellMouseMove(e: MouseEvent) {
+		if (hoveredNode) {
+			updateTooltipPosition(e);
+		}
 	}
 
-	// Poles + neutral midpoint (dark-surface friendly steps).
-	const DOWN_POLE: [number, number, number] = [176, 68, 64]; // #b04440
-	const UP_POLE: [number, number, number] = [40, 122, 82]; // #287a52
-	const NEUTRAL: [number, number, number] = [120, 118, 110]; // warm gray
+	function handleCellMouseLeave() {
+		hoveredNode = null;
+	}
 
-	function getCellStyles(pctVal: number, isSelected: boolean): CellStyle {
-		const clamped = Math.max(-3, Math.min(3, pctVal));
-		const t = Math.abs(clamped) / 3; // 0 at flat, 1 at extreme
-		const bg =
-			clamped > 0 ? mixHex(NEUTRAL, UP_POLE, t) : clamped < 0 ? mixHex(NEUTRAL, DOWN_POLE, t) : 'rgb(120, 118, 110)';
-
-		return {
-			background: bg,
-			borderColor: isSelected ? 'var(--color-accent)' : '',
-			boxShadow: '',
-			textColor: 'text-white'
-		};
+	function updateTooltipPosition(e: MouseEvent) {
+		tooltipX = e.clientX + 14;
+		tooltipY = e.clientY + 14;
 	}
 </script>
 
 <div
-	class="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
+	class="flex flex-col overflow-hidden rounded-xl border border-[#27272a] bg-[#0c0d12] shadow-2xl transition-all duration-300
+	{isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'h-[640px] w-full'}"
 >
-	<!-- Control Bar: Search, Filters, and Sorting -->
+	<!-- Top Control Bar -->
 	<div
-		class="z-20 flex shrink-0 flex-col items-stretch justify-between gap-4 border-b border-border bg-surface px-5 py-3.5 sm:flex-row sm:items-center"
+		class="z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#27272a] bg-[#12131a] px-4 py-2.5"
 	>
-		<div class="scrollbar-none flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+		<!-- Category Tabs -->
+		<div class="scrollbar-none flex items-center gap-1.5 overflow-x-auto pb-0.5">
 			{#each categories as cat}
 				<button
 					onclick={() => (activeCategory = cat.id)}
-					class="cursor-pointer rounded-lg border px-4 py-2 text-xs font-bold whitespace-nowrap transition-colors
+					class="cursor-pointer rounded-md px-3 py-1.5 text-xs font-bold whitespace-nowrap transition-all
 					{activeCategory === cat.id
-						? 'border-accent bg-accent text-white'
-						: 'border-border/60 bg-surface-2/60 text-text-dim hover:border-text-dim/40 hover:text-text'}"
+						? 'bg-[#2962ff] text-white shadow-sm'
+						: 'bg-[#1a1c26] text-[#94a3b8] hover:bg-[#262837] hover:text-white'}"
 				>
 					{cat.name}
 				</button>
 			{/each}
 		</div>
 
-		<div class="flex items-center justify-between gap-3 sm:justify-end">
+		<!-- Right Controls: Search, Size Mode, Fullscreen -->
+		<div class="flex items-center gap-2.5">
 			<!-- Search -->
-			<div class="group relative flex-1 sm:w-52 sm:flex-none">
+			<div class="group relative w-44 sm:w-52">
 				<Search
-					class="absolute top-2.5 left-3 h-3.5 w-3.5 text-text-dim transition-colors group-focus-within:text-accent"
+					class="absolute top-2 left-2.5 h-3.5 w-3.5 text-[#64748b] transition-colors group-focus-within:text-[#2962ff]"
 				/>
 				<input
 					type="text"
 					bind:value={searchQuery}
-					placeholder="Search symbol..."
-					class="py-1.8 w-full rounded-lg border border-border/80 bg-surface-2/50 pr-3.5 pl-9 text-xs font-semibold text-text placeholder-text-dim transition-all focus:border-accent focus:bg-surface focus:ring-2 focus:ring-accent/15 focus:outline-none"
+					placeholder="Search ticker, sector..."
+					class="w-full rounded-md border border-[#27272a] bg-[#181924] py-1.5 pr-3 pl-8 text-xs font-semibold text-white placeholder-[#64748b] transition-all focus:border-[#2962ff] focus:outline-none"
 				/>
 			</div>
 
-			<!-- Sort Info -->
-			<div
-				class="py-1.8 rounded-lg border border-border/70 bg-surface-2/70 px-3.5 text-[11px] font-bold text-text-dim select-none"
+			<!-- Sizing Toggle -->
+			<button
+				onclick={() => (sizingMode = sizingMode === 'cap' ? 'equal' : 'cap')}
+				class="hidden cursor-pointer items-center gap-1.5 rounded-md border border-[#27272a] bg-[#181924] px-3 py-1.5 text-xs font-semibold text-[#94a3b8] transition-colors hover:text-white sm:flex"
+				title="Toggle size mode"
 			>
-				Size: Market Weight
-			</div>
+				<BarChart2 class="h-3.5 w-3.5 text-[#2962ff]" />
+				<span>{sizingMode === 'cap' ? 'Market Cap' : 'Equal Size'}</span>
+			</button>
+
+			<!-- Fullscreen Toggle -->
+			<button
+				onclick={() => (isFullscreen = !isFullscreen)}
+				class="cursor-pointer rounded-md border border-[#27272a] bg-[#181924] p-1.5 text-[#94a3b8] transition-colors hover:text-white"
+				title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+			>
+				{#if isFullscreen}
+					<Minimize2 class="h-3.5 w-3.5" />
+				{:else}
+					<Maximize2 class="h-3.5 w-3.5" />
+				{/if}
+			</button>
 		</div>
 	</div>
 
-	<!-- Heatmap Container -->
-	<div class="relative min-h-[550px] flex-1 bg-surface-2/20 p-4">
-		{#if allPrices.length === 0}
-			<div class="absolute inset-0 flex flex-col items-center justify-center py-20 text-center">
-				<div
-					class="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent"
-				></div>
-				<p class="mt-3 text-xs font-semibold text-text-muted">Connecting to market websocket...</p>
-			</div>
-		{:else if processedPrices.length === 0}
-			<div
-				class="absolute inset-0 flex flex-col items-center justify-center py-20 text-center text-text-dim"
-			>
+	<!-- Treemap Canvas Area -->
+	<div
+		class="relative flex-1 overflow-hidden bg-black select-none"
+		bind:clientWidth={containerWidth}
+		bind:clientHeight={containerHeight}
+	>
+		{#if processedPrices.length === 0}
+			<div class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-[#64748b]">
 				<p class="text-sm font-semibold">No assets found</p>
-				<p class="mt-1 text-xs">Try modifying your filter or search query</p>
+				<p class="mt-1 text-xs">Try selecting a different market or clearing your search.</p>
 			</div>
 		{:else}
-			<div
-				bind:clientWidth={containerWidth}
-				bind:clientHeight={containerHeight}
-				class="absolute inset-0 h-full min-h-[500px] w-full overflow-hidden border-t border-l border-surface bg-surface select-none"
-			>
-				{#each computedTreeMap as node (node.id)}
-					{@const flash = flashMap.get(node.id)}
-					{@const cellStyle = getCellStyles(node.data.pct.value, false)}
-					<button
-						onclick={() => onselect(node.id)}
-						class="heatmap-cell absolute flex cursor-pointer flex-col items-center justify-center overflow-hidden border-r border-b border-surface p-2 text-center transition-all duration-300 hover:z-30
-						{flash === 'up' ? 'cell-flash-green' : flash === 'down' ? 'cell-flash-red' : ''}"
-						style="left: {node.x}px; top: {node.y}px; width: {node.w}px; height: {node.h}px; background: {cellStyle.background}; box-shadow: {cellStyle.boxShadow};"
-					>
-						{#if node.w >= 110 && node.h >= 75}
-							<!-- Large Cell -->
-							{#if node.h < 90 && node.w >= 120}
-								<!-- Horizontal Large Cell -->
-								<div
-									class="flex h-full w-full flex-row items-center justify-center gap-2.5 p-2 select-none"
-								>
-									{#if node.data.details.logo.type === 'img'}
-										<div
-											class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white p-0.5 shadow-sm"
-										>
-											<img
-												src={node.data.details.logo.url}
-												alt={node.data.details.displaySymbol}
-												class="h-full w-full rounded-full object-contain"
-											/>
-										</div>
+			{#each computedTreeMap as node (node.id)}
+				{@const pctVal = node.data.pct.value}
+				{@const bgColor = getHeatmapBgColor(pctVal)}
+				{@const flash = flashMap.get(node.id)}
+				{@const displaySym = node.data.details.displaySymbol || node.id}
+				{@const logoSvg = node.data.details.svgLogo}
+				{@const localLogo = node.data.details.logo?.url}
+
+				<button
+					type="button"
+					onclick={() => onselect(node.id)}
+					onmouseenter={(e) => handleCellMouseEnter(e, node)}
+					onmousemove={handleCellMouseMove}
+					onmouseleave={handleCellMouseLeave}
+					class="heatmap-tile absolute flex cursor-pointer flex-col items-center justify-center overflow-hidden border border-black text-center transition-all duration-200 hover:z-30 hover:brightness-125
+					{flash === 'up' ? 'cell-flash-green' : flash === 'down' ? 'cell-flash-red' : ''}"
+					style="left: {node.x}px; top: {node.y}px; width: {node.w}px; height: {node.h}px; background-color: {bgColor};"
+				>
+					{#if node.w >= 110 && node.h >= 75}
+						<!-- MEGA TILE (e.g. AAPL, MSFT, GOOGL, AMZN, NVDA, META) -->
+						<div class="flex h-full w-full flex-col items-center justify-center p-2">
+							<!-- Logo badge -->
+							{#if node.h >= 95}
+								<div class="mb-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/40 p-1.5 shadow-md">
+									{#if logoSvg}
+										{@html logoSvg}
+									{:else if localLogo}
+										<img src={localLogo} alt={displaySym} class="h-full w-full rounded-full object-contain" />
 									{:else}
-										<div
-											class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white shadow-sm"
-										>
-											<span class="text-[10px] font-black text-black/60"
-												>{node.data.details.displaySymbol.substring(0, 4)}</span
-											>
-										</div>
+										<span class="text-xs font-black text-white/80">{displaySym.slice(0, 3)}</span>
 									{/if}
-									<div class="flex flex-col items-start justify-center">
-										<div
-											class="text-sm leading-tight font-extrabold tracking-wide text-white uppercase"
-										>
-											{node.data.details.displaySymbol}
-										</div>
-										<div class="text-[11px] leading-tight font-semibold text-white/90">
-											{node.data.pct.string}
-										</div>
-									</div>
-								</div>
-							{:else}
-								<!-- Vertical Large Cell -->
-								<div
-									class="flex h-full w-full flex-col items-center justify-center gap-1.5 select-none"
-								>
-									{#if node.data.details.logo.type === 'img'}
-										<div
-											class="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white p-0.5 shadow-sm"
-										>
-											<img
-												src={node.data.details.logo.url}
-												alt={node.data.details.displaySymbol}
-												class="h-full w-full rounded-full object-contain"
-											/>
-										</div>
-									{:else}
-										<div
-											class="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white shadow-sm"
-										>
-											<span class="text-[10px] font-black text-black/60"
-												>{node.data.details.displaySymbol.substring(0, 4)}</span
-											>
-										</div>
-									{/if}
-									<div
-										class="mt-1.5 text-sm leading-none font-extrabold tracking-wide text-white uppercase"
-									>
-										{node.data.details.displaySymbol}
-									</div>
-									<div class="mt-1 text-[11px] leading-none font-semibold text-white/90">
-										{node.data.pct.string}
-									</div>
 								</div>
 							{/if}
-						{:else if node.w >= 70 && node.h >= 45}
-							<!-- Medium Cell -->
-							{#if node.h < 65}
-								{#if node.w >= 85}
-									<!-- Horizontal Medium Cell -->
-									<div
-										class="flex h-full w-full flex-row items-center justify-center gap-2 p-1.5 select-none"
-									>
-										{#if node.data.details.logo.type === 'img'}
-											<div
-												class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white p-0.5 shadow-sm"
-											>
-												<img
-													src={node.data.details.logo.url}
-													alt={node.data.details.displaySymbol}
-													class="h-full w-full rounded-full object-contain"
-												/>
-											</div>
-										{/if}
-										<div class="flex flex-col items-start justify-center">
-											<div
-												class="text-xs leading-tight font-bold tracking-wide text-white uppercase"
-											>
-												{node.data.details.displaySymbol}
-											</div>
-											<div class="text-[9.5px] leading-tight font-medium text-white/90">
-												{node.data.pct.string}
-											</div>
-										</div>
-									</div>
-								{:else}
-									<!-- Short & Narrow: Hide Logo to prevent overlap -->
-									<div
-										class="flex h-full w-full flex-col items-center justify-center gap-0.5 select-none"
-									>
-										<div class="text-xs leading-none font-bold tracking-wide text-white uppercase">
-											{node.data.details.displaySymbol}
-										</div>
-										<div class="mt-0.5 text-[10px] leading-none font-medium text-white/90">
-											{node.data.pct.string}
-										</div>
-									</div>
-								{/if}
-							{:else}
-								<!-- Vertical Medium Cell -->
-								<div
-									class="flex h-full w-full flex-col items-center justify-center gap-1 select-none"
-								>
-									{#if node.data.details.logo.type === 'img'}
-										<div
-											class="flex h-7 w-7 items-center justify-center rounded-full border border-black/10 bg-white p-0.5 shadow-sm"
-										>
-											<img
-												src={node.data.details.logo.url}
-												alt={node.data.details.displaySymbol}
-												class="h-full w-full rounded-full object-contain"
-											/>
-										</div>
+
+							<!-- Ticker -->
+							<div class="text-base leading-tight font-black tracking-tight text-white drop-shadow-sm sm:text-lg">
+								{displaySym}
+							</div>
+
+							<!-- Percent Change -->
+							<div class="mt-0.5 text-xs font-bold text-white/95 sm:text-sm">
+								{node.data.pct.string}
+							</div>
+						</div>
+					{:else if node.w >= 65 && node.h >= 45}
+						<!-- MEDIUM TILE (e.g. LLY, JPM, WMT, V, MA, JNJ, ABBV, PLTR, AMGN, NOW, CRM, NFLX) -->
+						<div class="flex h-full w-full flex-col items-center justify-center p-1">
+							{#if node.h >= 68 && node.w >= 80}
+								<div class="mb-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/35 p-1 shadow-sm">
+									{#if logoSvg}
+										{@html logoSvg}
+									{:else if localLogo}
+										<img src={localLogo} alt={displaySym} class="h-full w-full rounded-full object-contain" />
+									{:else}
+										<span class="text-[9px] font-black text-white/80">{displaySym.slice(0, 2)}</span>
 									{/if}
-									<div
-										class="mt-0.5 text-xs leading-none font-bold tracking-wide text-white uppercase"
-									>
-										{node.data.details.displaySymbol}
-									</div>
-									<div class="mt-0.5 text-[10px] leading-none font-medium text-white/90">
-										{node.data.pct.string}
-									</div>
 								</div>
 							{/if}
-						{:else if node.w >= 40 && node.h >= 25}
-							<!-- Small Cell -->
-							<div
-								class="flex h-full w-full flex-col items-center justify-center gap-0.5 select-none"
-							>
-								<div class="text-[11px] leading-none font-bold tracking-wide text-white uppercase">
-									{node.data.details.displaySymbol}
-								</div>
-								<div class="text-[9px] leading-none font-medium text-white/85">
+							<div class="text-xs leading-tight font-black tracking-tight text-white drop-shadow-sm sm:text-sm">
+								{displaySym}
+							</div>
+							<div class="text-[11px] leading-tight font-bold text-white/90">
+								{node.data.pct.string}
+							</div>
+						</div>
+					{:else if node.w >= 36 && node.h >= 22}
+						<!-- SMALL TILE -->
+						<div class="flex h-full w-full flex-col items-center justify-center p-0.5">
+							<div class="text-[10.5px] leading-tight font-black tracking-tight text-white">
+								{displaySym}
+							</div>
+							{#if node.h >= 32}
+								<div class="text-[9px] leading-tight font-bold text-white/85">
 									{node.data.pct.string}
 								</div>
-							</div>
-						{:else}
-							<!-- Very Small Cell -->
-							<div class="flex h-full w-full items-center justify-center select-none">
-								<div class="text-[9px] leading-none font-bold tracking-wide text-white uppercase">
-									{node.data.details.displaySymbol}
-								</div>
-							</div>
-						{/if}
-					</button>
-				{/each}
-			</div>
+							{/if}
+						</div>
+					{:else}
+						<!-- MICRO TILE -->
+						<div class="flex h-full w-full items-center justify-center">
+							{#if node.w >= 20 && node.h >= 14}
+								<span class="text-[8px] leading-none font-bold text-white/80">{displaySym.slice(0, 3)}</span>
+							{/if}
+						</div>
+					{/if}
+				</button>
+			{/each}
 		{/if}
 	</div>
+
+	<!-- Bottom Legend Scale -->
+	<div class="z-20 flex shrink-0 items-center justify-between border-t border-[#27272a] bg-[#12131a] px-4 py-2 text-[11px] text-[#94a3b8]">
+		<div class="flex items-center gap-1.5 font-medium">
+			<Info class="h-3.5 w-3.5 text-[#2962ff]" />
+			<span>Showing {processedPrices.length} assets • Click tile to open detailed chart</span>
+		</div>
+
+		<!-- Gradient Legend -->
+		<div class="flex items-center gap-1.5 font-mono text-[10px]">
+			<span>-4%</span>
+			<div class="flex h-2.5 items-center gap-0.5 overflow-hidden rounded-sm border border-black/60">
+				<div class="h-full w-3.5 bg-[#ef4444]"></div>
+				<div class="h-full w-3.5 bg-[#b91c1c]"></div>
+				<div class="h-full w-3.5 bg-[#701a20]"></div>
+				<div class="h-full w-3.5 bg-[#1e222d]"></div>
+				<div class="h-full w-3.5 bg-[#064e3b]"></div>
+				<div class="h-full w-3.5 bg-[#16a34a]"></div>
+				<div class="h-full w-3.5 bg-[#22c55e]"></div>
+			</div>
+			<span>+4%</span>
+		</div>
+	</div>
 </div>
+
+<!-- Floating Hover Tooltip -->
+{#if hoveredNode}
+	{@const d = hoveredNode.data}
+	<div
+		class="pointer-events-none fixed z-50 w-56 rounded-lg border border-[#3f3f46] bg-[#18181b]/95 p-3 text-white shadow-2xl backdrop-blur-md transition-opacity duration-150"
+		style="left: {tooltipX}px; top: {tooltipY}px;"
+	>
+		<div class="flex items-center justify-between border-b border-[#27272a] pb-2">
+			<div>
+				<div class="text-sm font-black tracking-tight">{d.details.displaySymbol}</div>
+				<div class="line-clamp-1 text-[11px] text-[#a1a1aa]">{d.details.name}</div>
+			</div>
+			<span
+				class="rounded px-1.5 py-0.5 text-[10px] font-bold"
+				style="background-color: {getHeatmapBgColor(d.pct.value)}; color: #ffffff;"
+			>
+				{d.pct.string}
+			</span>
+		</div>
+
+		<div class="mt-2 space-y-1 text-xs">
+			<div class="flex justify-between">
+				<span class="text-[#71717a]">Price:</span>
+				<span class="font-mono font-bold">${Number(d.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+			</div>
+			{#if d.details.sector}
+				<div class="flex justify-between">
+					<span class="text-[#71717a]">Sector:</span>
+					<span class="text-[#d4d4d8]">{d.details.sector}</span>
+				</div>
+			{/if}
+			{#if d.details.marketCap}
+				<div class="flex justify-between">
+					<span class="text-[#71717a]">Market Cap:</span>
+					<span class="font-mono text-[#d4d4d8]">${d.details.marketCap}B</span>
+				</div>
+			{/if}
+		</div>
+	</div>
+{/if}
 
 <style>
 	/* Hide scrollbars for overflow tabs */
@@ -721,22 +810,15 @@
 		scrollbar-width: none;
 	}
 
-	.heatmap-cell {
+	.heatmap-tile {
 		border-radius: 0px;
-		transition:
-			filter 0.2s ease;
 		outline: none !important;
+		user-select: none;
 	}
 
-	.heatmap-cell:hover {
-		filter: brightness(1.08);
-		z-index: 30;
-	}
-
-	/* Brief brightness lift on WebSocket updates — no neon outline. */
 	@keyframes local-pulse {
 		0% {
-			filter: brightness(1.25);
+			filter: brightness(1.3);
 		}
 		100% {
 			filter: brightness(1);
@@ -744,7 +826,7 @@
 	}
 	.cell-flash-green,
 	.cell-flash-red {
-		animation: local-pulse 0.7s cubic-bezier(0.25, 1, 0.5, 1);
-		z-index: 20;
+		animation: local-pulse 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+		z-index: 25;
 	}
 </style>
