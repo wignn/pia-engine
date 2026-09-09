@@ -97,19 +97,6 @@ export default function TerminalPage() {
     defaultTimeframe: "15m",
   });
 
-  // Load saved settings from localStorage
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("atlsd_terminal_settings");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setSettings((prev) => ({ ...prev, ...parsed }));
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
   const handleSaveSettings = (newSettings: TerminalSettings) => {
     setSettings(newSettings);
     try {
@@ -186,6 +173,110 @@ export default function TerminalPage() {
     },
   ]);
 
+  // Tabbed charts state (Supports Chart, News, Social, OrderBook, Intel, Calendar)
+  const [tabs, setTabs] = useState<TabItem[]>([
+    { id: "tab-1", type: "chart", symbol: "XAUUSD", timeframe: "15m", name: "Gold Spot / U.S. Dollar" },
+    { id: "tab-2", type: "chart", symbol: "BTCUSDT", timeframe: "1h", name: "Bitcoin / TetherUS" },
+    { id: "tab-3", type: "chart", symbol: "SPX", timeframe: "1D", name: "S&P 500 Index" },
+  ]);
+  const [activeTabId, setActiveTabId] = useState<string>("tab-1");
+
+  // Track if local state has been initialized from localStorage
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Load saved settings & workspace layout state from localStorage on initial mount
+  useEffect(() => {
+    try {
+      const savedSettings = localStorage.getItem("atlsd_terminal_settings");
+      if (savedSettings) {
+        setSettings((prev) => ({ ...prev, ...JSON.parse(savedSettings) }));
+      }
+
+      const savedLayout = localStorage.getItem("atlsd_terminal_layout") as ChartLayout | null;
+      if (savedLayout) {
+        setLayout(savedLayout);
+      }
+
+      const savedPanes = localStorage.getItem("atlsd_terminal_panes");
+      if (savedPanes) {
+        const parsed = JSON.parse(savedPanes);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPanes(parsed);
+        }
+      }
+
+      const savedTabs = localStorage.getItem("atlsd_terminal_tabs");
+      if (savedTabs) {
+        const parsed = JSON.parse(savedTabs);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setTabs(parsed);
+        }
+      }
+
+      const savedActivePane = localStorage.getItem("atlsd_terminal_active_pane_id");
+      if (savedActivePane) setActivePaneId(savedActivePane);
+
+      const savedActiveTab = localStorage.getItem("atlsd_terminal_active_tab_id");
+      if (savedActiveTab) setActiveTabId(savedActiveTab);
+
+      const savedWidth = localStorage.getItem("atlsd_terminal_sidebar_width");
+      if (savedWidth) setSidebarWidth(Number(savedWidth) || 330);
+
+      const savedCollapsed = localStorage.getItem("atlsd_terminal_sidebar_collapsed");
+      if (savedCollapsed !== null) setIsSidebarCollapsed(savedCollapsed === "true");
+
+      const savedRightTab = localStorage.getItem("atlsd_terminal_right_tab") as SidebarTab | null;
+      if (savedRightTab) setRightSidebarTab(savedRightTab);
+    } catch {
+      // ignore
+    } finally {
+      setIsInitialized(true);
+    }
+  }, []);
+
+  // Auto-persist workspace state on every change once initialized
+  useEffect(() => {
+    if (!isInitialized) return;
+    try {
+      localStorage.setItem("atlsd_terminal_layout", layout);
+      localStorage.setItem("atlsd_terminal_panes", JSON.stringify(panes));
+      localStorage.setItem("atlsd_terminal_tabs", JSON.stringify(tabs));
+      localStorage.setItem("atlsd_terminal_active_pane_id", activePaneId);
+      localStorage.setItem("atlsd_terminal_active_tab_id", activeTabId);
+      localStorage.setItem("atlsd_terminal_sidebar_width", String(sidebarWidth));
+      localStorage.setItem("atlsd_terminal_sidebar_collapsed", String(isSidebarCollapsed));
+      localStorage.setItem("atlsd_terminal_right_tab", rightSidebarTab);
+    } catch {
+      // ignore
+    }
+  }, [
+    isInitialized,
+    layout,
+    panes,
+    tabs,
+    activePaneId,
+    activeTabId,
+    sidebarWidth,
+    isSidebarCollapsed,
+    rightSidebarTab,
+  ]);
+
+  const handleManualSave = () => {
+    try {
+      localStorage.setItem("atlsd_terminal_layout", layout);
+      localStorage.setItem("atlsd_terminal_panes", JSON.stringify(panes));
+      localStorage.setItem("atlsd_terminal_tabs", JSON.stringify(tabs));
+      localStorage.setItem("atlsd_terminal_active_pane_id", activePaneId);
+      localStorage.setItem("atlsd_terminal_active_tab_id", activeTabId);
+      localStorage.setItem("atlsd_terminal_sidebar_width", String(sidebarWidth));
+      localStorage.setItem("atlsd_terminal_sidebar_collapsed", String(isSidebarCollapsed));
+      localStorage.setItem("atlsd_terminal_right_tab", rightSidebarTab);
+      localStorage.setItem("atlsd_terminal_settings", JSON.stringify(settings));
+    } catch {
+      // ignore
+    }
+  };
+
   const findItem = useCallback(
     (sym: string) =>
       watchlist.find((w) => w.symbol === sym) ??
@@ -225,14 +316,6 @@ export default function TerminalPage() {
   }, [layout, activePane, panes]);
 
   const gridClass = useMemo(() => getGridClass(layout, isLight), [layout, isLight]);
-
-  // Tabbed charts state (Supports Chart, News, Social, OrderBook, Intel, Calendar)
-  const [tabs, setTabs] = useState<TabItem[]>([
-    { id: "tab-1", type: "chart", symbol: "XAUUSD", timeframe: "15m", name: "Gold Spot / U.S. Dollar" },
-    { id: "tab-2", type: "chart", symbol: "BTCUSDT", timeframe: "1h", name: "Bitcoin / TetherUS" },
-    { id: "tab-3", type: "chart", symbol: "SPX", timeframe: "1D", name: "S&P 500 Index" },
-  ]);
-  const [activeTabId, setActiveTabId] = useState<string>("tab-1");
 
   const handleSelectTab = (tabId: string) => {
     setActiveTabId(tabId);
@@ -602,6 +685,7 @@ export default function TerminalPage() {
         theme={settings.theme}
         onToggleTheme={handleToggleTheme}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onSave={handleManualSave}
       />
 
       <ChartTabs

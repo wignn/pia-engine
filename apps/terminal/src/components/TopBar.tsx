@@ -50,6 +50,7 @@ interface TopBarProps {
   theme?: "dark" | "light";
   onToggleTheme?: () => void;
   onOpenSettings?: () => void;
+  onSave?: () => void;
 }
 
 const TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1D", "1W"];
@@ -80,6 +81,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   theme = "dark",
   onToggleTheme,
   onOpenSettings,
+  onSave,
 }) => {
   const isPositive = change >= 0;
   const isLight = theme === "light";
@@ -88,6 +90,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   const handleSave = () => {
     try {
+      onSave?.();
       localStorage.setItem("atlsd_terminal_saved_layout", JSON.stringify({ symbol, timeframe, chartType, layout }));
       setSavedFeedback(true);
       setTimeout(() => setSavedFeedback(false), 2000);
