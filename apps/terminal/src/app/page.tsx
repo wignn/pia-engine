@@ -360,8 +360,10 @@ export default function TerminalPage() {
 
   const handleNewTab = (type: TabContentType = "chart") => {
     const newId = `tab-${Date.now()}`;
-    const defaultSymbol = "BTCUSDT";
-    const item = findItem(defaultSymbol);
+    const defaultSymbols = ["BTCUSDT", "ETHUSDT", "XAUUSD", "SPX", "NVDA", "AAPL", "EURUSD", "NDX", "TSLA"];
+    const existing = new Set(tabs.map((t) => t.symbol));
+    const nextSym = defaultSymbols.find((s) => !existing.has(s)) || selectedItem.symbol;
+    const item = findItem(nextSym);
     const newTab: TabItem = {
       id: newId,
       type,
