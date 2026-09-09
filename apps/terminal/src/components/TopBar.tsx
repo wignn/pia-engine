@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { Timeframe, IndicatorState, ChartLayout } from "@/types";
 
+import { VisualLayoutPicker } from "./VisualLayoutPicker";
+
 interface TopBarProps {
   symbol: string;
   timeframe: Timeframe;
@@ -82,6 +84,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const isPositive = change >= 0;
   const isLight = theme === "light";
   const [savedFeedback, setSavedFeedback] = useState(false);
+  const [isLayoutPickerOpen, setIsLayoutPickerOpen] = useState(false);
 
   const handleSave = () => {
     try {
@@ -288,39 +291,37 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
         </div>
 
-        {/* Layout Mode */}
-        <div className="relative group">
+        {/* Visual Layout Mode Picker (TradingView-style) */}
+        <div className="relative">
           <button
+            onClick={() => setIsLayoutPickerOpen((v) => !v)}
             className={`p-1.5 rounded transition-colors cursor-pointer ${
               isLight ? "hover:bg-[#f0f3fa] text-[#5d606b] hover:text-[#131722]" : "hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]"
             }`}
-            title={`Select Grid Layout (${layout})`}
+            title={`Select Layout (${layout})`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
           </button>
-          <div
-            className={`hidden group-hover:flex absolute top-full right-0 z-30 mt-1 w-40 flex-col rounded border p-1 shadow-xl ${
-              isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
-            }`}
-          >
-            {([
-              ["1x1", "Single (1x1)"],
-              ["1x2", "Dual Horizontal (1x2)"],
-              ["2x1", "Dual Vertical (2x1)"],
-              ["2x2", "Quad Grid (2x2)"],
-              ["1x3", "Triple Horizontal (1x3)"],
-            ] as const).map(([id, label]) => (
-              <button
-                key={id}
-                onClick={() => onLayoutChange?.(id)}
-                className={`rounded px-2 py-1.5 text-left text-xs hover:bg-black/5 dark:hover:bg-[#2a2e39] cursor-pointer ${
-                  layout === id ? "text-[#2962ff] font-bold" : isLight ? "text-[#131722]" : "text-[#d1d4dc]"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+
+          {isLayoutPickerOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setIsLayoutPickerOpen(false)}
+              />
+              <div className="absolute top-full right-0 z-40 mt-1">
+                <VisualLayoutPicker
+                  currentLayout={layout}
+                  onSelectLayout={(ly) => {
+                    onLayoutChange?.(ly);
+                    setIsLayoutPickerOpen(false);
+                  }}
+                  onClose={() => setIsLayoutPickerOpen(false)}
+                  theme={theme}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Quick Save */}

@@ -24,6 +24,7 @@ interface LeftToolbarProps {
   onToggleDrawingModeLock?: () => void;
   isDrawingsHidden?: boolean;
   onToggleHideDrawings?: () => void;
+  theme?: "dark" | "light";
 }
 
 export const LeftToolbar: React.FC<LeftToolbarProps> = ({
@@ -35,7 +36,10 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
   onToggleDrawingModeLock,
   isDrawingsHidden = false,
   onToggleHideDrawings,
+  theme = "dark",
 }) => {
+  const isLight = theme === "light";
+
   const tools: { id: DrawingTool; label: string; icon: React.ReactNode }[] = [
     { id: "cursor", label: "Crosshair (V / Esc)", icon: <Crosshair className="w-4 h-4" /> },
     { id: "trendline", label: "Trend Line (T)", icon: <TrendingUp className="w-4 h-4" /> },
@@ -45,7 +49,11 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
   ];
 
   return (
-    <aside className="hidden md:flex w-[48px] bg-[#1e222d] border-r border-[#2a2e39] flex-col items-center py-2 justify-between select-none z-10 shrink-0">
+    <aside
+      className={`hidden md:flex w-[48px] border-r flex-col items-center py-2 justify-between select-none z-10 shrink-0 transition-colors ${
+        isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+      }`}
+    >
       {/* Drawing Tools */}
       <div className="flex flex-col items-center gap-1.5 w-full">
         {tools.map((t) => {
@@ -57,6 +65,8 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
               className={`group relative p-2 rounded transition-all cursor-pointer ${
                 isActive
                   ? "bg-[#2962ff]/20 text-[#2962ff] shadow-sm"
+                  : isLight
+                  ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#f0f3fa]"
                   : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39]"
               }`}
               title={t.label}
@@ -71,13 +81,15 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
       </div>
 
       {/* Utility Actions (TradingView-style Lock, Hide, Trash) */}
-      <div className="flex flex-col items-center gap-1.5 w-full pt-2 border-t border-[#2a2e39]">
+      <div className={`flex flex-col items-center gap-1.5 w-full pt-2 border-t ${isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]"}`}>
         {/* Stay in Drawing Mode Lock */}
         <button
           onClick={onToggleDrawingModeLock}
           className={`p-2 rounded transition-colors cursor-pointer ${
             isDrawingModeLocked
               ? "bg-[#2962ff]/20 text-[#2962ff]"
+              : isLight
+              ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#f0f3fa]"
               : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39]"
           }`}
           title={isDrawingModeLocked ? "Stay in Drawing Mode: ON" : "Stay in Drawing Mode: OFF"}
@@ -91,6 +103,8 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
           className={`p-2 rounded transition-colors cursor-pointer ${
             isDrawingsHidden
               ? "bg-[#f5b942]/20 text-[#f5b942]"
+              : isLight
+              ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#f0f3fa]"
               : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39]"
           }`}
           title={isDrawingsHidden ? "Show All Drawings" : "Hide All Drawings"}
@@ -102,7 +116,9 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
         <button
           onClick={onClearDrawings}
           disabled={drawingsCount === 0}
-          className="relative p-2 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#f23645] transition-colors disabled:opacity-40 cursor-pointer"
+          className={`relative p-2 rounded transition-colors disabled:opacity-40 cursor-pointer ${
+            isLight ? "hover:bg-[#f0f3fa] text-[#5d606b] hover:text-[#f23645]" : "hover:bg-[#2a2e39] text-[#787b86] hover:text-[#f23645]"
+          }`}
           title={`Clear Drawings (${drawingsCount})`}
         >
           <Trash2 className="w-4 h-4" />

@@ -9,8 +9,6 @@ import {
   Calendar,
   Brain,
   Radio,
-  Flame,
-  TrendingUp, 
   Settings2 
 } from "lucide-react";
 
@@ -19,9 +17,12 @@ export type SidebarTab = "watchlist" | "news" | "alerts" | "calendar" | "intelli
 interface RightDockProps {
   activeTab: SidebarTab;
   setActiveTab: (tab: SidebarTab) => void;
+  theme?: "dark" | "light";
 }
 
-export const RightDock: React.FC<RightDockProps> = ({ activeTab, setActiveTab }) => {
+export const RightDock: React.FC<RightDockProps> = ({ activeTab, setActiveTab, theme = "dark" }) => {
+  const isLight = theme === "light";
+
   const tabs: { id: SidebarTab; label: string; icon: React.ReactNode }[] = [
     { id: "watchlist", label: "Watchlist & Details", icon: <Bookmark className="w-4 h-4" /> },
     { id: "orderbook", label: "Order Book & Trades", icon: <Layers className="w-4 h-4" /> },
@@ -33,7 +34,11 @@ export const RightDock: React.FC<RightDockProps> = ({ activeTab, setActiveTab })
   ];
 
   return (
-    <div className="hidden lg:flex w-[45px] bg-[#1e222d] border-l border-[#2a2e39] flex-col items-center py-2 justify-between select-none z-10 shrink-0">
+    <div
+      className={`hidden lg:flex w-[45px] border-l flex-col items-center py-2 justify-between select-none z-10 shrink-0 transition-colors ${
+        isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+      }`}
+    >
       <div className="flex flex-col items-center gap-1 w-full">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -41,9 +46,11 @@ export const RightDock: React.FC<RightDockProps> = ({ activeTab, setActiveTab })
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`p-2.5 rounded transition-all relative group ${
+              className={`p-2.5 rounded transition-all relative group cursor-pointer ${
                 isActive
                   ? "text-[#2962ff] bg-[#2962ff]/10"
+                  : isLight
+                  ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#f0f3fa]"
                   : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39]"
               }`}
               title={tab.label}
@@ -57,8 +64,13 @@ export const RightDock: React.FC<RightDockProps> = ({ activeTab, setActiveTab })
         })}
       </div>
 
-      <div className="flex flex-col items-center gap-1 w-full pt-2 border-t border-[#2a2e39]">
-        <button className="p-2.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]" title="Layout Settings">
+      <div className={`flex flex-col items-center gap-1 w-full pt-2 border-t ${isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]"}`}>
+        <button
+          className={`p-2.5 rounded transition-colors cursor-pointer ${
+            isLight ? "hover:bg-[#f0f3fa] text-[#5d606b] hover:text-[#131722]" : "hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]"
+          }`}
+          title="Dock Bar"
+        >
           <Settings2 className="w-4 h-4" />
         </button>
       </div>

@@ -52,7 +52,18 @@ export interface IndicatorState {
 export type TabContentType = "chart" | "news" | "social" | "orderbook" | "intelligence" | "calendar";
 export type PaneContentType = TabContentType;
 
-export type ChartLayout = "1x1" | "1x2" | "2x1" | "2x2" | "1x3";
+export type ChartLayout =
+  | "1x1"
+  | "1x2"
+  | "2x1"
+  | "1x3"
+  | "3x1"
+  | "1L-2R"
+  | "2L-1R"
+  | "1T-2B"
+  | "2T-1B"
+  | "2x2"
+  | "3x2";
 
 export interface ChartPaneConfig {
   id: string;

@@ -8,6 +8,7 @@ interface AlertsPanelProps {
   symbol: string;
   livePrice: number | null;
   digits: number;
+  theme?: "dark" | "light";
 }
 
 // Play Web Audio frequency chime on alert trigger
@@ -40,10 +41,13 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({
   symbol,
   livePrice,
   digits,
+  theme = "dark",
 }) => {
+  const isLight = theme === "light";
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
-  const [targetPriceInput, setTargetPriceInput] = useState<string>("");
-  const [condition, setCondition] = useState<"crossing_up" | "crossing_down">("crossing_up");
+  const [targetInput, setTargetInput] = useState<string>("");
+  const [conditionInput, setConditionInput] = useState<"crossing_up" | "crossing_down">("crossing_up");
+  const [showAddForm, setShowAddForm] = useState(false);
 
   // Load alerts from localStorage
   useEffect(() => {
@@ -53,7 +57,7 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({
         setAlerts(JSON.parse(stored));
       }
     } catch {
-      // Ignore parse error
+      // ignore
     }
   }, []);
 
@@ -63,222 +67,211 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({
     try {
       localStorage.setItem("atlsd_price_alerts", JSON.stringify(newAlerts));
     } catch {
-      // Ignore write error
+      // ignore
     }
   };
 
-  // Sync initial input price when live price changes if input is empty
-  useEffect(() => {
-    if (livePrice && !targetPriceInput) {
-      setTargetPriceInput(livePrice.toFixed(digits));
-    }
-  }, [livePrice, digits, targetPriceInput]);
-
-  // Monitor livePrice against alerts
+  // Check alert conditions against live price
   useEffect(() => {
     if (!livePrice || livePrice <= 0) return;
 
-    let triggeredAny = false;
-    const updated = alerts.map((alert) => {
-      if (alert.triggered || alert.symbol !== symbol) return alert;
+    let hasUpdates = false;
+    const updated = alerts.map((a) => {
+      if (a.triggered || a.symbol !== symbol) return a;
 
-      const crossedUp = alert.condition === "crossing_up" && livePrice >= alert.targetPrice;
-      const crossedDown = alert.condition === "crossing_down" && livePrice <= alert.targetPrice;
-
-      if (crossedUp || crossedDown) {
-        triggeredAny = true;
-        return {
-          ...alert,
-          triggered: true,
-          triggeredAt: Date.now(),
-        };
+      let isTriggered = false;
+      if (a.condition === "crossing_up" && livePrice >= a.targetPrice && a.createdPrice < a.targetPrice) {
+        isTriggered = true;
+      } else if (a.condition === "crossing_down" && livePrice <= a.targetPrice && a.createdPrice > a.targetPrice) {
+        isTriggered = true;
       }
-      return alert;
+
+      if (isTriggered) {
+        hasUpdates = true;
+        playAlertChime();
+        return { ...a, triggered: true, triggeredAt: Date.now() };
+      }
+      return a;
     });
 
-    if (triggeredAny) {
-      playAlertChime();
+    if (hasUpdates) {
       saveAlerts(updated);
     }
   }, [livePrice, symbol, alerts]);
 
   const handleCreateAlert = (e: React.FormEvent) => {
     e.preventDefault();
-    const target = parseFloat(targetPriceInput);
-    if (isNaN(target) || target <= 0 || !livePrice) return;
+    const val = parseFloat(targetInput);
+    if (isNaN(val) || val <= 0) return;
 
     const newAlert: PriceAlert = {
-      id: "alert_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+      id: `alert-${Date.now()}`,
       symbol,
-      targetPrice: target,
-      condition: target >= livePrice ? "crossing_up" : "crossing_down",
-      createdPrice: livePrice,
+      targetPrice: val,
+      condition: conditionInput,
+      createdPrice: livePrice || val,
       createdAt: Date.now(),
       triggered: false,
     };
 
     saveAlerts([newAlert, ...alerts]);
+    setTargetInput("");
+    setShowAddForm(false);
   };
 
   const handleDeleteAlert = (id: string) => {
     saveAlerts(alerts.filter((a) => a.id !== id));
   };
 
-  const handlePreset = (percentDelta: number) => {
-    if (!livePrice) return;
-    const target = livePrice * (1 + percentDelta / 100);
-    setTargetPriceInput(target.toFixed(digits));
-    setCondition(percentDelta >= 0 ? "crossing_up" : "crossing_down");
-  };
-
   const symbolAlerts = alerts.filter((a) => a.symbol === symbol);
-  const activeAlerts = symbolAlerts.filter((a) => !a.triggered);
-  const triggeredAlerts = symbolAlerts.filter((a) => a.triggered);
 
   return (
-    <div className="flex h-full flex-col bg-[#1e222d] border-l border-[#2a2e39] text-xs text-[#d1d4dc] overflow-hidden">
+    <aside
+      className={`w-full flex flex-col h-full select-none text-xs overflow-hidden transition-colors ${
+        isLight ? "bg-[#ffffff] border-[#e0e3eb] text-[#131722]" : "bg-[#1e222d] border-[#2a2e39] text-[#d1d4dc]"
+      }`}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#2a2e39] px-4 py-3 shrink-0">
+      <div
+        className={`h-[44px] border-b flex items-center justify-between px-4 shrink-0 ${
+          isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+        }`}
+      >
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-[#2962ff]" />
-          <span className="font-bold text-white text-sm">Price Alerts</span>
+          <span className={`font-bold text-sm ${isLight ? "text-[#131722]" : "text-white"}`}>Price Alerts</span>
         </div>
-        <span className="font-mono text-[10px] text-[#787b86] uppercase bg-[#141722] px-2 py-0.5 rounded border border-[#2a2e39]">
-          {symbol}
-        </span>
+        <button
+          onClick={() => setShowAddForm((v) => !v)}
+          className="flex items-center gap-1 bg-[#2962ff] text-white px-2 py-1 rounded text-[11px] font-semibold hover:bg-[#1e4bd8] transition-colors cursor-pointer"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>New Alert</span>
+        </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Create Alert Form */}
-        <form onSubmit={handleCreateAlert} className="space-y-3 rounded-lg border border-[#2a2e39] bg-[#141722] p-3">
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-[#787b86]">Current Price:</span>
-            <span className="font-mono font-bold text-white">
-              {livePrice ? livePrice.toFixed(digits) : "—"}
-            </span>
+      {/* Quick Add Form */}
+      {showAddForm && (
+        <form
+          onSubmit={handleCreateAlert}
+          className={`p-3 border-b flex flex-col gap-2.5 shrink-0 ${
+            isLight ? "bg-[#f8f9fc] border-[#e0e3eb]" : "bg-[#141722] border-[#2a2e39]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-[11px] text-[#787b86]">Symbol:</span>
+            <span className={`font-mono font-bold ${isLight ? "text-[#131722]" : "text-white"}`}>{symbol}</span>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-semibold text-[#787b86] mb-1">
-              Target Price ({symbol})
-            </label>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] uppercase font-bold text-[#787b86]">Condition</label>
+            <select
+              value={conditionInput}
+              onChange={(e) => setConditionInput(e.target.value as any)}
+              className={`rounded px-2 py-1.5 border text-xs focus:outline-hidden ${
+                isLight ? "bg-white border-[#e0e3eb] text-[#131722]" : "bg-[#1e222d] border-[#2a2e39] text-white"
+              }`}
+            >
+              <option value="crossing_up">Crossing Up (&gt;=)</option>
+              <option value="crossing_down">Crossing Down (&lt;=)</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] uppercase font-bold text-[#787b86]">Target Price</label>
             <input
               type="number"
               step="any"
-              value={targetPriceInput}
-              onChange={(e) => setTargetPriceInput(e.target.value)}
-              placeholder="Enter target price..."
-              className="w-full rounded border border-[#2a2e39] bg-[#1e222d] px-2.5 py-1.5 font-mono text-xs text-white focus:border-[#2962ff] focus:outline-none"
+              placeholder={livePrice ? livePrice.toFixed(digits) : "0.00"}
+              value={targetInput}
+              onChange={(e) => setTargetInput(e.target.value)}
+              className={`rounded px-2 py-1.5 border text-xs font-mono focus:outline-hidden ${
+                isLight ? "bg-white border-[#e0e3eb] text-[#131722]" : "bg-[#1e222d] border-[#2a2e39] text-white"
+              }`}
+              autoFocus
             />
           </div>
 
-          {/* Quick % Offset Presets */}
-          <div className="flex gap-1.5">
-            {[0.5, 1.0, -0.5, -1.0].map((pct) => (
-              <button
-                key={pct}
-                type="button"
-                onClick={() => handlePreset(pct)}
-                className={`flex-1 rounded py-1 text-[10px] font-mono font-bold transition-colors ${
-                  pct > 0
-                    ? "bg-[#089981]/15 text-[#089981] hover:bg-[#089981]/25"
-                    : "bg-[#f23645]/15 text-[#f23645] hover:bg-[#f23645]/25"
-                }`}
-              >
-                {pct > 0 ? `+${pct}%` : `${pct}%`}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 mt-1">
+            <button
+              type="submit"
+              className="flex-1 bg-[#2962ff] text-white py-1.5 rounded font-bold hover:bg-[#1e4bd8] transition-colors cursor-pointer"
+            >
+              Set Alert
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAddForm(false)}
+              className={`px-3 py-1.5 rounded border transition-colors cursor-pointer ${
+                isLight ? "border-[#e0e3eb] text-[#5d606b] hover:bg-[#e0e3eb]" : "border-[#2a2e39] text-[#787b86] hover:bg-[#2a2e39]"
+              }`}
+            >
+              Cancel
+            </button>
           </div>
-
-          <button
-            type="submit"
-            disabled={!livePrice || !targetPriceInput}
-            className="flex w-full items-center justify-center gap-1.5 rounded bg-[#2962ff] py-2 text-xs font-bold text-white hover:bg-[#1e53e5] transition-colors disabled:opacity-50"
-          >
-            <Plus className="w-3.5 h-3.5" /> Set Alert
-          </button>
         </form>
+      )}
 
-        {/* Active Alerts List */}
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-wider text-[#787b86] mb-2">
-            Active Alerts ({activeAlerts.length})
+      {/* Alerts List */}
+      <div className={`flex-1 overflow-y-auto divide-y ${isLight ? "divide-[#e0e3eb]" : "divide-[#2a2e39]/50"}`}>
+        {symbolAlerts.length === 0 ? (
+          <div className="p-8 text-center text-[#787b86]">
+            <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p className="font-medium">No alerts for {symbol}</p>
+            <p className="text-[11px] opacity-75 mt-1">Click "New Alert" above to create one</p>
           </div>
-          {activeAlerts.length === 0 ? (
-            <div className="rounded border border-[#2a2e39] bg-[#181b27] p-3 text-center text-[11px] text-[#787b86]">
-              No active alerts for {symbol}.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {activeAlerts.map((alert) => {
-                const diff = livePrice ? alert.targetPrice - livePrice : 0;
-                const diffPct = livePrice ? (diff / livePrice) * 100 : 0;
-                return (
-                  <div
-                    key={alert.id}
-                    className="flex items-center justify-between rounded border border-[#2a2e39] bg-[#181b27] p-2.5 transition-colors hover:border-[#363a45]"
+        ) : (
+          symbolAlerts.map((a) => (
+            <div
+              key={a.id}
+              className={`p-3 flex items-center justify-between transition-colors ${
+                a.triggered
+                  ? "bg-amber-500/10 border-l-2 border-amber-500"
+                  : isLight
+                  ? "hover:bg-[#f8f9fc]"
+                  : "hover:bg-[#262b37]"
+              }`}
+            >
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className={`font-mono font-bold text-sm ${isLight ? "text-[#131722]" : "text-white"}`}>
+                    {a.targetPrice.toFixed(digits)}
+                  </span>
+                  <span
+                    className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold uppercase ${
+                      a.condition === "crossing_up"
+                        ? "bg-[#089981]/15 text-[#089981]"
+                        : "bg-[#f23645]/15 text-[#f23645]"
+                    }`}
                   >
-                    <div>
-                      <div className="flex items-center gap-1.5 font-mono font-bold text-white">
-                        <span>{alert.targetPrice.toFixed(digits)}</span>
-                        <span className="text-[9px] font-normal text-[#787b86]">
-                          ({alert.condition === "crossing_up" ? "≥ Target" : "≤ Target"})
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-[#787b86] mt-0.5 font-mono">
-                        Distance: {diff >= 0 ? "+" : ""}{diff.toFixed(digits)} ({diffPct >= 0 ? "+" : ""}{diffPct.toFixed(2)}%)
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteAlert(alert.id)}
-                      className="p-1 rounded text-[#787b86] hover:text-[#f23645] hover:bg-[#2a2e39] transition-colors"
-                      title="Delete Alert"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Triggered Alerts History */}
-        {triggeredAlerts.length > 0 && (
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-[#787b86] mb-2">
-              Triggered History ({triggeredAlerts.length})
-            </div>
-            <div className="space-y-1.5">
-              {triggeredAlerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="flex items-center justify-between rounded border border-[#2a2e39]/60 bg-[#141722] p-2 text-[11px]"
-                >
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#089981]" />
-                    <div>
-                      <span className="font-mono font-semibold text-white">
-                        {alert.targetPrice.toFixed(digits)}
-                      </span>
-                      <div className="text-[9px] text-[#787b86]">
-                        {alert.triggeredAt ? new Date(alert.triggeredAt).toLocaleTimeString() : "Triggered"}
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteAlert(alert.id)}
-                    className="p-1 text-[#787b86] hover:text-[#f23645]"
-                    title="Remove"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                    {a.condition === "crossing_up" ? "Cross Up" : "Cross Down"}
+                  </span>
                 </div>
-              ))}
+                <div className="text-[10px] text-[#787b86]">
+                  {a.triggered ? (
+                    <span className="text-amber-500 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Triggered
+                    </span>
+                  ) : (
+                    `Active · Created at ${a.createdPrice.toFixed(digits)}`
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleDeleteAlert(a.id)}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  isLight ? "text-[#5d606b] hover:text-[#f23645] hover:bg-[#f0f3fa]" : "text-[#787b86] hover:text-[#f23645] hover:bg-[#2a2e39]"
+                }`}
+                title="Delete Alert"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             </div>
-          </div>
+          ))
         )}
       </div>
-    </div>
+    </aside>
   );
 };

@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
-import { ExternalLink, MessageCircle, Repeat2, Heart } from "lucide-react";
+import { ExternalLink, MessageCircle, Repeat2, Heart, RefreshCw } from "lucide-react";
 
 export interface SocialPostItem {
   event_id: string;
@@ -24,6 +24,10 @@ interface SocialApiResponse {
   has_more?: boolean;
 }
 
+interface SocialPanelProps {
+  theme?: "dark" | "light";
+}
+
 function formatDate(isoString: string): string {
   try {
     const d = new Date(isoString);
@@ -39,94 +43,169 @@ function formatDate(isoString: string): string {
   }
 }
 
-export const SocialPanel: React.FC = () => {
-  const [items, setItems] = useState<SocialPostItem[]>([]);
-  const [loading, setLoading] = useState(true);
+export const SocialPanel: React.FC<SocialPanelProps> = ({ theme = "dark" }) => {
+  const isLight = theme === "light";
+  const [posts, setPosts] = useState<SocialPostItem[]>([]);
+  const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
   const [nextBefore, setNextBefore] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchPosts = useCallback(async (before?: string | null) => {
+  const fetchPosts = useCallback(async (before?: string) => {
     const isInitial = !before;
-    if (isInitial) setLoading(true);
-    else setLoadingMore(true);
+    if (isInitial) {
+      setLoading(true);
+      setError(null);
+    } else {
+      setLoadingMore(true);
+    }
 
     try {
-      const params = new URLSearchParams({ platform: "twitter", limit: "30" });
-      if (before) params.set("before", before);
+      const url = new URL("/api/v1/social/posts", window.location.origin);
+      url.searchParams.set("limit", "25");
+      if (before) {
+        url.searchParams.set("before", before);
+      }
 
-      const res = await fetch(`/api/social?${params.toString()}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("Fetch failed");
+      const res = await fetch(url.toString());
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: Failed to load social feed`);
+      }
+
       const data: SocialApiResponse = await res.json();
+      const newItems = data.items ?? [];
 
-      const newItems = Array.isArray(data.items) ? data.items : [];
-      setItems((prev) => {
-        if (isInitial) return newItems;
-        const seen = new Set(prev.map((p) => p.event_id));
-        return [...prev, ...newItems.filter((p) => !seen.has(p.event_id))];
-      });
+      if (isInitial) {
+        setPosts(newItems);
+      } else {
+        setPosts((prev) => {
+          const seen = new Set(prev.map((p) => p.post_id));
+          const unique = newItems.filter((p) => !seen.has(p.post_id));
+          return [...prev, ...unique];
+        });
+      }
 
       setNextBefore(data.next_before ?? null);
       setHasMore(Boolean(data.has_more && data.next_before));
-    } catch {
-      if (isInitial) setItems([]);
+    } catch (err: any) {
+      setError(err?.message || "Failed to load social posts");
     } finally {
-      if (isInitial) setLoading(false);
-      else setLoadingMore(false);
+      setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
   useEffect(() => {
     fetchPosts();
+    const interval = setInterval(() => {
+      fetchPosts();
+    }, 45000);
+    return () => clearInterval(interval);
   }, [fetchPosts]);
 
   return (
-    <aside className="flex h-full flex-col overflow-hidden border-l border-[#2a2e39] bg-[#1e222d] text-xs text-[#d1d4dc]">
-      <div className="flex shrink-0 items-center justify-between border-b border-[#2a2e39] px-3 py-2.5">
-        <div>
-          <div className="font-bold text-white">Social pulse</div>
-          <div className="text-[10px] text-[#787b86]">Twitter/X posts collected by ATLSD</div>
+    <aside
+      className={`flex h-full w-full flex-col overflow-hidden text-xs transition-colors ${
+        isLight ? "bg-[#ffffff] text-[#131722]" : "bg-[#1e222d] text-[#d1d4dc]"
+      }`}
+    >
+      {/* Header */}
+      <div
+        className={`flex h-11 items-center justify-between border-b px-3 shrink-0 ${
+          isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+          </span>
+          <span className={`text-sm font-bold ${isLight ? "text-[#131722]" : "text-white"}`}>
+            Social Pulse
+          </span>
+          <span className="text-[10px] text-[#787b86]">X/Twitter</span>
         </div>
-        <span className="rounded border border-[#2a2e39] bg-[#141722] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-[#787b86]">
-          Realtime
-        </span>
+
+        <button
+          onClick={() => fetchPosts()}
+          disabled={loading}
+          className={`p-1.5 rounded transition-colors cursor-pointer ${
+            isLight ? "hover:bg-[#f0f3fa] text-[#5d606b] hover:text-[#131722]" : "hover:bg-[#2a2e39] text-[#787b86] hover:text-white"
+          }`}
+          title="Refresh Feed"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        </button>
       </div>
 
+      {/* Feed List */}
       <div className="flex-1 overflow-y-auto p-3">
-        {loading ? (
-          <div className="py-8 text-center text-[11px] text-[#787b86]">Loading social posts…</div>
-        ) : items.length === 0 ? (
-          <div className="rounded border border-[#2a2e39] bg-[#181b27] p-3 text-center text-[11px] text-[#787b86]">
-            No social posts available.
+        {error && (
+          <div className="mb-3 rounded-lg border border-red-500/20 bg-red-500/10 p-2.5 text-[11px] text-red-400">
+            {error}
+          </div>
+        )}
+
+        {loading && posts.length === 0 ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className={`animate-pulse rounded-lg border p-3 ${
+                  isLight ? "border-[#e0e3eb] bg-[#f8f9fc]" : "border-[#2a2e39] bg-[#141722]"
+                }`}
+              >
+                <div className={`h-4 w-1/3 rounded ${isLight ? "bg-[#e0e3eb]" : "bg-[#2a2e39]"}`} />
+                <div className={`mt-2 h-10 rounded ${isLight ? "bg-[#e0e3eb]" : "bg-[#2a2e39]"}`} />
+              </div>
+            ))}
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="flex h-48 flex-col items-center justify-center text-center text-[#787b86]">
+            <p>No social posts captured yet.</p>
+            <p className="mt-1 text-[11px] opacity-75">
+              Live tweets from financial sources will appear here.
+            </p>
           </div>
         ) : (
           <div className="space-y-2.5">
-            {items.map((item) => (
-              <article
-                key={item.event_id}
-                className="rounded border border-[#2a2e39] bg-[#181b27] p-2.5 transition-colors hover:border-[#363a45]"
+            {posts.map((item) => (
+              <div
+                key={item.post_id}
+                className={`rounded-lg border p-3 transition-colors ${
+                  isLight
+                    ? "border-[#e0e3eb] bg-[#f8f9fc] hover:border-[#2962ff]/40"
+                    : "border-[#2a2e39] bg-[#141722] hover:border-[#2962ff]/40"
+                }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="truncate font-semibold text-white">
-                      {item.author_display_name || item.author_username}
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <span className={`truncate text-[12px] font-bold ${isLight ? "text-[#131722]" : "text-white"}`}>
+                        {item.author_display_name || item.author_username}
+                      </span>
+                      <span className="text-[11px] text-[#787b86]">
+                        @{item.author_username}
+                      </span>
                     </div>
                     <div className="text-[10px] text-[#787b86]">
-                      @{item.author_username} · {formatDate(item.created_at)}
+                      {formatDate(item.created_at)}
                     </div>
                   </div>
+
                   <a
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="shrink-0 p-0.5 text-[#787b86] transition-colors hover:text-white"
+                    className="p-1 text-[#787b86] transition-colors hover:text-[#2962ff]"
                     title="Open on X"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
                 </div>
 
-                <p className="mt-2 whitespace-pre-wrap break-words leading-relaxed text-[#d1d4dc]">
+                <p className={`mt-2 whitespace-pre-wrap break-words leading-relaxed ${isLight ? "text-[#131722]" : "text-[#d1d4dc]"}`}>
                   {item.text}
                 </p>
 
@@ -142,7 +221,9 @@ export const SocialPanel: React.FC = () => {
                         href={url}
                         target="_blank"
                         rel="noreferrer"
-                        className="group relative block overflow-hidden rounded border border-[#2a2e39] bg-[#131722]"
+                        className={`group relative block overflow-hidden rounded border ${
+                          isLight ? "border-[#e0e3eb] bg-[#f0f3fa]" : "border-[#2a2e39] bg-[#131722]"
+                        }`}
                       >
                         <img
                           src={url}
@@ -156,7 +237,11 @@ export const SocialPanel: React.FC = () => {
                   </div>
                 )}
 
-                <div className="mt-2.5 flex items-center gap-3.5 border-t border-[#2a2e39]/60 pt-2 text-[10px] text-[#787b86]">
+                <div
+                  className={`mt-2.5 flex items-center gap-3.5 border-t pt-2 text-[10px] text-[#787b86] ${
+                    isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]/60"
+                  }`}
+                >
                   <span className="flex items-center gap-1">
                     <MessageCircle className="h-3 w-3" />
                     {item.reply_count ?? 0}
@@ -170,23 +255,22 @@ export const SocialPanel: React.FC = () => {
                     {item.like_count ?? 0}
                   </span>
                 </div>
-              </article>
+              </div>
             ))}
 
-            <div className="pt-2 text-center">
-              {hasMore ? (
-                <button
-                  type="button"
-                  disabled={loadingMore}
-                  onClick={() => fetchPosts(nextBefore)}
-                  className="w-full rounded border border-[#2a2e39] bg-[#181b27] py-1.5 text-[11px] font-medium text-[#d1d4dc] transition-colors hover:border-[#363a45] hover:text-white disabled:opacity-50"
-                >
-                  {loadingMore ? "Loading history…" : "Load older posts"}
-                </button>
-              ) : (
-                <span className="text-[10px] text-[#787b86]">End of social history</span>
-              )}
-            </div>
+            {hasMore && (
+              <button
+                onClick={() => nextBefore && fetchPosts(nextBefore)}
+                disabled={loadingMore}
+                className={`w-full rounded-lg border py-2 text-center text-[11px] font-medium transition-colors cursor-pointer ${
+                  isLight
+                    ? "border-[#e0e3eb] bg-[#f8f9fc] text-[#5d606b] hover:bg-[#f0f3fa] hover:text-[#131722]"
+                    : "border-[#2a2e39] bg-[#141722] text-[#787b86] hover:bg-[#2a2e39] hover:text-white"
+                }`}
+              >
+                {loadingMore ? "Loading earlier posts..." : "Load Earlier Posts"}
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -32,6 +32,52 @@ import {
   TerminalSettings,
 } from "@/types";
 
+function getGridClass(layout: ChartLayout, isLight: boolean): string {
+  const borderColor = isLight ? "bg-[#e0e3eb]" : "bg-[#1e222d]";
+  switch (layout) {
+    case "1x2":
+      return `grid grid-cols-1 md:grid-cols-2 gap-0.5 h-full w-full ${borderColor}`;
+    case "2x1":
+      return `grid grid-rows-2 gap-0.5 h-full w-full ${borderColor}`;
+    case "1x3":
+      return `grid grid-cols-1 lg:grid-cols-3 gap-0.5 h-full w-full ${borderColor}`;
+    case "3x1":
+      return `grid grid-rows-3 gap-0.5 h-full w-full ${borderColor}`;
+    case "1L-2R":
+    case "2L-1R":
+      return `grid grid-cols-1 md:grid-cols-2 grid-rows-2 gap-0.5 h-full w-full ${borderColor}`;
+    case "1T-2B":
+    case "2T-1B":
+      return `grid grid-cols-2 grid-rows-2 gap-0.5 h-full w-full ${borderColor}`;
+    case "2x2":
+      return `grid grid-cols-1 sm:grid-cols-2 grid-rows-2 gap-0.5 h-full w-full ${borderColor}`;
+    case "3x2":
+      return `grid grid-cols-1 sm:grid-cols-3 grid-rows-2 gap-0.5 h-full w-full ${borderColor}`;
+    default:
+      return "h-full w-full";
+  }
+}
+
+function getPaneSpanClass(layout: ChartLayout, index: number): string {
+  if (layout === "1L-2R") {
+    if (index === 0) return "col-span-1 row-span-2 h-full w-full overflow-hidden";
+    return "col-span-1 row-span-1 h-full w-full overflow-hidden";
+  }
+  if (layout === "2L-1R") {
+    if (index === 2) return "col-span-1 row-span-2 h-full w-full overflow-hidden";
+    return "col-span-1 row-span-1 h-full w-full overflow-hidden";
+  }
+  if (layout === "1T-2B") {
+    if (index === 0) return "col-span-2 row-span-1 h-full w-full overflow-hidden";
+    return "col-span-1 row-span-1 h-full w-full overflow-hidden";
+  }
+  if (layout === "2T-1B") {
+    if (index === 2) return "col-span-2 row-span-1 h-full w-full overflow-hidden";
+    return "col-span-1 row-span-1 h-full w-full overflow-hidden";
+  }
+  return "h-full w-full overflow-hidden";
+}
+
 export default function TerminalPage() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(INITIAL_WATCHLIST);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -122,6 +168,22 @@ export default function TerminalPage() {
       chartType: "candlestick",
       indicators: { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
     },
+    {
+      id: "pane-5",
+      type: "chart",
+      symbol: "EURUSD",
+      timeframe: "15m",
+      chartType: "candlestick",
+      indicators: { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
+    },
+    {
+      id: "pane-6",
+      type: "chart",
+      symbol: "NVDA",
+      timeframe: "1D",
+      chartType: "candlestick",
+      indicators: { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
+    },
   ]);
 
   const findItem = useCallback(
@@ -155,25 +217,14 @@ export default function TerminalPage() {
   const visiblePanes = useMemo(() => {
     if (layout === "1x1") return [activePane];
     if (layout === "1x2" || layout === "2x1") return panes.slice(0, 2);
-    if (layout === "1x3") return panes.slice(0, 3);
-    return panes.slice(0, 4);
+    if (["1x3", "3x1", "1L-2R", "2L-1R", "1T-2B", "2T-1B"].includes(layout)) {
+      return panes.slice(0, 3);
+    }
+    if (layout === "2x2") return panes.slice(0, 4);
+    return panes.slice(0, 6);
   }, [layout, activePane, panes]);
 
-  const gridClass = useMemo(() => {
-    const borderColor = isLight ? "bg-[#e0e3eb]" : "bg-[#1e222d]";
-    switch (layout) {
-      case "1x2":
-        return `grid grid-cols-1 md:grid-cols-2 gap-0.5 h-full w-full ${borderColor}`;
-      case "2x1":
-        return `grid grid-rows-2 gap-0.5 h-full w-full ${borderColor}`;
-      case "2x2":
-        return `grid grid-cols-1 sm:grid-cols-2 grid-rows-2 gap-0.5 h-full w-full ${borderColor}`;
-      case "1x3":
-        return `grid grid-cols-1 lg:grid-cols-3 gap-0.5 h-full w-full ${borderColor}`;
-      default:
-        return "h-full w-full";
-    }
-  }, [layout, isLight]);
+  const gridClass = useMemo(() => getGridClass(layout, isLight), [layout, isLight]);
 
   // Tabbed charts state (Supports Chart, News, Social, OrderBook, Intel, Calendar)
   const [tabs, setTabs] = useState<TabItem[]>([
@@ -269,6 +320,27 @@ export default function TerminalPage() {
     setPanes((curr) =>
       curr.map((p) => (p.id === paneId ? { ...p, type: newType } : p))
     );
+  };
+
+  const handleSplitHorizontal = () => {
+    if (layout === "1x1") setLayout("1x2");
+    else if (layout === "1x2") setLayout("1x3");
+    else if (layout === "2x1") setLayout("2x2");
+    else setLayout("2x2");
+  };
+
+  const handleSplitVertical = () => {
+    if (layout === "1x1") setLayout("2x1");
+    else if (layout === "2x1") setLayout("3x1");
+    else if (layout === "1x2") setLayout("2x2");
+    else setLayout("2x2");
+  };
+
+  const handleClosePane = () => {
+    if (layout === "3x2") setLayout("2x2");
+    else if (layout === "2x2") setLayout("1x3");
+    else if (["1x3", "3x1", "1L-2R", "2L-1R", "1T-2B", "2T-1B"].includes(layout)) setLayout("1x2");
+    else setLayout("1x1");
   };
 
   const handleTimeframe = useCallback(
@@ -496,6 +568,7 @@ export default function TerminalPage() {
 
   return (
     <div
+      data-theme={settings.theme}
       className={`flex flex-col h-full w-full ${
         isLight ? "bg-[#ffffff] text-[#131722]" : "bg-[#131722] text-[#d1d4dc]"
       } overflow-hidden transition-colors select-none`}
@@ -551,40 +624,47 @@ export default function TerminalPage() {
           onToggleDrawingModeLock={() => setIsDrawingModeLocked((v) => !v)}
           isDrawingsHidden={isDrawingsHidden}
           onToggleHideDrawings={() => setIsDrawingsHidden((v) => !v)}
+          theme={settings.theme}
         />
 
         {/* Main Workspace View */}
         <main className="flex-1 h-full overflow-hidden relative">
           <div className={gridClass}>
-            {visiblePanes.map((pane) => {
+            {visiblePanes.map((pane, idx) => {
               const meta = findItem(pane.symbol);
+              const spanClass = getPaneSpanClass(layout, idx);
               return (
-                <ChartPaneWrapper
-                  key={pane.id}
-                  pane={pane}
-                  isActive={pane.id === activePaneId}
-                  onActivate={() => setActivePaneId(pane.id)}
-                  activeTool={activeTool}
-                  digits={meta.digits}
-                  provider={meta.provider}
-                  clearDrawingsTrigger={clearDrawingsTrigger}
-                  snapshotTrigger={pane.id === activePaneId ? snapshotTrigger : 0}
-                  onDrawingsCountChange={setDrawingsCount}
-                  onToggleIndicator={handleToggleIndicator}
-                  isDrawingsHidden={isDrawingsHidden}
-                  isDrawingModeLocked={isDrawingModeLocked}
-                  onDrawingFinished={() => setActiveTool("cursor")}
-                  onCanUndoRedoChange={(u, r) => {
-                    setCanUndo(u);
-                    setCanRedo(r);
-                  }}
-                  undoTrigger={pane.id === activePaneId ? undoTrigger : 0}
-                  redoTrigger={pane.id === activePaneId ? redoTrigger : 0}
-                  theme={settings.theme}
-                  settings={settings}
-                  onChangePaneType={(newType) => handleChangePaneType(pane.id, newType)}
-                  showPaneHeader={layout !== "1x1"}
-                />
+                <div key={pane.id} className={spanClass}>
+                  <ChartPaneWrapper
+                    pane={pane}
+                    isActive={pane.id === activePaneId}
+                    onActivate={() => setActivePaneId(pane.id)}
+                    activeTool={activeTool}
+                    digits={meta.digits}
+                    provider={meta.provider}
+                    clearDrawingsTrigger={clearDrawingsTrigger}
+                    snapshotTrigger={pane.id === activePaneId ? snapshotTrigger : 0}
+                    onDrawingsCountChange={setDrawingsCount}
+                    onToggleIndicator={handleToggleIndicator}
+                    isDrawingsHidden={isDrawingsHidden}
+                    isDrawingModeLocked={isDrawingModeLocked}
+                    onDrawingFinished={() => setActiveTool("cursor")}
+                    onCanUndoRedoChange={(u, r) => {
+                      setCanUndo(u);
+                      setCanRedo(r);
+                    }}
+                    undoTrigger={pane.id === activePaneId ? undoTrigger : 0}
+                    redoTrigger={pane.id === activePaneId ? redoTrigger : 0}
+                    theme={settings.theme}
+                    settings={settings}
+                    onChangePaneType={(newType) => handleChangePaneType(pane.id, newType)}
+                    onSplitHorizontal={handleSplitHorizontal}
+                    onSplitVertical={handleSplitVertical}
+                    onClosePane={handleClosePane}
+                    canClosePane={layout !== "1x1"}
+                    showPaneHeader={layout !== "1x1"}
+                  />
+                </div>
               );
             })}
           </div>
@@ -637,7 +717,7 @@ export default function TerminalPage() {
             ${isMobileDrawerOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
             ${isSidebarCollapsed ? "lg:hidden" : "lg:flex"}
             ${isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"}
-            flex flex-col h-full overflow-hidden border-l shrink-0
+            flex flex-col h-full overflow-hidden border-l shrink-0 transition-colors
           `}
         >
           {/* Mobile Drawer Close Header */}
@@ -664,6 +744,7 @@ export default function TerminalPage() {
                 items={watchlist}
                 selectedSymbol={selectedItem.symbol}
                 onSelectSymbol={handleSelectSymbol}
+                theme={settings.theme}
               />
             )}
             {rightSidebarTab === "orderbook" && (
@@ -671,25 +752,33 @@ export default function TerminalPage() {
                 symbol={selectedItem.symbol}
                 livePrice={selectedItem.price}
                 digits={selectedItem.digits}
+                theme={settings.theme}
               />
             )}
-            {rightSidebarTab === "news" && <NewsPanel symbol={selectedItem.symbol} />}
-            {rightSidebarTab === "intelligence" && (
-              <MarketIntelligencePanel symbol={selectedItem.symbol} />
+            {rightSidebarTab === "news" && (
+              <NewsPanel symbol={selectedItem.symbol} theme={settings.theme} />
             )}
-            {rightSidebarTab === "social" && <SocialPanel />}
+            {rightSidebarTab === "intelligence" && (
+              <MarketIntelligencePanel symbol={selectedItem.symbol} theme={settings.theme} />
+            )}
+            {rightSidebarTab === "social" && <SocialPanel theme={settings.theme} />}
             {rightSidebarTab === "alerts" && (
               <AlertsPanel
                 symbol={selectedItem.symbol}
                 livePrice={selectedItem.price}
                 digits={selectedItem.digits}
+                theme={settings.theme}
               />
             )}
-            {rightSidebarTab === "calendar" && <CalendarPanel />}
+            {rightSidebarTab === "calendar" && <CalendarPanel theme={settings.theme} />}
           </div>
         </aside>
 
-        <RightDock activeTab={rightSidebarTab} setActiveTab={handleTabChangeFromDock} />
+        <RightDock
+          activeTab={rightSidebarTab}
+          setActiveTab={handleTabChangeFromDock}
+          theme={settings.theme}
+        />
       </div>
 
       {/* Mobile Bottom Navigation (< md) */}
@@ -711,6 +800,7 @@ export default function TerminalPage() {
         items={watchlist}
         onSelect={handleSelectSymbol}
         initialQuery={initialSearchQuery}
+        theme={settings.theme}
       />
 
       <SettingsModal

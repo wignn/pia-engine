@@ -17,9 +17,11 @@ import { NewsArticle } from "@/types";
 
 interface NewsPanelProps {
   symbol: string;
+  theme?: "dark" | "light";
 }
 
-export const NewsPanel: React.FC<NewsPanelProps> = ({ symbol }) => {
+export const NewsPanel: React.FC<NewsPanelProps> = ({ symbol, theme = "dark" }) => {
+  const isLight = theme === "light";
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "high" | "forex" | "crypto">("all");
@@ -38,12 +40,11 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({ symbol }) => {
           published_at: item.published_at || new Date().toISOString(),
           impact_level: item.impact_level || "medium",
           sentiment: item.sentiment || "neutral",
-          summary: item.summary || item.translated_title || "",
         }));
         setArticles(mapped);
       }
-    } catch (e) {
-      console.error("Failed to fetch news", e);
+    } catch {
+      // ignore
     } finally {
       setLoading(false);
     }
@@ -51,102 +52,131 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({ symbol }) => {
 
   useEffect(() => {
     fetchNews();
-    const interval = setInterval(fetchNews, 60000);
+    const interval = setInterval(fetchNews, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  const filtered = articles.filter((a) => {
+  const filteredArticles = articles.filter((a) => {
     if (filter === "high") return a.impact_level === "high";
     return true;
   });
 
   return (
-    <div className="flex flex-col h-full bg-[#1e222d] text-xs text-[#d1d4dc] select-none">
-      {/* Top Header */}
-      <div className="h-[46px] border-b border-[#2a2e39] flex items-center justify-between px-3">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded bg-[#f23645]/20 flex items-center justify-center text-[#f23645]">
-            <Flame className="w-3.5 h-3.5" />
-          </div>
-          <span className="font-bold text-sm text-white">Live News & Calendar</span>
+    <div
+      className={`w-full flex flex-col h-full select-none text-xs transition-colors ${
+        isLight ? "bg-[#ffffff] border-[#e0e3eb] text-[#131722]" : "bg-[#1e222d] border-[#2a2e39] text-[#d1d4dc]"
+      }`}
+    >
+      {/* Header */}
+      <div
+        className={`h-[44px] border-b flex items-center justify-between px-3 shrink-0 ${
+          isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+        }`}
+      >
+        <div className="flex items-center gap-1.5 font-bold text-sm">
+          <Newspaper className="w-4 h-4 text-[#2962ff]" />
+          <span className={isLight ? "text-[#131722]" : "text-white"}>News Stream</span>
         </div>
-        <div className="flex items-center gap-1">
-          <button 
-            onClick={fetchNews} 
-            className={`p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc] transition-colors ${loading ? "animate-spin" : ""}`}
-            title="Refresh news"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <button
+          onClick={fetchNews}
+          className={`p-1.5 rounded transition-colors cursor-pointer ${
+            isLight ? "hover:bg-[#f0f3fa] text-[#5d606b] hover:text-[#131722]" : "hover:bg-[#2a2e39] text-[#787b86] hover:text-white"
+          }`}
+          title="Refresh Feed"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+        </button>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[#2a2e39] bg-[#181b27]">
-        {(["all", "high"] as const).map((f) => (
+      <div
+        className={`flex items-center gap-1 px-3 py-1.5 border-b overflow-x-auto text-[11px] shrink-0 ${
+          isLight ? "bg-[#f0f3fa] border-[#e0e3eb]" : "bg-[#181b27] border-[#2a2e39]"
+        }`}
+      >
+        {(["all", "high", "forex", "crypto"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-2 py-0.5 rounded capitalize font-medium transition-colors ${
-              filter === f ? "bg-[#2a2e39] text-white font-bold" : "text-[#787b86] hover:text-[#d1d4dc]"
+            className={`px-2 py-0.5 rounded capitalize font-medium transition-colors cursor-pointer ${
+              filter === f
+                ? isLight
+                  ? "bg-[#ffffff] text-[#131722] font-bold shadow-xs"
+                  : "bg-[#2a2e39] text-white font-bold shadow-xs"
+                : isLight
+                ? "text-[#5d606b] hover:text-[#131722]"
+                : "text-[#787b86] hover:text-[#d1d4dc]"
             }`}
           >
-            {f === "high" ? "🔥 High Impact" : "All Feed"}
+            {f === "high" ? "🔥 High Impact" : f}
           </button>
         ))}
       </div>
 
-      {/* News Feed Stream */}
-      <div className="flex-1 overflow-y-auto divide-y divide-[#2a2e39]/50">
+      {/* Articles Stream */}
+      <div className={`flex-1 overflow-y-auto divide-y ${isLight ? "divide-[#e0e3eb]" : "divide-[#2a2e39]/50"}`}>
         {loading && articles.length === 0 ? (
-          <div className="p-8 text-center text-[#787b86] flex flex-col items-center gap-2">
-            <RefreshCw className="w-5 h-5 animate-spin" />
-            <span>Fetching live market headlines...</span>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="p-8 text-center text-[#787b86]">No news articles found</div>
+          <div className="p-8 text-center text-[#787b86]">Loading market news...</div>
+        ) : filteredArticles.length === 0 ? (
+          <div className="p-8 text-center text-[#787b86]">No news articles available</div>
         ) : (
-          filtered.map((item) => {
-            const isHigh = item.impact_level === "high";
+          filteredArticles.map((article) => {
+            const isHigh = article.impact_level === "high";
+            const date = new Date(article.published_at);
+            const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
             return (
               <a
-                key={item.id}
-                href={item.url}
+                key={article.id}
+                href={article.url}
                 target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 flex flex-col gap-1.5 hover:bg-[#262b37] transition-colors group block"
+                rel="noreferrer"
+                className={`block p-3 transition-colors cursor-pointer ${
+                  isLight ? "hover:bg-[#f8f9fc]" : "hover:bg-[#262b37]"
+                }`}
               >
-                <div className="flex items-center justify-between text-[10px] text-[#787b86]">
-                  <span className="font-semibold text-[#2962ff] uppercase tracking-wider">{item.source}</span>
-                  <div className="flex items-center gap-1">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold uppercase ${
+                        isHigh
+                          ? "bg-[#f23645]/15 text-[#f23645]"
+                          : isLight
+                          ? "bg-[#f0f3fa] text-[#5d606b]"
+                          : "bg-[#141722] text-[#787b86]"
+                      }`}
+                    >
+                      {article.source}
+                    </span>
+                    {isHigh && <Flame className="w-3 h-3 text-[#f23645]" />}
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] text-[#787b86] font-mono">
                     <Clock className="w-3 h-3" />
-                    <span>{new Date(item.published_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                    <span>{timeStr}</span>
                   </div>
                 </div>
 
-                <h4 className="text-[12px] font-medium text-white group-hover:text-[#2962ff] transition-colors leading-snug line-clamp-2">
-                  {item.title}
-                </h4>
+                <div
+                  className={`font-semibold text-xs leading-snug line-clamp-2 mb-1.5 ${
+                    isLight ? "text-[#131722] hover:text-[#2962ff]" : "text-[#d1d4dc] hover:text-white"
+                  }`}
+                >
+                  {article.title}
+                </div>
 
-                {item.summary && (
-                  <p className="text-[11px] text-[#787b86] line-clamp-2 leading-relaxed">
-                    {item.summary}
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between mt-1 pt-1 border-t border-[#2a2e39]/40">
+                <div className="flex items-center justify-between text-[10px] text-[#787b86]">
                   <span
-                    className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                      isHigh ? "bg-[#f23645]/15 text-[#f23645]" : "bg-[#2a2e39] text-[#787b86]"
+                    className={`capitalize font-medium ${
+                      article.sentiment === "bullish"
+                        ? "text-[#089981]"
+                        : article.sentiment === "bearish"
+                        ? "text-[#f23645]"
+                        : "text-[#787b86]"
                     }`}
                   >
-                    {item.impact_level || "Medium"} Impact
+                    {article.sentiment}
                   </span>
-
-                  <span className="flex items-center gap-1 text-[10px] text-[#787b86] group-hover:text-white transition-colors">
-                    Read <ExternalLink className="w-2.5 h-2.5" />
-                  </span>
+                  <ExternalLink className="w-3 h-3 opacity-60" />
                 </div>
               </a>
             );

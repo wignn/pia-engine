@@ -10,6 +10,7 @@ interface SymbolSearchModalProps {
   items: WatchlistItem[];
   onSelect: (item: WatchlistItem) => void;
   initialQuery?: string;
+  theme?: "dark" | "light";
 }
 
 export const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({
@@ -18,9 +19,11 @@ export const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({
   items,
   onSelect,
   initialQuery = "",
+  theme = "dark",
 }) => {
+  const isLight = theme === "light";
   const [query, setQuery] = useState(initialQuery);
-  const [tab, setTab] = useState<"all" | "crypto" | "forex" | "indices" | "commodities" | "stocks">("all");
+  const [tab, setTab] = useState<"all" | "commodities" | "indices" | "forex" | "crypto" | "stocks">("all");
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
@@ -66,12 +69,20 @@ export const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-[580px] max-h-[520px] bg-[#1e222d] border border-[#2a2e39] rounded-xl shadow-2xl flex flex-col overflow-hidden text-xs text-[#d1d4dc]"
+        className={`w-[580px] max-h-[520px] rounded-xl shadow-2xl flex flex-col overflow-hidden text-xs transition-colors ${
+          isLight
+            ? "bg-[#ffffff] border border-[#e0e3eb] text-[#131722]"
+            : "bg-[#1e222d] border border-[#2a2e39] text-[#d1d4dc]"
+        }`}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
         {/* Header Search Bar */}
-        <div className="flex items-center px-4 py-3 border-b border-[#2a2e39] gap-3">
+        <div
+          className={`flex items-center px-4 py-3 border-b gap-3 ${
+            isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+          }`}
+        >
           <Search className="w-4 h-4 text-[#787b86]" />
           <input
             type="text"
@@ -82,18 +93,26 @@ export const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({
               setSelectedIndex(0);
             }}
             autoFocus
-            className="flex-1 bg-transparent border-none outline-hidden text-white placeholder-[#787b86] text-sm font-semibold"
+            className={`flex-1 bg-transparent border-none outline-hidden text-sm font-semibold ${
+              isLight ? "text-[#131722] placeholder-[#8e929d]" : "text-white placeholder-[#787b86]"
+            }`}
           />
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-white cursor-pointer"
+            className={`p-1 rounded cursor-pointer transition-colors ${
+              isLight ? "hover:bg-[#f0f3fa] text-[#5d606b] hover:text-[#131722]" : "hover:bg-[#2a2e39] text-[#787b86] hover:text-white"
+            }`}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Filter Categories */}
-        <div className="flex items-center gap-1.5 px-4 py-2 border-b border-[#2a2e39] bg-[#181b27] overflow-x-auto">
+        <div
+          className={`flex items-center gap-1.5 px-4 py-2 border-b overflow-x-auto ${
+            isLight ? "bg-[#f0f3fa] border-[#e0e3eb]" : "bg-[#181b27] border-[#2a2e39]"
+          }`}
+        >
           {(["all", "commodities", "indices", "forex", "crypto", "stocks"] as const).map((c) => (
             <button
               key={c}
@@ -104,6 +123,8 @@ export const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({
               className={`px-2.5 py-1 rounded capitalize font-medium cursor-pointer transition-colors ${
                 tab === c
                   ? "bg-[#2962ff] text-white font-bold"
+                  : isLight
+                  ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#e0e3eb]"
                   : "text-[#787b86] hover:text-white hover:bg-[#2a2e39]"
               }`}
             >
@@ -113,7 +134,7 @@ export const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({
         </div>
 
         {/* Results List */}
-        <div className="flex-1 overflow-y-auto divide-y divide-[#2a2e39]/50">
+        <div className={`flex-1 overflow-y-auto divide-y ${isLight ? "divide-[#e0e3eb]" : "divide-[#2a2e39]/50"}`}>
           {filtered.length === 0 ? (
             <div className="p-8 text-center text-[#787b86]">No instruments found for "{query}"</div>
           ) : (
@@ -128,14 +149,26 @@ export const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({
                   }}
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-colors ${
-                    isSelected ? "bg-[#2a2e39]" : "hover:bg-[#2a2e39]/60"
+                    isSelected
+                      ? isLight
+                        ? "bg-[#2962ff]/10"
+                        : "bg-[#2a2e39]"
+                      : isLight
+                      ? "hover:bg-[#f0f3fa]"
+                      : "hover:bg-[#2a2e39]/60"
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-sm">{item.symbol}</span>
-                        <span className="text-[10px] font-mono text-[#787b86] bg-[#131722] px-1.5 py-0.5 rounded">
+                        <span className={`font-bold text-sm ${isLight ? "text-[#131722]" : "text-white"}`}>
+                          {item.symbol}
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                            isLight ? "bg-[#f0f3fa] text-[#5d606b]" : "bg-[#131722] text-[#787b86]"
+                          }`}
+                        >
                           {item.provider}
                         </span>
                         <span className="text-[10px] font-mono uppercase text-[#2962ff] bg-[#2962ff]/10 px-1.5 py-0.5 rounded">
@@ -147,7 +180,7 @@ export const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({
                   </div>
 
                   <div className="text-right font-mono">
-                    <div className="text-white font-bold text-sm">
+                    <div className={`font-bold text-sm ${isLight ? "text-[#131722]" : "text-white"}`}>
                       {item.price.toFixed(item.digits)}
                     </div>
                     <div
