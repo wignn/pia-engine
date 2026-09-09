@@ -18,6 +18,7 @@ import { ChartTabs } from "@/components/ChartTabs";
 import { SymbolSearchModal } from "@/components/SymbolSearchModal";
 import { SettingsModal } from "@/components/SettingsModal";
 import { INITIAL_WATCHLIST } from "@/lib/constants";
+import { resolveInstrument } from "@/lib/instruments";
 import {
   WatchlistItem,
   Timeframe,
@@ -622,9 +623,12 @@ export default function TerminalPage() {
         const bySym: Record<string, any> = {};
         for (const it of data.items) bySym[String(it.symbol ?? "").toUpperCase()] = it;
 
-        setWatchlist((list) =>
-          list.map((w) => {
-            const hit = bySym[w.symbol.toUpperCase()];
+        setWatchlist((list) => {
+          const existingSyms = new Set<string>();
+          const updated = list.map((w) => {
+            const sym = w.symbol.toUpperCase();
+            existingSyms.add(sym);
+            const hit = bySym[sym];
             if (!hit || typeof hit.price !== "number") return w;
             const change = w.price ? hit.price - (w.price - w.change) : 0;
             return {
@@ -635,8 +639,28 @@ export default function TerminalPage() {
                 ? Number(((change / (hit.price - change)) * 100).toFixed(2))
                 : 0,
             };
-          })
-        );
+          });
+
+          const additions: WatchlistItem[] = [];
+          for (const it of data.items) {
+            const sym = String(it.symbol ?? "").toUpperCase();
+            if (!sym || existingSyms.has(sym) || typeof it.price !== "number") continue;
+            existingSyms.add(sym);
+            const meta = resolveInstrument(sym, it.asset_type);
+            additions.push({
+              symbol: sym,
+              name: meta.name,
+              price: it.price,
+              change: 0,
+              changePercent: 0,
+              category: meta.category,
+              provider: meta.provider,
+              digits: meta.digits,
+            });
+          }
+
+          return additions.length > 0 ? [...updated, ...additions] : updated;
+        });
       } catch {
         /* ignore */
       }
