@@ -31,6 +31,7 @@ import {
 export default function TerminalPage() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(INITIAL_WATCHLIST);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [initialSearchQuery, setInitialSearchQuery] = useState("");
   const [rightSidebarTab, setRightSidebarTab] = useState<SidebarTab>("watchlist");
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
@@ -89,11 +90,17 @@ export default function TerminalPage() {
 
   const selectedItem = findItem(activePane.symbol);
 
-  // Interactive Drawing Tools
+  // Interactive Drawing Tools & State
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [drawingsCount, setDrawingsCount] = useState(0);
   const [clearDrawingsTrigger, setClearDrawingsTrigger] = useState(0);
   const [snapshotTrigger, setSnapshotTrigger] = useState(0);
+  const [isDrawingModeLocked, setIsDrawingModeLocked] = useState(false);
+  const [isDrawingsHidden, setIsDrawingsHidden] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const [undoTrigger, setUndoTrigger] = useState(0);
+  const [redoTrigger, setRedoTrigger] = useState(0);
 
   // Visible panes based on current layout
   const visiblePanes = useMemo(() => {
@@ -214,10 +221,15 @@ export default function TerminalPage() {
     }
   }, []);
 
+  // TradingView principle: Clicking active tab toggles panel open/close!
   const handleTabChangeFromDock = (tab: SidebarTab) => {
-    setRightSidebarTab(tab);
-    setIsMobileDrawerOpen(true);
-    setIsSidebarCollapsed(false);
+    if (rightSidebarTab === tab && !isSidebarCollapsed) {
+      setIsSidebarCollapsed(true);
+    } else {
+      setRightSidebarTab(tab);
+      setIsMobileDrawerOpen(true);
+      setIsSidebarCollapsed(false);
+    }
   };
 
   // Draggable Splitter Handler
@@ -247,7 +259,7 @@ export default function TerminalPage() {
     };
   }, [isDraggingSplitter, isSidebarCollapsed]);
 
-  // Pro Keyboard Shortcuts
+  // Pro Keyboard Shortcuts & Type-to-Search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Scoped cleanly away from inputs, textareas, or modals
@@ -260,6 +272,7 @@ export default function TerminalPage() {
       // Quick Search Modal: '/'
       if (e.key === "/") {
         e.preventDefault();
+        setInitialSearchQuery("");
         setIsSearchOpen(true);
         return;
       }
@@ -268,6 +281,19 @@ export default function TerminalPage() {
       if (e.altKey && e.key.toLowerCase() === "s") {
         e.preventDefault();
         setIsSidebarCollapsed((c) => !c);
+        return;
+      }
+
+      // Undo / Redo Shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) setRedoTrigger((c) => c + 1);
+        else setUndoTrigger((c) => c + 1);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        setRedoTrigger((c) => c + 1);
         return;
       }
 
@@ -291,6 +317,20 @@ export default function TerminalPage() {
       }
       if (e.key.toLowerCase() === "m" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         setActiveTool("measure");
+        return;
+      }
+
+      // TradingView Type-to-Search: Any letter key when cursor tool is active
+      if (
+        /^[a-zA-Z]$/.test(e.key) &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        activeTool === "cursor"
+      ) {
+        e.preventDefault();
+        setInitialSearchQuery(e.key.toUpperCase());
+        setIsSearchOpen(true);
         return;
       }
 
@@ -319,7 +359,7 @@ export default function TerminalPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activePane.symbol, handleSelectSymbol, handleTimeframe]);
+  }, [activePane.symbol, handleSelectSymbol, handleTimeframe, activeTool]);
 
   // Poll real prices for the whole watchlist every 5s
   useEffect(() => {
@@ -370,7 +410,10 @@ export default function TerminalPage() {
         change={selectedItem.change}
         changePercent={selectedItem.changePercent}
         digits={selectedItem.digits}
-        onSearchClick={() => setIsSearchOpen(true)}
+        onSearchClick={() => {
+          setInitialSearchQuery("");
+          setIsSearchOpen(true);
+        }}
         indicators={activePane.indicators}
         chartType={activePane.chartType}
         onChartTypeChange={handleChartTypeChange}
@@ -381,6 +424,10 @@ export default function TerminalPage() {
         onLayoutChange={setLayout}
         onSnapshot={() => setSnapshotTrigger((c) => c + 1)}
         onToggleSidebar={() => setIsMobileDrawerOpen((prev) => !prev)}
+        onUndo={() => setUndoTrigger((c) => c + 1)}
+        onRedo={() => setRedoTrigger((c) => c + 1)}
+        canUndo={canUndo}
+        canRedo={canRedo}
       />
 
       <ChartTabs
@@ -397,6 +444,10 @@ export default function TerminalPage() {
           setActiveTool={setActiveTool}
           drawingsCount={drawingsCount}
           onClearDrawings={() => setClearDrawingsTrigger((c) => c + 1)}
+          isDrawingModeLocked={isDrawingModeLocked}
+          onToggleDrawingModeLock={() => setIsDrawingModeLocked((v) => !v)}
+          isDrawingsHidden={isDrawingsHidden}
+          onToggleHideDrawings={() => setIsDrawingsHidden((v) => !v)}
         />
 
         {/* Main Grid View */}
@@ -417,6 +468,15 @@ export default function TerminalPage() {
                   snapshotTrigger={pane.id === activePaneId ? snapshotTrigger : 0}
                   onDrawingsCountChange={setDrawingsCount}
                   onToggleIndicator={handleToggleIndicator}
+                  isDrawingsHidden={isDrawingsHidden}
+                  isDrawingModeLocked={isDrawingModeLocked}
+                  onDrawingFinished={() => setActiveTool("cursor")}
+                  onCanUndoRedoChange={(u, r) => {
+                    setCanUndo(u);
+                    setCanRedo(r);
+                  }}
+                  undoTrigger={pane.id === activePaneId ? undoTrigger : 0}
+                  redoTrigger={pane.id === activePaneId ? redoTrigger : 0}
                 />
               );
             })}
@@ -455,7 +515,7 @@ export default function TerminalPage() {
           />
         )}
 
-        {/* Right Dock Sidebar: Sliding Drawer on Mobile/Tablet (< lg), Resizable/Collapsible Docked Panel on Desktop (lg:) */}
+        {/* Right Dock Sidebar */}
         <aside
           style={{ width: isSidebarCollapsed ? 0 : `${sidebarWidth}px` }}
           className={`
@@ -473,7 +533,7 @@ export default function TerminalPage() {
             </span>
             <button
               onClick={() => setIsMobileDrawerOpen(false)}
-              className="p-1 rounded text-[#787b86] hover:text-white hover:bg-[#2a2e39] transition-colors"
+              className="p-1 rounded text-[#787b86] hover:text-white hover:bg-[#2a2e39] transition-colors cursor-pointer"
               title="Close Drawer"
             >
               <X className="w-4 h-4" />
@@ -532,6 +592,7 @@ export default function TerminalPage() {
         onClose={() => setIsSearchOpen(false)}
         items={watchlist}
         onSelect={handleSelectSymbol}
+        initialQuery={initialSearchQuery}
       />
     </div>
   );

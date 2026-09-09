@@ -28,7 +28,7 @@ export const RightWatchlist: React.FC<RightWatchlistProps> = ({
   selectedSymbol,
   onSelectSymbol,
 }) => {
-  const [activeTab, setActiveTab] = useState<"all" | "crypto" | "forex" | "indices" | "commodities">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "crypto" | "forex" | "indices" | "commodities" | "stocks">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [sortBy, setSortBy] = useState<"symbol" | "price" | "change" | null>(null);
@@ -117,7 +117,7 @@ export const RightWatchlist: React.FC<RightWatchlistProps> = ({
 
       {/* Category Tabs */}
       <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[#2a2e39] bg-[#181b27] overflow-x-auto text-[11px] shrink-0">
-        {(["all", "commodities", "indices", "forex", "crypto"] as const).map((cat) => (
+        {(["all", "commodities", "indices", "forex", "crypto", "stocks"] as const).map((cat) => (
           <button
             key={cat}
             onClick={() => setActiveTab(cat)}

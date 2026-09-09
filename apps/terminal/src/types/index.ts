@@ -23,12 +23,20 @@ export type ChartType = "candlestick" | "bar" | "line" | "area" | "heikin_ashi";
 
 export type DrawingTool = "cursor" | "trendline" | "horizontal" | "fibonacci" | "measure";
 
+export interface DrawingPoint {
+  x: number;
+  y: number;
+  time?: number;
+  price?: number;
+  logical?: number;
+}
+
 export interface DrawingItem {
   id: string;
   type: "trendline" | "horizontal" | "fibonacci" | "measure";
   symbol: string;
-  p1: { x: number; y: number; price?: number };
-  p2?: { x: number; y: number; price?: number };
+  p1: DrawingPoint;
+  p2?: DrawingPoint;
   color?: string;
   strokeWidth?: number;
 }

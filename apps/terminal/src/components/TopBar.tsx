@@ -15,6 +15,7 @@ import {
   Share2,
   Undo2,
   Redo2,
+  Check,
   Plus
 } from "lucide-react";
 import { Timeframe, IndicatorState, ChartLayout } from "@/types";
@@ -38,6 +39,10 @@ interface TopBarProps {
   onLayoutChange?: (layout: ChartLayout) => void;
   onSnapshot?: () => void;
   onToggleSidebar?: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 const TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1D", "1W"];
@@ -61,16 +66,31 @@ export const TopBar: React.FC<TopBarProps> = ({
   onLayoutChange,
   onSnapshot,
   onToggleSidebar,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }) => {
   const isPositive = change >= 0;
+  const [savedFeedback, setSavedFeedback] = useState(false);
+
+  const handleSave = () => {
+    try {
+      localStorage.setItem("atlsd_terminal_saved_layout", JSON.stringify({ symbol, timeframe, chartType, layout }));
+      setSavedFeedback(true);
+      setTimeout(() => setSavedFeedback(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
 
   return (
-    <header className="h-[46px] bg-[#1e222d] border-b border-[#2a2e39] flex items-center justify-between px-3 text-[#d1d4dc] select-none text-xs">
+    <header className="h-[46px] bg-[#1e222d] border-b border-[#2a2e39] flex items-center justify-between px-3 text-[#d1d4dc] select-none text-xs shrink-0">
       {/* Left Segment: Symbol, Interval, Indicators */}
       <div className="flex items-center gap-1.5 h-full">
         {/* Brand / Logo */}
         <div className="flex items-center gap-2 pr-2 border-r border-[#2a2e39] h-6 mr-1">
-          <div className="w-6 h-6 rounded bg-[#2962ff] flex items-center justify-center font-black text-white text-xs">
+          <div className="w-6 h-6 rounded bg-[#2962ff] flex items-center justify-center font-black text-white text-xs shadow-sm">
             TV
           </div>
           <span className="font-bold text-white tracking-wider text-[13px] hidden md:inline">ATLSD</span>
@@ -79,7 +99,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Symbol Search Button */}
         <button
           onClick={onSearchClick}
-          className="flex items-center gap-2 px-2.5 py-1 rounded hover:bg-[#2a2e39] transition-colors border border-transparent hover:border-[#363a45]"
+          className="flex items-center gap-2 px-2.5 py-1 rounded hover:bg-[#2a2e39] transition-colors border border-transparent hover:border-[#363a45] cursor-pointer"
         >
           <Search className="w-3.5 h-3.5 text-[#787b86]" />
           <span className="font-bold text-white text-sm">{symbol}</span>
@@ -94,7 +114,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             <button
               key={tf}
               onClick={() => setTimeframe(tf)}
-              className={`px-2 py-1 rounded font-semibold text-xs transition-colors ${
+              className={`px-2 py-1 rounded font-semibold text-xs transition-colors cursor-pointer ${
                 timeframe === tf
                   ? "text-[#2962ff] bg-[#2962ff]/10 font-bold"
                   : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39]"
@@ -109,14 +129,22 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Chart Style (Candles) */}
         <div className="relative group">
-          <button className="flex items-center gap-1 px-2 py-1 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]">
+          <button className="flex items-center gap-1 px-2 py-1 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc] cursor-pointer">
             <BarChart2 className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline text-xs font-medium">{chartType === "heikin_ashi" ? "Heikin Ashi" : chartType[0].toUpperCase() + chartType.slice(1)}</span>
+            <span className="hidden lg:inline text-xs font-medium">
+              {chartType === "heikin_ashi" ? "Heikin Ashi" : chartType[0].toUpperCase() + chartType.slice(1)}
+            </span>
             <ChevronDown className="w-3 h-3" />
           </button>
           <div className="hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-36 flex-col rounded border border-[#2a2e39] bg-[#1e222d] p-1 shadow-xl">
             {(["candlestick", "bar", "line", "area", "heikin_ashi"] as const).map((type) => (
-              <button key={type} onClick={() => onChartTypeChange?.(type)} className={`rounded px-2 py-1.5 text-left text-xs capitalize hover:bg-[#2a2e39] ${chartType === type ? "text-[#2962ff]" : "text-[#d1d4dc]"}`}>
+              <button
+                key={type}
+                onClick={() => onChartTypeChange?.(type)}
+                className={`rounded px-2 py-1.5 text-left text-xs capitalize hover:bg-[#2a2e39] cursor-pointer ${
+                  chartType === type ? "text-[#2962ff] font-bold" : "text-[#d1d4dc]"
+                }`}
+              >
                 {type === "heikin_ashi" ? "Heikin Ashi" : type}
               </button>
             ))}
@@ -125,29 +153,36 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Indicators */}
         <div className="relative group">
-          <button className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-[#2a2e39] text-[#d1d4dc] font-medium">
+          <button className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-[#2a2e39] text-[#d1d4dc] font-medium cursor-pointer">
             <TrendingUp className="w-3.5 h-3.5 text-[#2962ff]" />
             <span>Indicators</span>
           </button>
-          <div className="hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-48 flex-col rounded border border-[#2a2e39] bg-[#1e222d] p-1 shadow-xl">
+          <div className="hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-52 flex-col rounded border border-[#2a2e39] bg-[#1e222d] p-1 shadow-xl">
             {([
-              ['sma20', 'SMA 20'],
-              ['ema50', 'EMA 50'],
+              ['sma20', 'SMA 20 (Moving Average)'],
+              ['ema50', 'EMA 50 (Exponential)'],
               ['bollinger', 'Bollinger Bands (20, 2)'],
               ['rsi', 'RSI (14) Oscillator'],
               ['macd', 'MACD (12, 26, 9)']
             ] as const).map(([id, label]) => (
-              <button key={id} onClick={() => onToggleIndicator?.(id)} className="flex items-center justify-between rounded px-2 py-1.5 text-left text-xs text-[#d1d4dc] hover:bg-[#2a2e39]">
-                <span>{label}</span><span className={indicators[id] ? "text-[#2962ff] font-bold" : "text-[#787b86]"}>{indicators[id] ? "ON" : "OFF"}</span>
+              <button
+                key={id}
+                onClick={() => onToggleIndicator?.(id)}
+                className="flex items-center justify-between rounded px-2.5 py-1.5 text-left text-xs text-[#d1d4dc] hover:bg-[#2a2e39] cursor-pointer"
+              >
+                <span>{label}</span>
+                <span className={indicators[id] ? "text-[#2962ff] font-bold" : "text-[#787b86]"}>
+                  {indicators[id] ? "ON" : "OFF"}
+                </span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Templates / Alerts */}
+        {/* Alerts Button */}
         <button
           onClick={onAlertClick}
-          className="hidden xl:flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc] transition-colors"
+          className="hidden xl:flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc] transition-colors cursor-pointer"
         >
           <Clock className="w-3.5 h-3.5" />
           <span>Alert</span>
@@ -166,21 +201,35 @@ export const TopBar: React.FC<TopBarProps> = ({
         </div>
       </div>
 
-      {/* Right Segment: Layout, Settings, Fullscreen, Publish */}
+      {/* Right Segment: Layout, Settings, Fullscreen, Snapshot */}
       <div className="flex items-center gap-1">
-        {/* Undo / Redo */}
+        {/* Interactive Undo / Redo */}
         <div className="hidden md:flex items-center gap-0.5 pr-2 border-r border-[#2a2e39]">
-          <button className="p-1 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]" title="Undo">
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            className={`p-1.5 rounded transition-colors cursor-pointer ${
+              canUndo ? "text-[#d1d4dc] hover:bg-[#2a2e39]" : "text-[#787b86]/40 cursor-not-allowed"
+            }`}
+            title="Undo Drawing (Ctrl+Z)"
+          >
             <Undo2 className="w-3.5 h-3.5" />
           </button>
-          <button className="p-1 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]" title="Redo">
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            className={`p-1.5 rounded transition-colors cursor-pointer ${
+              canRedo ? "text-[#d1d4dc] hover:bg-[#2a2e39]" : "text-[#787b86]/40 cursor-not-allowed"
+            }`}
+            title="Redo Drawing (Ctrl+Y)"
+          >
             <Redo2 className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Layout Mode */}
         <div className="relative group">
-          <button className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc] transition-colors" title={`Select Grid Layout (${layout})`}>
+          <button className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc] transition-colors cursor-pointer" title={`Select Grid Layout (${layout})`}>
             <LayoutGrid className="w-3.5 h-3.5" />
           </button>
           <div className="hidden group-hover:flex absolute top-full right-0 z-30 mt-1 w-36 flex-col rounded border border-[#2a2e39] bg-[#1e222d] p-1 shadow-xl">
@@ -193,7 +242,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               <button
                 key={id}
                 onClick={() => onLayoutChange?.(id)}
-                className={`rounded px-2 py-1.5 text-left text-xs hover:bg-[#2a2e39] ${
+                className={`rounded px-2 py-1.5 text-left text-xs hover:bg-[#2a2e39] cursor-pointer ${
                   layout === id ? "text-[#2962ff] font-bold" : "text-[#d1d4dc]"
                 }`}
               >
@@ -203,34 +252,41 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         </div>
 
-        {/* Quick Save */}
-        <button className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold text-[#d1d4dc] hover:bg-[#2a2e39]">
-          <span>Save</span>
-          <ChevronDown className="w-3 h-3 text-[#787b86]" />
-        </button>
-
-        {/* Settings */}
-        <button className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]" title="Chart Settings">
-          <Settings className="w-3.5 h-3.5" />
+        {/* Quick Save with Live Feedback */}
+        <button
+          onClick={handleSave}
+          className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold text-[#d1d4dc] hover:bg-[#2a2e39] cursor-pointer transition-colors"
+          title="Save Layout State"
+        >
+          {savedFeedback ? (
+            <>
+              <Check className="w-3 h-3 text-[#089981]" />
+              <span className="text-[#089981]">Saved</span>
+            </>
+          ) : (
+            <>
+              <span>Save</span>
+              <ChevronDown className="w-3 h-3 text-[#787b86]" />
+            </>
+          )}
         </button>
 
         {/* Fullscreen */}
-        <button onClick={onFullscreen} className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]" title="Fullscreen">
+        <button
+          onClick={onFullscreen}
+          className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc] cursor-pointer transition-colors"
+          title="Fullscreen (F11)"
+        >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
 
         {/* Snapshot */}
         <button
           onClick={onSnapshot}
-          className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc] transition-colors"
+          className="p-1.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc] transition-colors cursor-pointer"
           title="Take a snapshot (PNG)"
         >
           <Camera className="w-3.5 h-3.5" />
-        </button>
-
-        {/* Publish / Action button */}
-        <button className="ml-1 px-3 py-1 rounded bg-[#2962ff] text-white font-bold text-xs hover:bg-[#1e53e5] transition-colors shadow-sm">
-          Publish
         </button>
       </div>
     </header>

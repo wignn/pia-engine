@@ -9,7 +9,9 @@ import {
   Trash2,
   Minus,
   Lock,
-  Eye
+  Unlock,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { DrawingTool } from "@/types";
 
@@ -18,6 +20,10 @@ interface LeftToolbarProps {
   setActiveTool?: (tool: DrawingTool) => void;
   onClearDrawings?: () => void;
   drawingsCount?: number;
+  isDrawingModeLocked?: boolean;
+  onToggleDrawingModeLock?: () => void;
+  isDrawingsHidden?: boolean;
+  onToggleHideDrawings?: () => void;
 }
 
 export const LeftToolbar: React.FC<LeftToolbarProps> = ({
@@ -25,13 +31,17 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
   setActiveTool,
   onClearDrawings,
   drawingsCount = 0,
+  isDrawingModeLocked = false,
+  onToggleDrawingModeLock,
+  isDrawingsHidden = false,
+  onToggleHideDrawings,
 }) => {
   const tools: { id: DrawingTool; label: string; icon: React.ReactNode }[] = [
-    { id: "cursor", label: "Crosshair (Navigation)", icon: <Crosshair className="w-4 h-4" /> },
-    { id: "trendline", label: "Trend Line", icon: <TrendingUp className="w-4 h-4" /> },
-    { id: "horizontal", label: "Horizontal Line / S&R", icon: <Minus className="w-4 h-4" /> },
-    { id: "fibonacci", label: "Fibonacci Retracement", icon: <Percent className="w-4 h-4" /> },
-    { id: "measure", label: "Measure / Pips Ruler", icon: <Ruler className="w-4 h-4" /> },
+    { id: "cursor", label: "Crosshair (V / Esc)", icon: <Crosshair className="w-4 h-4" /> },
+    { id: "trendline", label: "Trend Line (T)", icon: <TrendingUp className="w-4 h-4" /> },
+    { id: "horizontal", label: "Horizontal Ray / S&R (H)", icon: <Minus className="w-4 h-4" /> },
+    { id: "fibonacci", label: "Fibonacci Retracement (F)", icon: <Percent className="w-4 h-4" /> },
+    { id: "measure", label: "Measure / Pips Ruler (M)", icon: <Ruler className="w-4 h-4" /> },
   ];
 
   return (
@@ -44,7 +54,7 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
             <button
               key={t.id}
               onClick={() => setActiveTool?.(t.id)}
-              className={`group relative p-2 rounded transition-all ${
+              className={`group relative p-2 rounded transition-all cursor-pointer ${
                 isActive
                   ? "bg-[#2962ff]/20 text-[#2962ff] shadow-sm"
                   : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39]"
@@ -60,12 +70,39 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
         })}
       </div>
 
-      {/* Utility Actions */}
-      <div className="flex flex-col items-center gap-1 w-full pt-2 border-t border-[#2a2e39]">
+      {/* Utility Actions (TradingView-style Lock, Hide, Trash) */}
+      <div className="flex flex-col items-center gap-1.5 w-full pt-2 border-t border-[#2a2e39]">
+        {/* Stay in Drawing Mode Lock */}
+        <button
+          onClick={onToggleDrawingModeLock}
+          className={`p-2 rounded transition-colors cursor-pointer ${
+            isDrawingModeLocked
+              ? "bg-[#2962ff]/20 text-[#2962ff]"
+              : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39]"
+          }`}
+          title={isDrawingModeLocked ? "Stay in Drawing Mode: ON" : "Stay in Drawing Mode: OFF"}
+        >
+          {isDrawingModeLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+        </button>
+
+        {/* Hide/Show All Drawings */}
+        <button
+          onClick={onToggleHideDrawings}
+          className={`p-2 rounded transition-colors cursor-pointer ${
+            isDrawingsHidden
+              ? "bg-[#f5b942]/20 text-[#f5b942]"
+              : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39]"
+          }`}
+          title={isDrawingsHidden ? "Show All Drawings" : "Hide All Drawings"}
+        >
+          {isDrawingsHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+
+        {/* Clear All Drawings */}
         <button
           onClick={onClearDrawings}
           disabled={drawingsCount === 0}
-          className="relative p-2 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#f23645] transition-colors disabled:opacity-40"
+          className="relative p-2 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-[#f23645] transition-colors disabled:opacity-40 cursor-pointer"
           title={`Clear Drawings (${drawingsCount})`}
         >
           <Trash2 className="w-4 h-4" />

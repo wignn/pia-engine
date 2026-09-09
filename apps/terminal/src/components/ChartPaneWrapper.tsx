@@ -16,6 +16,12 @@ interface ChartPaneWrapperProps {
   digits: number;
   provider: string;
   onToggleIndicator?: (indicator: keyof ChartPaneConfig["indicators"]) => void;
+  isDrawingsHidden?: boolean;
+  isDrawingModeLocked?: boolean;
+  onDrawingFinished?: () => void;
+  onCanUndoRedoChange?: (canUndo: boolean, canRedo: boolean) => void;
+  undoTrigger?: number;
+  redoTrigger?: number;
 }
 
 export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
@@ -29,6 +35,12 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
   digits,
   provider,
   onToggleIndicator,
+  isDrawingsHidden = false,
+  isDrawingModeLocked = false,
+  onDrawingFinished,
+  onCanUndoRedoChange,
+  undoTrigger = 0,
+  redoTrigger = 0,
 }) => {
   const {
     candles,
@@ -68,6 +80,12 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
         clearDrawingsTrigger={isActive ? clearDrawingsTrigger : 0}
         snapshotTrigger={isActive ? snapshotTrigger : 0}
         onToggleIndicator={isActive ? onToggleIndicator : undefined}
+        isDrawingsHidden={isDrawingsHidden}
+        isDrawingModeLocked={isDrawingModeLocked}
+        onDrawingFinished={isActive ? onDrawingFinished : undefined}
+        onCanUndoRedoChange={isActive ? onCanUndoRedoChange : undefined}
+        undoTrigger={isActive ? undoTrigger : 0}
+        redoTrigger={isActive ? redoTrigger : 0}
       />
     </div>
   );
