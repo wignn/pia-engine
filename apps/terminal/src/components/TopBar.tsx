@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { 
   Search, 
   BarChart2, 
@@ -109,10 +110,17 @@ export const TopBar: React.FC<TopBarProps> = ({
     >
       {/* Left Segment: Symbol, Interval, Indicators */}
       <div className="flex items-center gap-1.5 h-full">
-        {/* Brand / Logo */}
-        <div className={`flex items-center gap-2 pr-2 border-r h-6 mr-1 ${isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]"}`}>
-          <div className="w-6 h-6 rounded bg-[#2962ff] flex items-center justify-center font-black text-white text-xs shadow-sm">
-            TV
+        {/* Brand / Logo (PIA Logo) */}
+        <div className={`flex items-center gap-2 pr-2.5 border-r h-7 mr-1 ${isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]"}`}>
+          <div className="w-6 h-6 rounded-md overflow-hidden flex items-center justify-center shrink-0">
+            <Image
+              src="/logo.png"
+              alt="PIA Logo"
+              width={24}
+              height={24}
+              className="w-full h-full object-contain"
+              priority
+            />
           </div>
           <span className={`font-bold tracking-wider text-[13px] hidden md:inline ${isLight ? "text-[#131722]" : "text-white"}`}>
             ATLSD
