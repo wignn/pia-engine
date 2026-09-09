@@ -12,15 +12,24 @@ async function read(path: string) {
 
 export async function GET(request: NextRequest) {
   const symbol = request.nextUrl.searchParams.get("symbol") || "BTC";
-  const [options, yields, fearGreed, news] = await Promise.allSettled([
-    read(`/api/v1/options/summary?symbol=${encodeURIComponent(symbol)}`),
+  const [optionsSummary, yields, fearGreed, news] = await Promise.allSettled([
+    read("/api/v1/options/summary"),
     read("/api/v1/rates/yield-curve?country=US"),
     read("/api/v1/fear-greed?scope=global"),
     read("/api/v1/forex/news/latest"),
   ]);
 
+  const allSnapshots =
+    optionsSummary.status === "fulfilled" && Array.isArray(optionsSummary.value?.data)
+      ? optionsSummary.value.data
+      : [];
+
   return NextResponse.json({
-    options: options.status === "fulfilled" ? options.value : null,
+    options: {
+      data: allSnapshots,
+    },
+    options_list: allSnapshots,
+    requested_symbol: symbol,
     yields: yields.status === "fulfilled" ? yields.value : null,
     fear_greed: fearGreed.status === "fulfilled" ? fearGreed.value : null,
     news: news.status === "fulfilled" ? news.value : { items: [] },
