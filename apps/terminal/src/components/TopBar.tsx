@@ -122,8 +122,8 @@ export const TopBar: React.FC<TopBarProps> = ({
               priority
             />
           </div>
-          <span className={`font-bold tracking-wider text-[13px] hidden md:inline ${isLight ? "text-[#131722]" : "text-white"}`}>
-            ATLSD
+          <span className={`font-black tracking-wider text-[14px] hidden md:inline ${isLight ? "text-[#131722]" : "text-white"}`}>
+            PIA
           </span>
         </div>
 

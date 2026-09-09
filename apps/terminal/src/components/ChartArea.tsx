@@ -250,21 +250,21 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           // Brand Watermark
           ctx.font = "bold 15px -apple-system, sans-serif";
           ctx.fillStyle = "#2962ff";
-          ctx.fillText("ATLSD TERMINAL", 20, canvas.height - 16);
+          ctx.fillText("PIA TERMINAL", 20, canvas.height - 16);
 
           // Meta watermark
           ctx.font = "12px monospace";
           ctx.fillStyle = "#d1d4dc";
           ctx.fillText(
             `${symbol} · ${timeframe} · ${new Date().toISOString().replace("T", " ").substring(0, 19)} UTC`,
-            175,
+            150,
             canvas.height - 16
           );
 
           const url = watermarked.toDataURL("image/png");
           const a = document.createElement("a");
           a.href = url;
-          a.download = `ATLSD_${symbol}_${timeframe}_${Date.now()}.png`;
+          a.download = `PIA_${symbol}_${timeframe}_${Date.now()}.png`;
           a.click();
         }
       } catch (err) {

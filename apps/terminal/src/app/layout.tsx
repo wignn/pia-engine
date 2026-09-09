@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "XAUUSD 4,429.825 USD — TradingView Pro Terminal",
+  title: "PIA Terminal — Professional Market Intelligence",
   description: "Enterprise Grade Real-Time Financial Trading Terminal",
   icons: {
     icon: "/logo.png",
