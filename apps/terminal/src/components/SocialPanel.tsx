@@ -62,7 +62,7 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ theme = "dark" }) => {
     }
 
     try {
-      const url = new URL("/api/v1/social/posts", window.location.origin);
+      const url = new URL("/api/social", window.location.origin);
       url.searchParams.set("limit", "25");
       if (before) {
         url.searchParams.set("before", before);
