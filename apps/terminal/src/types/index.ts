@@ -49,10 +49,14 @@ export interface IndicatorState {
   macd: boolean;
 }
 
-export type ChartLayout = "1x1" | "1x2" | "2x1" | "2x2";
+export type TabContentType = "chart" | "news" | "social" | "orderbook" | "intelligence" | "calendar";
+export type PaneContentType = TabContentType;
+
+export type ChartLayout = "1x1" | "1x2" | "2x1" | "2x2" | "1x3";
 
 export interface ChartPaneConfig {
   id: string;
+  type?: PaneContentType;
   symbol: string;
   timeframe: Timeframe;
   chartType: ChartType;
@@ -72,9 +76,20 @@ export interface PriceAlert {
 
 export interface TabItem {
   id: string;
+  type?: TabContentType;
   symbol: string;
   timeframe: Timeframe;
   name: string;
+}
+
+export interface TerminalSettings {
+  theme: "dark" | "light";
+  upColor: string;
+  downColor: string;
+  gridVisible: boolean;
+  timezone: string;
+  audioAlerts: boolean;
+  defaultTimeframe: Timeframe;
 }
 
 export interface NewsArticle {

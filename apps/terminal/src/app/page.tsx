@@ -16,24 +16,69 @@ import { OrderBookPanel } from "@/components/OrderBookPanel";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { ChartTabs } from "@/components/ChartTabs";
 import { SymbolSearchModal } from "@/components/SymbolSearchModal";
+import { SettingsModal } from "@/components/SettingsModal";
 import { INITIAL_WATCHLIST } from "@/lib/constants";
 import {
   WatchlistItem,
   Timeframe,
   TabItem,
+  TabContentType,
+  PaneContentType,
   ChartType,
   DrawingTool,
   IndicatorState,
   ChartLayout,
   ChartPaneConfig,
+  TerminalSettings,
 } from "@/types";
 
 export default function TerminalPage() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(INITIAL_WATCHLIST);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [initialSearchQuery, setInitialSearchQuery] = useState("");
   const [rightSidebarTab, setRightSidebarTab] = useState<SidebarTab>("watchlist");
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+
+  // Terminal Settings State (Dark / Light Theme, Candle Colors, Audio Alerts)
+  const [settings, setSettings] = useState<TerminalSettings>({
+    theme: "dark",
+    upColor: "#089981",
+    downColor: "#f23645",
+    gridVisible: true,
+    timezone: "UTC",
+    audioAlerts: true,
+    defaultTimeframe: "15m",
+  });
+
+  // Load saved settings from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("atlsd_terminal_settings");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setSettings((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleSaveSettings = (newSettings: TerminalSettings) => {
+    setSettings(newSettings);
+    try {
+      localStorage.setItem("atlsd_terminal_settings", JSON.stringify(newSettings));
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleToggleTheme = () => {
+    const nextTheme = settings.theme === "light" ? "dark" : "light";
+    handleSaveSettings({ ...settings, theme: nextTheme });
+  };
+
+  const isLight = settings.theme === "light";
 
   // Desktop Resizable & Collapsible Sidebar State
   const [sidebarWidth, setSidebarWidth] = useState(330);
@@ -47,6 +92,7 @@ export default function TerminalPage() {
   const [panes, setPanes] = useState<ChartPaneConfig[]>([
     {
       id: "pane-1",
+      type: "chart",
       symbol: "XAUUSD",
       timeframe: "15m",
       chartType: "candlestick",
@@ -54,6 +100,7 @@ export default function TerminalPage() {
     },
     {
       id: "pane-2",
+      type: "chart",
       symbol: "BTCUSDT",
       timeframe: "1h",
       chartType: "candlestick",
@@ -61,6 +108,7 @@ export default function TerminalPage() {
     },
     {
       id: "pane-3",
+      type: "chart",
       symbol: "SPX",
       timeframe: "1D",
       chartType: "candlestick",
@@ -68,6 +116,7 @@ export default function TerminalPage() {
     },
     {
       id: "pane-4",
+      type: "chart",
       symbol: "DXY",
       timeframe: "1h",
       chartType: "candlestick",
@@ -106,27 +155,31 @@ export default function TerminalPage() {
   const visiblePanes = useMemo(() => {
     if (layout === "1x1") return [activePane];
     if (layout === "1x2" || layout === "2x1") return panes.slice(0, 2);
+    if (layout === "1x3") return panes.slice(0, 3);
     return panes.slice(0, 4);
   }, [layout, activePane, panes]);
 
   const gridClass = useMemo(() => {
+    const borderColor = isLight ? "bg-[#e0e3eb]" : "bg-[#1e222d]";
     switch (layout) {
       case "1x2":
-        return "grid grid-cols-1 md:grid-cols-2 gap-0.5 h-full w-full bg-[#1e222d]";
+        return `grid grid-cols-1 md:grid-cols-2 gap-0.5 h-full w-full ${borderColor}`;
       case "2x1":
-        return "grid grid-rows-2 gap-0.5 h-full w-full bg-[#1e222d]";
+        return `grid grid-rows-2 gap-0.5 h-full w-full ${borderColor}`;
       case "2x2":
-        return "grid grid-cols-1 sm:grid-cols-2 grid-rows-2 gap-0.5 h-full w-full bg-[#1e222d]";
+        return `grid grid-cols-1 sm:grid-cols-2 grid-rows-2 gap-0.5 h-full w-full ${borderColor}`;
+      case "1x3":
+        return `grid grid-cols-1 lg:grid-cols-3 gap-0.5 h-full w-full ${borderColor}`;
       default:
         return "h-full w-full";
     }
-  }, [layout]);
+  }, [layout, isLight]);
 
-  // Tabbed charts state
+  // Tabbed charts state (Supports Chart, News, Social, OrderBook, Intel, Calendar)
   const [tabs, setTabs] = useState<TabItem[]>([
-    { id: "tab-1", symbol: "XAUUSD", timeframe: "15m", name: "Gold Spot / U.S. Dollar" },
-    { id: "tab-2", symbol: "BTCUSDT", timeframe: "1h", name: "Bitcoin / TetherUS" },
-    { id: "tab-3", symbol: "SPX", timeframe: "1D", name: "S&P 500 Index" },
+    { id: "tab-1", type: "chart", symbol: "XAUUSD", timeframe: "15m", name: "Gold Spot / U.S. Dollar" },
+    { id: "tab-2", type: "chart", symbol: "BTCUSDT", timeframe: "1h", name: "Bitcoin / TetherUS" },
+    { id: "tab-3", type: "chart", symbol: "SPX", timeframe: "1D", name: "S&P 500 Index" },
   ]);
   const [activeTabId, setActiveTabId] = useState<string>("tab-1");
 
@@ -136,7 +189,14 @@ export default function TerminalPage() {
     if (!t) return;
     setPanes((curr) =>
       curr.map((p) =>
-        p.id === activePaneId ? { ...p, symbol: t.symbol, timeframe: t.timeframe } : p
+        p.id === activePaneId
+          ? {
+              ...p,
+              type: t.type || "chart",
+              symbol: t.symbol,
+              timeframe: t.timeframe,
+            }
+          : p
       )
     );
   };
@@ -163,16 +223,51 @@ export default function TerminalPage() {
     [activePaneId, activeTabId]
   );
 
-  const handleCreateNewTab = () => {
+  const handleNewTab = (type: TabContentType = "chart") => {
     const newId = `tab-${Date.now()}`;
-    const item = findItem("ETHUSDT");
-    setTabs((curr) => [
-      ...curr,
-      { id: newId, symbol: item.symbol, timeframe: "15m", name: item.name },
-    ]);
+    const defaultSymbol = "BTCUSDT";
+    const item = findItem(defaultSymbol);
+    const newTab: TabItem = {
+      id: newId,
+      type,
+      symbol: item.symbol,
+      timeframe: settings.defaultTimeframe,
+      name:
+        type === "news"
+          ? "News Headlines"
+          : type === "social"
+          ? "Social Pulse"
+          : type === "orderbook"
+          ? `DOM · ${item.symbol}`
+          : type === "intelligence"
+          ? "Market Intel"
+          : type === "calendar"
+          ? "Economic Calendar"
+          : item.name,
+    };
+    setTabs((curr) => [...curr, newTab]);
     setActiveTabId(newId);
     setPanes((curr) =>
-      curr.map((p) => (p.id === activePaneId ? { ...p, symbol: item.symbol, timeframe: "15m" } : p))
+      curr.map((p) =>
+        p.id === activePaneId
+          ? {
+              ...p,
+              type,
+              symbol: item.symbol,
+              timeframe: settings.defaultTimeframe,
+            }
+          : p
+      )
+    );
+  };
+
+  const handleReorderTabs = (newTabs: TabItem[]) => {
+    setTabs(newTabs);
+  };
+
+  const handleChangePaneType = (paneId: string, newType: PaneContentType) => {
+    setPanes((curr) =>
+      curr.map((p) => (p.id === paneId ? { ...p, type: newType } : p))
     );
   };
 
@@ -262,7 +357,6 @@ export default function TerminalPage() {
   // Pro Keyboard Shortcuts & Type-to-Search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Scoped cleanly away from inputs, textareas, or modals
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
@@ -401,7 +495,11 @@ export default function TerminalPage() {
   }, []);
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#131722] overflow-hidden">
+    <div
+      className={`flex flex-col h-full w-full ${
+        isLight ? "bg-[#ffffff] text-[#131722]" : "bg-[#131722] text-[#d1d4dc]"
+      } overflow-hidden transition-colors select-none`}
+    >
       <TopBar
         symbol={selectedItem.symbol}
         timeframe={activePane.timeframe}
@@ -428,6 +526,9 @@ export default function TerminalPage() {
         onRedo={() => setRedoTrigger((c) => c + 1)}
         canUndo={canUndo}
         canRedo={canRedo}
+        theme={settings.theme}
+        onToggleTheme={handleToggleTheme}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       <ChartTabs
@@ -435,7 +536,9 @@ export default function TerminalPage() {
         activeTabId={activeTabId}
         onSelectTab={handleSelectTab}
         onCloseTab={handleCloseTab}
-        onNewTab={handleCreateNewTab}
+        onNewTab={handleNewTab}
+        onReorderTabs={handleReorderTabs}
+        theme={settings.theme}
       />
 
       <div className="flex-1 flex w-full overflow-hidden relative">
@@ -450,7 +553,7 @@ export default function TerminalPage() {
           onToggleHideDrawings={() => setIsDrawingsHidden((v) => !v)}
         />
 
-        {/* Main Grid View */}
+        {/* Main Workspace View */}
         <main className="flex-1 h-full overflow-hidden relative">
           <div className={gridClass}>
             {visiblePanes.map((pane) => {
@@ -477,6 +580,10 @@ export default function TerminalPage() {
                   }}
                   undoTrigger={pane.id === activePaneId ? undoTrigger : 0}
                   redoTrigger={pane.id === activePaneId ? redoTrigger : 0}
+                  theme={settings.theme}
+                  settings={settings}
+                  onChangePaneType={(newType) => handleChangePaneType(pane.id, newType)}
+                  showPaneHeader={layout !== "1x1"}
                 />
               );
             })}
@@ -486,7 +593,9 @@ export default function TerminalPage() {
         {/* Desktop Splitter & Collapse Button */}
         <div
           onMouseDown={handleSplitterMouseDown}
-          className={`hidden lg:flex relative w-1 hover:w-1.5 cursor-col-resize bg-[#2a2e39] hover:bg-[#2962ff] transition-all items-center justify-center select-none z-20 group shrink-0 ${
+          className={`hidden lg:flex relative w-1 hover:w-1.5 cursor-col-resize ${
+            isLight ? "bg-[#e0e3eb]" : "bg-[#2a2e39]"
+          } hover:bg-[#2962ff] transition-all items-center justify-center select-none z-20 group shrink-0 ${
             isDraggingSplitter ? "bg-[#2962ff] w-1.5" : ""
           }`}
           title="Drag to resize width"
@@ -496,7 +605,11 @@ export default function TerminalPage() {
               e.stopPropagation();
               setIsSidebarCollapsed((c) => !c);
             }}
-            className="absolute -left-2.5 top-1/2 -translate-y-1/2 w-5 h-7 rounded bg-[#1e222d] border border-[#2a2e39] text-[#787b86] hover:text-white hover:border-[#363a45] flex items-center justify-center shadow-md z-30 transition-all cursor-pointer"
+            className={`absolute -left-2.5 top-1/2 -translate-y-1/2 w-5 h-7 rounded border flex items-center justify-center shadow-md z-30 transition-all cursor-pointer ${
+              isLight
+                ? "bg-[#ffffff] border-[#e0e3eb] text-[#5d606b] hover:text-[#131722]"
+                : "bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-white"
+            }`}
             title={isSidebarCollapsed ? "Expand Panel (Alt+S)" : "Collapse Panel (Alt+S)"}
           >
             {isSidebarCollapsed ? (
@@ -519,21 +632,26 @@ export default function TerminalPage() {
         <aside
           style={{ width: isSidebarCollapsed ? 0 : `${sidebarWidth}px` }}
           className={`
-            fixed inset-y-0 right-0 z-50 w-[85vw] max-w-[360px] bg-[#1e222d] shadow-2xl transition-transform duration-300 ease-in-out
+            fixed inset-y-0 right-0 z-50 w-[85vw] max-w-[360px] shadow-2xl transition-transform duration-300 ease-in-out
             lg:static lg:z-auto lg:shadow-none lg:translate-x-0 lg:transition-none
             ${isMobileDrawerOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
             ${isSidebarCollapsed ? "lg:hidden" : "lg:flex"}
-            flex flex-col h-full overflow-hidden border-l border-[#2a2e39] shrink-0
+            ${isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"}
+            flex flex-col h-full overflow-hidden border-l shrink-0
           `}
         >
           {/* Mobile Drawer Close Header */}
-          <div className="flex items-center justify-between px-3 py-2.5 border-b border-[#2a2e39] lg:hidden bg-[#141722] shrink-0">
-            <span className="font-bold text-xs uppercase tracking-wider text-white">
+          <div
+            className={`flex items-center justify-between px-3 py-2.5 border-b lg:hidden shrink-0 ${
+              isLight ? "bg-[#f8f9fc] border-[#e0e3eb]" : "bg-[#141722] border-[#2a2e39]"
+            }`}
+          >
+            <span className="font-bold text-xs uppercase tracking-wider">
               {rightSidebarTab}
             </span>
             <button
               onClick={() => setIsMobileDrawerOpen(false)}
-              className="p-1 rounded text-[#787b86] hover:text-white hover:bg-[#2a2e39] transition-colors cursor-pointer"
+              className="p-1 rounded text-[#787b86] hover:text-white hover:bg-black/10 dark:hover:bg-[#2a2e39] transition-colors cursor-pointer"
               title="Close Drawer"
             >
               <X className="w-4 h-4" />
@@ -593,6 +711,13 @@ export default function TerminalPage() {
         items={watchlist}
         onSelect={handleSelectSymbol}
         initialQuery={initialSearchQuery}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={settings}
+        onSaveSettings={handleSaveSettings}
       />
     </div>
   );

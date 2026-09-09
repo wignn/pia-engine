@@ -41,6 +41,8 @@ interface ChartAreaProps {
   onCanUndoRedoChange?: (canUndo: boolean, canRedo: boolean) => void;
   undoTrigger?: number;
   redoTrigger?: number;
+  theme?: "dark" | "light";
+  settings?: import("@/types").TerminalSettings;
 }
 
 export const ChartArea: React.FC<ChartAreaProps> = ({
@@ -68,6 +70,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   onCanUndoRedoChange,
   undoTrigger = 0,
   redoTrigger = 0,
+  theme = "dark",
+  settings,
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -300,31 +304,32 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
+    const isLight = (settings?.theme || theme) === "light";
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight,
       layout: {
-        background: { color: "#131722" },
-        textColor: "#787b86",
+        background: { color: isLight ? "#ffffff" : "#131722" },
+        textColor: isLight ? "#131722" : "#787b86",
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, sans-serif",
         attributionLogo: false,
       },
       grid: {
-        vertLines: { color: "#1f2431" },
-        horzLines: { color: "#1f2431" },
+        vertLines: { color: settings?.gridVisible !== false ? (isLight ? "#f0f3fa" : "#1f2431") : "transparent" },
+        horzLines: { color: settings?.gridVisible !== false ? (isLight ? "#f0f3fa" : "#1f2431") : "transparent" },
       },
       crosshair: {
         mode: 1, // Normal Crosshair
-        vertLine: { color: "#787b86", width: 1, style: 3, labelBackgroundColor: "#2a2e39" },
-        horzLine: { color: "#787b86", width: 1, style: 3, labelBackgroundColor: "#2a2e39" },
+        vertLine: { color: isLight ? "#b2b5be" : "#787b86", width: 1, style: 3, labelBackgroundColor: isLight ? "#f0f3fa" : "#2a2e39" },
+        horzLine: { color: isLight ? "#b2b5be" : "#787b86", width: 1, style: 3, labelBackgroundColor: isLight ? "#f0f3fa" : "#2a2e39" },
       },
       rightPriceScale: {
-        borderColor: "#2a2e39",
+        borderColor: isLight ? "#e0e3eb" : "#2a2e39",
         visible: true,
         scaleMargins: { top: 0.1, bottom: 0.2 },
       },
       timeScale: {
-        borderColor: "#2a2e39",
+        borderColor: isLight ? "#e0e3eb" : "#2a2e39",
         timeVisible: true,
         secondsVisible: false,
       },
@@ -342,13 +347,13 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
     });
 
     const candlestickSeries = chart.addCandlestickSeries({
-      upColor: "#089981",
-      downColor: "#f23645",
+      upColor: settings?.upColor || "#089981",
+      downColor: settings?.downColor || "#f23645",
       borderVisible: false,
-      wickUpColor: "#089981",
-      wickDownColor: "#f23645",
+      wickUpColor: settings?.upColor || "#089981",
+      wickDownColor: settings?.downColor || "#f23645",
     });
-    const lineSeries = chart.addLineSeries({ color: "#d1d4dc", lineWidth: 2, priceLineVisible: false });
+    const lineSeries = chart.addLineSeries({ color: isLight ? "#2962ff" : "#d1d4dc", lineWidth: 2, priceLineVisible: false });
     const areaSeries = chart.addAreaSeries({
       lineColor: "#2962ff",
       topColor: "#2962ff55",
@@ -357,8 +362,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       priceLineVisible: false,
     });
     const barSeries = chart.addBarSeries({
-      upColor: "#089981",
-      downColor: "#f23645",
+      upColor: settings?.upColor || "#089981",
+      downColor: settings?.downColor || "#f23645",
       openVisible: true,
       thinBars: false,
     });
@@ -475,6 +480,47 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       bbLowerRef.current = null;
     };
   }, []);
+
+  // Apply live theme & styling updates
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const isLight = (settings?.theme || theme) === "light";
+    chart.applyOptions({
+      layout: {
+        background: { color: isLight ? "#ffffff" : "#131722" },
+        textColor: isLight ? "#131722" : "#787b86",
+      },
+      grid: {
+        vertLines: { color: settings?.gridVisible !== false ? (isLight ? "#f0f3fa" : "#1f2431") : "transparent" },
+        horzLines: { color: settings?.gridVisible !== false ? (isLight ? "#f0f3fa" : "#1f2431") : "transparent" },
+      },
+      rightPriceScale: {
+        borderColor: isLight ? "#e0e3eb" : "#2a2e39",
+      },
+      timeScale: {
+        borderColor: isLight ? "#e0e3eb" : "#2a2e39",
+      },
+      crosshair: {
+        vertLine: { color: isLight ? "#b2b5be" : "#787b86", labelBackgroundColor: isLight ? "#f0f3fa" : "#2a2e39" },
+        horzLine: { color: isLight ? "#b2b5be" : "#787b86", labelBackgroundColor: isLight ? "#f0f3fa" : "#2a2e39" },
+      },
+    });
+
+    seriesRef.current?.applyOptions({
+      upColor: settings?.upColor || "#089981",
+      downColor: settings?.downColor || "#f23645",
+      wickUpColor: settings?.upColor || "#089981",
+      wickDownColor: settings?.downColor || "#f23645",
+    });
+    barRef.current?.applyOptions({
+      upColor: settings?.upColor || "#089981",
+      downColor: settings?.downColor || "#f23645",
+    });
+    lineRef.current?.applyOptions({
+      color: isLight ? "#2962ff" : "#d1d4dc",
+    });
+  }, [settings, theme]);
 
   // Infinite history handler
   useEffect(() => {
@@ -821,14 +867,26 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   const isUp = ohlc.close >= ohlc.open;
   const hasData = candles.length > 0;
 
+  const isLight = (settings?.theme || theme) === "light";
+
   return (
-    <div className="relative w-full h-full flex flex-col bg-[#131722] overflow-hidden select-none">
+    <div
+      className={`relative w-full h-full flex flex-col ${
+        isLight ? "bg-white text-[#131722]" : "bg-[#131722] text-[#d1d4dc]"
+      } overflow-hidden select-none`}
+    >
       {/* Chart Legend Overlay */}
       <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 pointer-events-none">
         <div className="flex flex-wrap items-center gap-1.5 pointer-events-auto">
-          <span className="font-bold text-sm text-white tracking-wide">{symbol}</span>
+          <span className={`font-bold text-sm tracking-wide ${isLight ? "text-[#131722]" : "text-white"}`}>
+            {symbol}
+          </span>
           <span className="text-xs text-[#787b86] font-medium">{timeframe}</span>
-          <span className="text-[10px] text-[#787b86] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded">
+          <span
+            className={`text-[10px] text-[#787b86] font-mono border px-1.5 py-0.5 rounded ${
+              isLight ? "bg-[#f0f3fa] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+            }`}
+          >
             {provider}
           </span>
           <span
@@ -962,7 +1020,11 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       <OscillatorPane candles={candles} indicators={indicators} />
 
       {/* Quick Timeframe Range Bar & Scale Mode Controls (TradingView Signature) */}
-      <div className="h-7 bg-[#1e222d] border-t border-[#2a2e39] flex items-center justify-between px-2 text-[11px] font-mono select-none shrink-0 z-20">
+      <div
+        className={`h-7 border-t flex items-center justify-between px-2 text-[11px] font-mono select-none shrink-0 z-20 ${
+          isLight ? "bg-[#f0f3fa] border-[#e0e3eb] text-[#5d606b]" : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
+        }`}
+      >
         {/* Left: Quick Range Fit */}
         <div className="flex items-center gap-1 text-[#787b86]">
           {(["1D", "5D", "1M", "3M", "6M", "1Y", "ALL"] as const).map((rng) => (
