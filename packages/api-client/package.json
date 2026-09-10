@@ -30,7 +30,7 @@
   },
   "homepage": "https://pia.wign.dev/portal/docs",
   "scripts": {
-    "build": "bun build src/index.ts --outdir ./dist --format esm --sourcemap && bun x tsc -p tsconfig.json --emitDeclarationOnly",
+    "build": "bun build src/index.ts --outdir ./dist --format esm && bun x tsc -p tsconfig.json --emitDeclarationOnly",
     "test": "bun test",
     "prepublishOnly": "bun run build && bun test"
   },
