@@ -458,13 +458,6 @@ func main() {
 # or
 bun add @piaa/sdk`}
             </pre>
-            <ul style={{ margin: "10px 0 0", padding: "0 0 0 16px", fontSize: 11, color: "#555", lineHeight: 1.7 }}>
-              <li>ESM native bundle with full TypeScript declarations</li>
-              <li>Exponential backoff with jitter on transient failures</li>
-              <li>In-Band WebSocket Auth (no token in URL)</li>
-              <li>Market, Social, News, Options resource modules</li>
-              <li>Works in Node.js, Bun, Deno, and edge runtimes</li>
-            </ul>
           </div>
 
           {/* Python SDK */}
@@ -485,13 +478,7 @@ bun add @piaa/sdk`}
             <pre style={{ margin: 0, padding: 10, background: "rgba(9,9,238,0.04)", border: "1px solid rgba(9,9,238,0.12)", fontSize: 11, fontFamily: "var(--font-geist-mono), monospace", color: "var(--blue)" }}>
 {`pip install piaa-sdk`}
             </pre>
-            <ul style={{ margin: "10px 0 0", padding: "0 0 0 16px", fontSize: 11, color: "#555", lineHeight: 1.7 }}>
-              <li>Dual engine: synchronous <code>PiaClient</code> + async <code>AsyncPiaClient</code></li>
-              <li>Batteries-included: REST + WebSocket in one package</li>
-              <li>Typed dataclasses for all API responses</li>
-              <li>Automatic retry with rate-limit header awareness</li>
-              <li>Python 3.8+ compatible</li>
-            </ul>
+
           </div>
         </div>
 
