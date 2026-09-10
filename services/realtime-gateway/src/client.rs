@@ -497,4 +497,15 @@ mod tests {
         assert_eq!(cmd.method.to_uppercase(), "SUBSCRIBE");
         assert_eq!(cmd.params, vec!["XAUUSD", "BTCUSDT"]);
     }
+
+    #[test]
+    fn client_command_parses_token_and_ticket() {
+        let json_ticket = r#"{"action": "auth", "ticket": "wst_12345"}"#;
+        let cmd: ClientCommand = serde_json::from_str(json_ticket).unwrap();
+        assert_eq!(cmd.ticket.as_deref(), Some("wst_12345"));
+
+        let json_token = r#"{"method": "auth", "token": "wi_live_tok"}"#;
+        let cmd2: ClientCommand = serde_json::from_str(json_token).unwrap();
+        assert_eq!(cmd2.token.as_deref(), Some("wi_live_tok"));
+    }
 }
