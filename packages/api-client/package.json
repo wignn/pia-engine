@@ -1,10 +1,32 @@
 {
-  "name": "@atlsd/api-client",
+  "name": "@pia/sdk",
   "version": "1.0.0",
-  "description": "Shared TypeScript client for portal and public-web",
-  "main": "index.js",
-  "scripts": {
-    "build": "echo 'No build script configured'"
+  "description": "Official TypeScript/JavaScript SDK for PIA Market Intelligence Platform",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
   },
-  "private": true
+  "scripts": {
+    "build": "bun build src/index.ts --outdir ./dist --sourcemap",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "pia",
+    "atlsd",
+    "market-data",
+    "finance",
+    "crypto",
+    "trading",
+    "sdk",
+    "websocket"
+  ],
+  "author": "Merrr <wign@wign.dev>",
+  "license": "MIT"
 }

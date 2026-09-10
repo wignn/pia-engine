@@ -28,3 +28,4 @@ infra/monitoring/textfile/
 # Agent plans and local load tests
 .hermes/
 loadtest*.js
+packages/*/dist/
