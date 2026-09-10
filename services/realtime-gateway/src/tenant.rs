@@ -24,6 +24,7 @@ struct CachedKey {
     rate_limit_per_min: i32,
     can_scrape: bool,
     expires_at: Option<DateTime<Utc>>,
+    permissions: Vec<String>,
 }
 
 pub struct TenantRegistry {
@@ -49,6 +50,7 @@ type TenantRow = (
     i32,
     bool,
     Option<DateTime<Utc>>,
+    Vec<String>,
 );
 
 impl TenantRegistry {
@@ -61,7 +63,7 @@ impl TenantRegistry {
 
     pub async fn reload(&self) {
         let rows: Result<Vec<TenantRow>, _> = sqlx::query_as(
-            "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, COALESCE(k.max_ws_connections, p.ws_connections, 1), COALESCE(p.requests_per_day, 100), COALESCE(p.x_usernames_max, 1), COALESCE(p.tv_symbols_max, 3), COALESCE(p.rate_limit_per_min, 10), COALESCE(p.can_scrape, FALSE), k.expires_at FROM api_keys k JOIN users u ON u.id = k.user_id LEFT JOIN plans p ON p.id = u.plan",
+            "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, COALESCE(k.max_ws_connections, p.ws_connections, 1), COALESCE(p.requests_per_day, 100), COALESCE(p.x_usernames_max, 1), COALESCE(p.tv_symbols_max, 3), COALESCE(p.rate_limit_per_min, 10), COALESCE(p.can_scrape, FALSE), k.expires_at, k.permissions FROM api_keys k JOIN users u ON u.id = k.user_id LEFT JOIN plans p ON p.id = u.plan",
         )
         .fetch_all(&self.db)
         .await;
@@ -83,6 +85,7 @@ impl TenantRegistry {
                     rate_limit_per_min,
                     can_scrape,
                     expires_at,
+                    permissions,
                 ) in rows
                 {
                     map.insert(
@@ -100,6 +103,7 @@ impl TenantRegistry {
                             rate_limit_per_min,
                             can_scrape,
                             expires_at,
+                            permissions,
                         },
                     );
                 }
@@ -128,7 +132,7 @@ impl TenantRegistry {
             } else {
                 // Cache-aside on miss: instant zero-wait activation for newly provisioned keys
                 let row: Result<Option<TenantRow>, _> = sqlx::query_as(
-                    "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, COALESCE(k.max_ws_connections, p.ws_connections, 1), COALESCE(p.requests_per_day, 100), COALESCE(p.x_usernames_max, 1), COALESCE(p.tv_symbols_max, 3), COALESCE(p.rate_limit_per_min, 10), COALESCE(p.can_scrape, FALSE), k.expires_at FROM api_keys k JOIN users u ON u.id = k.user_id LEFT JOIN plans p ON p.id = u.plan WHERE k.key_hash = $1",
+                    "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, COALESCE(k.max_ws_connections, p.ws_connections, 1), COALESCE(p.requests_per_day, 100), COALESCE(p.x_usernames_max, 1), COALESCE(p.tv_symbols_max, 3), COALESCE(p.rate_limit_per_min, 10), COALESCE(p.can_scrape, FALSE), k.expires_at, k.permissions FROM api_keys k JOIN users u ON u.id = k.user_id LEFT JOIN plans p ON p.id = u.plan WHERE k.key_hash = $1",
                 )
                 .bind(&hash)
                 .fetch_optional(&self.db)
@@ -148,6 +152,7 @@ impl TenantRegistry {
                     rlm,
                     scrape,
                     expires,
+                    perms,
                 ))) = row
                 {
                     let entry = CachedKey {
@@ -163,6 +168,7 @@ impl TenantRegistry {
                         rate_limit_per_min: rlm,
                         can_scrape: scrape,
                         expires_at: expires,
+                        permissions: perms,
                     };
                     self.keys.write().await.insert(hash, entry.clone());
                     info!(key_id = %key_id, "realtime cache-aside loaded new key instantly");
@@ -195,6 +201,7 @@ impl TenantRegistry {
             can_scrape: cached.can_scrape,
             x_usernames: Default::default(),
             tv_symbols: Default::default(),
+            permissions: cached.permissions,
         })
     }
 }
@@ -223,6 +230,7 @@ mod tests {
             rate_limit_per_min: 60,
             can_scrape: false,
             expires_at: None,
+            permissions: vec!["realtime:ws".to_string()],
         };
 
         assert_eq!(cached.ws_connections, 7);

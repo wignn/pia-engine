@@ -148,6 +148,34 @@ impl User {
         .fetch_optional(db)
         .await
     }
+
+    pub async fn update_name(
+        db: &PgPool,
+        user_id: Uuid,
+        name: &str,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as::<_, Self>(
+            "UPDATE users SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
+        )
+        .bind(name)
+        .bind(user_id)
+        .fetch_optional(db)
+        .await
+    }
+
+    pub async fn update_password(
+        db: &PgPool,
+        user_id: Uuid,
+        new_password: &str,
+    ) -> Result<(), sqlx::Error> {
+        let pw_hash = hash_password(new_password);
+        sqlx::query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2")
+            .bind(pw_hash)
+            .bind(user_id)
+            .execute(db)
+            .await?;
+        Ok(())
+    }
 }
 
 /// Hash a password using Argon2id.

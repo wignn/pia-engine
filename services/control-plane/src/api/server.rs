@@ -181,6 +181,11 @@ pub fn build_router(state: AppState) -> Router {
             post(super::auth::oauth_callback),
         )
         .route("/api/v1/auth/me", get(super::auth::me))
+        .route("/api/v1/auth/profile", put(super::auth::update_profile))
+        .route(
+            "/api/v1/auth/change-password",
+            post(super::auth::change_password),
+        )
         .route("/api/v1/keys", get(super::keys::list_keys))
         .route("/api/v1/keys", post(super::keys::create_key))
         .route("/api/v1/keys/{id}", delete(super::keys::revoke_key))

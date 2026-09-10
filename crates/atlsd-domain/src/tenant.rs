@@ -15,6 +15,7 @@ pub struct TenantContext {
     pub can_scrape: bool,
     pub x_usernames: HashSet<String>,
     pub tv_symbols: HashSet<String>,
+    pub permissions: Vec<String>,
 }
 
 impl TenantContext {
@@ -32,6 +33,16 @@ impl TenantContext {
             can_scrape: true,
             x_usernames: HashSet::new(),
             tv_symbols: HashSet::new(),
+            permissions: vec!["*".to_string()],
         }
+    }
+
+    /// Check if the tenant API key grants access to the specified scope.
+    /// If permissions array is empty (legacy keys) or contains "*", it grants access.
+    pub fn has_permission(&self, required: &str) -> bool {
+        if self.is_admin || self.permissions.is_empty() {
+            return true;
+        }
+        self.permissions.iter().any(|p| p == "*" || p == required)
     }
 }

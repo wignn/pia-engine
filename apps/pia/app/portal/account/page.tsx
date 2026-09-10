@@ -14,6 +14,7 @@ import { CreateKeyModal } from "@/src/components/portal/CreateKeyModal";
 import { RevealKeyModal } from "@/src/components/portal/RevealKeyModal";
 import { UsageMeter } from "@/src/components/portal/UsageMeter";
 import { UsageChart } from "@/src/components/portal/UsageChart";
+import { AccountSettings } from "@/src/components/portal/AccountSettings";
 
 const fallbackPlans: Plan[] = [
   { id: "free", name: "Free", price_idr: 0, requests_per_day: 100, ws_connections: 1, news_history_days: 1, rate_limit_per_min: 10 },
@@ -40,7 +41,7 @@ export default function AccountPage() {
   const [plans, setPlans] = useState<Plan[]>(fallbackPlans);
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
   const [usageHistory, setUsageHistory] = useState<DailyUsage[]>([]);
-  const [activeTab, setActiveTab] = useState<"overview" | "keys" | "plans">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "keys" | "plans" | "settings">("overview");
   const [notice, setNotice] = useState("LOADING PIA ACCOUNT...");
   const [loading, setLoading] = useState(true);
 
@@ -241,7 +242,7 @@ export default function AccountPage() {
       ) : (
         <>
           <nav className="account-tabs" aria-label="Account sections">
-            {(["overview", "keys", "plans"] as const).map((tab) => (
+            {(["overview", "keys", "plans", "settings"] as const).map((tab) => (
               <button
                 className={activeTab === tab ? "is-active" : ""}
                 onClick={() => setActiveTab(tab)}
@@ -558,6 +559,20 @@ export default function AccountPage() {
                   );
                 })}
               </div>
+            </section>
+          )}
+
+          {/* TAB 4: SETTINGS */}
+          {activeTab === "settings" && user && (
+            <section className="account-section">
+              <AccountSettings
+                user={user}
+                onUserUpdate={(updated) => {
+                  setUser(updated);
+                  setNotice(`PROFILE UPDATED · ${updated.name.toUpperCase()}`);
+                }}
+                onLogout={handleLogout}
+              />
             </section>
           )}
         </>

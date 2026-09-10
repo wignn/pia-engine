@@ -153,6 +153,15 @@ async fn ws_handler_inner(
             "Valid API key required for WebSocket connection",
         );
     }
+    if let Some(tenant) = &tenant_context {
+        if !tenant.has_permission("realtime:ws") {
+            return reject_ws(
+                &state,
+                StatusCode::FORBIDDEN,
+                "API key lacks 'realtime:ws' scope permission",
+            );
+        }
+    }
     let api_key_id = if admin_authenticated {
         "admin".to_string()
     } else {

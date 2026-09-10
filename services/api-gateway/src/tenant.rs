@@ -23,6 +23,7 @@ struct CachedKey {
     tv_symbols_max: i32,
     rate_limit_per_min: i32,
     expires_at: Option<DateTime<Utc>>,
+    permissions: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -51,6 +52,7 @@ type TenantRow = (
     i32,
     i32,
     Option<DateTime<Utc>>,
+    Vec<String>,
 );
 
 pub fn reload_interval() -> Duration {
@@ -72,7 +74,7 @@ impl TenantRegistry {
         };
 
         let rows: Result<Vec<TenantRow>, _> = sqlx::query_as(
-            "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, COALESCE(p.can_scrape, FALSE), COALESCE(p.requests_per_day, 100), COALESCE(p.ws_connections, 1), COALESCE(p.x_usernames_max, 1), COALESCE(p.tv_symbols_max, 3), COALESCE(p.rate_limit_per_min, 10), k.expires_at FROM api_keys k JOIN users u ON u.id = k.user_id LEFT JOIN plans p ON p.id = u.plan",
+            "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, COALESCE(p.can_scrape, FALSE), COALESCE(p.requests_per_day, 100), COALESCE(p.ws_connections, 1), COALESCE(p.x_usernames_max, 1), COALESCE(p.tv_symbols_max, 3), COALESCE(p.rate_limit_per_min, 10), k.expires_at, k.permissions FROM api_keys k JOIN users u ON u.id = k.user_id LEFT JOIN plans p ON p.id = u.plan",
         )
         .fetch_all(db)
         .await;
@@ -94,6 +96,7 @@ impl TenantRegistry {
                     tv_max,
                     rlm,
                     expires,
+                    perms,
                 ) in rows
                 {
                     map.insert(
@@ -111,6 +114,7 @@ impl TenantRegistry {
                             tv_symbols_max: tv_max,
                             rate_limit_per_min: rlm,
                             expires_at: expires,
+                            permissions: perms,
                         },
                     );
                 }
@@ -199,7 +203,7 @@ impl TenantRegistry {
             } else if let Some(db) = &self.db {
                 // Cache-aside on miss: instant zero-wait activation for newly provisioned keys
                 let row: Result<Option<TenantRow>, _> = sqlx::query_as(
-                    "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, COALESCE(p.can_scrape, FALSE), COALESCE(p.requests_per_day, 100), COALESCE(p.ws_connections, 1), COALESCE(p.x_usernames_max, 1), COALESCE(p.tv_symbols_max, 3), COALESCE(p.rate_limit_per_min, 10), k.expires_at FROM api_keys k JOIN users u ON u.id = k.user_id LEFT JOIN plans p ON p.id = u.plan WHERE k.key_hash = $1",
+                    "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, COALESCE(p.can_scrape, FALSE), COALESCE(p.requests_per_day, 100), COALESCE(p.ws_connections, 1), COALESCE(p.x_usernames_max, 1), COALESCE(p.tv_symbols_max, 3), COALESCE(p.rate_limit_per_min, 10), k.expires_at, k.permissions FROM api_keys k JOIN users u ON u.id = k.user_id LEFT JOIN plans p ON p.id = u.plan WHERE k.key_hash = $1",
                 )
                 .bind(&hash)
                 .fetch_optional(db)
@@ -219,6 +223,7 @@ impl TenantRegistry {
                     tv_max,
                     rlm,
                     expires,
+                    perms,
                 ))) = row
                 {
                     let entry = CachedKey {
@@ -234,6 +239,7 @@ impl TenantRegistry {
                         tv_symbols_max: tv_max,
                         rate_limit_per_min: rlm,
                         expires_at: expires,
+                        permissions: perms,
                     };
                     self.keys.write().await.insert(hash, entry.clone());
                     info!(key_id = %kid, "api-gateway cache-aside loaded new key instantly");
@@ -275,6 +281,7 @@ impl TenantRegistry {
             can_scrape: cached.can_scrape,
             x_usernames: config.x_usernames,
             tv_symbols: config.tv_symbols,
+            permissions: cached.permissions,
         })
     }
 }

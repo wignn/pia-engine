@@ -26,6 +26,20 @@ pub async fn require_api_key_auth(
         return Ok(next.run(request).await);
     }
     if let Some(ctx) = state.tenant_registry.validate_key(&raw_key).await {
+        let req_scope = required_scope_for_path(request.uri().path());
+        if !ctx.has_permission(req_scope) {
+            let res = (
+                StatusCode::FORBIDDEN,
+                axum::Json(serde_json::json!({
+                    "error": "insufficient_scope",
+                    "message": format!("API key does not have the required '{}' scope permission.", req_scope),
+                    "required_scope": req_scope
+                })),
+            )
+                .into_response();
+            return Ok(res);
+        }
+
         let decision = state.usage_tracker.check_rate_limit(&ctx).await;
         match decision {
             RateLimitDecision::Allowed {
@@ -169,6 +183,21 @@ fn extract_api_key(request: &Request) -> Option<String> {
         })
 }
 
+pub fn required_scope_for_path(path: &str) -> &'static str {
+    if path.starts_with("/api/v1/social") {
+        "social:read"
+    } else if path.starts_with("/api/v1/news") || path.starts_with("/api/v1/forex/news") {
+        "news:read"
+    } else if path.starts_with("/api/v1/market/economic")
+        || path.starts_with("/api/v1/central-banks")
+        || path.starts_with("/api/v1/geosignals")
+    {
+        "macro:read"
+    } else {
+        "market:read"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,5 +262,34 @@ mod tests {
 
         let day_exceeded = RateLimitDecision::DailyQuotaExceeded { limit: 5000 };
         assert!(!day_exceeded.is_allowed());
+    }
+
+    #[test]
+    fn required_scope_for_path_mapping() {
+        assert_eq!(
+            required_scope_for_path("/api/v1/market/prices"),
+            "market:read"
+        );
+        assert_eq!(
+            required_scope_for_path("/api/v1/options/summary"),
+            "market:read"
+        );
+        assert_eq!(
+            required_scope_for_path("/api/v1/social/posts"),
+            "social:read"
+        );
+        assert_eq!(required_scope_for_path("/api/v1/news/feed"), "news:read");
+        assert_eq!(
+            required_scope_for_path("/api/v1/market/economic/indicators"),
+            "macro:read"
+        );
+        assert_eq!(
+            required_scope_for_path("/api/v1/central-banks/fed/stance"),
+            "macro:read"
+        );
+        assert_eq!(
+            required_scope_for_path("/api/v1/geosignals/map"),
+            "macro:read"
+        );
     }
 }

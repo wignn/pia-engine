@@ -74,6 +74,16 @@ export const accountApi = {
       body: JSON.stringify({ email, name, password }),
     }),
   logout: () => request<{ message: string }>("/api/v1/auth/logout", { method: "POST" }),
+  updateProfile: (name: string) =>
+    request<{ status: string; user: User }>("/api/v1/auth/profile", {
+      method: "PUT",
+      body: JSON.stringify({ name }),
+    }),
+  changePassword: (newPassword: string, currentPassword?: string) =>
+    request<{ status: string; message: string }>("/api/v1/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ new_password: newPassword, current_password: currentPassword }),
+    }),
   keys: async () => (await request<{ keys: KeyInfo[] }>("/api/v1/keys")).keys,
   createKey: (label: string, permissions: string[] = ["market:read", "realtime:ws"]) =>
     request<{ api_key: string; key_info: KeyInfo }>("/api/v1/keys", {

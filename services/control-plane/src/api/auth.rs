@@ -89,7 +89,14 @@ pub async fn register(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let (_key, raw_key) = ApiKey::create(&state.db, user.id, "default", &[])
+    let default_scopes = vec![
+        "market:read".to_string(),
+        "realtime:ws".to_string(),
+        "news:read".to_string(),
+        "macro:read".to_string(),
+        "social:read".to_string(),
+    ];
+    let (_key, raw_key) = ApiKey::create(&state.db, user.id, "default", &default_scopes)
         .await
         .map_err(|e| {
             warn!(error = %e, "failed to create initial API key");
@@ -279,6 +286,103 @@ pub async fn me(
         "active_keys": key_count.0,
         "plan_limits": plan,
         "linked_providers": linked_providers,
+    })))
+}
+
+#[derive(serde::Deserialize)]
+pub struct UpdateProfileRequest {
+    pub name: String,
+}
+
+/// PUT /api/v1/auth/profile
+pub async fn update_profile(
+    State(state): State<AppState>,
+    request: axum::extract::Request,
+) -> Result<Json<Value>, StatusCode> {
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    let bytes = axum::body::to_bytes(request.into_body(), 16 * 1024)
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let body: UpdateProfileRequest =
+        serde_json::from_slice(&bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let trimmed = body.name.trim();
+    if trimmed.is_empty() || trimmed.len() > 100 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let user = User::update_name(&state.db, auth.user_id, trimmed)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    Ok(Json(json!({
+        "status": "ok",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "plan": user.plan,
+            "avatar_url": user.avatar_url,
+        }
+    })))
+}
+
+#[derive(serde::Deserialize)]
+pub struct ChangePasswordRequest {
+    pub current_password: Option<String>,
+    pub new_password: String,
+}
+
+/// POST /api/v1/auth/change-password
+pub async fn change_password(
+    State(state): State<AppState>,
+    request: axum::extract::Request,
+) -> Result<Json<Value>, StatusCode> {
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    let bytes = axum::body::to_bytes(request.into_body(), 16 * 1024)
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let body: ChangePasswordRequest =
+        serde_json::from_slice(&bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    if body.new_password.len() < 6 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let user = User::find_by_id(&state.db, auth.user_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if user.password_hash.is_some() {
+        let Some(current) = body.current_password else {
+            return Err(StatusCode::BAD_REQUEST);
+        };
+        if !user.verify_password(&current) {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
+    }
+
+    User::update_password(&state.db, auth.user_id, &body.new_password)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    info!(user_id = %auth.user_id, "user password changed");
+
+    Ok(Json(json!({
+        "status": "ok",
+        "message": "Password changed successfully"
     })))
 }
 
@@ -592,5 +696,20 @@ mod tests {
         assert!(validate_oauth_state("github", &state, secret));
         assert!(!validate_oauth_state("google", &state, secret));
         assert!(!validate_oauth_state("github", &state, "different-secret"));
+    }
+
+    #[test]
+    fn update_profile_payload_deserialization() {
+        let json = r#"{"name":"Alice Smith"}"#;
+        let req: super::UpdateProfileRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.name, "Alice Smith");
+    }
+
+    #[test]
+    fn change_password_payload_deserialization() {
+        let json = r#"{"current_password":"oldPass123","new_password":"newPass456"}"#;
+        let req: super::ChangePasswordRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.current_password.as_deref(), Some("oldPass123"));
+        assert_eq!(req.new_password, "newPass456");
     }
 }
