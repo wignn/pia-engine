@@ -180,19 +180,28 @@ async function run() {
   const data = await res.json();
   console.log(\`Received \${data.total} market instruments.\`);
 
-  // 2. Connect to WebSocket Stream
-  const ws = new WebSocket(\`\${WS_URL}?api_key=\${API_KEY}\`);
+  // 2. Connect to WebSocket Stream (In-Band Message Auth)
+  const ws = new WebSocket(WS_URL);
   ws.on("open", () => {
-    console.log("WebSocket connected. Subscribing to XAUUSD & BTCUSDT...");
+    console.log("WebSocket connected. Authenticating via message frame...");
     ws.send(JSON.stringify({
-      action: "subscribe",
-      symbols: ["XAUUSD", "BTCUSDT"]
+      action: "auth",
+      api_key: API_KEY
     }));
   });
 
   ws.on("message", (msg) => {
-    const tick = JSON.parse(msg.toString());
-    console.log(\`[TICK] \${tick.symbol} -> \${tick.price}\`);
+    const data = JSON.parse(msg.toString());
+    if (data.event === "authenticated") {
+      console.log("Authenticated! Subscribing to XAUUSD & BTCUSDT...");
+      ws.send(JSON.stringify({
+        action: "subscribe",
+        symbols: ["XAUUSD", "BTCUSDT"]
+      }));
+    } else if (data.event === "market.trade") {
+      const tick = data.data.tick;
+      console.log(\`[TICK] \${tick.symbol} -> \${tick.price}\`);
+    }
   });
 }
 
@@ -541,24 +550,43 @@ func main() {
         <span className="account-card-label">REALTIME STREAMING</span>
         <h2>WebSocket Gateway Protocol</h2>
         <p className="account-muted" style={{ marginBottom: 16 }}>
-          Sub-millisecond ticker feed streaming with dedicated connection concurrency per tier.
+          Sub-millisecond ticker feed streaming supporting both In-Band Message Authentication and Handshake Tickets.
         </p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
           <div style={{ padding: 14, background: "rgba(255,255,255,0.6)", border: "1px solid rgba(9,9,238,0.15)" }}>
-            <h3 style={{ fontSize: 13, margin: "0 0 8px" }}>1. Connection Handshake</h3>
+            <h3 style={{ fontSize: 13, margin: "0 0 8px" }}>1. In-Band Auth (Cross-Platform)</h3>
             <p className="account-muted" style={{ fontSize: 11, lineHeight: 1.5, margin: 0 }}>
-              Connect directly via WebSocket URL with your API key:
+              Connect clean without query tokens, then send an auth frame within 5s:
             </p>
             <pre style={{ margin: "8px 0 0", padding: 8, background: "rgba(9,9,238,0.04)", fontSize: 10, fontFamily: "var(--font-geist-mono), monospace", color: "var(--blue)" }}>
-{`wss://api-engine.wign.dev/api/v1/ws?api_key=${selectedKey}`}
+{`wss://api-engine.wign.dev/api/v1/ws
+
+Send frame:
+{
+  "action": "auth",
+  "api_key": "${selectedKey}"
+}`}
             </pre>
           </div>
 
           <div style={{ padding: 14, background: "rgba(255,255,255,0.6)", border: "1px solid rgba(9,9,238,0.15)" }}>
-            <h3 style={{ fontSize: 13, margin: "0 0 8px" }}>2. Subscription Payload</h3>
+            <h3 style={{ fontSize: 13, margin: "0 0 8px" }}>2. Ephemeral Ticket (Browser)</h3>
             <p className="account-muted" style={{ fontSize: 11, lineHeight: 1.5, margin: 0 }}>
-              Send a subscription command immediately after connection open:
+              Request a 60s single-use ticket via REST, then connect safely:
+            </p>
+            <pre style={{ margin: "8px 0 0", padding: 8, background: "rgba(9,9,238,0.04)", fontSize: 10, fontFamily: "var(--font-geist-mono), monospace", color: "var(--blue)" }}>
+{`POST /api/v1/ws/ticket (Header: x-api-key)
+-> {"ticket": "wst_..."}
+
+wss://api-engine.wign.dev/api/v1/ws?ticket=wst_...`}
+            </pre>
+          </div>
+
+          <div style={{ padding: 14, background: "rgba(255,255,255,0.6)", border: "1px solid rgba(9,9,238,0.15)" }}>
+            <h3 style={{ fontSize: 13, margin: "0 0 8px" }}>3. Dynamic Subscription</h3>
+            <p className="account-muted" style={{ fontSize: 11, lineHeight: 1.5, margin: 0 }}>
+              Subscribe to specific symbols or multiple channels dynamically:
             </p>
             <pre style={{ margin: "8px 0 0", padding: 8, background: "rgba(9,9,238,0.04)", fontSize: 10, fontFamily: "var(--font-geist-mono), monospace", color: "var(--blue)" }}>
 {`{

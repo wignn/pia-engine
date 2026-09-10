@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use atlsd_domain::tenant::TenantContext;
 use serde_json::{json, Value};
 
-const BASE_STREAMS: &[&str] = &[
+pub(crate) const BASE_STREAMS: &[&str] = &[
     "all",
     "market_data",
     "forex_news",

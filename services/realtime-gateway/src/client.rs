@@ -11,11 +11,18 @@ use crate::streams;
 
 #[derive(Debug, Deserialize)]
 struct ClientCommand {
+    #[serde(alias = "action")]
     method: String,
-    #[serde(default)]
+    #[serde(default, alias = "symbols", alias = "streams")]
     params: Vec<String>,
     #[serde(default)]
     id: Option<Value>,
+    #[serde(default)]
+    api_key: Option<String>,
+    #[serde(default)]
+    token: Option<String>,
+    #[serde(default)]
+    ticket: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -139,6 +146,199 @@ pub async fn handle_registered_socket(
     hub.unregister(client_id).await;
 }
 
+pub async fn handle_unauthenticated_socket(
+    mut socket: axum::extract::ws::WebSocket,
+    state: crate::state::AppState,
+    bot_id: String,
+    channel_override: Option<String>,
+    params: std::collections::HashMap<String, String>,
+) {
+    use axum::extract::ws::Message;
+    use futures_util::SinkExt;
+    use std::time::Duration;
+
+    let welcome = json!({
+        "event": "connected",
+        "data": {
+            "message": "Connected to PIA Realtime Gateway. Authentication required within 5 seconds.",
+            "format": {"action": "auth", "api_key": "YOUR_KEY"}
+        }
+    });
+    if socket
+        .send(Message::Text(welcome.to_string().into()))
+        .await
+        .is_err()
+    {
+        return;
+    }
+
+    let auth_timeout = Duration::from_secs(5);
+    let msg = match tokio::time::timeout(auth_timeout, socket.recv()).await {
+        Ok(Some(Ok(Message::Text(text)))) => text,
+        _ => {
+            let timeout_err = json!({
+                "error": "auth_timeout",
+                "message": "Authentication timed out. Disconnecting."
+            });
+            let _ = socket
+                .send(Message::Text(timeout_err.to_string().into()))
+                .await;
+            let _ = socket.close().await;
+            return;
+        }
+    };
+
+    let cmd = match serde_json::from_str::<ClientCommand>(&msg) {
+        Ok(cmd) => cmd,
+        Err(_) => {
+            let parse_err = json!({
+                "error": "bad_request",
+                "message": "Expected JSON payload with {\"action\": \"auth\", \"api_key\": \"...\"}"
+            });
+            let _ = socket
+                .send(Message::Text(parse_err.to_string().into()))
+                .await;
+            let _ = socket.close().await;
+            return;
+        }
+    };
+
+    if cmd.method.to_uppercase() != "AUTH" {
+        let auth_req_err = json!({
+            "error": "unauthenticated",
+            "message": "First message must be an auth action: {\"action\": \"auth\", \"api_key\": \"...\"}"
+        });
+        let _ = socket
+            .send(Message::Text(auth_req_err.to_string().into()))
+            .await;
+        let _ = socket.close().await;
+        return;
+    }
+
+    let mut token = cmd.api_key.or(cmd.token);
+    if let Some(ticket_id) = cmd.ticket {
+        if let Some(api_key) = state.ticket_store.redeem(&ticket_id).await {
+            token = Some(api_key);
+        }
+    }
+
+    let Some(raw_key) = token else {
+        let missing_key_err = json!({
+            "error": "unauthorized",
+            "message": "Missing 'api_key' or 'ticket' in auth frame"
+        });
+        let _ = socket
+            .send(Message::Text(missing_key_err.to_string().into()))
+            .await;
+        let _ = socket.close().await;
+        return;
+    };
+
+    let (api_key_id, tenant_context, admin_authenticated) =
+        match crate::http::authenticate_and_verify(&state, &raw_key).await {
+            Ok(tuple) => tuple,
+            Err((status, msg)) => {
+                let err_msg = json!({
+                    "error": status.as_u16(),
+                    "message": msg
+                });
+                let _ = socket.send(Message::Text(err_msg.to_string().into())).await;
+                let _ = socket.close().await;
+                return;
+            }
+        };
+
+    let connection_limit = if admin_authenticated {
+        i32::MAX
+    } else {
+        tenant_context
+            .as_ref()
+            .map(|tenant| tenant.ws_connections)
+            .or_else(|| {
+                state
+                    .config
+                    .api_key_connection_limits
+                    .get(&raw_key)
+                    .copied()
+            })
+            .unwrap_or(i32::MAX)
+    };
+
+    if !state
+        .hub
+        .try_acquire_api_key_slot(&api_key_id, connection_limit)
+        .await
+    {
+        let limit_err = json!({
+            "error": "rate_limited",
+            "message": "WebSocket connection limit reached"
+        });
+        let _ = socket
+            .send(Message::Text(limit_err.to_string().into()))
+            .await;
+        let _ = socket.close().await;
+        return;
+    }
+
+    let ack = json!({
+        "event": "authenticated",
+        "id": cmd.id.unwrap_or(Value::Null),
+        "data": {
+            "user_id": tenant_context.as_ref().map(|t| t.user_id),
+            "plan": tenant_context.as_ref().map(|t| t.plan.as_str()).unwrap_or("enterprise"),
+            "ws_connections_max": connection_limit
+        }
+    });
+    if socket
+        .send(Message::Text(ack.to_string().into()))
+        .await
+        .is_err()
+    {
+        return;
+    }
+
+    let channels_query: Option<HashSet<String>> = channel_override
+        .map(|ch| std::iter::once(ch).collect())
+        .or_else(|| {
+            params
+                .get("channels")
+                .map(|channels| channels.split(',').map(|s| s.trim().to_string()).collect())
+        });
+
+    let symbols_query = params
+        .get("symbols")
+        .map(|symbols| crate::http::normalize_symbol_set(symbols))
+        .unwrap_or_default();
+
+    let initial_streams =
+        crate::http::legacy_streams(&channels_query, &symbols_query).unwrap_or_default();
+
+    let user_id: Option<Uuid> = tenant_context.as_ref().map(|tenant| tenant.user_id);
+    let wants_snapshot = crate::snapshot::wants_market_snapshot(&initial_streams);
+    let (client_id, rx) = state
+        .hub
+        .register_api_key(bot_id, initial_streams, user_id, api_key_id)
+        .await;
+
+    if wants_snapshot {
+        let snapshot = state.snapshot.clone();
+        let hub = state.hub.clone();
+        tokio::spawn(async move {
+            crate::snapshot::send_snapshot(&snapshot, &hub, client_id).await;
+        });
+    }
+
+    handle_registered_socket(
+        socket,
+        state.hub.clone(),
+        client_id,
+        rx,
+        tenant_context,
+        state.snapshot.clone(),
+    )
+    .await;
+}
+
 async fn handle_command(
     client_id: crate::hub::ClientId,
     hub: &Arc<crate::hub::Hub>,
@@ -159,8 +359,33 @@ async fn handle_command(
 
     let method = command.method.to_uppercase();
     match method.as_str() {
+        "AUTH" => {
+            send_control(
+                control_tx,
+                json!({
+                    "event": "authenticated",
+                    "status": "already_authenticated",
+                    "id": command.id.unwrap_or(Value::Null),
+                }),
+            )
+            .await;
+        }
         "SUBSCRIBE" => {
-            let streams = match streams::normalize_streams(&command.params) {
+            let normalized_params: Vec<String> = command
+                .params
+                .into_iter()
+                .map(|p| {
+                    let s = p.trim();
+                    if !s.contains(':')
+                        && !crate::streams::BASE_STREAMS.contains(&s.to_lowercase().as_str())
+                    {
+                        format!("market_data:{}", s.to_uppercase())
+                    } else {
+                        s.to_string()
+                    }
+                })
+                .collect();
+            let streams = match streams::normalize_streams(&normalized_params) {
                 Ok(streams) => streams,
                 Err(error) => {
                     send_control(control_tx, streams::error_response(&error, command.id)).await;
@@ -255,5 +480,21 @@ mod tests {
             assert!(channels.contains(channel));
         }
         assert_eq!(channels.len(), 9);
+    }
+
+    #[test]
+    fn client_command_parses_action_auth() {
+        let json_auth = r#"{"action": "auth", "api_key": "wi_live_test123"}"#;
+        let cmd: ClientCommand = serde_json::from_str(json_auth).unwrap();
+        assert_eq!(cmd.method.to_uppercase(), "AUTH");
+        assert_eq!(cmd.api_key.as_deref(), Some("wi_live_test123"));
+    }
+
+    #[test]
+    fn client_command_parses_symbols_alias() {
+        let json_sub = r#"{"action": "subscribe", "symbols": ["XAUUSD", "BTCUSDT"]}"#;
+        let cmd: ClientCommand = serde_json::from_str(json_sub).unwrap();
+        assert_eq!(cmd.method.to_uppercase(), "SUBSCRIBE");
+        assert_eq!(cmd.params, vec!["XAUUSD", "BTCUSDT"]);
     }
 }

@@ -1,6 +1,7 @@
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
 
+use atlsd_domain::tenant::TenantContext;
 use axum::{
     extract::{Path, State, WebSocketUpgrade},
     http::StatusCode,
@@ -22,6 +23,7 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(crate::health))
         .route("/metrics", get(metrics_handler))
+        .route("/ws", get(ws_general_handler))
         .route("/ws/v1", get(ws_v1_handler))
         .route("/api/v1/ws/v1", get(ws_v1_handler))
         .route("/api/v1/ws", get(ws_general_handler))
@@ -37,7 +39,7 @@ pub fn build_router(state: AppState) -> Router {
         .with_state(state)
 }
 
-fn normalize_symbol_set(raw: &str) -> HashSet<String> {
+pub(crate) fn normalize_symbol_set(raw: &str) -> HashSet<String> {
     raw.split(',')
         .map(|symbol| symbol.trim().to_uppercase())
         .filter(|symbol| !symbol.is_empty())
@@ -72,7 +74,7 @@ fn reject_ws(state: &AppState, status: StatusCode, body: &'static str) -> Respon
     text_response(status, body)
 }
 
-fn legacy_streams(
+pub(crate) fn legacy_streams(
     channels: &Option<HashSet<String>>,
     symbols: &HashSet<String>,
 ) -> Result<HashSet<String>, crate::streams::StreamError> {
@@ -103,6 +105,56 @@ fn legacy_streams(
     Ok(streams)
 }
 
+pub(crate) async fn authenticate_and_verify(
+    state: &AppState,
+    raw_key: &str,
+) -> Result<(String, Option<TenantContext>, bool), (StatusCode, &'static str)> {
+    let tenant_context = match &state.tenant_registry {
+        Some(registry) => registry.validate_key(raw_key).await,
+        None => None,
+    };
+    let admin_authenticated = !state.config.admin_api_key.is_empty()
+        && atlsd_auth::internal::secrets_match(&state.config.admin_api_key, raw_key);
+    let authenticated = admin_authenticated
+        || tenant_context.is_some()
+        || state
+            .config
+            .api_keys
+            .iter()
+            .any(|key| atlsd_auth::internal::secrets_match(key, raw_key));
+
+    if !authenticated {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "Valid API key required for WebSocket connection",
+        ));
+    }
+
+    if let Some(tenant) = &tenant_context {
+        if !tenant.has_permission("realtime:ws") {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "API key lacks 'realtime:ws' scope permission",
+            ));
+        }
+    }
+
+    let api_key_id = if admin_authenticated {
+        "admin".to_string()
+    } else {
+        tenant_context
+            .as_ref()
+            .map(|tenant| tenant.api_key_id.to_string())
+            .unwrap_or_else(|| {
+                let mut hasher = DefaultHasher::new();
+                raw_key.hash(&mut hasher);
+                hasher.finish().to_string()
+            })
+    };
+
+    Ok((api_key_id, tenant_context, admin_authenticated))
+}
+
 async fn ws_handler_inner(
     ws: WebSocketUpgrade,
     state: AppState,
@@ -126,120 +178,97 @@ async fn ws_handler_inner(
         }
     }
 
-    let Some(raw_key) = token.as_ref() else {
-        return reject_ws(
-            &state,
-            StatusCode::UNAUTHORIZED,
-            "Valid API key required for WebSocket connection",
-        );
-    };
-    let tenant_context = match &state.tenant_registry {
-        Some(registry) => registry.validate_key(raw_key).await,
-        None => None,
-    };
-    let admin_authenticated = !state.config.admin_api_key.is_empty()
-        && atlsd_auth::internal::secrets_match(&state.config.admin_api_key, raw_key);
-    let authenticated = admin_authenticated
-        || tenant_context.is_some()
-        || state
-            .config
-            .api_keys
-            .iter()
-            .any(|key| atlsd_auth::internal::secrets_match(key, raw_key));
-    if !authenticated {
-        return reject_ws(
-            &state,
-            StatusCode::UNAUTHORIZED,
-            "Valid API key required for WebSocket connection",
-        );
-    }
-    if let Some(tenant) = &tenant_context {
-        if !tenant.has_permission("realtime:ws") {
+    if let Some(raw_key) = token {
+        let (api_key_id, tenant_context, admin_authenticated) =
+            match authenticate_and_verify(&state, &raw_key).await {
+                Ok(tuple) => tuple,
+                Err((status, msg)) => return reject_ws(&state, status, msg),
+            };
+
+        let connection_limit = if admin_authenticated {
+            i32::MAX
+        } else {
+            tenant_context
+                .as_ref()
+                .map(|tenant| tenant.ws_connections)
+                .or_else(|| {
+                    state
+                        .config
+                        .api_key_connection_limits
+                        .get(&raw_key)
+                        .copied()
+                })
+                .unwrap_or(i32::MAX)
+        };
+        if !state
+            .hub
+            .try_acquire_api_key_slot(&api_key_id, connection_limit)
+            .await
+        {
             return reject_ws(
                 &state,
-                StatusCode::FORBIDDEN,
-                "API key lacks 'realtime:ws' scope permission",
+                StatusCode::TOO_MANY_REQUESTS,
+                "WebSocket connection limit reached",
             );
         }
-    }
-    let api_key_id = if admin_authenticated {
-        "admin".to_string()
-    } else {
-        tenant_context
-            .as_ref()
-            .map(|tenant| tenant.api_key_id.to_string())
-            .unwrap_or_else(|| {
-                let mut hasher = DefaultHasher::new();
-                raw_key.hash(&mut hasher);
-                hasher.finish().to_string()
-            })
-    };
-    let connection_limit = if admin_authenticated {
-        i32::MAX
-    } else {
-        tenant_context
-            .as_ref()
-            .map(|tenant| tenant.ws_connections)
-            .or_else(|| state.config.api_key_connection_limits.get(raw_key).copied())
-            .unwrap_or(i32::MAX)
-    };
-    if !state
-        .hub
-        .try_acquire_api_key_slot(&api_key_id, connection_limit)
-        .await
-    {
-        return reject_ws(
-            &state,
-            StatusCode::TOO_MANY_REQUESTS,
-            "WebSocket connection limit reached",
-        );
-    }
 
-    let channels_query: Option<HashSet<String>> = channel_override
-        .map(|ch| std::iter::once(ch.to_string()).collect())
-        .or_else(|| {
-            params
-                .get("channels")
-                .map(|channels| channels.split(',').map(|s| s.trim().to_string()).collect())
-        });
-
-    let symbols_query = params
-        .get("symbols")
-        .map(|symbols| normalize_symbol_set(symbols))
-        .unwrap_or_default();
-
-    let initial_streams = match legacy_streams(&channels_query, &symbols_query) {
-        Ok(streams) => streams,
-        Err(error) => return string_response(StatusCode::BAD_REQUEST, error.message),
-    };
-
-    let user_id: Option<Uuid> = tenant_context.as_ref().map(|tenant| tenant.user_id);
-    let hub = state.hub.clone();
-    let snapshot = state.snapshot.clone();
-    ws.on_upgrade(move |socket| async move {
-        // Catch-up for clients that connected already subscribed to market
-        // streams: deliver the latest-price snapshot before the live stream.
-        let wants_snapshot = crate::snapshot::wants_market_snapshot(&initial_streams);
-        let (client_id, rx) = hub
-            .register_api_key(bot_id.clone(), initial_streams, user_id, api_key_id)
-            .await;
-        if wants_snapshot {
-            let snapshot = snapshot.clone();
-            let hub = hub.clone();
-            tokio::spawn(async move {
-                crate::snapshot::send_snapshot(&snapshot, &hub, client_id).await;
+        let channels_query: Option<HashSet<String>> = channel_override
+            .map(|ch| std::iter::once(ch.to_string()).collect())
+            .or_else(|| {
+                params
+                    .get("channels")
+                    .map(|channels| channels.split(',').map(|s| s.trim().to_string()).collect())
             });
-        }
-        crate::client::handle_registered_socket(
-            socket,
-            hub,
-            client_id,
-            rx,
-            tenant_context,
-            snapshot,
-        )
-        .await;
-    })
+
+        let symbols_query = params
+            .get("symbols")
+            .map(|symbols| normalize_symbol_set(symbols))
+            .unwrap_or_default();
+
+        let initial_streams = match legacy_streams(&channels_query, &symbols_query) {
+            Ok(streams) => streams,
+            Err(error) => return string_response(StatusCode::BAD_REQUEST, error.message),
+        };
+
+        let user_id: Option<Uuid> = tenant_context.as_ref().map(|tenant| tenant.user_id);
+        let hub = state.hub.clone();
+        let snapshot = state.snapshot.clone();
+        ws.on_upgrade(move |socket| async move {
+            let wants_snapshot = crate::snapshot::wants_market_snapshot(&initial_streams);
+            let (client_id, rx) = hub
+                .register_api_key(bot_id.clone(), initial_streams, user_id, api_key_id)
+                .await;
+            if wants_snapshot {
+                let snapshot = snapshot.clone();
+                let hub = hub.clone();
+                tokio::spawn(async move {
+                    crate::snapshot::send_snapshot(&snapshot, &hub, client_id).await;
+                });
+            }
+            crate::client::handle_registered_socket(
+                socket,
+                hub,
+                client_id,
+                rx,
+                tenant_context,
+                snapshot,
+            )
+            .await;
+        })
+    } else {
+        let state_clone = state.clone();
+        let channel_override_owned = channel_override.map(|s| s.to_string());
+        ws.on_upgrade(move |socket| async move {
+            crate::client::handle_unauthenticated_socket(
+                socket,
+                state_clone,
+                bot_id,
+                channel_override_owned,
+                params,
+            )
+            .await;
+        })
+    }
 }
 
 #[derive(serde::Serialize)]
