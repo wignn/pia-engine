@@ -4,7 +4,7 @@
 
 // Client-exposed (inlined at build time by Next via NEXT_PUBLIC_*).
 export const PUBLIC_CORE_WS_URL =
-  process.env.NEXT_PUBLIC_CORE_WS_URL || "wss://realtime-engine.wign.dev";
+  process.env.NEXT_PUBLIC_CORE_WS_URL || "wss://api-engine.wign.dev";
 export const PUBLIC_CORE_REST_URL =
   process.env.NEXT_PUBLIC_CORE_REST_URL || "https://api-engine.wign.dev";
 
