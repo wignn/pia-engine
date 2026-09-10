@@ -44,9 +44,8 @@ Selamat datang di dokumentasi resmi API **ATLSD (Advanced Trading & Financial In
 
 | Environment | REST API Base URL | Realtime WebSocket URL |
 |---|---|---|
-| **Production Gateway** | `https://slv-gateway.wign.dev/api/v1` | `wss://slv-realtime.wign.dev/ws/v1` |
-| **Engine Direct Gateway** | `https://api-engine.wign.dev/api/v1` | `wss://realtime-engine.wign.dev/ws/v1` |
-| **Local Development** | `http://localhost:8000/api/v1` | `ws://localhost:8020/ws/v1` |
+| **Unified Engine Gateway** | `https://api-engine.wign.dev` | `wss://api-engine.wign.dev/api/v1/ws` |
+| **Local Development** | `http://localhost:8000` | `ws://localhost:8000/api/v1/ws` |
 
 ---
 

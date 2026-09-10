@@ -13,13 +13,13 @@ API_KEY=olin WS_URL=ws://localhost:8020 VUS=20 HOLD=1m HOLD_SECONDS=30 k6 run sc
 VPS/public test:
 
 ```bash
-API_KEY=*** WS_URL=wss://realtime-engine.wign.dev VUS=20 HOLD=1m HOLD_SECONDS=30 k6 run scripts/k6/realtime-ws.js
+API_KEY=*** WS_URL=wss://api-engine.wign.dev/api/v1/ws VUS=20 HOLD=1m HOLD_SECONDS=30 k6 run scripts/k6/realtime-ws.js
 ```
 
 Ticket-based test:
 
 ```bash
-API_KEY=*** WS_URL=wss://realtime-engine.wign.dev USE_TICKET=true VUS=20 HOLD=1m HOLD_SECONDS=30 k6 run scripts/k6/realtime-ws.js
+API_KEY=*** WS_URL=wss://api-engine.wign.dev/api/v1/ws USE_TICKET=true VUS=20 HOLD=1m HOLD_SECONDS=30 k6 run scripts/k6/realtime-ws.js
 ```
 
 Useful knobs:
