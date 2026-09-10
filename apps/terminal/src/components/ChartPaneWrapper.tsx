@@ -267,6 +267,7 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
           <CalendarPanel theme={theme} />
         ) : (
           <ChartArea
+            paneId={pane.id}
             symbol={pane.symbol}
             provider={provider}
             timeframe={pane.timeframe}

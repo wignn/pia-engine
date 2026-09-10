@@ -17,6 +17,7 @@ import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { ChartTabs } from "@/components/ChartTabs";
 import { SymbolSearchModal } from "@/components/SymbolSearchModal";
 import { SettingsModal } from "@/components/SettingsModal";
+import { IndicatorSettingsModal } from "@/components/IndicatorSettingsModal";
 import { INITIAL_WATCHLIST } from "@/lib/constants";
 import { resolveInstrument } from "@/lib/instruments";
 import {
@@ -31,6 +32,8 @@ import {
   ChartLayout,
   ChartPaneConfig,
   TerminalSettings,
+  IndicatorParameters,
+  DEFAULT_INDICATOR_PARAMS,
 } from "@/types";
 
 function getGridClass(layout: ChartLayout, isLight: boolean): string {
@@ -83,11 +86,12 @@ export default function TerminalPage() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(INITIAL_WATCHLIST);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isIndicatorSettingsOpen, setIsIndicatorSettingsOpen] = useState(false);
   const [initialSearchQuery, setInitialSearchQuery] = useState("");
   const [rightSidebarTab, setRightSidebarTab] = useState<SidebarTab>("watchlist");
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
-  // Terminal Settings State (Dark / Light Theme, Candle Colors, Audio Alerts)
+  // Terminal Settings State (Dark / Light Theme, Candle Colors, Audio Alerts, Indicator Configs)
   const [settings, setSettings] = useState<TerminalSettings>({
     theme: "dark",
     upColor: "#089981",
@@ -96,6 +100,9 @@ export default function TerminalPage() {
     timezone: "UTC",
     audioAlerts: true,
     defaultTimeframe: "15m",
+    syncCrosshair: true,
+    syncTime: true,
+    indicatorParams: DEFAULT_INDICATOR_PARAMS,
   });
 
   const handleSaveSettings = (newSettings: TerminalSettings) => {
@@ -110,6 +117,20 @@ export default function TerminalPage() {
   const handleToggleTheme = () => {
     const nextTheme = settings.theme === "light" ? "dark" : "light";
     handleSaveSettings({ ...settings, theme: nextTheme });
+  };
+
+  const handleToggleSyncCrosshair = () => {
+    const next = settings.syncCrosshair === false;
+    handleSaveSettings({ ...settings, syncCrosshair: next });
+  };
+
+  const handleToggleSyncTime = () => {
+    const next = settings.syncTime === false;
+    handleSaveSettings({ ...settings, syncTime: next });
+  };
+
+  const handleSaveIndicatorParams = (params: IndicatorParameters) => {
+    handleSaveSettings({ ...settings, indicatorParams: params });
   };
 
   const isLight = settings.theme === "light";
@@ -130,7 +151,7 @@ export default function TerminalPage() {
       symbol: "XAUUSD",
       timeframe: "15m",
       chartType: "candlestick",
-      indicators: { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
+      indicators: { sma20: false, ema50: false, vwap: false, bollinger: false, rsi: false, macd: false, atr: false },
     },
     {
       id: "pane-2",
@@ -138,7 +159,7 @@ export default function TerminalPage() {
       symbol: "BTCUSDT",
       timeframe: "1h",
       chartType: "candlestick",
-      indicators: { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
+      indicators: { sma20: false, ema50: false, vwap: false, bollinger: false, rsi: false, macd: false, atr: false },
     },
     {
       id: "pane-3",
@@ -146,7 +167,7 @@ export default function TerminalPage() {
       symbol: "SPX",
       timeframe: "1D",
       chartType: "candlestick",
-      indicators: { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
+      indicators: { sma20: false, ema50: false, vwap: false, bollinger: false, rsi: false, macd: false, atr: false },
     },
     {
       id: "pane-4",
@@ -154,7 +175,7 @@ export default function TerminalPage() {
       symbol: "DXY",
       timeframe: "1h",
       chartType: "candlestick",
-      indicators: { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
+      indicators: { sma20: false, ema50: false, vwap: false, bollinger: false, rsi: false, macd: false, atr: false },
     },
     {
       id: "pane-5",
@@ -162,7 +183,7 @@ export default function TerminalPage() {
       symbol: "EURUSD",
       timeframe: "15m",
       chartType: "candlestick",
-      indicators: { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
+      indicators: { sma20: false, ema50: false, vwap: false, bollinger: false, rsi: false, macd: false, atr: false },
     },
     {
       id: "pane-6",
@@ -170,7 +191,7 @@ export default function TerminalPage() {
       symbol: "NVDA",
       timeframe: "1D",
       chartType: "candlestick",
-      indicators: { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
+      indicators: { sma20: false, ema50: false, vwap: false, bollinger: false, rsi: false, macd: false, atr: false },
     },
   ]);
 
@@ -711,6 +732,12 @@ export default function TerminalPage() {
         theme={settings.theme}
         onToggleTheme={handleToggleTheme}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenIndicatorSettings={() => setIsIndicatorSettingsOpen(true)}
+        indicatorParams={settings.indicatorParams || DEFAULT_INDICATOR_PARAMS}
+        syncCrosshair={settings.syncCrosshair !== false}
+        onToggleSyncCrosshair={handleToggleSyncCrosshair}
+        syncTime={settings.syncTime !== false}
+        onToggleSyncTime={handleToggleSyncTime}
         onSave={handleManualSave}
       />
 
@@ -919,6 +946,14 @@ export default function TerminalPage() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onSaveSettings={handleSaveSettings}
+      />
+
+      <IndicatorSettingsModal
+        isOpen={isIndicatorSettingsOpen}
+        onClose={() => setIsIndicatorSettingsOpen(false)}
+        params={settings.indicatorParams || DEFAULT_INDICATOR_PARAMS}
+        onSave={handleSaveIndicatorParams}
+        theme={settings.theme}
       />
     </div>
   );

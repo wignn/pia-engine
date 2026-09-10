@@ -19,9 +19,12 @@ import {
   Check,
   Moon,
   Sun,
-  Plus
+  Plus,
+  Crosshair,
+  Link2,
+  Sliders
 } from "lucide-react";
-import { Timeframe, IndicatorState, ChartLayout } from "@/types";
+import { Timeframe, IndicatorState, ChartLayout, IndicatorParameters } from "@/types";
 
 import { VisualLayoutPicker } from "./VisualLayoutPicker";
 
@@ -51,6 +54,12 @@ interface TopBarProps {
   theme?: "dark" | "light";
   onToggleTheme?: () => void;
   onOpenSettings?: () => void;
+  onOpenIndicatorSettings?: () => void;
+  indicatorParams?: IndicatorParameters;
+  syncCrosshair?: boolean;
+  onToggleSyncCrosshair?: () => void;
+  syncTime?: boolean;
+  onToggleSyncTime?: () => void;
   onSave?: () => void;
 }
 
@@ -82,6 +91,12 @@ export const TopBar: React.FC<TopBarProps> = ({
   theme = "dark",
   onToggleTheme,
   onOpenSettings,
+  onOpenIndicatorSettings,
+  indicatorParams,
+  syncCrosshair = true,
+  onToggleSyncCrosshair,
+  syncTime = true,
+  onToggleSyncTime,
   onSave,
 }) => {
   const isPositive = change >= 0;
@@ -217,30 +232,50 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span>Indicators</span>
           </button>
           <div
-            className={`hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-52 flex-col rounded border p-1 shadow-xl ${
+            className={`hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-60 flex-col rounded-xl border p-1.5 shadow-2xl ${
               isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
             }`}
           >
+            <div className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 text-[#787b86]">
+              Technical Indicators
+            </div>
             {([
-              ['sma20', 'SMA 20 (Moving Average)'],
-              ['ema50', 'EMA 50 (Exponential)'],
-              ['bollinger', 'Bollinger Bands (20, 2)'],
-              ['rsi', 'RSI (14) Oscillator'],
-              ['macd', 'MACD (12, 26, 9)']
+              ['sma20', `SMA ${indicatorParams?.smaPeriod || 20} (Moving Average)`],
+              ['ema50', `EMA ${indicatorParams?.emaPeriod || 50} (Exponential)`],
+              ['vwap', 'VWAP (Volume Weighted)'],
+              ['bollinger', `Bollinger Bands (${indicatorParams?.bollingerPeriod || 20}, ${indicatorParams?.bollingerStdDev || 2})`],
+              ['rsi', `RSI (${indicatorParams?.rsiPeriod || 14}) Oscillator`],
+              ['atr', `ATR (${indicatorParams?.atrPeriod || 14}) Volatility`],
+              ['macd', `MACD (${indicatorParams?.macdFast || 12}, ${indicatorParams?.macdSlow || 26}, ${indicatorParams?.macdSignal || 9})`]
             ] as const).map(([id, label]) => (
               <button
                 key={id}
-                onClick={() => onToggleIndicator?.(id)}
-                className={`flex items-center justify-between rounded px-2.5 py-1.5 text-left text-xs cursor-pointer ${
+                onClick={() => onToggleIndicator?.(id as any)}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs cursor-pointer transition-colors ${
                   isLight ? "text-[#131722] hover:bg-[#f0f3fa]" : "text-[#d1d4dc] hover:bg-[#2a2e39]"
                 }`}
               >
                 <span>{label}</span>
-                <span className={indicators[id] ? "text-[#2962ff] font-bold" : "text-[#787b86]"}>
-                  {indicators[id] ? "ON" : "OFF"}
+                <span className={indicators[id as keyof IndicatorState] ? "text-[#2962ff] font-bold" : "text-[#787b86]"}>
+                  {indicators[id as keyof IndicatorState] ? "ON" : "OFF"}
                 </span>
               </button>
             ))}
+
+            <div className={`mt-1 pt-1 border-t ${isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]"}`}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenIndicatorSettings?.();
+                }}
+                className={`w-full flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold cursor-pointer transition-colors ${
+                  isLight ? "text-[#2962ff] hover:bg-[#f0f3fa]" : "text-[#2962ff] hover:bg-[#2a2e39]"
+                }`}
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Configure Parameters...</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -301,6 +336,39 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Redo2 className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {/* Multi-Chart Synchronization Controls */}
+        {layout !== "1x1" && (
+          <div className={`flex items-center gap-0.5 px-1 py-0.5 rounded-lg border ${isLight ? "bg-[#f8f9fc] border-[#e0e3eb]" : "bg-[#141722] border-[#2a2e39]"}`}>
+            <button
+              onClick={onToggleSyncCrosshair}
+              className={`p-1 rounded cursor-pointer transition-colors ${
+                syncCrosshair
+                  ? "bg-[#2962ff]/20 text-[#2962ff]"
+                  : isLight
+                  ? "text-[#787b86] hover:text-[#131722]"
+                  : "text-[#787b86] hover:text-white"
+              }`}
+              title={`Sync Crosshair across Charts: ${syncCrosshair ? "ON" : "OFF"}`}
+            >
+              <Crosshair className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={onToggleSyncTime}
+              className={`p-1 rounded cursor-pointer transition-colors ${
+                syncTime
+                  ? "bg-[#2962ff]/20 text-[#2962ff]"
+                  : isLight
+                  ? "text-[#787b86] hover:text-[#131722]"
+                  : "text-[#787b86] hover:text-white"
+              }`}
+              title={`Sync Time / Zoom Range across Charts: ${syncTime ? "ON" : "OFF"}`}
+            >
+              <Link2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Visual Layout Mode Picker (TradingView-style) */}
         <div className="relative">

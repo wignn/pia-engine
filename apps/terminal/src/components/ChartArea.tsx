@@ -16,6 +16,7 @@ import { Wifi, WifiOff, Loader2, Trash2, X, Eye, EyeOff } from "lucide-react";
 import { OscillatorPane } from "./OscillatorPane";
 
 interface ChartAreaProps {
+  paneId?: string;
   symbol: string;
   provider: string;
   timeframe: Timeframe;
@@ -47,6 +48,7 @@ interface ChartAreaProps {
 }
 
 export const ChartArea: React.FC<ChartAreaProps> = ({
+  paneId,
   symbol,
   provider,
   timeframe,
@@ -89,6 +91,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   const bbUpperRef = useRef<ISeriesApi<"Line"> | null>(null);
   const bbLowerRef = useRef<ISeriesApi<"Line"> | null>(null);
   const bbBasisRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const vwapRef = useRef<ISeriesApi<"Line"> | null>(null);
 
   const hoveringRef = useRef(false);
   const hasInitializedDataRef = useRef(false);
@@ -450,6 +453,12 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       priceLineVisible: false,
       lastValueVisible: false,
     });
+    const vwapSeries = chart.addLineSeries({
+      color: "#a855f7",
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
 
     chartRef.current = chart;
     seriesRef.current = candlestickSeries;
@@ -462,15 +471,23 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
     bbUpperRef.current = bbUpperSeries;
     bbBasisRef.current = bbBasisSeries;
     bbLowerRef.current = bbLowerSeries;
+    vwapRef.current = vwapSeries;
 
     // Crosshair hover synchronization
     chart.subscribeCrosshairMove((param) => {
-      if (!param || !param.time || !param.seriesData) {
+      if (!param || !param.point || param.time === undefined) {
         hoveringRef.current = false;
+        if (paneId) {
+          window.dispatchEvent(
+            new CustomEvent("terminal-crosshair-sync", {
+              detail: { sourceId: paneId, clear: true },
+            })
+          );
+        }
         return;
       }
       hoveringRef.current = true;
-      const data = param.seriesData.get(candlestickSeries) as CandlestickData | undefined;
+      const data = param.seriesData?.get(candlestickSeries) as CandlestickData | undefined;
       if (data) {
         const ch = data.close - data.open;
         const chp = data.open ? (ch / data.open) * 100 : 0;
@@ -482,6 +499,17 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           change: ch,
           changePercent: chp,
         });
+      }
+
+      if (paneId) {
+        window.dispatchEvent(
+          new CustomEvent("terminal-crosshair-sync", {
+            detail: {
+              sourceId: paneId,
+              time: param.time,
+            },
+          })
+        );
       }
     });
 
@@ -514,6 +542,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       bbUpperRef.current = null;
       bbBasisRef.current = null;
       bbLowerRef.current = null;
+      vwapRef.current = null;
     };
   }, []);
 
@@ -582,6 +611,73 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       priceFormat: { type: "price", precision: digits, minMove: 1 / Math.pow(10, digits) },
     });
   }, [digits]);
+
+  // Multi-chart Crosshair Synchronization Listener
+  useEffect(() => {
+    if (settings?.syncCrosshair === false || !paneId) return;
+
+    const handleCrosshairSync = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || detail.sourceId === paneId || !chartRef.current || !seriesRef.current) return;
+
+      if (detail.clear) {
+        chartRef.current.clearCrosshairPosition();
+      } else if (detail.time !== undefined) {
+        const hit = candles.find((c) => c.time === detail.time);
+        const targetPrice = hit ? hit.close : (candles[candles.length - 1]?.close || 100);
+        try {
+          chartRef.current.setCrosshairPosition(targetPrice, detail.time as any, seriesRef.current);
+        } catch {
+          // ignore if out of range
+        }
+      }
+    };
+
+    window.addEventListener("terminal-crosshair-sync", handleCrosshairSync);
+    return () => window.removeEventListener("terminal-crosshair-sync", handleCrosshairSync);
+  }, [paneId, settings?.syncCrosshair, candles]);
+
+  // Multi-chart Time Scale / Zoom Range Synchronization Listener
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || settings?.syncTime === false || !paneId) return;
+
+    let isSyncing = false;
+
+    const handleRangeSync = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || detail.sourceId === paneId || isSyncing) return;
+
+      isSyncing = true;
+      try {
+        chart.timeScale().setVisibleLogicalRange({ from: detail.from, to: detail.to });
+      } catch {
+        // ignore
+      } finally {
+        setTimeout(() => {
+          isSyncing = false;
+        }, 50);
+      }
+    };
+
+    window.addEventListener("terminal-time-sync", handleRangeSync);
+
+    const onRangeChange = (range: { from: number; to: number } | null) => {
+      if (!range || isSyncing || settings?.syncTime === false) return;
+      window.dispatchEvent(
+        new CustomEvent("terminal-time-sync", {
+          detail: { sourceId: paneId, from: range.from, to: range.to },
+        })
+      );
+    };
+
+    chart.timeScale().subscribeVisibleLogicalRangeChange(onRangeChange);
+
+    return () => {
+      window.removeEventListener("terminal-time-sync", handleRangeSync);
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
+    };
+  }, [paneId, settings?.syncTime]);
 
   // Update chart data, volume, and technical overlays
   useEffect(() => {
@@ -660,16 +756,53 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       return output;
     };
 
-    smaRef.current?.setData(indicators.sma20 ? movingAverage(20, false) : []);
-    emaRef.current?.setData(indicators.ema50 ? movingAverage(50, true) : []);
+    const smaPeriod = settings?.indicatorParams?.smaPeriod || 20;
+    const emaPeriod = settings?.indicatorParams?.emaPeriod || 50;
+    const bbPeriod = settings?.indicatorParams?.bollingerPeriod || 20;
+    const bbStd = settings?.indicatorParams?.bollingerStdDev || 2.0;
 
-    // Bollinger Bands (20, 2)
-    if (indicators.bollinger && candles.length >= 20) {
+    smaRef.current?.setData(indicators.sma20 ? movingAverage(smaPeriod, false) : []);
+    emaRef.current?.setData(indicators.ema50 ? movingAverage(emaPeriod, true) : []);
+
+    // VWAP (Volume-Weighted Average Price, anchored to each UTC calendar day)
+    const calculateVWAP = (): LineData<Time>[] => {
+      const result: LineData<Time>[] = [];
+      let cumVol = 0;
+      let cumTypicalVol = 0;
+      let lastDay = -1;
+
+      for (let i = 0; i < candles.length; i++) {
+        const c = candles[i];
+        const date = new Date(c.time * 1000);
+        const day = date.getUTCDate();
+
+        if (day !== lastDay) {
+          cumVol = 0;
+          cumTypicalVol = 0;
+          lastDay = day;
+        }
+
+        const vol = typeof c.volume === "number" && c.volume > 0 ? c.volume : 1;
+        const typicalPrice = (c.high + c.low + c.close) / 3;
+        cumVol += vol;
+        cumTypicalVol += typicalPrice * vol;
+
+        const vwapVal = cumVol > 0 ? cumTypicalVol / cumVol : c.close;
+        result.push({ time: c.time as Time, value: vwapVal });
+      }
+
+      return result;
+    };
+
+    vwapRef.current?.setData(indicators.vwap ? calculateVWAP() : []);
+
+    // Bollinger Bands (period, mult)
+    if (indicators.bollinger && candles.length >= bbPeriod) {
       const upper: LineData<Time>[] = [];
       const basis: LineData<Time>[] = [];
       const lower: LineData<Time>[] = [];
-      const period = 20;
-      const mult = 2;
+      const period = bbPeriod;
+      const mult = bbStd;
 
       for (let i = period - 1; i < candles.length; i++) {
         const slice = candles.slice(i - period + 1, i + 1);
@@ -711,7 +844,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       const chp = last.open ? (ch / last.open) * 100 : 0;
       setOhlc({ open: last.open, high: last.high, low: last.low, close: last.close, change: ch, changePercent: chp });
     }
-  }, [candles, chartType, indicators, symbol, timeframe]);
+  }, [candles, chartType, indicators, symbol, timeframe, settings?.indicatorParams]);
 
   // Live price streaming update
   useEffect(() => {
@@ -936,32 +1069,52 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
 
           {/* Quick Indicator Pills */}
           {indicators.sma20 && (
-            <div className="group flex items-center gap-1 text-[10px] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded text-[#f5b942]">
-              <span>SMA 20</span>
+            <div className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#f5b942] ${
+              isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+            }`}>
+              <span>SMA {settings?.indicatorParams?.smaPeriod || 20}</span>
               <button
                 onClick={() => onToggleIndicator?.("sma20")}
                 className="opacity-0 group-hover:opacity-100 hover:text-white cursor-pointer"
-                title="Remove SMA 20"
+                title="Remove SMA"
               >
                 <X className="w-2.5 h-2.5" />
               </button>
             </div>
           )}
           {indicators.ema50 && (
-            <div className="group flex items-center gap-1 text-[10px] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded text-[#2962ff]">
-              <span>EMA 50</span>
+            <div className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#2962ff] ${
+              isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+            }`}>
+              <span>EMA {settings?.indicatorParams?.emaPeriod || 50}</span>
               <button
                 onClick={() => onToggleIndicator?.("ema50")}
                 className="opacity-0 group-hover:opacity-100 hover:text-white cursor-pointer"
-                title="Remove EMA 50"
+                title="Remove EMA"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          )}
+          {indicators.vwap && (
+            <div className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#a855f7] ${
+              isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+            }`}>
+              <span>VWAP</span>
+              <button
+                onClick={() => onToggleIndicator?.("vwap")}
+                className="opacity-0 group-hover:opacity-100 hover:text-white cursor-pointer"
+                title="Remove VWAP"
               >
                 <X className="w-2.5 h-2.5" />
               </button>
             </div>
           )}
           {indicators.bollinger && (
-            <div className="group flex items-center gap-1 text-[10px] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded text-[#089981]">
-              <span>BB(20,2)</span>
+            <div className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#089981] ${
+              isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+            }`}>
+              <span>BB({settings?.indicatorParams?.bollingerPeriod || 20},{settings?.indicatorParams?.bollingerStdDev || 2})</span>
               <button
                 onClick={() => onToggleIndicator?.("bollinger")}
                 className="opacity-0 group-hover:opacity-100 hover:text-white cursor-pointer"
@@ -972,8 +1125,10 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
             </div>
           )}
           {indicators.rsi && (
-            <div className="group flex items-center gap-1 text-[10px] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded text-[#ab47bc]">
-              <span>RSI 14</span>
+            <div className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#ab47bc] ${
+              isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+            }`}>
+              <span>RSI {settings?.indicatorParams?.rsiPeriod || 14}</span>
               <button
                 onClick={() => onToggleIndicator?.("rsi")}
                 className="opacity-0 group-hover:opacity-100 hover:text-white cursor-pointer"
@@ -983,8 +1138,24 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
               </button>
             </div>
           )}
+          {indicators.atr && (
+            <div className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#f59e0b] ${
+              isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+            }`}>
+              <span>ATR {settings?.indicatorParams?.atrPeriod || 14}</span>
+              <button
+                onClick={() => onToggleIndicator?.("atr")}
+                className="opacity-0 group-hover:opacity-100 hover:text-white cursor-pointer"
+                title="Remove ATR"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          )}
           {indicators.macd && (
-            <div className="group flex items-center gap-1 text-[10px] font-mono bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 rounded text-[#2962ff]">
+            <div className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#2962ff] ${
+              isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+            }`}>
               <span>MACD</span>
               <button
                 onClick={() => onToggleIndicator?.("macd")}
@@ -1052,8 +1223,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       {/* Chart Canvas */}
       <div ref={chartContainerRef} className="w-full flex-1" />
 
-      {/* Oscillator Sub-pane (RSI / MACD) */}
-      <OscillatorPane candles={candles} indicators={indicators} />
+      {/* Oscillator Sub-pane (RSI / MACD / ATR) */}
+      <OscillatorPane candles={candles} indicators={indicators} settings={settings} theme={theme} />
 
       {/* Quick Timeframe Range Bar & Scale Mode Controls (TradingView Signature) */}
       <div

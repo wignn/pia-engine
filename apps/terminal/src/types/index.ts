@@ -41,12 +41,38 @@ export interface DrawingItem {
   strokeWidth?: number;
 }
 
+export interface IndicatorParameters {
+  smaPeriod: number;
+  emaPeriod: number;
+  bollingerPeriod: number;
+  bollingerStdDev: number;
+  rsiPeriod: number;
+  macdFast: number;
+  macdSlow: number;
+  macdSignal: number;
+  atrPeriod: number;
+}
+
+export const DEFAULT_INDICATOR_PARAMS: IndicatorParameters = {
+  smaPeriod: 20,
+  emaPeriod: 50,
+  bollingerPeriod: 20,
+  bollingerStdDev: 2,
+  rsiPeriod: 14,
+  macdFast: 12,
+  macdSlow: 26,
+  macdSignal: 9,
+  atrPeriod: 14,
+};
+
 export interface IndicatorState {
   sma20: boolean;
   ema50: boolean;
+  vwap?: boolean;
   bollinger: boolean;
   rsi: boolean;
   macd: boolean;
+  atr?: boolean;
 }
 
 export type TabContentType = "chart" | "news" | "social" | "orderbook" | "intelligence" | "calendar";
@@ -101,6 +127,9 @@ export interface TerminalSettings {
   timezone: string;
   audioAlerts: boolean;
   defaultTimeframe: Timeframe;
+  syncCrosshair?: boolean;
+  syncTime?: boolean;
+  indicatorParams?: IndicatorParameters;
 }
 
 export interface NewsArticle {

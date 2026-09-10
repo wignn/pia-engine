@@ -1,24 +1,36 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { CandleData, IndicatorState } from "@/types";
+import { CandleData, IndicatorState, TerminalSettings } from "@/types";
 
 interface OscillatorPaneProps {
   candles: CandleData[];
   indicators: IndicatorState;
+  settings?: TerminalSettings;
+  theme?: "dark" | "light";
 }
 
 export const OscillatorPane: React.FC<OscillatorPaneProps> = ({
   candles,
   indicators,
+  settings,
+  theme = "dark",
 }) => {
   const showRsi = indicators.rsi;
   const showMacd = indicators.macd;
+  const showAtr = indicators.atr;
+  const isLight = (settings?.theme || theme) === "light";
 
-  // --- Calculate RSI (14) series ---
+  const rsiPeriod = settings?.indicatorParams?.rsiPeriod || 14;
+  const macdFast = settings?.indicatorParams?.macdFast || 12;
+  const macdSlow = settings?.indicatorParams?.macdSlow || 26;
+  const macdSignal = settings?.indicatorParams?.macdSignal || 9;
+  const atrPeriod = settings?.indicatorParams?.atrPeriod || 14;
+
+  // --- Calculate RSI series ---
   const rsiSeries = useMemo(() => {
-    if (!showRsi || candles.length < 16) return [];
-    const period = 14;
+    if (!showRsi || candles.length < rsiPeriod + 2) return [];
+    const period = rsiPeriod;
     const result: { time: number; value: number }[] = [];
 
     let gains = 0;
@@ -50,19 +62,18 @@ export const OscillatorPane: React.FC<OscillatorPaneProps> = ({
     }
 
     return result;
-  }, [candles, showRsi]);
+  }, [candles, showRsi, rsiPeriod]);
 
-  // --- Calculate MACD (12, 26, 9) series ---
+  // --- Calculate MACD series ---
   const macdSeries = useMemo(() => {
-    if (!showMacd || candles.length < 35) return [];
-    const fastP = 12;
-    const slowP = 26;
-    const sigP = 9;
+    if (!showMacd || candles.length < macdSlow + macdSignal) return [];
+    const fastP = macdFast;
+    const slowP = macdSlow;
+    const sigP = macdSignal;
 
     const closes = candles.map((c) => c.close);
     const times = candles.map((c) => c.time);
 
-    // Calculate EMA helper
     const calcEMA = (data: number[], period: number): number[] => {
       const k = 2 / (period + 1);
       const emaArr: number[] = new Array(data.length);
@@ -79,138 +90,216 @@ export const OscillatorPane: React.FC<OscillatorPaneProps> = ({
       return emaArr;
     };
 
-    const fastEma = calcEMA(closes, fastP);
-    const slowEma = calcEMA(closes, slowP);
+    const emaFast = calcEMA(closes, fastP);
+    const emaSlow = calcEMA(closes, slowP);
 
-    const macdLine: (number | null)[] = new Array(closes.length).fill(null);
-    const macdRaw: number[] = [];
-    const macdIndices: number[] = [];
+    const macdLine: number[] = [];
+    const macdTimes: number[] = [];
 
     for (let i = slowP - 1; i < closes.length; i++) {
-      const diff = fastEma[i] - slowEma[i];
-      macdLine[i] = diff;
-      macdRaw.push(diff);
-      macdIndices.push(i);
+      macdLine.push(emaFast[i] - emaSlow[i]);
+      macdTimes.push(times[i]);
     }
 
-    if (macdRaw.length < sigP) return [];
+    const signalLine = calcEMA(macdLine, sigP);
 
-    const signalRaw = calcEMA(macdRaw, sigP);
     const result: { time: number; macd: number; signal: number; hist: number }[] = [];
-
-    for (let j = sigP - 1; j < macdRaw.length; j++) {
-      const idx = macdIndices[j];
-      const mVal = macdRaw[j];
-      const sVal = signalRaw[j];
+    for (let i = sigP - 1; i < macdLine.length; i++) {
+      const m = macdLine[i];
+      const s = signalLine[i];
       result.push({
-        time: times[idx],
-        macd: mVal,
-        signal: sVal,
-        hist: mVal - sVal,
+        time: macdTimes[i],
+        macd: m,
+        signal: s,
+        hist: m - s,
       });
     }
 
     return result;
-  }, [candles, showMacd]);
+  }, [candles, showMacd, macdFast, macdSlow, macdSignal]);
 
-  if (!showRsi && !showMacd) return null;
+  // --- Calculate ATR (Average True Range) series ---
+  const atrSeries = useMemo(() => {
+    if (!showAtr || candles.length < atrPeriod + 2) return [];
+    const trArr: { time: number; tr: number }[] = [];
+
+    for (let i = 1; i < candles.length; i++) {
+      const prev = candles[i - 1].close;
+      const cur = candles[i];
+      const tr = Math.max(
+        cur.high - cur.low,
+        Math.abs(cur.high - prev),
+        Math.abs(cur.low - prev)
+      );
+      trArr.push({ time: cur.time, tr });
+    }
+
+    if (trArr.length < atrPeriod) return [];
+    const result: { time: number; value: number }[] = [];
+    let sum = 0;
+    for (let i = 0; i < atrPeriod; i++) sum += trArr[i].tr;
+    let atr = sum / atrPeriod;
+    result.push({ time: trArr[atrPeriod - 1].time, value: atr });
+
+    for (let i = atrPeriod; i < trArr.length; i++) {
+      atr = (atr * (atrPeriod - 1) + trArr[i].tr) / atrPeriod;
+      result.push({ time: trArr[i].time, value: atr });
+    }
+
+    return result;
+  }, [candles, showAtr, atrPeriod]);
+
+  if (!showRsi && !showMacd && !showAtr) return null;
 
   const currentRsi = rsiSeries.length > 0 ? rsiSeries[rsiSeries.length - 1].value : null;
   const currentMacd = macdSeries.length > 0 ? macdSeries[macdSeries.length - 1] : null;
+  const currentAtr = atrSeries.length > 0 ? atrSeries[atrSeries.length - 1].value : null;
 
   return (
-    <div className="flex flex-col border-t border-[#2a2e39] bg-[#141722] text-xs select-none">
-      {/* RSI Sub-pane */}
+    <div
+      className={`border-t flex flex-col divide-y transition-colors ${
+        isLight ? "bg-[#ffffff] border-[#e0e3eb] divide-[#e0e3eb]" : "bg-[#131722] border-[#2a2e39] divide-[#2a2e39]"
+      }`}
+    >
+      {/* 1. RSI (Relative Strength Index) Pane */}
       {showRsi && (
-        <div className="relative h-[95px] w-full border-b border-[#2a2e39] px-3 py-1">
-          {/* Header & Badges */}
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[11px] font-bold text-[#9c27b0]">RSI (14)</span>
-            {currentRsi !== null && (
-              <span
-                className={`font-mono text-[10px] font-semibold px-1.5 py-0.2 rounded border ${
-                  currentRsi >= 70
-                    ? "bg-[#f23645]/15 border-[#f23645]/30 text-[#f23645]"
-                    : currentRsi <= 30
-                    ? "bg-[#089981]/15 border-[#089981]/30 text-[#089981]"
-                    : "bg-[#1e222d] border-[#2a2e39] text-[#d1d4dc]"
-                }`}
-              >
-                {currentRsi.toFixed(1)} {currentRsi >= 70 ? "Overbought" : currentRsi <= 30 ? "Oversold" : "Neutral"}
-              </span>
-            )}
+        <div className="relative px-3 py-1.5 select-none shrink-0">
+          <div className="flex items-center justify-between text-[11px] font-mono">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[#787b86]">RSI ({rsiPeriod})</span>
+              {currentRsi !== null && (
+                <span
+                  className={`font-black ${
+                    currentRsi >= 70
+                      ? "text-[#f23645]"
+                      : currentRsi <= 30
+                      ? "text-[#089981]"
+                      : "text-[#2962ff]"
+                  }`}
+                >
+                  {currentRsi.toFixed(2)}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-[9px] text-[#787b86]">
+              <span className="text-[#f23645]/80">OB 70</span>
+              <span className="text-[#089981]/80">OS 30</span>
+            </div>
           </div>
 
-          {/* SVG Canvas for RSI */}
-          <div className="relative h-[68px] w-full mt-1">
+          <div className="relative h-[56px] w-full mt-1">
             <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 1000 100">
-              {/* Overbought / Oversold Zone (30-70) */}
-              <rect x="0" y="30" width="1000" height="40" fill="rgba(156, 39, 176, 0.05)" />
-              {/* Level 70 */}
-              <line x1="0" y1="30" x2="1000" y2="30" stroke="#f2364566" strokeWidth="1" strokeDasharray="4 3" />
-              {/* Level 50 */}
-              <line x1="0" y1="50" x2="1000" y2="50" stroke="#787b8633" strokeWidth="1" strokeDasharray="2 2" />
-              {/* Level 30 */}
-              <line x1="0" y1="70" x2="1000" y2="70" stroke="#08998166" strokeWidth="1" strokeDasharray="4 3" />
+              <rect x="0" y="30" width="1000" height="40" fill={isLight ? "rgba(41, 98, 255, 0.04)" : "rgba(41, 98, 255, 0.06)"} />
+              <line x1="0" y1="30" x2="1000" y2="30" stroke="#f2364555" strokeDasharray="3 3" strokeWidth="1" />
+              <line x1="0" y1="50" x2="1000" y2="50" stroke="#787b8633" strokeDasharray="2 2" strokeWidth="1" />
+              <line x1="0" y1="70" x2="1000" y2="70" stroke="#08998155" strokeDasharray="3 3" strokeWidth="1" />
 
-              {/* RSI Curve */}
               {rsiSeries.length > 1 && (
                 <polyline
                   fill="none"
-                  stroke="#ab47bc"
+                  stroke="#a855f7"
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   points={rsiSeries
-                    .slice(-120)
+                    .slice(-100)
                     .map((pt, idx, arr) => {
                       const x = (idx / (arr.length - 1)) * 1000;
-                      const y = 100 - pt.value; // Invert: 100 is top (y=0), 0 is bottom (y=100)
+                      const y = 100 - pt.value;
                       return `${x.toFixed(1)},${y.toFixed(1)}`;
                     })
                     .join(" ")}
                 />
               )}
             </svg>
-
-            {/* Labels right */}
-            <div className="absolute right-1 top-0 bottom-0 flex flex-col justify-between text-[9px] font-mono text-[#787b86] pointer-events-none">
-              <span>70</span>
-              <span>50</span>
-              <span>30</span>
-            </div>
           </div>
         </div>
       )}
 
-      {/* MACD Sub-pane */}
-      {showMacd && (
-        <div className="relative h-[95px] w-full px-3 py-1">
-          {/* Header & Badges */}
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[11px] font-bold text-[#2962ff]">MACD (12, 26, 9)</span>
-            {currentMacd && (
-              <div className="flex items-center gap-2 font-mono text-[10px]">
-                <span className="text-[#2962ff]">MACD: {currentMacd.macd.toFixed(2)}</span>
-                <span className="text-[#f5b942]">Signal: {currentMacd.signal.toFixed(2)}</span>
-                <span className={currentMacd.hist >= 0 ? "text-[#089981]" : "text-[#f23645]"}>
-                  Hist: {currentMacd.hist >= 0 ? "+" : ""}{currentMacd.hist.toFixed(2)}
+      {/* 2. ATR (Average True Range) Pane */}
+      {showAtr && (
+        <div className="relative px-3 py-1.5 select-none shrink-0">
+          <div className="flex items-center justify-between text-[11px] font-mono">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[#787b86]">ATR ({atrPeriod})</span>
+              {currentAtr !== null && (
+                <span className="font-black text-[#f59e0b]">
+                  {currentAtr.toFixed(4)}
                 </span>
-              </div>
-            )}
+              )}
+            </div>
+            <span className="text-[9px] text-[#787b86]">Volatility Measure</span>
           </div>
 
-          {/* SVG Canvas for MACD */}
+          <div className="relative h-[48px] w-full mt-1">
+            <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 1000 100">
+              {atrSeries.length > 1 && (() => {
+                const slice = atrSeries.slice(-100);
+                const minVal = Math.min(...slice.map((p) => p.value)) * 0.95;
+                const maxVal = Math.max(...slice.map((p) => p.value)) * 1.05;
+                const range = maxVal - minVal || 1;
+
+                const points = slice
+                  .map((pt, idx) => {
+                    const x = (idx / (slice.length - 1)) * 1000;
+                    const y = 90 - ((pt.value - minVal) / range) * 80;
+                    return `${x.toFixed(1)},${y.toFixed(1)}`;
+                  })
+                  .join(" ");
+
+                return (
+                  <polyline
+                    fill="none"
+                    stroke="#f59e0b"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    points={points}
+                  />
+                );
+              })()}
+            </svg>
+          </div>
+        </div>
+      )}
+
+      {/* 3. MACD Pane */}
+      {showMacd && (
+        <div className="relative px-3 py-1.5 select-none shrink-0">
+          <div className="flex items-center justify-between text-[11px] font-mono">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[#787b86]">
+                MACD ({macdFast}, {macdSlow}, {macdSignal})
+              </span>
+              {currentMacd && (
+                <>
+                  <span className="font-bold text-[#2962ff]">
+                    {currentMacd.macd.toFixed(2)}
+                  </span>
+                  <span className="font-bold text-[#f5b942]">
+                    {currentMacd.signal.toFixed(2)}
+                  </span>
+                  <span
+                    className={`font-black ${
+                      currentMacd.hist >= 0 ? "text-[#089981]" : "text-[#f23645]"
+                    }`}
+                  >
+                    {currentMacd.hist.toFixed(2)}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
           <div className="relative h-[68px] w-full mt-1">
             <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 1000 100">
-              {/* Zero Line */}
               <line x1="0" y1="50" x2="1000" y2="50" stroke="#787b8644" strokeWidth="1" />
 
               {/* Histogram Bars */}
               {macdSeries.slice(-100).map((pt, idx, arr) => {
                 const maxVal = Math.max(0.01, ...arr.map((p) => Math.abs(p.hist)));
                 const x = (idx / arr.length) * 1000;
-                const barWidth = 1000 / arr.length * 0.7;
+                const barWidth = (1000 / arr.length) * 0.7;
                 const barHeight = Math.min(45, (Math.abs(pt.hist) / maxVal) * 45);
                 const y = pt.hist >= 0 ? 50 - barHeight : 50;
                 const isPositive = pt.hist >= 0;
