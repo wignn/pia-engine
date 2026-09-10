@@ -5,8 +5,8 @@ import { accountApi, type KeyInfo, type User } from "@/src/lib/api/account";
 
 type SnippetLang = "curl" | "python" | "typescript" | "go";
 
-const BASE_API_URL = process.env.NEXT_PUBLIC_API_URL || "https://contorl.wign.dev";
-const BASE_WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://contorl.wign.dev/ws";
+const BASE_API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-engine.wign.dev";
+const BASE_WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://realtime-engine.wign.dev";
 
 const REST_ENDPOINTS = [
   {
