@@ -1,4 +1,4 @@
-# @pia/sdk (Official TypeScript / JavaScript SDK)
+# @piaa/sdk (Official TypeScript / JavaScript SDK)
 
 The official, production-ready SDK for the **PIA Market Intelligence & Realtime Financial Platform**.
 
@@ -21,13 +21,13 @@ Designed for institutional algorithmic traders, fintech dashboards, and quantita
 
 ```bash
 # Using bun
-bun add @pia/sdk
+bun add @piaa/sdk
 
 # Using npm
-npm install @pia/sdk
+npm install @piaa/sdk
 
 # Using pnpm / yarn
-pnpm add @pia/sdk
+pnpm add @piaa/sdk
 ```
 
 ---
@@ -37,7 +37,7 @@ pnpm add @pia/sdk
 ### 1. REST API Usage
 
 ```typescript
-import { PiaClient, RateLimitError, AuthenticationError } from "@pia/sdk";
+import { PiaClient, RateLimitError, AuthenticationError } from "@piaa/sdk";
 
 // Automatically picks up process.env.PIA_API_KEY if omitted
 const client = new PiaClient({
@@ -84,7 +84,7 @@ run();
 Cross-platform streaming without query-string leakage:
 
 ```typescript
-import { PiaClient } from "@pia/sdk";
+import { PiaClient } from "@piaa/sdk";
 
 const client = new PiaClient({ apiKey: "wi_live_..." });
 

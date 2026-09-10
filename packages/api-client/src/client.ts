@@ -45,7 +45,7 @@ export class PiaClient {
    *
    * @example
    * ```typescript
-   * import { PiaClient } from "@pia/sdk";
+   * import { PiaClient } from "@piaa/sdk";
    *
    * const client = new PiaClient({ apiKey: "wi_live_..." });
    * const prices = await client.market.getPrices();
