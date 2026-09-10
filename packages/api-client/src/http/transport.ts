@@ -15,7 +15,7 @@ import {
 import type { RateLimitInfo, RequestOptions } from "../types";
 
 const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
-const SDK_VERSION = "1.0.0";
+const SDK_VERSION = "1.0.1";
 
 export class HttpTransport {
   private lastRateLimitInfo: RateLimitInfo = {};
