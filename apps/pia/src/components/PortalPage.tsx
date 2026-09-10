@@ -83,11 +83,11 @@ export function PortalPage() {
 
         <div className="portal-nav-group">
           <span className="portal-nav-label">RESOURCES</span>
-          <a href="#api">
-            <span>▣</span>API DOCS<b>[ 01 ]</b>
+          <a href="/portal/docs">
+            <span>▣</span>API REFERENCE<b>[ 01 ]</b>
           </a>
           <a href="/portal/account">
-            <span>◫</span>ACCOUNT<b>[ 02 ]</b>
+            <span>◫</span>DEVELOPER KEYS<b>[ 02 ]</b>
           </a>
           <a href="https://github.com/wignn/atlsd" target="_blank" rel="noreferrer">
             <span>?</span>GITHUB<b>[ 03 ]</b>

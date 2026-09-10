@@ -20,7 +20,7 @@ Thumbs.db
 CLAUDE.*
 apps/uriel
 apps/worldmonitor
-docs
+/docs
 # blue-green deployment state (host-local)
 infra/env/active_target
 infra/monitoring/textfile/

@@ -22,6 +22,32 @@ pub struct UsageTracker {
     redis_client: Option<redis::Client>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RateLimitDecision {
+    Allowed {
+        min_limit: u32,
+        min_remaining: u32,
+        day_limit: u32,
+        day_remaining: u32,
+        reset_seconds: u64,
+    },
+    MinuteExceeded {
+        limit: u32,
+        reset_seconds: u64,
+    },
+    DailyQuotaExceeded {
+        limit: u32,
+    },
+    Bypassed,
+}
+
+impl RateLimitDecision {
+    #[allow(dead_code)]
+    pub fn is_allowed(&self) -> bool {
+        matches!(self, Self::Allowed { .. } | Self::Bypassed)
+    }
+}
+
 impl UsageTracker {
     pub fn new(js: Option<JetStreamContext>, redis_client: Option<redis::Client>) -> Self {
         let (tx, mut rx) = mpsc::channel::<UsageEvent>(8_192);
@@ -73,12 +99,12 @@ impl UsageTracker {
         }
     }
 
-    pub async fn try_consume_daily_quota(&self, tenant: &TenantContext) -> bool {
+    pub async fn check_rate_limit(&self, tenant: &TenantContext) -> RateLimitDecision {
         if tenant.is_admin {
-            return true;
+            return RateLimitDecision::Bypassed;
         }
         let Some(redis_client) = &self.redis_client else {
-            return true;
+            return RateLimitDecision::Bypassed;
         };
         let minute_key = format!(
             "rate:min:{}:{}",
@@ -95,7 +121,7 @@ impl UsageTracker {
             Ok(conn) => conn,
             Err(err) => {
                 tracing::warn!(error = %err, "quota redis connect failed; fail-open");
-                return true;
+                return RateLimitDecision::Bypassed;
             }
         };
 
@@ -105,38 +131,64 @@ impl UsageTracker {
             if min_val == 1 then
                 redis.call('EXPIRE', KEYS[1], 60)
             end
-            if min_val > tonumber(ARGV[1]) then
-                return -1
+            local min_limit = tonumber(ARGV[1])
+            local min_ttl = redis.call('TTL', KEYS[1])
+            if min_val > min_limit then
+                return {-1, min_limit, min_ttl}
             end
 
             local day_val = redis.call('INCR', KEYS[2])
             if day_val == 1 then
                 redis.call('EXPIRE', KEYS[2], tonumber(ARGV[3]))
             end
-            if day_val > tonumber(ARGV[2]) then
-                return -2
+            local day_limit = tonumber(ARGV[2])
+            if day_val > day_limit then
+                return {-2, day_limit, 0}
             end
 
-            return 0
+            local min_rem = math.max(0, min_limit - min_val)
+            local day_rem = math.max(0, day_limit - day_val)
+            return {0, min_rem, day_rem, min_ttl}
         "#;
 
-        let res: i64 = match redis::Script::new(script)
+        let res: Result<Vec<i64>, _> = redis::Script::new(script)
             .key(&minute_key)
             .key(&daily_key)
             .arg(i64::from(tenant.rate_limit_per_min))
             .arg(i64::from(tenant.requests_per_day))
             .arg(daily_ttl)
             .invoke_async(&mut conn)
-            .await
-        {
-            Ok(value) => value,
+            .await;
+
+        match res {
+            Ok(vals) if !vals.is_empty() => match vals[0] {
+                0 => RateLimitDecision::Allowed {
+                    min_limit: tenant.rate_limit_per_min.max(0) as u32,
+                    min_remaining: vals.get(1).copied().unwrap_or(0).max(0) as u32,
+                    day_limit: tenant.requests_per_day.max(0) as u32,
+                    day_remaining: vals.get(2).copied().unwrap_or(0).max(0) as u32,
+                    reset_seconds: vals.get(3).copied().unwrap_or(60).max(0) as u64,
+                },
+                -1 => RateLimitDecision::MinuteExceeded {
+                    limit: tenant.rate_limit_per_min.max(0) as u32,
+                    reset_seconds: vals.get(2).copied().unwrap_or(60).max(1) as u64,
+                },
+                -2 => RateLimitDecision::DailyQuotaExceeded {
+                    limit: tenant.requests_per_day.max(0) as u32,
+                },
+                _ => RateLimitDecision::Bypassed,
+            },
+            Ok(_) => RateLimitDecision::Bypassed,
             Err(err) => {
                 tracing::warn!(error = %err, "quota redis script failed; fail-open");
-                return true;
+                RateLimitDecision::Bypassed
             }
-        };
+        }
+    }
 
-        res == 0
+    #[allow(dead_code)]
+    pub async fn try_consume_daily_quota(&self, tenant: &TenantContext) -> bool {
+        self.check_rate_limit(tenant).await.is_allowed()
     }
 }
 

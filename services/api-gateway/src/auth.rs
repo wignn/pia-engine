@@ -3,12 +3,12 @@ use axum::{
     extract::{Request, State},
     http::StatusCode,
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use std::time::Instant;
 
 use crate::state::AppState;
-use crate::usage::UsageEvent;
+use crate::usage::{RateLimitDecision, UsageEvent};
 
 pub async fn require_api_key_auth(
     State(state): State<AppState>,
@@ -26,14 +26,95 @@ pub async fn require_api_key_auth(
         return Ok(next.run(request).await);
     }
     if let Some(ctx) = state.tenant_registry.validate_key(&raw_key).await {
-        if !state.usage_tracker.try_consume_daily_quota(&ctx).await {
-            return Err(StatusCode::TOO_MANY_REQUESTS);
+        let decision = state.usage_tracker.check_rate_limit(&ctx).await;
+        match decision {
+            RateLimitDecision::Allowed {
+                min_limit,
+                min_remaining,
+                day_limit,
+                day_remaining,
+                reset_seconds,
+            } => {
+                request.extensions_mut().insert(ctx);
+                let mut response = next.run(request).await;
+                let headers = response.headers_mut();
+                headers.insert(
+                    "x-ratelimit-limit",
+                    axum::http::HeaderValue::from(min_limit),
+                );
+                headers.insert(
+                    "x-ratelimit-remaining",
+                    axum::http::HeaderValue::from(min_remaining),
+                );
+                headers.insert(
+                    "x-ratelimit-reset",
+                    axum::http::HeaderValue::from(reset_seconds),
+                );
+                headers.insert(
+                    "x-dailyquota-limit",
+                    axum::http::HeaderValue::from(day_limit),
+                );
+                headers.insert(
+                    "x-dailyquota-remaining",
+                    axum::http::HeaderValue::from(day_remaining),
+                );
+                Ok(response)
+            }
+            RateLimitDecision::MinuteExceeded {
+                limit,
+                reset_seconds,
+            } => {
+                let mut res = (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    axum::Json(serde_json::json!({
+                        "error": "rate_limit_exceeded",
+                        "message": format!("Burst rate limit of {} req/min exceeded. Please retry after {} seconds.", limit, reset_seconds),
+                        "limit": limit,
+                        "retry_after_seconds": reset_seconds,
+                        "upgrade_url": "https://pia.wign.dev/portal/account"
+                    })),
+                )
+                    .into_response();
+                let headers = res.headers_mut();
+                headers.insert("retry-after", axum::http::HeaderValue::from(reset_seconds));
+                headers.insert(
+                    "x-ratelimit-reset",
+                    axum::http::HeaderValue::from(reset_seconds),
+                );
+                headers.insert("x-ratelimit-limit", axum::http::HeaderValue::from(limit));
+                headers.insert(
+                    "x-ratelimit-remaining",
+                    axum::http::HeaderValue::from_static("0"),
+                );
+                Ok(res)
+            }
+            RateLimitDecision::DailyQuotaExceeded { limit } => {
+                let mut res = (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    axum::Json(serde_json::json!({
+                        "error": "daily_quota_exceeded",
+                        "message": format!("Daily quota of {} requests exceeded for your tier. Upgrade your plan to continue.", limit),
+                        "limit": limit,
+                        "upgrade_url": "https://pia.wign.dev/portal/account"
+                    })),
+                )
+                    .into_response();
+                let headers = res.headers_mut();
+                headers.insert("x-dailyquota-limit", axum::http::HeaderValue::from(limit));
+                headers.insert(
+                    "x-dailyquota-remaining",
+                    axum::http::HeaderValue::from_static("0"),
+                );
+                Ok(res)
+            }
+            RateLimitDecision::Bypassed => {
+                request.extensions_mut().insert(ctx);
+                Ok(next.run(request).await)
+            }
         }
-        request.extensions_mut().insert(ctx);
     } else {
-        return Err(StatusCode::UNAUTHORIZED);
+        Err(StatusCode::UNAUTHORIZED)
     }
-    Ok(next.run(request).await)
 }
 
 pub async fn usage_logger(State(state): State<AppState>, request: Request, next: Next) -> Response {
@@ -128,5 +209,29 @@ mod tests {
         assert!(is_admin_key("admin-secret", "admin-secret"));
         assert!(!is_admin_key("tenant-key", "admin-secret"));
         assert!(!is_admin_key("admin-secret", ""));
+    }
+
+    #[test]
+    fn rate_limit_decision_is_allowed_logic() {
+        let allowed = RateLimitDecision::Allowed {
+            min_limit: 60,
+            min_remaining: 59,
+            day_limit: 5000,
+            day_remaining: 4999,
+            reset_seconds: 60,
+        };
+        assert!(allowed.is_allowed());
+
+        let bypassed = RateLimitDecision::Bypassed;
+        assert!(bypassed.is_allowed());
+
+        let min_exceeded = RateLimitDecision::MinuteExceeded {
+            limit: 60,
+            reset_seconds: 30,
+        };
+        assert!(!min_exceeded.is_allowed());
+
+        let day_exceeded = RateLimitDecision::DailyQuotaExceeded { limit: 5000 };
+        assert!(!day_exceeded.is_allowed());
     }
 }

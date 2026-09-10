@@ -60,6 +60,36 @@ export function UsageMeter({ summary, loading }: UsageMeterProps) {
         </div>
       </div>
 
+      {pct >= 100 ? (
+        <div
+          style={{
+            padding: "6px 10px",
+            marginBottom: 14,
+            background: "rgba(163, 77, 77, 0.1)",
+            border: "1px solid rgba(163, 77, 77, 0.3)",
+            color: "#a34d4d",
+            fontSize: 10,
+            fontFamily: "var(--font-geist-mono), monospace",
+          }}
+        >
+          ⚠ DAILY QUOTA EXHAUSTED (100%) — Requests are throttled with HTTP 429. Upgrade plan to continue.
+        </div>
+      ) : pct >= 80 ? (
+        <div
+          style={{
+            padding: "6px 10px",
+            marginBottom: 14,
+            background: "rgba(217, 119, 6, 0.1)",
+            border: "1px solid rgba(217, 119, 6, 0.3)",
+            color: "#b45309",
+            fontSize: 10,
+            fontFamily: "var(--font-geist-mono), monospace",
+          }}
+        >
+          ⚠ HIGH USAGE WARNING ({pct}%) — Approaching daily quota ceiling.
+        </div>
+      ) : null}
+
       <dl
         style={{
           display: "grid",

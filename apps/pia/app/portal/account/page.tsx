@@ -210,7 +210,14 @@ export default function AccountPage() {
           </h1>
           <p>Manage your real-time API keys, subscriptions, and consumption telemetry.</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <a
+            className="account-button account-button-primary"
+            href="/portal/docs"
+            style={{ padding: "0 14px", height: 34, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+          >
+            API REFERENCE →
+          </a>
           {user && (
             <button
               onClick={handleLogout}
@@ -221,7 +228,7 @@ export default function AccountPage() {
             </button>
           )}
           <a className="account-back" href="/portal">
-            ← BACK TO PLATFORM
+            ← PLATFORM
           </a>
         </div>
       </header>
