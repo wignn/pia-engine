@@ -121,12 +121,20 @@ export function PortalCanvas() {
     };
     const onVisibility = () => {
       running = document.visibilityState === "visible";
-      running ? start() : stop();
+      if (running) {
+        start();
+      } else {
+        stop();
+      }
     };
 
     const observer = new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting;
-      visible ? start() : stop();
+      if (visible) {
+        start();
+      } else {
+        stop();
+      }
     }, { rootMargin: "18% 0px 18%" });
 
     resize();

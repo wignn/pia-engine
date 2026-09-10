@@ -51,46 +51,58 @@ export default function AccountPage() {
   const [editLabelInput, setEditLabelInput] = useState("");
   const [upgradingPlanId, setUpgradingPlanId] = useState<string | null>(null);
 
-  const loadDashboardData = useCallback(async () => {
-    try {
-      const [meRes, keyList, planList] = await Promise.allSettled([
-        accountApi.me(),
-        accountApi.keys(),
-        accountApi.plans(),
-      ]);
-
-      if (meRes.status === "fulfilled") {
-        const u = meRes.value.user;
-        setUser(u);
-        setNotice(`SESSION ACTIVE · PLAN: ${u.plan.toUpperCase()}`);
-
-        // Fetch usage telemetry
-        Promise.allSettled([accountApi.usage(), accountApi.usageHistory(14)]).then(([uRes, hRes]) => {
-          if (uRes.status === "fulfilled") setUsageSummary(uRes.value);
-          if (hRes.status === "fulfilled") setUsageHistory(hRes.value);
-        });
-      } else {
-        setUser(null);
-        setNotice("SIGN IN TO MANAGE YOUR PIA DEVELOPER ACCOUNT");
-      }
-
-      if (keyList.status === "fulfilled") setKeys(keyList.value);
-      if (planList.status === "fulfilled" && planList.value.length) setPlans(planList.value);
-    } catch {
-      setNotice("ERROR CONNECTING TO CONTROL PLANE");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [refreshIndex, setRefreshIndex] = useState(0);
 
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    let ignore = false;
+
+    async function fetchData() {
+      try {
+        const [meRes, keyList, planList] = await Promise.allSettled([
+          accountApi.me(),
+          accountApi.keys(),
+          accountApi.plans(),
+        ]);
+
+        if (ignore) return;
+
+        if (meRes.status === "fulfilled") {
+          const u = meRes.value.user;
+          setUser(u);
+          setNotice(`SESSION ACTIVE · PLAN: ${u.plan.toUpperCase()}`);
+
+          const [uRes, hRes] = await Promise.allSettled([accountApi.usage(), accountApi.usageHistory(14)]);
+          if (ignore) return;
+          if (uRes.status === "fulfilled") setUsageSummary(uRes.value);
+          if (hRes.status === "fulfilled") setUsageHistory(hRes.value);
+        } else {
+          setUser(null);
+          setNotice("SIGN IN TO MANAGE YOUR PIA DEVELOPER ACCOUNT");
+        }
+
+        if (keyList.status === "fulfilled") setKeys(keyList.value);
+        if (planList.status === "fulfilled" && planList.value.length) setPlans(planList.value);
+      } catch {
+        if (!ignore) setNotice("ERROR CONNECTING TO CONTROL PLANE");
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+
+    fetchData();
+    return () => {
+      ignore = true;
+    };
+  }, [refreshIndex]);
+
+  const refreshDashboard = useCallback(() => {
+    setRefreshIndex((i) => i + 1);
+  }, []);
 
   const handleAuthSuccess = (authenticatedUser: User, rawApiKey?: string) => {
     setUser(authenticatedUser);
     setNotice(`WELCOME BACK · ${authenticatedUser.name.toUpperCase()}`);
-    loadDashboardData();
+    refreshDashboard();
 
     if (rawApiKey) {
       setRevealKeyData({ key: rawApiKey, label: "Default Key" });
@@ -174,7 +186,7 @@ export default function AccountPage() {
       const res = await accountApi.upgradePlan(planId);
       if (res.error) throw new Error(res.error);
       setNotice(`PLAN UPGRADED TO ${target.name.toUpperCase()} · LIMITS UPDATED`);
-      await loadDashboardData();
+      refreshDashboard();
     } catch (err) {
       setNotice(err instanceof Error ? err.message.toUpperCase() : "FAILED TO UPGRADE PLAN");
     } finally {
@@ -320,7 +332,7 @@ export default function AccountPage() {
                   ))}
                   {keys.length === 0 && (
                     <span style={{ gridColumn: "1 / -1", textAlign: "center" }}>
-                      No keys provisioned yet. Click "Manage Keys" to create one.
+                      No keys provisioned yet. Click &quot;Manage Keys&quot; to create one.
                     </span>
                   )}
                 </div>
