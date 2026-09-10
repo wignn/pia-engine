@@ -2,11 +2,11 @@ import type { Handle } from '@sveltejs/kit';
 
 const csp = [
 	"default-src 'self'",
-	"script-src 'self' 'unsafe-inline'",
+	"script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
 	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
 	"font-src 'self' https://fonts.gstatic.com",
 	"img-src 'self' data: https:",
-	"connect-src 'self' http://localhost:8081 http://localhost:8000 https://slv-gateway.wign.dev https://api-engine.wign.dev ws://localhost:8090 ws://localhost:8020 https: wss://slv-realtime.wign.dev wss://api-atlsd.wign.cloud wss://realtime-engine.wign.dev",
+	"connect-src 'self' http://localhost:8081 http://localhost:8000 https://slv-gateway.wign.dev https://api-engine.wign.dev ws://localhost:8090 ws://localhost:8020 https: wss://api-engine.wign.dev wss://slv-realtime.wign.dev wss://api-atlsd.wign.cloud wss://realtime-engine.wign.dev https://cloudflareinsights.com",
 	"frame-ancestors 'none'",
 	"base-uri 'self'",
 	"form-action 'self'"
