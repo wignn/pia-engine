@@ -6,7 +6,7 @@ import { accountApi, type KeyInfo, type User } from "@/src/lib/api/account";
 type SnippetLang = "curl" | "python" | "typescript" | "go";
 
 const BASE_API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-engine.wign.dev";
-const BASE_WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://realtime-engine.wign.dev";
+const BASE_WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://api-engine.wign.dev/api/v1/ws";
 
 const REST_ENDPOINTS = [
   {
@@ -551,7 +551,7 @@ func main() {
               Connect directly via WebSocket URL with your API key:
             </p>
             <pre style={{ margin: "8px 0 0", padding: 8, background: "rgba(9,9,238,0.04)", fontSize: 10, fontFamily: "var(--font-geist-mono), monospace", color: "var(--blue)" }}>
-{`wss://contorl.wign.dev/ws?api_key=${selectedKey}`}
+{`wss://api-engine.wign.dev/api/v1/ws?api_key=${selectedKey}`}
             </pre>
           </div>
 

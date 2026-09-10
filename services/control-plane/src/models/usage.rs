@@ -43,7 +43,7 @@ impl UsageLog {
         response_ms: Option<i32>,
     ) {
         let _ = sqlx::query(
-            "INSERT INTO usage_logs (user_id, api_key_id, endpoint, method, status_code, response_ms) \
+            "INSERT INTO auth.usage_logs (user_id, api_key_id, endpoint, method, status_code, response_ms) \
              VALUES ($1, $2, $3, $4, $5, $6)",
         )
         .bind(user_id)
@@ -60,7 +60,7 @@ impl UsageLog {
     #[allow(dead_code)]
     pub async fn count_today(db: &PgPool, user_id: Uuid) -> Result<i64, sqlx::Error> {
         let count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM usage_logs WHERE user_id = $1 AND created_at >= CURRENT_DATE",
+            "SELECT COUNT(*) FROM auth.usage_logs WHERE user_id = $1 AND created_at >= CURRENT_DATE",
         )
         .bind(user_id)
         .fetch_one(db)
@@ -71,21 +71,21 @@ impl UsageLog {
     /// Get usage summary.
     pub async fn summary(db: &PgPool, user_id: Uuid) -> Result<(i64, i64, i64), sqlx::Error> {
         let today: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM usage_logs WHERE user_id = $1 AND created_at >= CURRENT_DATE",
+            "SELECT COUNT(*) FROM auth.usage_logs WHERE user_id = $1 AND created_at >= CURRENT_DATE",
         )
         .bind(user_id)
         .fetch_one(db)
         .await?;
 
         let week: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM usage_logs WHERE user_id = $1 AND created_at >= date_trunc('week', CURRENT_DATE)",
+            "SELECT COUNT(*) FROM auth.usage_logs WHERE user_id = $1 AND created_at >= date_trunc('week', CURRENT_DATE)",
         )
         .bind(user_id)
         .fetch_one(db)
         .await?;
 
         let month: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM usage_logs WHERE user_id = $1 AND created_at >= date_trunc('month', CURRENT_DATE)",
+            "SELECT COUNT(*) FROM auth.usage_logs WHERE user_id = $1 AND created_at >= date_trunc('month', CURRENT_DATE)",
         )
         .bind(user_id)
         .fetch_one(db)
@@ -102,7 +102,7 @@ impl UsageLog {
     ) -> Result<Vec<DailyUsage>, sqlx::Error> {
         sqlx::query_as::<_, DailyUsage>(
             "SELECT to_char(created_at::date, 'YYYY-MM-DD') AS day, COUNT(*) AS count \
-             FROM usage_logs \
+             FROM auth.usage_logs \
              WHERE user_id = $1 AND created_at >= CURRENT_DATE - ($2 || ' days')::interval \
              GROUP BY created_at::date \
              ORDER BY created_at::date DESC",
