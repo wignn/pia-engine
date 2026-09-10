@@ -216,6 +216,16 @@ pub async fn verify_email(
     }
 }
 
+pub async fn logout() -> Response {
+    let mut resp = axum::Json(json!({ "message": "Logged out successfully" })).into_response();
+    let cookie = "wi_jwt=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0";
+    if let Ok(hv) = cookie.parse() {
+        resp.headers_mut()
+            .insert(axum::http::header::SET_COOKIE, hv);
+    }
+    resp
+}
+
 pub async fn me(
     State(state): State<AppState>,
     request: axum::extract::Request,

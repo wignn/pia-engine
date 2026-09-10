@@ -62,10 +62,10 @@ export function PortalPage() {
         <div className="portal-corner portal-corner-bottom" />
         <div className="portal-brand">
           <div className="portal-brand-mark">
-            <Image src="/logo.png" alt="SLV logo" width={64} height={64} priority />
+            <Image src="/logo.png" alt="PIA logo" width={64} height={64} priority />
           </div>
           <div>
-            <strong>SLV<br />PORTAL</strong>
+            <strong>PIA<br />PORTAL</strong>
             <small>ATLSD ENGINE / V1.0</small>
           </div>
         </div>
@@ -103,11 +103,9 @@ export function PortalPage() {
 
         <a
           className="portal-signin"
-          href="https://discord.com/oauth2/authorize?client_id=1410191834241601556&permissions=8&integration_type=0&scope=bot"
-          target="_blank"
-          rel="noreferrer"
+          href="/portal/account"
         >
-          ↪ &nbsp; OPEN SLV ACCOUNT
+          ↪ &nbsp; DEVELOPER ACCOUNT
         </a>
       </aside>
 
@@ -124,24 +122,22 @@ export function PortalPage() {
         <div className="portal-hero" id="overview">
           <PortalCanvas />
           <div className="portal-hero-copy">
-            <span className="portal-kicker">✧ &nbsp; SLV PORTAL</span>
+            <span className="portal-kicker">✧ &nbsp; PIA PORTAL</span>
             <h1>
               EVERYTHING TO<br />
               POWER YOUR<br />
               <em>MARKET</em>
             </h1>
-            <p className="portal-lead">SLV Portal is the operating layer for realtime financial intelligence.</p>
+            <p className="portal-lead">PIA Portal is the operating layer for realtime financial intelligence.</p>
             <p className="portal-description">
               Connect market feeds, options GEX analytics, macro intelligence, and Discord delivery through one high-performance ATLSD engine.
             </p>
             <div className="portal-actions">
               <a
                 className="portal-primary-button"
-                href="https://discord.com/oauth2/authorize?client_id=1410191834241601556&permissions=8&integration_type=0&scope=bot"
-                target="_blank"
-                rel="noreferrer"
+                href="/portal/account"
               >
-                ADD BOT TO DISCORD
+                OPEN DEVELOPER ACCOUNT
               </a>
               <a className="portal-secondary-button" href="#engine">
                 EXPLORE ENGINE
@@ -149,7 +145,7 @@ export function PortalPage() {
             </div>
           </div>
           <div className="portal-hero-code">
-            SLV / ATLSD / V1.0.0<br />
+            PIA / ATLSD / V1.0.0<br />
             STATUS: <span>OPERATIONAL</span>
           </div>
         </div>
@@ -157,7 +153,7 @@ export function PortalPage() {
         <section className="portal-section-block" id="engine">
           <div className="portal-section-heading">
             <span>01 / ENGINE</span>
-            <h2>WHY SLV PORTAL?</h2>
+            <h2>WHY PIA PORTAL?</h2>
           </div>
           <div className="portal-feature-grid" ref={cardsRef}>
             {reasons.map(([number, title, body]) => (
@@ -227,16 +223,14 @@ export function PortalPage() {
           <p>Start with the public engine. Expand into the Portal when your workflow is ready.</p>
           <a
             className="portal-primary-button"
-            href="https://discord.com/oauth2/authorize?client_id=1410191834241601556&permissions=8&integration_type=0&scope=bot"
-            target="_blank"
-            rel="noreferrer"
+            href="/portal/account"
           >
             GET STARTED →
           </a>
         </section>
 
         <footer className="portal-footer">
-          <span>SLV PORTAL / ATLSD ENGINE</span>
+          <span>PIA PORTAL / ATLSD ENGINE</span>
           <span>WIGNN / 2026 / MIT LICENSE</span>
         </footer>
       </section>

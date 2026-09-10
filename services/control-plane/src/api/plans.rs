@@ -60,25 +60,75 @@ fn normalize_ws_connections(value: i32) -> Result<i32, StatusCode> {
     Ok(value)
 }
 
+#[derive(serde::Deserialize)]
+pub struct UpgradePlanRequest {
+    pub plan_id: Option<String>,
+    pub plan: Option<String>,
+}
+
 /// POST /api/v1/plans/upgrade
 pub async fn upgrade(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     request: axum::extract::Request,
 ) -> Result<Json<Value>, StatusCode> {
-    let _auth = request
+    let auth = request
         .extensions()
         .get::<AuthContext>()
         .cloned()
         .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    let body_bytes = axum::body::to_bytes(request.into_body(), 1024)
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let body: UpgradePlanRequest =
+        serde_json::from_slice(&body_bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let target_plan = body.plan_id.or(body.plan).ok_or(StatusCode::BAD_REQUEST)?;
+    let target_plan = target_plan.trim().to_lowercase();
+
+    let plan_exists = Plan::find_by_id(&state.db, &target_plan)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let Some(plan) = plan_exists else {
+        return Ok(Json(json!({
+            "error": format!("Plan '{}' does not exist", target_plan)
+        })));
+    };
+
+    if !plan.is_active {
+        return Ok(Json(json!({
+            "error": format!("Plan '{}' is not currently active", target_plan)
+        })));
+    }
+
+    sqlx::query("UPDATE users SET plan = $1, updated_at = NOW() WHERE id = $2")
+        .bind(&target_plan)
+        .bind(auth.user_id)
+        .execute(&state.db)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    crate::sync::publish_config_changed_for_user(
+        &state.redis,
+        &state.config.redis_channel_prefix,
+        Some(auth.user_id),
+    )
+    .await;
+
+    tracing::info!(user_id = %auth.user_id, plan = %target_plan, "user upgraded plan");
+
     Ok(Json(json!({
-        "status": "not_available",
-        "message": "Plan upgrades via payment coming soon. Contact admin for manual upgrades.",
+        "status": "active",
+        "plan": target_plan,
+        "message": format!("Successfully switched to {} plan", plan.name),
+        "limits": plan
     })))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_ws_connections;
+    use super::{normalize_ws_connections, UpgradePlanRequest};
 
     #[test]
     fn normalize_ws_connections_accepts_safe_admin_limits() {
@@ -86,5 +136,16 @@ mod tests {
         assert_eq!(normalize_ws_connections(1000).unwrap(), 1000);
         assert!(normalize_ws_connections(0).is_err());
         assert!(normalize_ws_connections(1001).is_err());
+    }
+
+    #[test]
+    fn upgrade_plan_request_accepts_both_plan_and_plan_id() {
+        let json_plan_id = r#"{"plan_id":"pro"}"#;
+        let req1: UpgradePlanRequest = serde_json::from_str(json_plan_id).unwrap();
+        assert_eq!(req1.plan_id.as_deref(), Some("pro"));
+
+        let json_plan = r#"{"plan":"starter"}"#;
+        let req2: UpgradePlanRequest = serde_json::from_str(json_plan).unwrap();
+        assert_eq!(req2.plan.as_deref(), Some("starter"));
     }
 }

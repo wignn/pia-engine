@@ -30,6 +30,7 @@ pub async fn auth_middleware(
         || path == "/"
         || path == "/api/v1/auth/register"
         || path == "/api/v1/auth/login"
+        || path == "/api/v1/auth/logout"
         || path == "/api/v1/auth/verify"
         || path == "/api/v1/plans"
         || path.starts_with("/api/v1/auth/oauth/")
@@ -143,6 +144,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/", get(root))
         .route("/api/v1/auth/register", post(super::auth::register))
         .route("/api/v1/auth/login", post(super::auth::login))
+        .route("/api/v1/auth/logout", post(super::auth::logout))
         .route("/api/v1/auth/verify", post(super::auth::verify_email))
         .route("/api/v1/plans", get(super::plans::list_plans))
         .route(
