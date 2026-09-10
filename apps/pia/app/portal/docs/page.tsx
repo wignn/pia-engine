@@ -157,6 +157,17 @@ try:
     quota = client.get_rate_limit_info()
     print(f"Remaining daily quota: {quota.daily_remaining}/{quota.daily_limit}")
 
+    # 4. Realtime WebSocket Streaming (batteries-included)
+    from pia import AsyncPiaClient
+    import asyncio
+
+    async def stream():
+        async_client = AsyncPiaClient(api_key="${selectedKey}")
+        async for tick in async_client.realtime.stream(["XAUUSD", "BTCUSDT"]):
+            print(f"[TICK] {tick.symbol} -> {tick.price}")
+
+    # asyncio.run(stream())
+
 except RateLimitError as e:
     print(f"Rate limit exceeded! Retry after {e.retry_after_seconds}s")
 except AuthenticationError:
@@ -405,6 +416,95 @@ func main() {
         </div>
       </section>
 
+      {/* SECTION: OFFICIAL CLIENT SDKs */}
+      <section className="account-card account-wide" style={{ marginBottom: 28 }}>
+        <div className="account-card-head" style={{ marginBottom: 16 }}>
+          <div>
+            <span className="account-card-label">CLIENT SDKs</span>
+            <h2>Official SDK Libraries</h2>
+            <p className="account-muted">
+              Production-ready, strongly-typed SDK packages with built-in retry, rate-limit awareness, and realtime WebSocket streaming.
+            </p>
+          </div>
+          <a
+            className="account-button account-button-primary"
+            href="https://github.com/wignn/pia-sdk"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ padding: "0 14px", height: 32, fontSize: 10, textDecoration: "none" }}
+          >
+            VIEW SOURCE ON GITHUB ↗
+          </a>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+          {/* TypeScript SDK */}
+          <div style={{ padding: 16, background: "rgba(255,255,255,0.6)", border: "1px solid rgba(9,9,238,0.15)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span style={{ padding: "2px 8px", background: "var(--blue)", color: "#fff", fontSize: 9, fontWeight: 700, fontFamily: "var(--font-geist-mono), monospace" }}>
+                TYPESCRIPT
+              </span>
+              <a
+                href="https://www.npmjs.com/package/@piaa/sdk"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 10, fontFamily: "var(--font-geist-mono), monospace", color: "var(--blue)" }}
+              >
+                @piaa/sdk on npm ↗
+              </a>
+            </div>
+            <pre style={{ margin: 0, padding: 10, background: "rgba(9,9,238,0.04)", border: "1px solid rgba(9,9,238,0.12)", fontSize: 11, fontFamily: "var(--font-geist-mono), monospace", color: "var(--blue)" }}>
+{`npm install @piaa/sdk
+# or
+bun add @piaa/sdk`}
+            </pre>
+            <ul style={{ margin: "10px 0 0", padding: "0 0 0 16px", fontSize: 11, color: "#555", lineHeight: 1.7 }}>
+              <li>ESM native bundle with full TypeScript declarations</li>
+              <li>Exponential backoff with jitter on transient failures</li>
+              <li>In-Band WebSocket Auth (no token in URL)</li>
+              <li>Market, Social, News, Options resource modules</li>
+              <li>Works in Node.js, Bun, Deno, and edge runtimes</li>
+            </ul>
+          </div>
+
+          {/* Python SDK */}
+          <div style={{ padding: 16, background: "rgba(255,255,255,0.6)", border: "1px solid rgba(9,9,238,0.15)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span style={{ padding: "2px 8px", background: "var(--blue)", color: "#fff", fontSize: 9, fontWeight: 700, fontFamily: "var(--font-geist-mono), monospace" }}>
+                PYTHON
+              </span>
+              <a
+                href="https://pypi.org/project/piaa-sdk/"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 10, fontFamily: "var(--font-geist-mono), monospace", color: "var(--blue)" }}
+              >
+                piaa-sdk on PyPI ↗
+              </a>
+            </div>
+            <pre style={{ margin: 0, padding: 10, background: "rgba(9,9,238,0.04)", border: "1px solid rgba(9,9,238,0.12)", fontSize: 11, fontFamily: "var(--font-geist-mono), monospace", color: "var(--blue)" }}>
+{`pip install piaa-sdk`}
+            </pre>
+            <ul style={{ margin: "10px 0 0", padding: "0 0 0 16px", fontSize: 11, color: "#555", lineHeight: 1.7 }}>
+              <li>Dual engine: synchronous <code>PiaClient</code> + async <code>AsyncPiaClient</code></li>
+              <li>Batteries-included: REST + WebSocket in one package</li>
+              <li>Typed dataclasses for all API responses</li>
+              <li>Automatic retry with rate-limit header awareness</li>
+              <li>Python 3.8+ compatible</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 16, padding: "10px 14px", background: "rgba(9,9,238,0.03)", border: "1px dashed rgba(9,9,238,0.15)", fontSize: 10, fontFamily: "var(--font-geist-mono), monospace", color: "#686d9d", lineHeight: 1.6 }}>
+          <strong>ARCHITECTURE:</strong> Both SDKs share the same API surface — <code>market</code>, <code>social</code>, <code>news</code>, <code>realtime</code> resource modules.
+          All sensitive tokens are auto-redacted from logs and error stack traces.
+          Source code, issue tracker, and contribution guide available at{" "}
+          <a href="https://github.com/wignn/pia-sdk" target="_blank" rel="noopener noreferrer" style={{ color: "var(--blue)" }}>
+            github.com/wignn/pia-sdk
+          </a>.
+        </div>
+      </section>
+
       {/* SECTION 2: RATE LIMITS & TELEMETRY HEADERS */}
       <section className="account-card account-wide" style={{ marginBottom: 28 }}>
         <span className="account-card-label">GATEWAY PROTOCOL</span>
@@ -591,7 +691,7 @@ wss://api-engine.wign.dev/api/v1/ws?ticket=wst_...`}
 
       <footer className="account-footer" style={{ marginTop: 32 }}>
         <span>PIA / DEVELOPER PLATFORM</span>
-        <span>ZERO DOWNTIME API ENGINE · RFC 6585 RATE LIMITS</span>
+        <span>ZERO DOWNTIME API ENGINE · RFC 6585 RATE LIMITS · SDK: <a href="https://github.com/wignn/pia-sdk" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "underline" }}>github.com/wignn/pia-sdk</a></span>
       </footer>
     </main>
   );
