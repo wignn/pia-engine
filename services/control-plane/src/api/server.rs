@@ -1,7 +1,7 @@
 use atlsd_auth::extract::{extract_bearer, extract_key};
 use axum::{
     extract::{Request, State},
-    http::{header, StatusCode},
+    http::StatusCode,
     middleware::Next,
     response::Response,
     routing::{delete, get, patch, post, put},
@@ -114,16 +114,41 @@ pub struct AuthContext {
 }
 
 pub fn build_router(state: AppState) -> Router {
-    let allowed_origins: Vec<axum::http::HeaderValue> = std::env::var("ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| {
-            "http://localhost:3000,http://localhost:5173,http://localhost:8080".to_string()
-        })
+    let raw_origins = std::env::var("ALLOWED_ORIGINS").unwrap_or_else(|_| {
+        "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:5175,https://pia.wign.dev,https://contorl.wign.dev,https://control.wign.dev".to_string()
+    });
+    let frontend_url = std::env::var("FRONTEND_URL").ok();
+
+    let mut parsed_origins: Vec<String> = raw_origins
         .split(',')
-        .filter_map(|o| o.trim().parse().ok())
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
         .collect();
 
+    if let Some(fu) = frontend_url {
+        let fu_trimmed = fu.trim().to_lowercase();
+        if !parsed_origins.contains(&fu_trimmed) {
+            parsed_origins.push(fu_trimmed);
+        }
+    }
+
+    let origins_set = parsed_origins;
+    let allow_origin = AllowOrigin::predicate(
+        move |origin: &axum::http::HeaderValue, _parts: &axum::http::request::Parts| {
+            let Ok(origin_str) = origin.to_str() else {
+                return false;
+            };
+            let lower = origin_str.to_lowercase();
+            origins_set.contains(&lower)
+                || lower.ends_with(".wign.dev")
+                || lower == "https://wign.dev"
+                || lower.starts_with("http://localhost:")
+                || lower.starts_with("http://127.0.0.1:")
+        },
+    );
+
     let cors = CorsLayer::new()
-        .allow_origin(AllowOrigin::list(allowed_origins))
+        .allow_origin(allow_origin)
         .allow_methods([
             axum::http::Method::GET,
             axum::http::Method::POST,
@@ -132,11 +157,7 @@ pub fn build_router(state: AppState) -> Router {
             axum::http::Method::DELETE,
             axum::http::Method::OPTIONS,
         ])
-        .allow_headers([
-            header::CONTENT_TYPE,
-            header::AUTHORIZATION,
-            axum::http::HeaderName::from_static("x-api-key"),
-        ])
+        .allow_headers(tower_http::cors::AllowHeaders::mirror_request())
         .allow_credentials(true);
 
     Router::new()
