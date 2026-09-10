@@ -192,7 +192,60 @@ impl TenantRegistry {
 
     pub async fn validate_key(&self, raw_key: &str) -> Option<TenantContext> {
         let hash = hash_key(raw_key);
-        let cached = self.keys.read().await.get(&hash).cloned()?;
+        let cached = {
+            let in_memory = self.keys.read().await.get(&hash).cloned();
+            if let Some(entry) = in_memory {
+                entry
+            } else if let Some(db) = &self.db {
+                // Cache-aside on miss: instant zero-wait activation for newly provisioned keys
+                let row: Result<Option<TenantRow>, _> = sqlx::query_as(
+                    "SELECT k.key_hash, k.user_id, k.id, u.plan, k.is_active, u.is_active, COALESCE(p.can_scrape, FALSE), COALESCE(p.requests_per_day, 100), COALESCE(p.ws_connections, 1), COALESCE(p.x_usernames_max, 1), COALESCE(p.tv_symbols_max, 3), COALESCE(p.rate_limit_per_min, 10), k.expires_at FROM api_keys k JOIN users u ON u.id = k.user_id LEFT JOIN plans p ON p.id = u.plan WHERE k.key_hash = $1",
+                )
+                .bind(&hash)
+                .fetch_optional(db)
+                .await;
+
+                if let Ok(Some((
+                    _,
+                    uid,
+                    kid,
+                    plan,
+                    kactive,
+                    uactive,
+                    scrape,
+                    rpd,
+                    wsc,
+                    x_max,
+                    tv_max,
+                    rlm,
+                    expires,
+                ))) = row
+                {
+                    let entry = CachedKey {
+                        user_id: uid,
+                        key_id: kid,
+                        plan,
+                        is_active: kactive,
+                        user_active: uactive,
+                        can_scrape: scrape,
+                        requests_per_day: rpd,
+                        ws_connections: wsc,
+                        x_usernames_max: x_max,
+                        tv_symbols_max: tv_max,
+                        rate_limit_per_min: rlm,
+                        expires_at: expires,
+                    };
+                    self.keys.write().await.insert(hash, entry.clone());
+                    info!(key_id = %kid, "api-gateway cache-aside loaded new key instantly");
+                    entry
+                } else {
+                    return None;
+                }
+            } else {
+                return None;
+            }
+        };
+
         if !cached.is_active
             || !cached.user_active
             || cached
