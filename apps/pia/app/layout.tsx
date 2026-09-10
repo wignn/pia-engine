@@ -6,7 +6,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "SLV — Realtime Financial Intelligence & ATLSD Engine",
+  title: "PIA — Realtime Financial Intelligence & ATLSD Engine",
   description: "High-performance real-time market infrastructure, options analytics, macro intelligence, and integrated Discord bot platform.",
   icons: {
     icon: [

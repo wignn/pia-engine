@@ -85,7 +85,7 @@ export function ArchitectureDiagram({ embedded = false }: ArchitectureDiagramPro
   return (
     <section className={`architecture-page${embedded ? " architecture-page-embedded" : ""}`} id="architecture-map">
       <header className="architecture-page-header">
-        <a className="architecture-back" href={embedded ? "#top" : "/portal"}>{embedded ? "↘ RETURN TO SIGNAL" : "← SLV PORTAL"}</a>
+        <a className="architecture-back" href={embedded ? "#top" : "/portal"}>{embedded ? "↘ RETURN TO SIGNAL" : "← PIA PORTAL"}</a>
         <div className="architecture-header-meta">ATLSD ENGINE / SYSTEM MAP / V1.0</div>
       </header>
 
