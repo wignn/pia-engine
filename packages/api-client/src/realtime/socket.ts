@@ -127,7 +127,7 @@ export class RealtimeClient extends TypedEventEmitter {
     let messageText: string;
     if (typeof rawPayload === "string") {
       messageText = rawPayload;
-    } else if (rawPayload instanceof ArrayBuffer || Buffer.isBuffer(rawPayload)) {
+    } else if (rawPayload instanceof ArrayBuffer || (typeof Buffer !== "undefined" && Buffer && Buffer.isBuffer(rawPayload))) {
       messageText = new TextDecoder().decode(rawPayload);
     } else {
       messageText = String(rawPayload);
