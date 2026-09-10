@@ -20,7 +20,7 @@ export function Portal() {
         select-none
         pointer-events-none
       ">
-        SLV
+        PIA
       </h1>
 
       <h1 className="
@@ -65,7 +65,7 @@ export function Portal() {
           tracking-wide
           uppercase
         ">
-          SLV
+          PIA
         </h2>
 
 
@@ -120,7 +120,7 @@ export function Portal() {
           loop
           muted
           playsInline
-          aria-label="SLV character animation"
+          aria-label="PIA character animation"
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1 }}

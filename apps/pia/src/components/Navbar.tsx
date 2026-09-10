@@ -21,8 +21,8 @@ export function Navbar() {
       </div>
 
       <div className="nav-center-stacked">
-        <a className="nav-brand-title" href="#top" aria-label="SLV ATLSD Engine">
-          <span className="brand-hermes">SLV</span>
+        <a className="nav-brand-title" href="#top" aria-label="PIA ATLSD Engine">
+          <span className="brand-hermes">PIA</span>
           <span className="brand-agent">ATLSD ENGINE</span>
         </a>
         <div className="nav-socials">
@@ -46,6 +46,7 @@ export function Navbar() {
             )}
           </AnimatePresence>
         </div>
+        <a className="nav-install" href="/portal/account" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)" }}>DEVELOPER KEY <span aria-hidden="true">→</span></a>
         <a className="nav-install" href="https://discord.com/oauth2/authorize?client_id=1534422019561492510&permissions=8&integration_type=0&scope=bot" target="_blank" rel="noreferrer">ADD BOT <span aria-hidden="true">→</span></a>
       </div>
       <button className="nav-menu" onClick={() => setOpen((value) => !value)} aria-label="Toggle navigation" aria-expanded={open}><span /><span /></button>

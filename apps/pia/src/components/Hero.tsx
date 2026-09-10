@@ -13,7 +13,7 @@ export function Hero() {
           <h1>REALTIME FINANCIAL<br />INTELLIGENCE & MARKET</h1>
 
           <p className="hero-description" style={{ color: "rgba(255,255,255,0.8)", marginBottom: "32px", fontSize: "14px", lineHeight: "1.6", maxWidth: "520px" }}>
-            SLV (ATLSD Engine) is a high-performance real-time financial infrastructure platform. Integrating multi-asset price feeds (Forex, Stocks, Commodities, Crypto), Options GEX analytics, Macro Intelligence, & AI-powered market movement analysis via REST, WebSocket, & Discord Bot.
+            PIA (ATLSD Engine) is a high-performance real-time financial infrastructure platform. Integrating multi-asset price feeds (Forex, Stocks, Commodities, Crypto), Options GEX analytics, Macro Intelligence, & AI-powered market movement analysis via REST, WebSocket, & Discord Bot.
           </p>
 
           <div className="install-desktop-section">
