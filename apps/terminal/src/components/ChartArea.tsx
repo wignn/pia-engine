@@ -34,6 +34,7 @@ interface ChartAreaProps {
   onDrawingsCountChange?: (count: number) => void;
   clearDrawingsTrigger?: number;
   snapshotTrigger?: number;
+  onSnapshotDone?: () => void;
   onToggleIndicator?: (indicator: keyof IndicatorState) => void;
   isDrawingsHidden?: boolean;
   isDrawingModeLocked?: boolean;
@@ -63,6 +64,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   onDrawingsCountChange,
   clearDrawingsTrigger = 0,
   snapshotTrigger = 0,
+  onSnapshotDone,
   onToggleIndicator,
   isDrawingsHidden = false,
   isDrawingModeLocked = false,
@@ -184,24 +186,46 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
     }
   }, [redoStack, drawings, symbol, onDrawingsCountChange, onCanUndoRedoChange]);
 
+  const lastHandledUndoRef = useRef(undoTrigger);
+  const lastHandledRedoRef = useRef(redoTrigger);
+  const lastHandledClearRef = useRef(clearDrawingsTrigger);
+  const lastHandledSnapshotRef = useRef(snapshotTrigger);
+  const symbolRef = useRef(symbol);
+  symbolRef.current = symbol;
+  const timeframeRef = useRef(timeframe);
+  timeframeRef.current = timeframe;
+
   useEffect(() => {
-    if (undoTrigger > 0) handleUndo();
+    if (undoTrigger > 0 && undoTrigger !== lastHandledUndoRef.current) {
+      lastHandledUndoRef.current = undoTrigger;
+      handleUndo();
+    } else if (undoTrigger === 0) {
+      lastHandledUndoRef.current = 0;
+    }
   }, [undoTrigger, handleUndo]);
 
   useEffect(() => {
-    if (redoTrigger > 0) handleRedo();
+    if (redoTrigger > 0 && redoTrigger !== lastHandledRedoRef.current) {
+      lastHandledRedoRef.current = redoTrigger;
+      handleRedo();
+    } else if (redoTrigger === 0) {
+      lastHandledRedoRef.current = 0;
+    }
   }, [redoTrigger, handleRedo]);
 
   // Clear drawings trigger
   useEffect(() => {
-    if (clearDrawingsTrigger > 0) {
+    if (clearDrawingsTrigger > 0 && clearDrawingsTrigger !== lastHandledClearRef.current) {
+      lastHandledClearRef.current = clearDrawingsTrigger;
       if (drawings.length > 0) {
         saveDrawings([], true);
       }
       setSelectedDrawingId(null);
-      localStorage.removeItem(`atlsd_drawings_${symbol}`);
+      localStorage.removeItem(`atlsd_drawings_${symbolRef.current}`);
+    } else if (clearDrawingsTrigger === 0) {
+      lastHandledClearRef.current = 0;
     }
-  }, [clearDrawingsTrigger, symbol, drawings.length, saveDrawings]);
+  }, [clearDrawingsTrigger, drawings.length, saveDrawings]);
 
   // Project chart (time, price, logical) -> current viewport (x, y) pixels
   const projectPoint = useCallback(
@@ -233,7 +257,15 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
 
   // Snapshot trigger effect
   useEffect(() => {
-    if (snapshotTrigger > 0 && chartRef.current) {
+    if (
+      snapshotTrigger > 0 &&
+      snapshotTrigger !== lastHandledSnapshotRef.current &&
+      chartRef.current
+    ) {
+      lastHandledSnapshotRef.current = snapshotTrigger;
+      const currentSymbol = symbolRef.current;
+      const currentTimeframe = timeframeRef.current;
+
       try {
         const canvas = chartRef.current.takeScreenshot();
         const watermarked = document.createElement("canvas");
@@ -256,7 +288,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           ctx.font = "12px monospace";
           ctx.fillStyle = "#d1d4dc";
           ctx.fillText(
-            `${symbol} · ${timeframe} · ${new Date().toISOString().replace("T", " ").substring(0, 19)} UTC`,
+            `${currentSymbol} · ${currentTimeframe} · ${new Date().toISOString().replace("T", " ").substring(0, 19)} UTC`,
             150,
             canvas.height - 16
           );
@@ -264,14 +296,18 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           const url = watermarked.toDataURL("image/png");
           const a = document.createElement("a");
           a.href = url;
-          a.download = `PIA_${symbol}_${timeframe}_${Date.now()}.png`;
+          a.download = `PIA_${currentSymbol}_${currentTimeframe}_${Date.now()}.png`;
           a.click();
         }
       } catch (err) {
         console.warn("[ChartArea] Snapshot export failed:", err);
       }
+
+      onSnapshotDone?.();
+    } else if (snapshotTrigger === 0) {
+      lastHandledSnapshotRef.current = 0;
     }
-  }, [snapshotTrigger, symbol, timeframe]);
+  }, [snapshotTrigger, onSnapshotDone]);
 
   // Delete selected drawing on Backspace / Delete or Ctrl+Z / Ctrl+Y
   useEffect(() => {

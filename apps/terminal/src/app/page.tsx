@@ -754,6 +754,7 @@ export default function TerminalPage() {
                     provider={meta.provider}
                     clearDrawingsTrigger={clearDrawingsTrigger}
                     snapshotTrigger={pane.id === activePaneId ? snapshotTrigger : 0}
+                    onSnapshotDone={() => setSnapshotTrigger(0)}
                     onDrawingsCountChange={setDrawingsCount}
                     onToggleIndicator={handleToggleIndicator}
                     isDrawingsHidden={isDrawingsHidden}
