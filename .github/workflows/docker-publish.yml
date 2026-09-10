@@ -296,6 +296,9 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
     needs: [check, docker]
     if: >-
       github.ref == 'refs/heads/main' &&

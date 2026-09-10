@@ -114,6 +114,25 @@ services:
     networks:
       - private
 
+  pia:
+    container_name: atlsd-pia
+    image: wign/atlsd-pia:${ATLSD_IMAGE_TAG:-latest}
+    environment:
+      CONTROL_PLANE_INTERNAL_URL: http://world-control-plane:8080
+      NEXT_PUBLIC_CONTROL_PLANE_URL: https://contorl.wign.dev
+      PORT: 3000
+    ports:
+      - "5176:3000"
+    healthcheck:
+      test: ["CMD", "bun", "--version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: always
+    logging: *default-logging
+    networks:
+      - private
+
 
   traffic-router:
     container_name: atlsd-traffic-router

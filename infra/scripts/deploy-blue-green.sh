@@ -221,8 +221,8 @@ healthcheck_color() {
 # ---------------------------------------------------------------------------
 LOCK_FILE="/tmp/atlsd-deploy.lock"
 exec 9>"$LOCK_FILE"
-if ! flock -n 9; then
-    echo "\u274c Another deployment is already running (lock held). Aborting."
+if ! flock -w 180 9; then
+    echo "❌ Another deployment is already running (lock held after 180s). Aborting."
     exit 1
 fi
 
