@@ -55,8 +55,8 @@ describe("Market Resource", () => {
       since: 1720000000,
     });
 
-    expect(requestedUrl).toContain("/api/v1/market/candles/BTCUSDT");
-    expect(requestedUrl).toContain("tf=1h");
+    expect(requestedUrl).toContain("/api/v1/market/history/BTCUSDT");
+    expect(requestedUrl).toContain("resolution=1h");
     expect(requestedUrl).toContain("limit=100");
     expect(requestedUrl).toContain("since=1720000000");
     expect(res.symbol).toBe("BTCUSDT");

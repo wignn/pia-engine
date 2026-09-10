@@ -43,18 +43,26 @@ export class MarketResource {
 
     const cleanSymbol = symbol.trim().toUpperCase();
     const params = new URLSearchParams();
-    if (options?.timeframe) params.set("tf", options.timeframe);
+    if (options?.timeframe) params.set("resolution", options.timeframe);
     if (options?.limit) params.set("limit", String(options.limit));
     if (options?.since) params.set("since", String(options.since));
-    if (options?.until) params.set("until", String(options.until));
+    if (options?.until) params.set("before", String(options.until));
 
     const query = params.toString() ? `?${params.toString()}` : "";
-    return this.transport.request<CandleResponse>(
-      `/api/v1/market/candles/${encodeURIComponent(cleanSymbol)}${query}`,
+    const raw = await this.transport.request<any>(
+      `/api/v1/market/history/${encodeURIComponent(cleanSymbol)}${query}`,
       "GET",
       undefined,
       options
     );
+
+    const candleList = raw?.candles || raw?.items || [];
+    return {
+      symbol: cleanSymbol,
+      timeframe: options?.timeframe || "1m",
+      count: candleList.length,
+      candles: candleList,
+    };
   }
 
   /**
