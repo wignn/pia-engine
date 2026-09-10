@@ -137,75 +137,66 @@ export default function DocsPage() {
     setTimeout(() => setCopiedSection(null), 2000);
   };
 
-  const getPythonSnippet = () => `import requests
-import json
+  const getPythonSnippet = () => `# pip install piaa-sdk
+from pia import PiaClient, RateLimitError, AuthenticationError
 
-API_KEY = "${selectedKey}"
-BASE_URL = "${BASE_API_URL}"
+client = PiaClient(api_key="${selectedKey}")
 
-headers = {
-    "x-api-key": API_KEY,
-    "Accept": "application/json"
-}
+try:
+    # 1. Fetch live multi-asset snapshot (105+ instruments)
+    prices = client.market.get_prices()
+    print(f"Total assets tracked: {prices.total}")
+    for item in prices.items[:5]:
+        print(f"[{item.symbol}] Price: \${item.price} ({item.asset_type})")
 
-# 1. Fetch live multi-asset snapshot
-response = requests.get(f"{BASE_URL}/api/v1/market/prices", headers=headers)
-if response.status_code == 200:
-    data = response.json()
-    print(f"Total assets tracked: {data['total']}")
-    for item in data["items"][:5]:
-        print(f"[{item['symbol']}] Price: {item['price']} ({item['asset_type']})")
-elif response.status_code == 429:
-    print("Rate limit reached:", response.json())
-else:
-    print(f"Request failed: {response.status_code}", response.text)
+    # 2. Fetch historical candlesticks
+    candles = client.market.get_candles("XAUUSD", timeframe="1m", limit=5)
+    print(f"Retrieved {candles.count} candles for {candles.symbol}")
+
+    # 3. Check rate limit telemetry
+    quota = client.get_rate_limit_info()
+    print(f"Remaining daily quota: {quota.daily_remaining}/{quota.daily_limit}")
+
+except RateLimitError as e:
+    print(f"Rate limit exceeded! Retry after {e.retry_after_seconds}s")
+except AuthenticationError:
+    print("Invalid or inactive API key.")
+finally:
+    client.close()
 `;
 
-  const getTypescriptSnippet = () => `import WebSocket from "ws";
+  const getTypescriptSnippet = () => `// npm install @piaa/sdk
+import { PiaClient, RateLimitError } from "@piaa/sdk";
 
-const API_KEY = "${selectedKey}";
-const BASE_URL = "${BASE_API_URL}";
-const WS_URL = "${BASE_WS_URL}";
+const client = new PiaClient({ apiKey: "${selectedKey}" });
 
 async function run() {
-  // 1. Fetch REST Market Prices
-  const res = await fetch(\`\${BASE_URL}/api/v1/market/prices\`, {
-    headers: { "x-api-key": API_KEY }
-  });
+  try {
+    // 1. Fetch REST Market Prices
+    const prices = await client.market.getPrices();
+    console.log(\`Received \${prices.total} market instruments.\`);
 
-  // Check rate limit telemetry headers
-  console.log("Remaining Minute Quota:", res.headers.get("x-ratelimit-remaining"));
-  console.log("Remaining Daily Quota:", res.headers.get("x-dailyquota-remaining"));
+    const quota = client.getRateLimitInfo();
+    console.log(\`Remaining Daily Quota: \${quota.dailyRemaining}/\${quota.dailyLimit}\`);
 
-  const data = await res.json();
-  console.log(\`Received \${data.total} market instruments.\`);
-
-  // 2. Connect to WebSocket Stream (In-Band Message Auth)
-  const ws = new WebSocket(WS_URL);
-  ws.on("open", () => {
-    console.log("WebSocket connected. Authenticating via message frame...");
-    ws.send(JSON.stringify({
-      action: "auth",
-      api_key: API_KEY
-    }));
-  });
-
-  ws.on("message", (msg) => {
-    const data = JSON.parse(msg.toString());
-    if (data.event === "authenticated") {
+    // 2. Realtime WebSocket Streaming (In-Band Message Auth)
+    client.realtime.on("connect", () => console.log("WebSocket connected."));
+    client.realtime.on("authenticated", (tier) => {
       console.log("Authenticated! Subscribing to XAUUSD & BTCUSDT...");
-      ws.send(JSON.stringify({
-        action: "subscribe",
-        symbols: ["XAUUSD", "BTCUSDT"]
-      }));
-    } else if (data.event === "market.trade") {
-      const tick = data.data.tick;
+      client.realtime.subscribe(["XAUUSD", "BTCUSDT"]);
+    });
+
+    client.realtime.on("tick", (tick) => {
       console.log(\`[TICK] \${tick.symbol} -> \${tick.price}\`);
-    }
-  });
+    });
+
+    client.realtime.connect();
+  } catch (err) {
+    console.error("API error:", err);
+  }
 }
 
-run().catch(console.error);
+run();
 `;
 
   const getCurlSnippet = () => `# 1. Get Live Market Snapshot
@@ -560,7 +551,7 @@ func main() {
               Connect clean without query tokens, then send an auth frame within 5s:
             </p>
             <pre style={{ margin: "8px 0 0", padding: 8, background: "rgba(9,9,238,0.04)", fontSize: 10, fontFamily: "var(--font-geist-mono), monospace", color: "var(--blue)" }}>
-{`wss://api-engine.wign.dev/api/v1/ws
+{`${BASE_WS_URL}
 
 Send frame:
 {
