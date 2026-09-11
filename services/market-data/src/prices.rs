@@ -2,6 +2,8 @@ use crate::clickhouse::LatestPriceTick;
 use crate::state::AppState;
 use axum::{
     extract::{Path, State},
+    http::{header, HeaderName, StatusCode},
+    response::{IntoResponse, Response},
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -43,7 +45,30 @@ pub async fn hydrate_price_cache(state: &AppState) -> anyhow::Result<usize> {
     Ok(count)
 }
 
-pub async fn list_prices(State(state): State<AppState>) -> Json<Value> {
+pub async fn list_prices(State(state): State<AppState>) -> Response {
+    // 1. Sub-millisecond pre-serialized L1 RAM cache (100ms micro-cache)
+    if let Some(bytes) = {
+        let guard = state.snapshot_cache.read();
+        guard.as_ref().and_then(|(cached_at, b)| {
+            if cached_at.elapsed() < std::time::Duration::from_millis(100) {
+                Some(b.clone())
+            } else {
+                None
+            }
+        })
+    } {
+        return (
+            StatusCode::OK,
+            [
+                (header::CONTENT_TYPE, "application/json"),
+                (HeaderName::from_static("x-cache"), "HIT"),
+            ],
+            axum::body::Body::from(bytes),
+        )
+            .into_response();
+    }
+
+    // 2. Compute from in-memory price map
     let mut prices: Vec<CachedPrice> = state.prices.read().values().cloned().collect();
     if prices.is_empty() {
         prices = load_clickhouse_latest_prices(&state).await;
@@ -52,10 +77,26 @@ pub async fn list_prices(State(state): State<AppState>) -> Json<Value> {
         prices = load_latest_prices(&state.db).await.unwrap_or_default();
     }
 
-    Json(json!({
+    let payload = json!({
         "items": prices.iter().map(|price| price_json_with_calendar(price, Some(&state.calendar))).collect::<Vec<_>>(),
         "total": prices.len(),
-    }))
+    });
+
+    let bytes = axum::body::Bytes::from(serde_json::to_vec(&payload).unwrap_or_default());
+    {
+        let mut guard = state.snapshot_cache.write();
+        *guard = Some((std::time::Instant::now(), bytes.clone()));
+    }
+
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "application/json"),
+            (HeaderName::from_static("x-cache"), "MISS"),
+        ],
+        axum::body::Body::from(bytes),
+    )
+        .into_response()
 }
 
 pub async fn get_price(Path(symbol): Path<String>, State(state): State<AppState>) -> Json<Value> {

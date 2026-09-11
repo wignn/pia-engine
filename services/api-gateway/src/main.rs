@@ -77,6 +77,10 @@ async fn main() {
 
     let usage_tracker = std::sync::Arc::new(UsageTracker::new(js, redis_client));
     let http = reqwest::Client::builder()
+        .tcp_nodelay(true)
+        .tcp_keepalive(Some(std::time::Duration::from_secs(30)))
+        .pool_idle_timeout(Some(std::time::Duration::from_secs(90)))
+        .pool_max_idle_per_host(64)
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .unwrap_or_default();
@@ -89,6 +93,7 @@ async fn main() {
         internal_api_key: std::env::var("INTERNAL_API_KEY")
             .ok()
             .filter(|key| !key.trim().is_empty()),
+        price_cache: std::sync::Arc::new(parking_lot::RwLock::new(None)),
     };
 
     let listener = match TcpListener::bind(&cfg.bind_addr).await {
@@ -99,7 +104,8 @@ async fn main() {
         }
     };
 
-    info!(bind_addr = %cfg.bind_addr, "api-gateway running");
+    info!(bind_addr = %cfg.bind_addr, "api-gateway running with TCP_NODELAY enabled");
+    let listener = atlsd_common::net::tap_nodelay(listener);
     if let Err(err) = axum::serve(listener, http::build_router(state)).await {
         error!(error = %err, "api-gateway HTTP server failed");
         std::process::exit(1);

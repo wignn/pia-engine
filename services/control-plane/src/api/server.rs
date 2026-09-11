@@ -271,6 +271,7 @@ pub async fn start(state: AppState) -> Result<(), Box<dyn std::error::Error>> {
     info!(addr = %addr, "control-plane HTTP server starting");
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
+    let listener = atlsd_common::net::tap_nodelay(listener);
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
