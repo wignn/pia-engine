@@ -6,13 +6,16 @@ import {
   type AdminUser,
   type AdminApiKey,
   type UserUsage,
+  type PlanChangeRequestItem,
 } from "@/lib/admin-client";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, formatNumber } from "@/lib/formatters";
 
 export default function TenantsPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [planRequests, setPlanRequests] = useState<PlanChangeRequestItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingRequests, setLoadingRequests] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [planFilter, setPlanFilter] = useState("all");
@@ -29,22 +32,56 @@ export default function TenantsPage() {
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [resettingQuota, setResettingQuota] = useState(false);
 
-  const loadUsers = async () => {
+  const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const list = await adminClient.getUsers();
-      setUsers(list);
+      const [uList, rList] = await Promise.allSettled([
+        adminClient.getUsers(),
+        adminClient.getPlanRequests(),
+      ]);
+
+      if (uList.status === "fulfilled") {
+        setUsers(uList.value);
+      } else {
+        setError(uList.reason?.message || "Failed to load tenants");
+      }
+
+      if (rList.status === "fulfilled") {
+        setPlanRequests(rList.value);
+      }
     } catch (err: any) {
-      setError(err?.message || "Failed to load tenants");
+      setError(err?.message || "Failed to load directory");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadUsers();
+    loadData();
   }, []);
+
+  const handleApprovePlan = async (requestId: string, email: string, plan: string) => {
+    try {
+      const res = await adminClient.approvePlanRequest(requestId);
+      setActionNotice(`✓ REQUEST APPROVED: ${email.toUpperCase()} UPGRADED TO ${plan.toUpperCase()}`);
+      setTimeout(() => setActionNotice(null), 4000);
+      loadData();
+    } catch (err: any) {
+      setActionNotice(`✕ APPROVAL FAILED: ${err?.message || "Error"}`);
+    }
+  };
+
+  const handleRejectPlan = async (requestId: string, email: string) => {
+    try {
+      await adminClient.rejectPlanRequest(requestId);
+      setActionNotice(`✓ REQUEST REJECTED FOR ${email.toUpperCase()}`);
+      setTimeout(() => setActionNotice(null), 3000);
+      loadData();
+    } catch (err: any) {
+      setActionNotice(`✕ REJECTION FAILED: ${err?.message || "Error"}`);
+    }
+  };
 
   const handlePlanChange = async (userId: string, newPlan: string) => {
     try {
@@ -142,7 +179,7 @@ export default function TenantsPage() {
         <div style={{ display: "flex", gap: 12 }}>
           <button
             type="button"
-            onClick={loadUsers}
+            onClick={loadData}
             disabled={loading}
             className="admin-button"
           >
@@ -178,6 +215,97 @@ export default function TenantsPage() {
           }}
         >
           ERROR: {error}
+        </div>
+      )}
+
+      {/* PENDING PLAN UPGRADE REQUESTS */}
+      {planRequests.filter((r) => r.status === "pending").length > 0 && (
+        <div
+          className="admin-card"
+          style={{
+            marginBottom: 28,
+            border: "1px solid #bd8535",
+            background: "rgba(189, 133, 53, 0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span className="admin-badge admin-badge-warn">
+                ● {planRequests.filter((r) => r.status === "pending").length} PENDING UPGRADE REQUEST(S)
+              </span>
+              <span style={{ fontSize: 11, color: "#6a6f9f" }}>
+                Tenants requested a plan upgrade without automated billing. Owner approval required.
+              </span>
+            </div>
+          </div>
+
+          <div className="admin-table-wrapper">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>TENANT</th>
+                  <th>CURRENT TIER</th>
+                  <th>REQUESTED TIER</th>
+                  <th>REQUESTED AT</th>
+                  <th style={{ textAlign: "right" }}>DECISION</th>
+                </tr>
+              </thead>
+              <tbody>
+                {planRequests
+                  .filter((r) => r.status === "pending")
+                  .map((req) => (
+                    <tr key={req.id}>
+                      <td>
+                        <strong style={{ color: "var(--blue)" }}>{req.name || "User"}</strong>
+                        <code style={{ fontSize: 10, color: "#5d6090" }}>{req.email}</code>
+                      </td>
+                      <td>
+                        <span style={{ padding: "2px 6px", background: "rgba(9, 9, 238, 0.06)", fontSize: 9, fontWeight: 700 }}>
+                          {req.current_plan.toUpperCase()}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            padding: "3px 8px",
+                            background: "rgba(43, 122, 75, 0.12)",
+                            color: "#2b7a4b",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            border: "1px solid #2b7a4b",
+                          }}
+                        >
+                          → {req.requested_plan.toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 10, color: "#6a6f9f" }}>
+                        {formatDate(req.created_at)}
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <div style={{ display: "inline-flex", gap: 8 }}>
+                          <button
+                            type="button"
+                            onClick={() => handleApprovePlan(req.id, req.email, req.requested_plan)}
+                            className="admin-button admin-button-primary"
+                            style={{ height: 26, fontSize: 9, padding: "0 12px" }}
+                          >
+                            ✓ APPROVE / ACC
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRejectPlan(req.id, req.email)}
+                            className="admin-button admin-button-danger"
+                            style={{ height: 26, fontSize: 9, padding: "0 10px" }}
+                          >
+                            ✕ REJECT
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

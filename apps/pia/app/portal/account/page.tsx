@@ -8,6 +8,7 @@ import {
   type User,
   type UsageSummary,
   type DailyUsage,
+  type PlanRequestInfo,
 } from "@/src/lib/api/account";
 import { AuthPanel } from "@/src/components/portal/AuthPanel";
 import { CreateKeyModal } from "@/src/components/portal/CreateKeyModal";
@@ -51,6 +52,7 @@ export default function AccountPage() {
   const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
   const [editLabelInput, setEditLabelInput] = useState("");
   const [upgradingPlanId, setUpgradingPlanId] = useState<string | null>(null);
+  const [pendingPlanRequest, setPendingPlanRequest] = useState<PlanRequestInfo | null>(null);
 
   const [refreshIndex, setRefreshIndex] = useState(0);
 
@@ -59,13 +61,20 @@ export default function AccountPage() {
 
     async function fetchData() {
       try {
-        const [meRes, keyList, planList] = await Promise.allSettled([
+        const [meRes, keyList, planList, reqRes] = await Promise.allSettled([
           accountApi.me(),
           accountApi.keys(),
           accountApi.plans(),
+          accountApi.pendingPlanRequest(),
         ]);
 
         if (ignore) return;
+
+        if (reqRes.status === "fulfilled" && reqRes.value.has_pending) {
+          setPendingPlanRequest(reqRes.value.request);
+        } else {
+          setPendingPlanRequest(null);
+        }
 
         if (meRes.status === "fulfilled") {
           const u = meRes.value.user;
@@ -178,7 +187,7 @@ export default function AccountPage() {
     const target = plans.find((p) => p.id === planId);
     if (!target) return;
 
-    if (!window.confirm(`Switch to the ${target.name} plan? This will update your rate limits and quotas.`)) {
+    if (!window.confirm(`Submit request to switch to the ${target.name} plan? The administrator will review and activate your plan.`)) {
       return;
     }
 
@@ -186,10 +195,10 @@ export default function AccountPage() {
     try {
       const res = await accountApi.upgradePlan(planId);
       if (res.error) throw new Error(res.error);
-      setNotice(`PLAN UPGRADED TO ${target.name.toUpperCase()} · LIMITS UPDATED`);
+      setNotice(`PLAN CHANGE REQUEST FOR ${target.name.toUpperCase()} SUBMITTED · AWAITING ADMIN APPROVAL`);
       refreshDashboard();
     } catch (err) {
-      setNotice(err instanceof Error ? err.message.toUpperCase() : "FAILED TO UPGRADE PLAN");
+      setNotice(err instanceof Error ? err.message.toUpperCase() : "FAILED TO SUBMIT PLAN REQUEST");
     } finally {
       setUpgradingPlanId(null);
     }
@@ -506,9 +515,33 @@ export default function AccountPage() {
                 </div>
               </div>
 
+              {pendingPlanRequest && (
+                <div
+                  style={{
+                    padding: "12px 16px",
+                    marginBottom: 20,
+                    background: "rgba(184, 123, 40, 0.08)",
+                    border: "1px solid rgba(184, 123, 40, 0.3)",
+                    font: "11px var(--font-geist-mono), monospace",
+                    color: "#a87431",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  <span style={{ fontSize: 16 }}>⏳</span>
+                  <div>
+                    <strong>PLAN REQUEST PENDING APPROVAL:</strong> You submitted a request to switch to the{" "}
+                    <strong>{pendingPlanRequest.requested_plan.toUpperCase()}</strong> plan on{" "}
+                    {formatDate(pendingPlanRequest.created_at)}. Your current plan remains active until the administrator reviews and approves.
+                  </div>
+                </div>
+              )}
+
               <div className="account-plans">
                 {plans.map((plan) => {
                   const isCurrent = plan.id === activePlan.id;
+                  const isRequested = pendingPlanRequest?.requested_plan === plan.id;
                   const isProcessing = upgradingPlanId === plan.id;
 
                   return (
@@ -517,7 +550,7 @@ export default function AccountPage() {
                       key={plan.id}
                     >
                       <span className="account-card-label">
-                        {isCurrent ? "ACTIVE PLAN" : plan.id.toUpperCase()}
+                        {isCurrent ? "ACTIVE PLAN" : isRequested ? "PENDING APPROVAL" : plan.id.toUpperCase()}
                       </span>
                       <h3>{plan.name}</h3>
                       <strong>{formatPrice(plan.price_idr, plan.id)}</strong>
@@ -549,11 +582,17 @@ export default function AccountPage() {
 
                       <button
                         className="account-button"
-                        disabled={isCurrent || isProcessing}
+                        disabled={isCurrent || isRequested || isProcessing}
                         onClick={() => handleChoosePlan(plan.id)}
                         style={{ width: "100%" }}
                       >
-                        {isCurrent ? "CURRENT PLAN" : isProcessing ? "SWITCHING..." : "CHOOSE PLAN →"}
+                        {isCurrent
+                          ? "CURRENT PLAN"
+                          : isRequested
+                          ? "REQUEST PENDING ⏳"
+                          : isProcessing
+                          ? "SUBMITTING..."
+                          : "REQUEST PLAN →"}
                       </button>
                     </article>
                   );

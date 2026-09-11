@@ -102,28 +102,93 @@ pub async fn upgrade(
         })));
     }
 
-    sqlx::query("UPDATE users SET plan = $1, updated_at = NOW() WHERE id = $2")
+    if target_plan == auth.plan {
+        return Ok(Json(json!({
+            "error": format!("You are already subscribed to the {} plan", plan.name)
+        })));
+    }
+
+    let existing_request: Option<(uuid::Uuid,)> = sqlx::query_as(
+        "SELECT id FROM plan_change_requests WHERE user_id = $1 AND status = 'pending'",
+    )
+    .bind(auth.user_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if let Some((req_id,)) = existing_request {
+        sqlx::query(
+            "UPDATE plan_change_requests SET requested_plan = $1, created_at = NOW() WHERE id = $2",
+        )
         .bind(&target_plan)
-        .bind(auth.user_id)
+        .bind(req_id)
         .execute(&state.db)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    } else {
+        sqlx::query(
+            "INSERT INTO plan_change_requests (user_id, current_plan, requested_plan, status) VALUES ($1, $2, $3, 'pending')",
+        )
+        .bind(auth.user_id)
+        .bind(&auth.plan)
+        .bind(&target_plan)
+        .execute(&state.db)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
 
-    crate::sync::publish_config_changed_for_user(
-        &state.redis,
-        &state.config.redis_channel_prefix,
-        Some(auth.user_id),
-    )
-    .await;
-
-    tracing::info!(user_id = %auth.user_id, plan = %target_plan, "user upgraded plan");
+    tracing::info!(user_id = %auth.user_id, current_plan = %auth.plan, requested_plan = %target_plan, "user requested plan change");
 
     Ok(Json(json!({
-        "status": "active",
-        "plan": target_plan,
-        "message": format!("Successfully switched to {} plan", plan.name),
+        "status": "pending",
+        "requested_plan": target_plan,
+        "message": format!("Plan change request for {} submitted. Awaiting administrator approval.", plan.name),
         "limits": plan
     })))
+}
+
+/// GET /api/v1/plans/request — check if user has a pending plan request
+pub async fn current_request(
+    State(state): State<AppState>,
+    request: axum::extract::Request,
+) -> Result<Json<Value>, StatusCode> {
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    let row: Option<(
+        uuid::Uuid,
+        String,
+        String,
+        String,
+        chrono::DateTime<chrono::Utc>,
+    )> = sqlx::query_as(
+        "SELECT id, current_plan, requested_plan, status, created_at \
+         FROM plan_change_requests \
+         WHERE user_id = $1 AND status = 'pending' \
+         ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(auth.user_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if let Some((id, cur, req, status, created_at)) = row {
+        Ok(Json(json!({
+            "has_pending": true,
+            "request": {
+                "id": id,
+                "current_plan": cur,
+                "requested_plan": req,
+                "status": status,
+                "created_at": created_at
+            }
+        })))
+    } else {
+        Ok(Json(json!({ "has_pending": false, "request": null })))
+    }
 }
 
 #[cfg(test)]

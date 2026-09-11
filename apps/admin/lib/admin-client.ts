@@ -64,6 +64,19 @@ export interface MarketPricesResponse {
   total: number;
 }
 
+export interface PlanChangeRequestItem {
+  id: string;
+  user_id: string;
+  email: string;
+  name: string;
+  current_plan: string;
+  requested_plan: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+}
+
 function getStoredAdminKey(): string {
   if (typeof window !== "undefined") {
     return localStorage.getItem("pia_admin_key") || "silvia";
@@ -143,4 +156,23 @@ export const adminClient = {
     if (!res.ok) throw new Error("Failed to load market prices");
     return (await res.json()) as MarketPricesResponse;
   },
+
+  getPlanRequests: async () => {
+    const res = await fetchAdmin<{ requests: PlanChangeRequestItem[]; total: number }>(
+      "/api/admin/admin/plan-requests"
+    );
+    return res.requests || [];
+  },
+
+  approvePlanRequest: (id: string) =>
+    fetchAdmin<{ message: string; plan: string; status: string }>(
+      `/api/admin/admin/plan-requests/${id}/approve`,
+      { method: "POST" }
+    ),
+
+  rejectPlanRequest: (id: string) =>
+    fetchAdmin<{ message: string; status: string }>(
+      `/api/admin/admin/plan-requests/${id}/reject`,
+      { method: "POST" }
+    ),
 };

@@ -202,6 +202,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/usage", get(super::usage::summary))
         .route("/api/v1/usage/history", get(super::usage::history))
         .route("/api/v1/plans/upgrade", post(super::plans::upgrade))
+        .route("/api/v1/plans/request", get(super::plans::current_request))
         .route("/api/v1/admin/users", get(super::admin::list_users))
         .route(
             "/api/v1/admin/users/{id}/keys",
@@ -227,6 +228,18 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/v1/admin/system/flush-cache",
             post(super::admin::flush_cache),
+        )
+        .route(
+            "/api/v1/admin/plan-requests",
+            get(super::admin::list_plan_requests),
+        )
+        .route(
+            "/api/v1/admin/plan-requests/{id}/approve",
+            post(super::admin::approve_plan_request),
+        )
+        .route(
+            "/api/v1/admin/plan-requests/{id}/reject",
+            post(super::admin::reject_plan_request),
         )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),

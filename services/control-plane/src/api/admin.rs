@@ -375,3 +375,183 @@ pub async fn flush_cache(
         "timestamp": chrono::Utc::now().to_rfc3339()
     })))
 }
+
+/// GET /api/v1/admin/plan-requests — list all plan change requests (admin only)
+pub async fn list_plan_requests(
+    State(state): State<AppState>,
+    request: axum::extract::Request,
+) -> Result<Json<Value>, StatusCode> {
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if !auth.is_admin {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    type Row = (
+        uuid::Uuid,
+        uuid::Uuid,
+        String,
+        String,
+        String,
+        String,
+        String,
+        chrono::DateTime<chrono::Utc>,
+        Option<chrono::DateTime<chrono::Utc>>,
+        Option<String>,
+    );
+
+    let rows: Vec<Row> = sqlx::query_as(
+        "SELECT r.id, r.user_id, u.email, u.name, r.current_plan, r.requested_plan, \
+                r.status, r.created_at, r.reviewed_at, r.reviewed_by \
+         FROM plan_change_requests r \
+         JOIN users u ON u.id = r.user_id \
+         ORDER BY CASE WHEN r.status = 'pending' THEN 0 ELSE 1 END, r.created_at DESC \
+         LIMIT 200",
+    )
+    .fetch_all(&state.db)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let items: Vec<Value> = rows
+        .into_iter()
+        .map(
+            |(id, uid, email, name, cur, req, status, created, reviewed, by)| {
+                json!({
+                    "id": id,
+                    "user_id": uid,
+                    "email": email,
+                    "name": name,
+                    "current_plan": cur,
+                    "requested_plan": req,
+                    "status": status,
+                    "created_at": created,
+                    "reviewed_at": reviewed,
+                    "reviewed_by": by,
+                })
+            },
+        )
+        .collect();
+
+    Ok(Json(json!({ "requests": items, "total": items.len() })))
+}
+
+/// POST /api/v1/admin/plan-requests/:id/approve — approve a plan change request (admin only)
+pub async fn approve_plan_request(
+    State(state): State<AppState>,
+    axum::extract::Path(request_id): axum::extract::Path<uuid::Uuid>,
+    request: axum::extract::Request,
+) -> Result<Json<Value>, StatusCode> {
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if !auth.is_admin {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let row: Option<(uuid::Uuid, String, String)> = sqlx::query_as(
+        "SELECT user_id, requested_plan, status FROM plan_change_requests WHERE id = $1",
+    )
+    .bind(request_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let Some((user_id, requested_plan, status)) = row else {
+        return Ok(Json(json!({ "error": "Plan request not found" })));
+    };
+
+    if status != "pending" {
+        return Ok(Json(
+            json!({ "error": format!("Request is already {}", status) }),
+        ));
+    }
+
+    sqlx::query(
+        "UPDATE plan_change_requests SET status = 'approved', reviewed_at = NOW(), reviewed_by = 'admin' WHERE id = $1",
+    )
+    .bind(request_id)
+    .execute(&state.db)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    sqlx::query("UPDATE users SET plan = $1, updated_at = NOW() WHERE id = $2")
+        .bind(&requested_plan)
+        .bind(user_id)
+        .execute(&state.db)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    sync::publish_config_changed_for_user(
+        &state.redis,
+        &state.config.redis_channel_prefix,
+        Some(user_id),
+    )
+    .await;
+
+    tracing::info!(request_id = %request_id, user_id = %user_id, plan = %requested_plan, "admin approved plan request");
+
+    Ok(Json(json!({
+        "message": format!("Plan upgraded to {}", requested_plan),
+        "request_id": request_id,
+        "user_id": user_id,
+        "plan": requested_plan,
+        "status": "approved"
+    })))
+}
+
+/// POST /api/v1/admin/plan-requests/:id/reject — reject a plan change request (admin only)
+pub async fn reject_plan_request(
+    State(state): State<AppState>,
+    axum::extract::Path(request_id): axum::extract::Path<uuid::Uuid>,
+    request: axum::extract::Request,
+) -> Result<Json<Value>, StatusCode> {
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if !auth.is_admin {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let row: Option<(uuid::Uuid, String)> =
+        sqlx::query_as("SELECT user_id, status FROM plan_change_requests WHERE id = $1")
+            .bind(request_id)
+            .fetch_optional(&state.db)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let Some((_user_id, status)) = row else {
+        return Ok(Json(json!({ "error": "Plan request not found" })));
+    };
+
+    if status != "pending" {
+        return Ok(Json(
+            json!({ "error": format!("Request is already {}", status) }),
+        ));
+    }
+
+    sqlx::query(
+        "UPDATE plan_change_requests SET status = 'rejected', reviewed_at = NOW(), reviewed_by = 'admin' WHERE id = $1",
+    )
+    .bind(request_id)
+    .execute(&state.db)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    tracing::info!(request_id = %request_id, "admin rejected plan request");
+
+    Ok(Json(json!({
+        "message": "Plan change request rejected",
+        "request_id": request_id,
+        "status": "rejected"
+    })))
+}
