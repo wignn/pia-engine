@@ -358,18 +358,18 @@ def build_dashboard():
         panels.append(make_stat_service(title, name, x, 5, w=3, h=3))
 
     # -------------------------------------------------------------
-    # ROW 3: AVAILABILITY & LATENCY SLA (y=8, panels y=9, h=6)
+    # ROW 3: AVAILABILITY & LATENCY SLA (y=8, panels y=9, h=8)
     # -------------------------------------------------------------
     panels.append({
         "collapsed": False,
         "gridPos": {"h": 1, "w": 24, "x": 0, "y": 8},
         "id": pid,
-        "title": "AVAILABILITY TIMELINE & LATENCY SLA",
+        "title": "AVAILABILITY TIMELINE & LATENCY SLA (CORE APPLICATIONS)",
         "type": "row"
     })
     pid += 1
 
-    # Left: Availability history (w=15) with step/resolution tuning
+    # Left: Availability history (w=15, h=8) - Clean 8 Core Services
     panels.append({
         "datasource": {"type": "prometheus", "uid": "prometheus"},
         "fieldConfig": {
@@ -392,13 +392,16 @@ def build_dashboard():
             },
             "overrides": []
         },
-        "gridPos": {"h": 6, "w": 15, "x": 0, "y": 9},
+        "gridPos": {"h": 8, "w": 15, "x": 0, "y": 9},
         "id": pid,
-        "options": {"showValue": "never"},
+        "options": {
+            "showValue": "never",
+            "rowHeight": 0.65
+        },
         "targets": [{
             "datasource": {"type": "prometheus", "uid": "prometheus"},
             "editorMode": "code",
-            "expr": 'max by (service) (last_over_time(probe_success{group=~"atlsd-services|atlsd-datastores"}[$__interval]))',
+            "expr": 'max by (service) (last_over_time(probe_success{service=~"api-gateway|realtime-gateway|control-plane|ingestion-gateway|pia-portal|mission-control|public-web|terminal"}[$__interval]))',
             "legendFormat": "{{service}}",
             "range": True,
             "interval": "2m",
@@ -409,7 +412,7 @@ def build_dashboard():
     })
     pid += 1
 
-    # Right: Latency Ranking Bar Gauge (w=9)
+    # Right: Latency Ranking Bar Gauge (w=9, h=8) - Same 8 Core Services
     panels.append({
         "datasource": {"type": "prometheus", "uid": "prometheus"},
         "fieldConfig": {
@@ -428,7 +431,7 @@ def build_dashboard():
             },
             "overrides": []
         },
-        "gridPos": {"h": 6, "w": 9, "x": 15, "y": 9},
+        "gridPos": {"h": 8, "w": 9, "x": 15, "y": 9},
         "id": pid,
         "options": {
             "displayMode": "gradient",
@@ -439,7 +442,7 @@ def build_dashboard():
         "targets": [{
             "datasource": {"type": "prometheus", "uid": "prometheus"},
             "editorMode": "code",
-            "expr": 'avg_over_time(probe_duration_seconds{group=~"atlsd-services|atlsd-datastores"}[1m]) * 1000',
+            "expr": 'avg_over_time(probe_duration_seconds{service=~"api-gateway|realtime-gateway|control-plane|ingestion-gateway|pia-portal|mission-control|public-web|terminal"}[1m]) * 1000',
             "legendFormat": "{{service}}",
             "range": True,
             "refId": "A"
@@ -450,11 +453,11 @@ def build_dashboard():
     pid += 1
 
     # -------------------------------------------------------------
-    # ROW 4: REALTIME WEBSOCKET STREAMING (y=15, panels y=16, h=6)
+    # ROW 4: REALTIME WEBSOCKET STREAMING (y=17, panels y=18, h=6)
     # -------------------------------------------------------------
     panels.append({
         "collapsed": False,
-        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 15},
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 17},
         "id": pid,
         "title": "REALTIME WEBSOCKET STREAMING (SUBSCRIBERS & THROUGHPUT)",
         "type": "row"
@@ -476,7 +479,7 @@ def build_dashboard():
             },
             "overrides": []
         },
-        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 16},
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 18},
         "id": pid,
         "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["last", "max"]}},
         "targets": [
@@ -519,7 +522,7 @@ def build_dashboard():
             },
             "overrides": []
         },
-        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 16},
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 18},
         "id": pid,
         "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["last", "max"]}},
         "targets": [
@@ -548,11 +551,11 @@ def build_dashboard():
     pid += 1
 
     # -------------------------------------------------------------
-    # ROW 5: HOST INFRASTRUCTURE METRICS (y=22, panels y=23, h=5)
+    # ROW 5: HOST INFRASTRUCTURE METRICS (y=24, panels y=25, h=5)
     # -------------------------------------------------------------
     panels.append({
         "collapsed": False,
-        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 22},
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 24},
         "id": pid,
         "title": "HOST INFRASTRUCTURE METRICS (CPU / RAM / DISK)",
         "type": "row"
@@ -569,7 +572,7 @@ def build_dashboard():
             },
             "overrides": []
         },
-        "gridPos": {"h": 5, "w": 8, "x": 0, "y": 23},
+        "gridPos": {"h": 5, "w": 8, "x": 0, "y": 25},
         "id": pid,
         "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
         "targets": [{
@@ -593,7 +596,7 @@ def build_dashboard():
             },
             "overrides": []
         },
-        "gridPos": {"h": 5, "w": 8, "x": 8, "y": 23},
+        "gridPos": {"h": 5, "w": 8, "x": 8, "y": 25},
         "id": pid,
         "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
         "targets": [{
@@ -617,7 +620,7 @@ def build_dashboard():
             },
             "overrides": []
         },
-        "gridPos": {"h": 5, "w": 8, "x": 16, "y": 23},
+        "gridPos": {"h": 5, "w": 8, "x": 16, "y": 25},
         "id": pid,
         "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
         "targets": [{
@@ -632,11 +635,11 @@ def build_dashboard():
     pid += 1
 
     # -------------------------------------------------------------
-    # ROW 6: CONTAINER RESOURCE CONSUMPTION & AUDIT LOGS (y=28, panels y=29, h=6)
+    # ROW 6: CONTAINER RESOURCE CONSUMPTION & AUDIT LOGS (y=30, panels y=31, h=6)
     # -------------------------------------------------------------
     panels.append({
         "collapsed": False,
-        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 28},
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 30},
         "id": pid,
         "title": "CONTAINER RESOURCE CONSUMPTION & LOG INGESTION",
         "type": "row"
@@ -653,7 +656,7 @@ def build_dashboard():
             },
             "overrides": []
         },
-        "gridPos": {"h": 6, "w": 7, "x": 0, "y": 29},
+        "gridPos": {"h": 6, "w": 7, "x": 0, "y": 31},
         "id": pid,
         "options": {
             "displayMode": "gradient",
@@ -681,7 +684,7 @@ def build_dashboard():
             },
             "overrides": []
         },
-        "gridPos": {"h": 6, "w": 7, "x": 7, "y": 29},
+        "gridPos": {"h": 6, "w": 7, "x": 7, "y": 31},
         "id": pid,
         "options": {
             "displayMode": "gradient",
@@ -709,7 +712,7 @@ def build_dashboard():
             },
             "overrides": []
         },
-        "gridPos": {"h": 6, "w": 10, "x": 14, "y": 29},
+        "gridPos": {"h": 6, "w": 10, "x": 14, "y": 31},
         "id": pid,
         "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
         "targets": [{

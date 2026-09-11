@@ -43,6 +43,11 @@ scrape_configs:
           group: atlsd-services
           service: api-gateway
       - targets:
+          - http://172.17.0.1:8020/metrics
+        labels:
+          group: atlsd-services
+          service: realtime-gateway
+      - targets:
           - http://172.17.0.1:8081/health
         labels:
           group: atlsd-services

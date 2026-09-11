@@ -2,7 +2,7 @@
   "uid": "atlsd-prod-overview",
   "title": "ATLSD Production Command Center",
   "schemaVersion": 39,
-  "version": 9,
+  "version": 10,
   "refresh": "10s",
   "time": {
     "from": "now-6h",
@@ -1139,7 +1139,7 @@
         "y": 8
       },
       "id": 17,
-      "title": "AVAILABILITY TIMELINE & LATENCY SLA",
+      "title": "AVAILABILITY TIMELINE & LATENCY SLA (CORE APPLICATIONS)",
       "type": "row"
     },
     {
@@ -1190,14 +1190,15 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 15,
         "x": 0,
         "y": 9
       },
       "id": 18,
       "options": {
-        "showValue": "never"
+        "showValue": "never",
+        "rowHeight": 0.65
       },
       "targets": [
         {
@@ -1206,7 +1207,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max by (service) (last_over_time(probe_success{group=~\"atlsd-services|atlsd-datastores\"}[$__interval]))",
+          "expr": "max by (service) (last_over_time(probe_success{service=~\"api-gateway|realtime-gateway|control-plane|ingestion-gateway|pia-portal|mission-control|public-web|terminal\"}[$__interval]))",
           "legendFormat": "{{service}}",
           "range": true,
           "interval": "2m",
@@ -1249,7 +1250,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 9,
         "x": 15,
         "y": 9
@@ -1274,7 +1275,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg_over_time(probe_duration_seconds{group=~\"atlsd-services|atlsd-datastores\"}[1m]) * 1000",
+          "expr": "avg_over_time(probe_duration_seconds{service=~\"api-gateway|realtime-gateway|control-plane|ingestion-gateway|pia-portal|mission-control|public-web|terminal\"}[1m]) * 1000",
           "legendFormat": "{{service}}",
           "range": true,
           "refId": "A"
@@ -1289,7 +1290,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 15
+        "y": 17
       },
       "id": 20,
       "title": "REALTIME WEBSOCKET STREAMING (SUBSCRIBERS & THROUGHPUT)",
@@ -1316,7 +1317,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 16
+        "y": 18
       },
       "id": 21,
       "options": {
@@ -1382,7 +1383,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 16
+        "y": 18
       },
       "id": 22,
       "options": {
@@ -1433,7 +1434,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 24
       },
       "id": 23,
       "title": "HOST INFRASTRUCTURE METRICS (CPU / RAM / DISK)",
@@ -1461,7 +1462,7 @@
         "h": 5,
         "w": 8,
         "x": 0,
-        "y": 23
+        "y": 25
       },
       "id": 24,
       "options": {
@@ -1506,7 +1507,7 @@
         "h": 5,
         "w": 8,
         "x": 8,
-        "y": 23
+        "y": 25
       },
       "id": 25,
       "options": {
@@ -1551,7 +1552,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 23
+        "y": 25
       },
       "id": 26,
       "options": {
@@ -1580,7 +1581,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 30
       },
       "id": 27,
       "title": "CONTAINER RESOURCE CONSUMPTION & LOG INGESTION",
@@ -1604,7 +1605,7 @@
         "h": 6,
         "w": 7,
         "x": 0,
-        "y": 29
+        "y": 31
       },
       "id": 28,
       "options": {
@@ -1650,7 +1651,7 @@
         "h": 6,
         "w": 7,
         "x": 7,
-        "y": 29
+        "y": 31
       },
       "id": 29,
       "options": {
@@ -1697,7 +1698,7 @@
         "h": 6,
         "w": 10,
         "x": 14,
-        "y": 29
+        "y": 31
       },
       "id": 30,
       "options": {
