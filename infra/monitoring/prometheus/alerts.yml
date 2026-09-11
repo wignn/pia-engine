@@ -42,22 +42,22 @@ groups:
   - name: service-health
     rules:
       - alert: ServiceHealthcheckDown
-        expr: probe_success{group="atlsd-services"} == 0
+        expr: probe_success{group=~"atlsd-services|atlsd-datastores"} == 0
         for: 2m
         labels:
           severity: critical
         annotations:
-          summary: "Service healthcheck down"
-          description: "{{ $labels.instance }} has failed health checks for 2 minutes."
+          summary: "Service or datastore healthcheck down"
+          description: "{{ $labels.service }} ({{ $labels.instance }}) has failed health checks for 2 minutes."
 
       - alert: ServiceHealthcheckSlow
-        expr: probe_duration_seconds{group="atlsd-services"} > 2
+        expr: probe_duration_seconds{group=~"atlsd-services|atlsd-datastores"} > 2
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Service healthcheck is slow"
-          description: "{{ $labels.instance }} healthcheck is slower than 2 seconds."
+          summary: "Service or datastore healthcheck is slow"
+          description: "{{ $labels.service }} ({{ $labels.instance }}) healthcheck is slower than 2 seconds."
 
   - name: realtime-gateway-ws
     rules:
