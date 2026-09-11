@@ -24,24 +24,14 @@ scrape_configs:
   - job_name: realtime-gateway
     metrics_path: /metrics
     static_configs:
-      - targets: ["172.17.0.1:8020"]
-
-  - job_name: market-data
-    metrics_path: /metrics
-    static_configs:
-      - targets: ["172.17.0.1:8011"]
-
-  - job_name: news-service
-    metrics_path: /metrics
-    static_configs:
-      - targets: ["172.17.0.1:8031"]
+      - targets: ["172.17.0.1:8000"]
 
   - job_name: ingestion-gateway
     metrics_path: /metrics
     static_configs:
       - targets: ["ingestion-gateway:8091"]
 
-  # HTTP Blackbox probes (Status, latency, SSL)
+  # HTTP Blackbox probes (Single persistent endpoints)
   - job_name: service-health
     metrics_path: /probe
     params:
@@ -53,30 +43,15 @@ scrape_configs:
           group: atlsd-services
           service: api-gateway
       - targets:
-          - http://172.17.0.1:8011/health
+          - http://172.17.0.1:8081/health
         labels:
           group: atlsd-services
-          service: market-data
+          service: control-plane
       - targets:
-          - http://172.17.0.1:8031/health
+          - http://ingestion-gateway:8091/health
         labels:
           group: atlsd-services
-          service: news-service
-      - targets:
-          - http://172.17.0.1:8041/health
-        labels:
-          group: atlsd-services
-          service: intelligence-service
-      - targets:
-          - http://172.17.0.1:8021/health
-        labels:
-          group: atlsd-services
-          service: realtime-gateway
-      - targets:
-          - http://172.17.0.1:5173/
-        labels:
-          group: atlsd-services
-          service: public-web
+          service: ingestion-gateway
       - targets:
           - http://172.17.0.1:5176/
         labels:
@@ -88,20 +63,20 @@ scrape_configs:
           group: atlsd-services
           service: mission-control
       - targets:
+          - http://172.17.0.1:5173/
+        labels:
+          group: atlsd-services
+          service: public-web
+      - targets:
+          - http://172.17.0.1:5175/
+        labels:
+          group: atlsd-services
+          service: terminal
+      - targets:
           - https://atlsd.wign.dev/
         labels:
           group: atlsd-services
           service: public-domain
-      - targets:
-          - http://world-control-plane:8080/health
-        labels:
-          group: atlsd-services
-          service: world-control-plane
-      - targets:
-          - http://ingestion-gateway:8091/health
-        labels:
-          group: atlsd-services
-          service: ingestion-gateway
       - targets:
           - http://clickhouse-prod:8123/ping
         labels:
@@ -125,7 +100,7 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # Core Datastores TCP probes (Postgres, Redis, NATS broker)
+  # Core Datastores TCP probes
   - job_name: datastore-tcp
     metrics_path: /probe
     params:

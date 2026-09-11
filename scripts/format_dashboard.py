@@ -4,7 +4,6 @@ def build_dashboard():
     with open('infra/monitoring/grafana/dashboards/atlsd-production-overview.json') as f:
         data = json.load(f)
 
-    # Let's rebuild the panels array with strict mathematical grid layout
     panels = []
     pid = 1
 
@@ -19,7 +18,7 @@ def build_dashboard():
                         {
                             "options": {
                                 "0": {"color": "red", "index": 0, "text": "DOWN"},
-                                "1": {"color": "green", "index": 1, "text": "HEALTHY"}
+                                "1": {"color": "green", "index": 1, "text": "UP"}
                             },
                             "type": "value"
                         }
@@ -56,10 +55,9 @@ def build_dashboard():
                 {
                     "datasource": {"type": "prometheus", "uid": "prometheus"},
                     "editorMode": "code",
-                    "expr": f'probe_success{{group=~"atlsd-services|atlsd-datastores",service="{service_name}"}}',
-                    "instant": False,
+                    "expr": f'max(probe_success{{service="{service_name}"}}) or vector(0)',
+                    "instant": True,
                     "legendFormat": "",
-                    "range": True,
                     "refId": "A"
                 }
             ],
@@ -122,13 +120,12 @@ def build_dashboard():
         "targets": [{
             "datasource": {"type": "prometheus", "uid": "prometheus"},
             "editorMode": "code",
-            "expr": 'sum(min_over_time(probe_success{group=~"atlsd-services|atlsd-datastores",job=~"service-health|datastore-tcp"}[5m]) == bool 0)',
-            "instant": False,
+            "expr": 'sum(probe_success{group=~"atlsd-services|atlsd-datastores"} == bool 0)',
+            "instant": True,
             "legendFormat": "",
-            "range": True,
             "refId": "A"
         }],
-        "title": "Down Services (5m)",
+        "title": "Down Services (Now)",
         "type": "stat"
     })
     pid += 1
@@ -161,7 +158,8 @@ def build_dashboard():
         "targets": [{
             "datasource": {"type": "prometheus", "uid": "prometheus"},
             "editorMode": "code",
-            "expr": "atlsd_realtime_ws_active_connections",
+            "expr": 'max(atlsd_realtime_ws_active_connections{job="realtime-gateway"}) or vector(0)',
+            "instant": False,
             "range": True,
             "refId": "A"
         }],
@@ -198,11 +196,12 @@ def build_dashboard():
         "targets": [{
             "datasource": {"type": "prometheus", "uid": "prometheus"},
             "editorMode": "code",
-            "expr": "rate(atlsd_realtime_ws_messages_out_total[5m])",
+            "expr": 'sum(rate(atlsd_realtime_ws_messages_out_total{job="realtime-gateway"}[5m])) or vector(0)',
+            "instant": False,
             "range": True,
             "refId": "A"
         }],
-        "title": "WS Broadcast Throughput",
+        "title": "WS Broadcast Outbound /s",
         "type": "stat"
     })
     pid += 1
@@ -235,11 +234,12 @@ def build_dashboard():
         "targets": [{
             "datasource": {"type": "prometheus", "uid": "prometheus"},
             "editorMode": "code",
-            "expr": "rate(atlsd_realtime_ws_send_failures_total[5m])",
+            "expr": 'sum(rate(atlsd_realtime_ws_send_failures_total{job="realtime-gateway"}[5m])) or vector(0)',
+            "instant": False,
             "range": True,
             "refId": "A"
         }],
-        "title": "Backpressure Drops /s",
+        "title": "WS Backpressure /s",
         "type": "stat"
     })
     pid += 1
@@ -337,20 +337,20 @@ def build_dashboard():
         "collapsed": False,
         "gridPos": {"h": 1, "w": 24, "x": 0, "y": 4},
         "id": pid,
-        "title": "CORE SAAS MICROSERVICES & APPS (LIVE MATRIX)",
+        "title": "CORE SAAS APPLICATIONS & PLATFORM NODES (LIVE MATRIX)",
         "type": "row"
     })
     pid += 1
 
     services = [
         ("api-gateway", "api-gateway"),
-        ("realtime-gateway", "realtime-gateway"),
-        ("market-data", "market-data"),
-        ("news-service", "news-service"),
-        ("intelligence", "intelligence-service"),
-        ("control-plane", "world-control-plane"),
+        ("realtime-ws", "realtime-gateway"),
+        ("control-plane", "control-plane"),
+        ("ingestion-gw", "ingestion-gateway"),
         ("pia-portal", "pia-portal"),
         ("mission-control", "mission-control"),
+        ("public-web", "public-web"),
+        ("terminal-app", "terminal"),
     ]
 
     for idx, (title, name) in enumerate(services):
@@ -369,7 +369,7 @@ def build_dashboard():
     })
     pid += 1
 
-    # Left: Availability history (w=15)
+    # Left: Availability history (w=15) with step/resolution tuning
     panels.append({
         "datasource": {"type": "prometheus", "uid": "prometheus"},
         "fieldConfig": {
@@ -398,9 +398,10 @@ def build_dashboard():
         "targets": [{
             "datasource": {"type": "prometheus", "uid": "prometheus"},
             "editorMode": "code",
-            "expr": "max by (service) (probe_success)",
+            "expr": 'max by (service) (last_over_time(probe_success{group=~"atlsd-services|atlsd-datastores"}[$__interval]))',
             "legendFormat": "{{service}}",
             "range": True,
+            "interval": "2m",
             "refId": "A"
         }],
         "title": "Service Availability History (Rolling)",
@@ -460,7 +461,7 @@ def build_dashboard():
     })
     pid += 1
 
-    # Left: WS Throughput (w=12)
+    # Left: WS Throughput (w=12) - strictly scoped to realtime-gateway job
     panels.append({
         "datasource": {"type": "prometheus", "uid": "prometheus"},
         "fieldConfig": {
@@ -481,19 +482,19 @@ def build_dashboard():
         "targets": [
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "expr": "rate(atlsd_realtime_ws_messages_out_total[5m])",
+                "expr": 'rate(atlsd_realtime_ws_messages_out_total{job="realtime-gateway"}[5m])',
                 "legendFormat": "Outbound Messages /s",
                 "refId": "A"
             },
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "expr": "rate(atlsd_realtime_ws_messages_in_total[5m])",
+                "expr": 'rate(atlsd_realtime_ws_messages_in_total{job="realtime-gateway"}[5m])',
                 "legendFormat": "Inbound Messages /s",
                 "refId": "B"
             },
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "expr": "rate(atlsd_realtime_ws_commands_total[5m])",
+                "expr": 'rate(atlsd_realtime_ws_commands_total{job="realtime-gateway"}[5m])',
                 "legendFormat": "Client Commands /s",
                 "refId": "C"
             }
@@ -503,7 +504,7 @@ def build_dashboard():
     })
     pid += 1
 
-    # Right: WS Health (w=12)
+    # Right: WS Health (w=12) - strictly scoped to realtime-gateway job
     panels.append({
         "datasource": {"type": "prometheus", "uid": "prometheus"},
         "fieldConfig": {
@@ -524,24 +525,24 @@ def build_dashboard():
         "targets": [
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "expr": "rate(atlsd_realtime_ws_broadcast_recipients_total[5m])",
-                "legendFormat": "Broadcast Fanout Recipients /s",
+                "expr": 'rate(atlsd_realtime_ws_broadcast_recipients_total{job="realtime-gateway"}[5m])',
+                "legendFormat": "Broadcast Fanout /s",
                 "refId": "A"
             },
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "expr": "rate(atlsd_realtime_ws_send_failures_total[5m])",
+                "expr": 'rate(atlsd_realtime_ws_send_failures_total{job="realtime-gateway"}[5m])',
                 "legendFormat": "Send Failures / Backpressure",
                 "refId": "B"
             },
             {
                 "datasource": {"type": "prometheus", "uid": "prometheus"},
-                "expr": "rate(atlsd_realtime_ws_connection_rejections_total[5m])",
+                "expr": 'rate(atlsd_realtime_ws_connection_rejections_total{job="realtime-gateway"}[5m])',
                 "legendFormat": "Connection Rejections /s",
                 "refId": "C"
             }
         ],
-        "title": "Fanout Quality & Backpressure",
+        "title": "Fanout Quality & Delivery Health",
         "type": "timeseries"
     })
     pid += 1
@@ -606,7 +607,7 @@ def build_dashboard():
     })
     pid += 1
 
-    # Disk (w=8)
+    # Disk (w=8) - single clean line for rootfs!
     panels.append({
         "datasource": {"type": "prometheus", "uid": "prometheus"},
         "fieldConfig": {
@@ -621,8 +622,8 @@ def build_dashboard():
         "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
         "targets": [{
             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "expr": "100 - ((node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\"} * 100) / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\"})",
-            "legendFormat": "Disk Used % ({{mountpoint}})",
+            "expr": "100 - ((node_filesystem_avail_bytes{mountpoint=\"/rootfs\"} * 100) / node_filesystem_size_bytes{mountpoint=\"/rootfs\"})",
+            "legendFormat": "Root Disk (/) Used %",
             "refId": "A"
         }],
         "title": "Root Filesystem Usage %",
@@ -637,12 +638,12 @@ def build_dashboard():
         "collapsed": False,
         "gridPos": {"h": 1, "w": 24, "x": 0, "y": 28},
         "id": pid,
-        "title": "CONTAINER RESOURCE CONSUMPTION & AUDIT LOGS",
+        "title": "CONTAINER RESOURCE CONSUMPTION & LOG INGESTION",
         "type": "row"
     })
     pid += 1
 
-    # Container CPU (w=7)
+    # Container CPU (w=7) - uses atlsd_docker_container_cpu_percent
     panels.append({
         "datasource": {"type": "prometheus", "uid": "prometheus"},
         "fieldConfig": {
@@ -661,8 +662,8 @@ def build_dashboard():
         },
         "targets": [{
             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "expr": 'topk(5, rate(container_cpu_usage_seconds_total{image!="",name!=""}[5m]) * 100)',
-            "legendFormat": "{{name}}",
+            "expr": 'topk(5, atlsd_docker_container_cpu_percent)',
+            "legendFormat": "{{container}}",
             "refId": "A"
         }],
         "title": "Top Container CPU %",
@@ -670,7 +671,7 @@ def build_dashboard():
     })
     pid += 1
 
-    # Container Memory (w=7)
+    # Container Memory (w=7) - uses atlsd_docker_container_memory_usage_bytes
     panels.append({
         "datasource": {"type": "prometheus", "uid": "prometheus"},
         "fieldConfig": {
@@ -689,16 +690,16 @@ def build_dashboard():
         },
         "targets": [{
             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "expr": 'topk(5, container_memory_working_set_bytes{image!="",name!=""})',
-            "legendFormat": "{{name}}",
+            "expr": 'topk(5, atlsd_docker_container_memory_usage_bytes)',
+            "legendFormat": "{{container}}",
             "refId": "A"
         }],
-        "title": "Top Container RAM",
+        "title": "Top Container RAM (Bytes)",
         "type": "bargauge"
     })
     pid += 1
 
-    # Loki Logs Error Rate (w=10)
+    # Loki Log Ingestion Volume Rate (w=10) - uses real container labels in Loki!
     panels.append({
         "datasource": {"type": "loki", "uid": "loki"},
         "fieldConfig": {
@@ -714,11 +715,11 @@ def build_dashboard():
         "targets": [{
             "datasource": {"type": "loki", "uid": "loki"},
             "editorMode": "code",
-            "expr": 'sum by (container) (rate({job="docker"} |= "error" [5m]))',
-            "legendFormat": "{{container}} errors",
+            "expr": 'sum by (container) (rate({container=~".+"} [1m]))',
+            "legendFormat": "{{container}}",
             "refId": "A"
         }],
-        "title": "Application Error Log Spike Rate",
+        "title": "Container Log Volume Rate (/s)",
         "type": "timeseries"
     })
     pid += 1
@@ -730,7 +731,7 @@ def build_dashboard():
     with open('infra/monitoring/grafana/dashboards/atlsd-production-overview.json', 'w') as f:
         json.dump(data, f, indent=2)
 
-    print(f"Successfully generated clean dashboard with {len(panels)} panels!")
+    print(f"Successfully generated perfected dashboard with {len(panels)} panels!")
 
 if __name__ == '__main__':
     build_dashboard()

@@ -2,7 +2,7 @@
   "uid": "atlsd-prod-overview",
   "title": "ATLSD Production Command Center",
   "schemaVersion": 39,
-  "version": 8,
+  "version": 9,
   "refresh": "10s",
   "time": {
     "from": "now-6h",
@@ -106,14 +106,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(min_over_time(probe_success{group=~\"atlsd-services|atlsd-datastores\",job=~\"service-health|datastore-tcp\"}[5m]) == bool 0)",
-          "instant": false,
+          "expr": "sum(probe_success{group=~\"atlsd-services|atlsd-datastores\"} == bool 0)",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
-      "title": "Down Services (5m)",
+      "title": "Down Services (Now)",
       "type": "stat"
     },
     {
@@ -172,7 +171,8 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "atlsd_realtime_ws_active_connections",
+          "expr": "max(atlsd_realtime_ws_active_connections{job=\"realtime-gateway\"}) or vector(0)",
+          "instant": false,
           "range": true,
           "refId": "A"
         }
@@ -232,12 +232,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(atlsd_realtime_ws_messages_out_total[5m])",
+          "expr": "sum(rate(atlsd_realtime_ws_messages_out_total{job=\"realtime-gateway\"}[5m])) or vector(0)",
+          "instant": false,
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "WS Broadcast Throughput",
+      "title": "WS Broadcast Outbound /s",
       "type": "stat"
     },
     {
@@ -296,12 +297,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(atlsd_realtime_ws_send_failures_total[5m])",
+          "expr": "sum(rate(atlsd_realtime_ws_send_failures_total{job=\"realtime-gateway\"}[5m])) or vector(0)",
+          "instant": false,
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Backpressure Drops /s",
+      "title": "WS Backpressure /s",
       "type": "stat"
     },
     {
@@ -453,7 +455,7 @@
         "y": 4
       },
       "id": 8,
-      "title": "CORE SAAS MICROSERVICES & APPS (LIVE MATRIX)",
+      "title": "CORE SAAS APPLICATIONS & PLATFORM NODES (LIVE MATRIX)",
       "type": "row"
     },
     {
@@ -477,7 +479,7 @@
                 "1": {
                   "color": "green",
                   "index": 1,
-                  "text": "HEALTHY"
+                  "text": "UP"
                 }
               },
               "type": "value"
@@ -531,10 +533,9 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_success{group=~\"atlsd-services|atlsd-datastores\",service=\"api-gateway\"}",
-          "instant": false,
+          "expr": "max(probe_success{service=\"api-gateway\"}) or vector(0)",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -562,7 +563,7 @@
                 "1": {
                   "color": "green",
                   "index": 1,
-                  "text": "HEALTHY"
+                  "text": "UP"
                 }
               },
               "type": "value"
@@ -616,14 +617,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_success{group=~\"atlsd-services|atlsd-datastores\",service=\"realtime-gateway\"}",
-          "instant": false,
+          "expr": "max(probe_success{service=\"realtime-gateway\"}) or vector(0)",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
-      "title": "realtime-gateway",
+      "title": "realtime-ws",
       "type": "stat"
     },
     {
@@ -647,7 +647,7 @@
                 "1": {
                   "color": "green",
                   "index": 1,
-                  "text": "HEALTHY"
+                  "text": "UP"
                 }
               },
               "type": "value"
@@ -701,14 +701,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_success{group=~\"atlsd-services|atlsd-datastores\",service=\"market-data\"}",
-          "instant": false,
+          "expr": "max(probe_success{service=\"control-plane\"}) or vector(0)",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
-      "title": "market-data",
+      "title": "control-plane",
       "type": "stat"
     },
     {
@@ -732,7 +731,7 @@
                 "1": {
                   "color": "green",
                   "index": 1,
-                  "text": "HEALTHY"
+                  "text": "UP"
                 }
               },
               "type": "value"
@@ -786,14 +785,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_success{group=~\"atlsd-services|atlsd-datastores\",service=\"news-service\"}",
-          "instant": false,
+          "expr": "max(probe_success{service=\"ingestion-gateway\"}) or vector(0)",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
-      "title": "news-service",
+      "title": "ingestion-gw",
       "type": "stat"
     },
     {
@@ -817,7 +815,7 @@
                 "1": {
                   "color": "green",
                   "index": 1,
-                  "text": "HEALTHY"
+                  "text": "UP"
                 }
               },
               "type": "value"
@@ -871,14 +869,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_success{group=~\"atlsd-services|atlsd-datastores\",service=\"intelligence-service\"}",
-          "instant": false,
+          "expr": "max(probe_success{service=\"pia-portal\"}) or vector(0)",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
-      "title": "intelligence",
+      "title": "pia-portal",
       "type": "stat"
     },
     {
@@ -902,7 +899,7 @@
                 "1": {
                   "color": "green",
                   "index": 1,
-                  "text": "HEALTHY"
+                  "text": "UP"
                 }
               },
               "type": "value"
@@ -956,14 +953,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_success{group=~\"atlsd-services|atlsd-datastores\",service=\"world-control-plane\"}",
-          "instant": false,
+          "expr": "max(probe_success{service=\"mission-control\"}) or vector(0)",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
-      "title": "control-plane",
+      "title": "mission-control",
       "type": "stat"
     },
     {
@@ -987,7 +983,7 @@
                 "1": {
                   "color": "green",
                   "index": 1,
-                  "text": "HEALTHY"
+                  "text": "UP"
                 }
               },
               "type": "value"
@@ -1041,14 +1037,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_success{group=~\"atlsd-services|atlsd-datastores\",service=\"pia-portal\"}",
-          "instant": false,
+          "expr": "max(probe_success{service=\"public-web\"}) or vector(0)",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
-      "title": "pia-portal",
+      "title": "public-web",
       "type": "stat"
     },
     {
@@ -1072,7 +1067,7 @@
                 "1": {
                   "color": "green",
                   "index": 1,
-                  "text": "HEALTHY"
+                  "text": "UP"
                 }
               },
               "type": "value"
@@ -1126,14 +1121,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "probe_success{group=~\"atlsd-services|atlsd-datastores\",service=\"mission-control\"}",
-          "instant": false,
+          "expr": "max(probe_success{service=\"terminal\"}) or vector(0)",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
-      "title": "mission-control",
+      "title": "terminal-app",
       "type": "stat"
     },
     {
@@ -1212,9 +1206,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max by (service) (probe_success)",
+          "expr": "max by (service) (last_over_time(probe_success{group=~\"atlsd-services|atlsd-datastores\"}[$__interval]))",
           "legendFormat": "{{service}}",
           "range": true,
+          "interval": "2m",
           "refId": "A"
         }
       ],
@@ -1340,7 +1335,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(atlsd_realtime_ws_messages_out_total[5m])",
+          "expr": "rate(atlsd_realtime_ws_messages_out_total{job=\"realtime-gateway\"}[5m])",
           "legendFormat": "Outbound Messages /s",
           "refId": "A"
         },
@@ -1349,7 +1344,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(atlsd_realtime_ws_messages_in_total[5m])",
+          "expr": "rate(atlsd_realtime_ws_messages_in_total{job=\"realtime-gateway\"}[5m])",
           "legendFormat": "Inbound Messages /s",
           "refId": "B"
         },
@@ -1358,7 +1353,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(atlsd_realtime_ws_commands_total[5m])",
+          "expr": "rate(atlsd_realtime_ws_commands_total{job=\"realtime-gateway\"}[5m])",
           "legendFormat": "Client Commands /s",
           "refId": "C"
         }
@@ -1406,8 +1401,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(atlsd_realtime_ws_broadcast_recipients_total[5m])",
-          "legendFormat": "Broadcast Fanout Recipients /s",
+          "expr": "rate(atlsd_realtime_ws_broadcast_recipients_total{job=\"realtime-gateway\"}[5m])",
+          "legendFormat": "Broadcast Fanout /s",
           "refId": "A"
         },
         {
@@ -1415,7 +1410,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(atlsd_realtime_ws_send_failures_total[5m])",
+          "expr": "rate(atlsd_realtime_ws_send_failures_total{job=\"realtime-gateway\"}[5m])",
           "legendFormat": "Send Failures / Backpressure",
           "refId": "B"
         },
@@ -1424,12 +1419,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(atlsd_realtime_ws_connection_rejections_total[5m])",
+          "expr": "rate(atlsd_realtime_ws_connection_rejections_total{job=\"realtime-gateway\"}[5m])",
           "legendFormat": "Connection Rejections /s",
           "refId": "C"
         }
       ],
-      "title": "Fanout Quality & Backpressure",
+      "title": "Fanout Quality & Delivery Health",
       "type": "timeseries"
     },
     {
@@ -1571,8 +1566,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 - ((node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\"} * 100) / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\"})",
-          "legendFormat": "Disk Used % ({{mountpoint}})",
+          "expr": "100 - ((node_filesystem_avail_bytes{mountpoint=\"/rootfs\"} * 100) / node_filesystem_size_bytes{mountpoint=\"/rootfs\"})",
+          "legendFormat": "Root Disk (/) Used %",
           "refId": "A"
         }
       ],
@@ -1588,7 +1583,7 @@
         "y": 28
       },
       "id": 27,
-      "title": "CONTAINER RESOURCE CONSUMPTION & AUDIT LOGS",
+      "title": "CONTAINER RESOURCE CONSUMPTION & LOG INGESTION",
       "type": "row"
     },
     {
@@ -1629,8 +1624,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "topk(5, rate(container_cpu_usage_seconds_total{image!=\"\",name!=\"\"}[5m]) * 100)",
-          "legendFormat": "{{name}}",
+          "expr": "topk(5, atlsd_docker_container_cpu_percent)",
+          "legendFormat": "{{container}}",
           "refId": "A"
         }
       ],
@@ -1675,12 +1670,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "topk(5, container_memory_working_set_bytes{image!=\"\",name!=\"\"})",
-          "legendFormat": "{{name}}",
+          "expr": "topk(5, atlsd_docker_container_memory_usage_bytes)",
+          "legendFormat": "{{container}}",
           "refId": "A"
         }
       ],
-      "title": "Top Container RAM",
+      "title": "Top Container RAM (Bytes)",
       "type": "bargauge"
     },
     {
@@ -1718,12 +1713,12 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum by (container) (rate({job=\"docker\"} |= \"error\" [5m]))",
-          "legendFormat": "{{container}} errors",
+          "expr": "sum by (container) (rate({container=~\".+\"} [1m]))",
+          "legendFormat": "{{container}}",
           "refId": "A"
         }
       ],
-      "title": "Application Error Log Spike Rate",
+      "title": "Container Log Volume Rate (/s)",
       "type": "timeseries"
     }
   ]
