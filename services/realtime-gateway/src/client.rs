@@ -32,7 +32,7 @@ pub struct ClientHandle {
     pub user_id: Option<Uuid>,
     pub api_key_id: Option<String>,
     pub streams: HashSet<String>,
-    pub sender: mpsc::Sender<Vec<u8>>,
+    pub sender: mpsc::Sender<Arc<str>>,
 }
 
 pub fn default_channels() -> HashSet<String> {
@@ -56,7 +56,7 @@ pub async fn handle_registered_socket(
     socket: axum::extract::ws::WebSocket,
     hub: Arc<crate::hub::Hub>,
     client_id: crate::hub::ClientId,
-    mut rx: mpsc::Receiver<Vec<u8>>,
+    mut rx: mpsc::Receiver<Arc<str>>,
     tenant_context: Option<TenantContext>,
     snapshot: Arc<crate::snapshot::Snapshot>,
 ) {
@@ -65,7 +65,7 @@ pub async fn handle_registered_socket(
     use std::time::Duration;
     use tracing::{debug, warn};
 
-    let (control_tx, mut control_rx) = mpsc::channel::<Vec<u8>>(64);
+    let (control_tx, mut control_rx) = mpsc::channel::<Arc<str>>(64);
     let (mut ws_tx, mut ws_rx) = socket.split();
 
     let write_hub = hub.clone();
@@ -77,16 +77,14 @@ pub async fn handle_registered_socket(
         loop {
             tokio::select! {
                 Some(msg) = rx.recv() => {
-                    let text = String::from_utf8_lossy(&msg).into_owned();
                     write_hub.metrics().message_out();
-                    if ws_tx.send(Message::Text(text.into())).await.is_err() {
+                    if ws_tx.send(Message::Text(msg.as_ref().into())).await.is_err() {
                         break;
                     }
                 }
                 Some(msg) = control_rx.recv() => {
-                    let text = String::from_utf8_lossy(&msg).into_owned();
                     write_hub.metrics().message_out();
-                    if ws_tx.send(Message::Text(text.into())).await.is_err() {
+                    if ws_tx.send(Message::Text(msg.as_ref().into())).await.is_err() {
                         break;
                     }
                 }
@@ -342,7 +340,7 @@ pub async fn handle_unauthenticated_socket(
 async fn handle_command(
     client_id: crate::hub::ClientId,
     hub: &Arc<crate::hub::Hub>,
-    control_tx: &mpsc::Sender<Vec<u8>>,
+    control_tx: &mpsc::Sender<Arc<str>>,
     tenant_context: Option<&TenantContext>,
     text: &str,
     snapshot: &Arc<crate::snapshot::Snapshot>,
@@ -454,9 +452,9 @@ async fn handle_command(
     }
 }
 
-async fn send_control(control_tx: &mpsc::Sender<Vec<u8>>, value: Value) {
-    if let Ok(payload) = serde_json::to_vec(&value) {
-        let _ = control_tx.send(payload).await;
+async fn send_control(control_tx: &mpsc::Sender<Arc<str>>, value: Value) {
+    if let Ok(payload) = serde_json::to_string(&value) {
+        let _ = control_tx.send(Arc::from(payload)).await;
     }
 }
 
