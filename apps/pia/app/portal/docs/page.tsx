@@ -422,9 +422,6 @@ func main() {
           <div>
             <span className="account-card-label">CLIENT SDKs</span>
             <h2>Official SDK Libraries</h2>
-            <p className="account-muted">
-              Production-ready, strongly-typed SDK packages with built-in retry, rate-limit awareness, and realtime WebSocket streaming.
-            </p>
           </div>
           <a
             className="account-button account-button-primary"
@@ -483,9 +480,6 @@ bun add @piaa/sdk`}
         </div>
 
         <div style={{ marginTop: 16, padding: "10px 14px", background: "rgba(9,9,238,0.03)", border: "1px dashed rgba(9,9,238,0.15)", fontSize: 10, fontFamily: "var(--font-geist-mono), monospace", color: "#686d9d", lineHeight: 1.6 }}>
-          <strong>ARCHITECTURE:</strong> Both SDKs share the same API surface — <code>market</code>, <code>social</code>, <code>news</code>, <code>realtime</code> resource modules.
-          All sensitive tokens are auto-redacted from logs and error stack traces.
-          Source code, issue tracker, and contribution guide available at{" "}
           <a href="https://github.com/wignn/pia-sdk" target="_blank" rel="noopener noreferrer" style={{ color: "var(--blue)" }}>
             github.com/wignn/pia-sdk
           </a>.

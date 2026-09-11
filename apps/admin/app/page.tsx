@@ -65,7 +65,6 @@ export default function OverviewPage() {
 
   return (
     <main className="admin-container">
-      {/* Header */}
       <div className="admin-header">
         <div>
           <span className="admin-kicker">PIA / EXECUTIVE OPERATIONS</span>
