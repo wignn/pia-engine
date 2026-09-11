@@ -216,6 +216,18 @@ pub fn build_router(state: AppState) -> Router {
             post(super::admin::toggle_user),
         )
         .route("/api/v1/admin/stats", get(super::admin::platform_stats))
+        .route(
+            "/api/v1/admin/users/{id}/usage",
+            get(super::admin::user_usage),
+        )
+        .route(
+            "/api/v1/admin/users/{id}/quota/reset",
+            post(super::admin::reset_user_quota),
+        )
+        .route(
+            "/api/v1/admin/system/flush-cache",
+            post(super::admin::flush_cache),
+        )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

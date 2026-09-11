@@ -248,3 +248,130 @@ pub async fn platform_stats(
         "users_by_plan": plans_map,
     })))
 }
+
+/// GET /api/v1/admin/users/:id/usage — get a user's usage details (admin only)
+pub async fn user_usage(
+    State(state): State<AppState>,
+    axum::extract::Path(user_id): axum::extract::Path<uuid::Uuid>,
+    request: axum::extract::Request,
+) -> Result<Json<Value>, StatusCode> {
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if !auth.is_admin {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let (db_today, week, month) = crate::models::usage::UsageLog::summary(&state.db, user_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut redis_today = 0i64;
+    let daily_key = format!(
+        "usage:daily:{}:{}",
+        user_id,
+        chrono::Utc::now().format("%Y-%m-%d")
+    );
+    if let Some(ref client) = state.redis {
+        if let Ok(mut conn) = client.get_multiplexed_tokio_connection().await {
+            let val: Result<Option<i64>, _> =
+                redis::AsyncCommands::get(&mut conn, &daily_key).await;
+            if let Ok(Some(count)) = val {
+                redis_today = count;
+            }
+        }
+    }
+
+    let today = redis_today.max(db_today);
+
+    let user_row: Option<(String,)> = sqlx::query_as("SELECT plan FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let plan_id = user_row.map(|r| r.0).unwrap_or_else(|| "free".to_string());
+    let plan = crate::models::plan::Plan::find_by_id(&state.db, &plan_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let limit = plan.map(|p| p.requests_per_day as i64).unwrap_or(100);
+
+    Ok(Json(json!({
+        "user_id": user_id,
+        "plan": plan_id,
+        "today": today,
+        "this_week": week.max(today),
+        "this_month": month.max(today),
+        "daily_limit": limit,
+        "remaining_today": (limit - today).max(0),
+    })))
+}
+
+/// POST /api/v1/admin/users/:id/quota/reset — reset user's daily usage in Redis to 0 (admin only)
+pub async fn reset_user_quota(
+    State(state): State<AppState>,
+    axum::extract::Path(user_id): axum::extract::Path<uuid::Uuid>,
+    request: axum::extract::Request,
+) -> Result<Json<Value>, StatusCode> {
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if !auth.is_admin {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let daily_key = format!(
+        "usage:daily:{}:{}",
+        user_id,
+        chrono::Utc::now().format("%Y-%m-%d")
+    );
+
+    if let Some(ref client) = state.redis {
+        if let Ok(mut conn) = client.get_multiplexed_tokio_connection().await {
+            let _: Result<(), _> = redis::AsyncCommands::del(&mut conn, &daily_key).await;
+        }
+    }
+
+    sync::publish_config_changed_for_user(
+        &state.redis,
+        &state.config.redis_channel_prefix,
+        Some(user_id),
+    )
+    .await;
+
+    Ok(Json(json!({
+        "message": format!("Daily quota reset for user {}", user_id),
+        "user_id": user_id,
+        "today": 0
+    })))
+}
+
+/// POST /api/v1/admin/system/flush-cache — broadcast sync and refresh all tenant caches (admin only)
+pub async fn flush_cache(
+    State(state): State<AppState>,
+    request: axum::extract::Request,
+) -> Result<Json<Value>, StatusCode> {
+    let auth = request
+        .extensions()
+        .get::<AuthContext>()
+        .cloned()
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if !auth.is_admin {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    sync::publish_config_changed_for_user(&state.redis, &state.config.redis_channel_prefix, None)
+        .await;
+
+    Ok(Json(json!({
+        "message": "Global config sync signal broadcasted to all gateways",
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    })))
+}
