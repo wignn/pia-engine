@@ -55,7 +55,7 @@ impl Hub {
         streams: HashSet<String>,
         user_id: Option<Uuid>,
         api_key_id: String,
-    ) -> (ClientId, mpsc::Receiver<Vec<u8>>) {
+    ) -> (ClientId, mpsc::Receiver<Arc<str>>) {
         self.register_with_key(bot_id, streams, user_id, Some(api_key_id))
             .await
     }
@@ -66,13 +66,13 @@ impl Hub {
         streams: HashSet<String>,
         user_id: Option<Uuid>,
         api_key_id: Option<String>,
-    ) -> (ClientId, mpsc::Receiver<Vec<u8>>) {
+    ) -> (ClientId, mpsc::Receiver<Arc<str>>) {
         let mut next = self.next_id.write().await;
         let id = *next;
         *next += 1;
         drop(next);
 
-        let (tx, rx) = mpsc::channel::<Vec<u8>>(256);
+        let (tx, rx) = mpsc::channel::<Arc<str>>(256);
 
         let handle = ClientHandle {
             id,
@@ -89,14 +89,16 @@ impl Hub {
         let count = self.client_count().await;
         info!(bot_id = %bot_id, user_id = ?user_id, total = count, "ws client connected");
 
-        let welcome = serde_json::to_vec(&json!({
-            "event": "connected",
-            "data": {
-                "message": "Connected to World Info WebSocket",
-                "bot_id": bot_id,
-            }
-        }))
-        .unwrap_or_default();
+        let welcome: Arc<str> = Arc::from(
+            serde_json::to_string(&json!({
+                "event": "connected",
+                "data": {
+                    "message": "Connected to World Info WebSocket",
+                    "bot_id": bot_id,
+                }
+            }))
+            .unwrap_or_default(),
+        );
 
         if let Some(client) = self.shards[shard_idx].read().await.get(&id) {
             let _ = client.sender.try_send(welcome);
@@ -214,7 +216,7 @@ impl Hub {
         }
     }
 
-    pub async fn push_to_client(&self, id: ClientId, payload: Vec<u8>) -> bool {
+    pub async fn push_to_client(&self, id: ClientId, payload: Arc<str>) -> bool {
         let shard_idx = Self::shard_idx(id);
         let shard = self.shards[shard_idx].read().await;
         match shard.get(&id) {
@@ -238,8 +240,8 @@ impl Hub {
             "timestamp": chrono::Utc::now().to_rfc3339(),
         });
 
-        let payload = match serde_json::to_vec(&msg) {
-            Ok(p) => p,
+        let payload: Arc<str> = match serde_json::to_string(&msg) {
+            Ok(p) => Arc::from(p),
             Err(e) => {
                 error!(error = %e, "failed to marshal broadcast");
                 return 0;
@@ -289,14 +291,13 @@ impl Hub {
         self.metrics.broadcast(count);
 
         if let Some(redis_client) = &self.redis_client {
-            let payload_text = String::from_utf8_lossy(&payload).to_string();
             let redis_channel = format!("{}:{}", self.redis_channel_prefix, channel);
 
             match redis_client.get_multiplexed_async_connection().await {
                 Ok(mut conn) => {
                     let publish_result: redis::RedisResult<i64> = redis::cmd("PUBLISH")
                         .arg(&redis_channel)
-                        .arg(&payload_text)
+                        .arg(payload.as_ref())
                         .query_async(&mut conn)
                         .await;
 
@@ -410,9 +411,9 @@ mod tests {
         values.iter().map(|value| value.to_string()).collect()
     }
 
-    async fn recv_json(rx: &mut mpsc::Receiver<Vec<u8>>) -> Value {
-        let bytes = rx.recv().await.unwrap();
-        serde_json::from_slice(&bytes).unwrap()
+    async fn recv_json(rx: &mut mpsc::Receiver<Arc<str>>) -> Value {
+        let text = rx.recv().await.unwrap();
+        serde_json::from_str(&text).unwrap()
     }
 
     async fn register_test(
@@ -420,7 +421,7 @@ mod tests {
         bot_id: &str,
         streams: HashSet<String>,
         user_id: Option<Uuid>,
-    ) -> (ClientId, mpsc::Receiver<Vec<u8>>) {
+    ) -> (ClientId, mpsc::Receiver<Arc<str>>) {
         hub.register_api_key(
             bot_id.to_string(),
             streams,

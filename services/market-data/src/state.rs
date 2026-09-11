@@ -20,6 +20,7 @@ pub struct AppState {
     pub candle: Option<Arc<CandleEngineHandle>>,
     pub metrics: Arc<atlsd_observability::MetricsRegistry>,
     pub prices: Arc<RwLock<HashMap<String, CachedPrice>>>,
+    pub snapshot_cache: Arc<RwLock<Option<(std::time::Instant, axum::body::Bytes)>>>,
     pub calendar: CalendarCache,
     pub history_cache: crate::cache::MarketHistoryCache,
 }
@@ -41,6 +42,7 @@ impl AppState {
             candle,
             metrics,
             prices: Arc::new(RwLock::new(HashMap::new())),
+            snapshot_cache: Arc::new(RwLock::new(None)),
             calendar: CalendarCache::new(),
             history_cache: crate::cache::MarketHistoryCache::new(),
         }

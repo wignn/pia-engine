@@ -71,7 +71,8 @@ pub async fn send_snapshot(snapshot: &Arc<Snapshot>, hub: &Arc<Hub>, client_id: 
         .and_then(Value::as_array)
         .map(|items| items.len())
         .unwrap_or(0);
-    let payload = serde_json::to_vec(&shape_snapshot(prices)).unwrap_or_default();
+    let payload: Arc<str> =
+        Arc::from(serde_json::to_string(&shape_snapshot(prices)).unwrap_or_default());
     if hub.push_to_client(client_id, payload).await {
         info!(
             client = client_id,

@@ -89,6 +89,7 @@ dependencies = [
  "chrono",
  "dotenvy",
  "futures-util",
+ "parking_lot",
  "redis",
  "reqwest",
  "serde",
@@ -1626,6 +1627,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "atlsd-common",
  "atlsd-eventbus",
  "atlsd-observability",
  "axum",

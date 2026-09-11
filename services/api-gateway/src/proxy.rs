@@ -18,6 +18,28 @@ pub async fn proxy_request(
         return text_response(StatusCode::NOT_FOUND, "route not found");
     };
 
+    // Sub-millisecond L1 RAM cache for global market prices snapshot (100ms micro-cache)
+    let is_market_prices = method == Method::GET && path == "/api/v1/market/prices";
+    if is_market_prices {
+        if let Some(cached) = {
+            let guard = state.price_cache.read();
+            guard.as_ref().and_then(|c| {
+                if c.cached_at.elapsed() < std::time::Duration::from_millis(100) {
+                    Some(c.bytes.clone())
+                } else {
+                    None
+                }
+            })
+        } {
+            return Response::builder()
+                .status(StatusCode::OK)
+                .header("content-type", "application/json")
+                .header("x-cache", "HIT")
+                .body(Body::from(cached))
+                .unwrap();
+        }
+    }
+
     let query = uri
         .query()
         .map(|query| format!("?{query}"))
@@ -50,7 +72,16 @@ pub async fn proxy_request(
                 builder = builder.header(name, value);
             }
             match response.bytes().await {
-                Ok(bytes) => builder.body(Body::from(bytes)).unwrap(),
+                Ok(bytes) => {
+                    if is_market_prices && status == StatusCode::OK {
+                        let mut guard = state.price_cache.write();
+                        *guard = Some(crate::state::CachedPriceSnapshot {
+                            bytes: bytes.clone(),
+                            cached_at: std::time::Instant::now(),
+                        });
+                    }
+                    builder.body(Body::from(bytes)).unwrap()
+                }
                 Err(_) => text_response(StatusCode::BAD_GATEWAY, "upstream body error"),
             }
         }

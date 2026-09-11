@@ -14,14 +14,16 @@ export default function OverviewPage() {
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [flushing, setFlushing] = useState(false);
   const [activePricesCount, setActivePricesCount] = useState<number | null>(null);
+  const [pendingPlanRequestsCount, setPendingPlanRequestsCount] = useState(0);
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [sRes, mRes] = await Promise.allSettled([
+      const [sRes, mRes, rRes] = await Promise.allSettled([
         adminClient.getStats(),
         adminClient.getMarketPrices(),
+        adminClient.getPlanRequests(),
       ]);
 
       if (sRes.status === "fulfilled") {
@@ -32,6 +34,11 @@ export default function OverviewPage() {
 
       if (mRes.status === "fulfilled") {
         setActivePricesCount(mRes.value.total);
+      }
+
+      if (rRes.status === "fulfilled") {
+        const pending = rRes.value.filter((r) => r.status === "pending").length;
+        setPendingPlanRequestsCount(pending);
       }
     } catch (err: any) {
       setError(err?.message || "Connection error");
@@ -110,6 +117,32 @@ export default function OverviewPage() {
           }}
         >
           {syncNotice}
+        </div>
+      )}
+
+      {pendingPlanRequestsCount > 0 && (
+        <div
+          style={{
+            padding: "12px 18px",
+            marginBottom: 24,
+            background: "rgba(189, 133, 53, 0.08)",
+            border: "1px solid #bd8535",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 16 }}>⚡</span>
+            <div style={{ fontSize: 12, color: "#a87431", fontFamily: "var(--font-geist-mono), monospace" }}>
+              <strong>{pendingPlanRequestsCount} PENDING PLAN UPGRADE REQUEST(S):</strong> Tenants have requested higher tier quotas awaiting your manual review.
+            </div>
+          </div>
+          <Link href="/tenants" className="admin-button" style={{ borderColor: "#bd8535", color: "#bd8535", height: 28, fontSize: 10 }}>
+            REVIEW &amp; ACC REQUESTS →
+          </Link>
         </div>
       )}
 

@@ -180,7 +180,8 @@ pub async fn serve(bind_addr: String, registry: HealthRegistry) {
 
     match TcpListener::bind(&bind_addr).await {
         Ok(listener) => {
-            info!(bind_addr = %bind_addr, "ingestion health server running");
+            info!(bind_addr = %bind_addr, "ingestion health server running with TCP_NODELAY enabled");
+            let listener = atlsd_common::net::tap_nodelay(listener);
             if let Err(err) = axum::serve(listener, app).await {
                 error!(error = %err, "ingestion health server failed");
             }

@@ -211,7 +211,8 @@ async fn main() {
         }
     };
 
-    info!(bind_addr = %cfg.bind_addr, "market-data service running");
+    info!(bind_addr = %cfg.bind_addr, "market-data service running with TCP_NODELAY enabled");
+    let listener = atlsd_common::net::tap_nodelay(listener);
     if let Err(err) = axum::serve(listener, http::build_router(state)).await {
         error!(error = %err, "market-data HTTP server failed");
         std::process::exit(1);

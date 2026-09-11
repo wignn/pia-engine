@@ -42,6 +42,14 @@ type DailyUsage = {
   count: number;
 };
 
+type PlanRequestInfo = {
+  id: string;
+  current_plan: string;
+  requested_plan: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+};
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`, {
     ...init,
@@ -101,10 +109,12 @@ export const accountApi = {
     (await request<{ history: DailyUsage[]; days: number }>(`/api/v1/usage/history?days=${days}`)).history,
   plans: async () => (await request<{ plans: Plan[] }>("/api/v1/plans")).plans,
   upgradePlan: (planId: string) =>
-    request<{ status: string; plan: string; message: string; limits?: Plan; error?: string }>("/api/v1/plans/upgrade", {
+    request<{ status: string; plan?: string; requested_plan?: string; message: string; limits?: Plan; error?: string }>("/api/v1/plans/upgrade", {
       method: "POST",
       body: JSON.stringify({ plan_id: planId }),
     }),
+  pendingPlanRequest: () =>
+    request<{ has_pending: boolean; request: PlanRequestInfo | null }>("/api/v1/plans/request"),
   oauthUrl: (provider: "google" | "github") =>
     request<{ url?: string; error?: string }>(`/api/v1/auth/oauth/${provider}/url`),
   oauthCallback: (provider: string, code: string, state: string) =>
@@ -114,4 +124,4 @@ export const accountApi = {
     }),
 };
 
-export type { KeyInfo, Plan, User, UsageSummary, DailyUsage };
+export type { KeyInfo, Plan, User, UsageSummary, DailyUsage, PlanRequestInfo };

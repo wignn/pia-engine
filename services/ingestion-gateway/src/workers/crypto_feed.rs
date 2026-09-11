@@ -146,7 +146,8 @@ pub async fn run(cfg: Arc<Config>, broker: Arc<dyn EventPublisher>, health: Heal
 
         let ws_stream = match connect_async(&url).await {
             Ok((stream, _response)) => {
-                info!(worker = WORKER, "websocket connected");
+                super::set_ws_nodelay(&stream);
+                info!(worker = WORKER, "websocket connected with TCP_NODELAY");
                 health.set_connected(WORKER, true).await;
                 backoff.reset();
                 stream
