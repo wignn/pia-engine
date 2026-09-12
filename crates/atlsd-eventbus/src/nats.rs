@@ -9,10 +9,10 @@ use crate::subjects;
 
 const NATS_MSG_ID: &str = "Nats-Msg-Id";
 const MARKET_DEDUP_WINDOW: Duration = Duration::from_secs(120);
-const MARKET_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
-const MARKET_MAX_BYTES: i64 = 2 * 1024 * 1024 * 1024;
-const MARKET_DEDUP_MAX_AGE: Duration = Duration::from_secs(12 * 60 * 60);
-const MARKET_DEDUP_MAX_BYTES: i64 = 1024 * 1024 * 1024;
+const MARKET_MAX_AGE: Duration = Duration::from_secs(4 * 60 * 60);
+const MARKET_MAX_BYTES: i64 = 512 * 1024 * 1024;
+const MARKET_DEDUP_MAX_AGE: Duration = Duration::from_secs(4 * 60 * 60);
+const MARKET_DEDUP_MAX_BYTES: i64 = 256 * 1024 * 1024;
 const NEWS_MAX_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 const INTELLIGENCE_MAX_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 const PLATFORM_MAX_AGE: Duration = Duration::from_secs(30 * 24 * 60 * 60);

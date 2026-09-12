@@ -47,23 +47,34 @@ write_router_conf() {
 
 upstream api_gateway_backend {
     server 172.17.0.1:$1;
+    keepalive 32;
 }
 
 upstream realtime_gateway_backend {
     server 172.17.0.1:$2;
+    keepalive 16;
 }
 
 upstream public_web_backend {
     server 172.17.0.1:$3;
+    keepalive 16;
 }
 
 upstream terminal_backend {
     server 172.17.0.1:$4;
+    keepalive 16;
 }
 
 # ---- REST API + WebSocket (public hosts 8000 / 8020) ----------------------
 server {
     listen 80;
+
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 3;
+    gzip_min_length 1024;
+    gzip_types application/json text/plain application/javascript text/css;
 
     location = /healthz {
         access_log off;
@@ -83,6 +94,8 @@ server {
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
+        proxy_buffering off;
+        tcp_nodelay on;
         proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;
     }
@@ -90,6 +103,7 @@ server {
     location / {
         proxy_pass http://api_gateway_backend;
         proxy_http_version 1.1;
+        proxy_set_header Connection "";
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -103,6 +117,8 @@ server {
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
+        proxy_buffering off;
+        tcp_nodelay on;
         proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;
     }
