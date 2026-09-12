@@ -81,7 +81,52 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/market/why/{symbol}",
             any(crate::proxy::proxy_request),
         )
+        .route(
+            "/api/v1/market/insights/{symbol}",
+            any(crate::proxy::proxy_request),
+        )
         .route("/api/v1/analyze", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/intelligence/analyze",
+            any(crate::proxy::proxy_request),
+        )
+        .route("/api/v1/news", any(crate::proxy::proxy_request))
+        .route("/api/v1/news/latest", any(crate::proxy::proxy_request))
+        .route("/api/v1/news/{id}", any(crate::proxy::proxy_request))
+        .route("/api/v1/social/feed", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/economic/calendar",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/economic/indicators",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/economic/indicators/{series_id}",
+            any(crate::proxy::proxy_request),
+        )
+        .route("/api/v1/economic/latest", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/economic/countries",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/economic/categories",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/fixed-income/yield-curve",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/fixed-income/spreads",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
+            "/api/v1/fixed-income/rates/{tenor}",
+            any(crate::proxy::proxy_request),
+        )
         .route("/api/v1/forex/calendar", any(crate::proxy::proxy_request))
         .route("/api/v1/forex/news", any(crate::proxy::proxy_request))
         .route(
@@ -94,22 +139,6 @@ pub fn build_router(state: AppState) -> Router {
             any(crate::proxy::proxy_request),
         )
         .route("/api/v1/macro/dashboard", any(crate::proxy::proxy_request))
-        .route(
-            "/api/v1/admin/forex/sources",
-            any(crate::proxy::proxy_request),
-        )
-        .route(
-            "/api/v1/admin/forex/sources/test",
-            any(crate::proxy::proxy_request),
-        )
-        .route(
-            "/api/v1/admin/forex/sources/{id}",
-            any(crate::proxy::proxy_request),
-        )
-        .route(
-            "/api/v1/admin/forex/sources/{id}/toggle",
-            any(crate::proxy::proxy_request),
-        )
         .route("/api/v1/social/posts", any(crate::proxy::proxy_request))
         .route("/api/v1/stock/news", any(crate::proxy::proxy_request))
         .route(

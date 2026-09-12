@@ -122,18 +122,29 @@ pub async fn proxy_request(
 }
 
 fn target_base_for_path<'a>(path: &str, config: &'a crate::config::Config) -> Option<&'a str> {
-    if path.starts_with("/api/v1/market/why") || path == "/api/v1/analyze" {
+    if path.starts_with("/api/v1/market/why")
+        || path.starts_with("/api/v1/market/insights")
+        || path == "/api/v1/analyze"
+        || path == "/api/v1/intelligence/analyze"
+    {
         Some(config.intelligence_service_url.as_str())
     } else if path.starts_with("/api/v1/market/")
+        || path.starts_with("/api/v1/fixed-income/")
         || path.starts_with("/api/v1/rates/")
         || path.starts_with("/api/v1/bonds/")
         || path.starts_with("/api/v1/energy/")
         || path.starts_with("/api/v1/cot/")
         || path.starts_with("/api/v1/fear-greed")
         || path.starts_with("/api/v1/options/")
+        || path.starts_with("/api/v1/economic/indicators")
+        || path.starts_with("/api/v1/economic/latest")
+        || path.starts_with("/api/v1/economic/countries")
+        || path.starts_with("/api/v1/economic/categories")
     {
         Some(config.market_data_url.as_str())
-    } else if path.starts_with("/api/v1/forex/")
+    } else if path.starts_with("/api/v1/news")
+        || path.starts_with("/api/v1/economic/calendar")
+        || path.starts_with("/api/v1/forex/")
         || path.starts_with("/api/v1/stock/")
         || path.starts_with("/api/v1/macro/")
         || path.starts_with("/api/v1/admin/forex/")
@@ -270,6 +281,44 @@ mod tests {
         assert_eq!(
             target_base_for_path("/api/v1/market/implied-volatility", &cfg),
             Some(cfg.market_data_url.as_str())
+        );
+    }
+
+    #[test]
+    fn routes_standardized_paths() {
+        let cfg = config();
+
+        assert_eq!(
+            target_base_for_path("/api/v1/news", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/news/latest", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/economic/calendar", &cfg),
+            Some(cfg.news_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/economic/indicators", &cfg),
+            Some(cfg.market_data_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/fixed-income/yield-curve", &cfg),
+            Some(cfg.market_data_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/market/insights/AAPL", &cfg),
+            Some(cfg.intelligence_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/intelligence/analyze", &cfg),
+            Some(cfg.intelligence_service_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/social/feed", &cfg),
+            Some(cfg.news_service_url.as_str())
         );
     }
 }

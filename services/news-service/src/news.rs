@@ -31,6 +31,14 @@ pub struct ForexNewsQuery {
 }
 
 #[derive(Deserialize)]
+pub struct UnifiedNewsQuery {
+    pub limit: Option<i64>,
+    pub source: Option<String>,
+    pub q: Option<String>,
+    pub category: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct CalendarQuery {
     pub impact: Option<String>,
     pub limit: Option<usize>,
@@ -294,6 +302,24 @@ pub async fn admin_test_forex_source(Json(payload): Json<FeedSourcePayload>) -> 
             "latency_ms": started.elapsed().as_millis().min(u64::MAX as u128) as u64,
         })),
         Err(error) => Json(json!({ "ok": false, "error": error })),
+    }
+}
+
+pub async fn list_unified_news(
+    State(state): State<AppState>,
+    Query(query): Query<UnifiedNewsQuery>,
+) -> Json<Value> {
+    let cat = query.category.as_deref().unwrap_or("").to_lowercase();
+    if cat == "stock" {
+        let limit_query = LimitQuery { limit: query.limit };
+        latest_stock_news(State(state), Query(limit_query)).await
+    } else {
+        let forex_query = ForexNewsQuery {
+            limit: query.limit,
+            q: query.q,
+            source: query.source,
+        };
+        list_forex_news(State(state), Query(forex_query)).await
     }
 }
 

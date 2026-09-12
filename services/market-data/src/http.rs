@@ -55,6 +55,38 @@ pub fn build_router(state: AppState) -> Router {
             get(crate::institutional::get_implied_volatility),
         )
         .route(
+            "/api/v1/economic/indicators",
+            get(crate::economic::list_indicators),
+        )
+        .route(
+            "/api/v1/economic/indicators/{series_id}",
+            get(crate::economic::get_series),
+        )
+        .route(
+            "/api/v1/economic/latest",
+            get(crate::economic::latest_indicators),
+        )
+        .route(
+            "/api/v1/economic/countries",
+            get(crate::economic::list_countries),
+        )
+        .route(
+            "/api/v1/economic/categories",
+            get(crate::economic::list_categories),
+        )
+        .route(
+            "/api/v1/fixed-income/yield-curve",
+            get(crate::bonds::get_yield_curve),
+        )
+        .route(
+            "/api/v1/fixed-income/spreads",
+            get(crate::rates::get_spreads),
+        )
+        .route(
+            "/api/v1/fixed-income/rates/{tenor}",
+            get(crate::rates::get_history),
+        )
+        .route(
             "/api/v1/market/economic/indicators",
             get(crate::economic::list_indicators),
         )

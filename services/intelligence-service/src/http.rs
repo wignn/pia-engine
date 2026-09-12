@@ -17,7 +17,15 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health", get(crate::health))
         .route("/api/v1/analyze", post(crate::sentiment::analyze_text))
         .route(
+            "/api/v1/intelligence/analyze",
+            post(crate::sentiment::analyze_text),
+        )
+        .route(
             "/api/v1/market/why/{symbol}",
+            get(crate::why_move::why_did_it_move),
+        )
+        .route(
+            "/api/v1/market/insights/{symbol}",
             get(crate::why_move::why_did_it_move),
         )
         .layer(axum::middleware::from_fn_with_state(
