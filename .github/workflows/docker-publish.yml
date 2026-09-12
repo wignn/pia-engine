@@ -187,67 +187,67 @@ jobs:
           }
 
           if [[ "$BUILD_ALL" == "true" || "$CONTROL_PLANE_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-control-plane","dockerfile":"infra/docker/Dockerfile.control-plane"}'
+            add '{"image":"pia-control-plane","dockerfile":"infra/docker/Dockerfile.control-plane"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$INGESTION_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-ingestion","dockerfile":"infra/docker/Dockerfile.ingestion"}'
+            add '{"image":"pia-ingestion","dockerfile":"infra/docker/Dockerfile.ingestion"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$BOT_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-bot","dockerfile":"infra/docker/Dockerfile.bot"}'
+            add '{"image":"pia-bot","dockerfile":"infra/docker/Dockerfile.bot"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$ANALYZER_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-analyzer","dockerfile":"infra/docker/Dockerfile.analyzer"}'
+            add '{"image":"pia-analyzer","dockerfile":"infra/docker/Dockerfile.analyzer"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$API_GATEWAY_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-api-gateway","dockerfile":"infra/docker/Dockerfile.api-gateway"}'
+            add '{"image":"pia-api-gateway","dockerfile":"infra/docker/Dockerfile.api-gateway"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$MARKET_DATA_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-market-data","dockerfile":"infra/docker/Dockerfile.market-data"}'
+            add '{"image":"pia-market-data","dockerfile":"infra/docker/Dockerfile.market-data"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$REALTIME_GATEWAY_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-realtime-gateway","dockerfile":"infra/docker/Dockerfile.realtime-gateway"}'
+            add '{"image":"pia-realtime-gateway","dockerfile":"infra/docker/Dockerfile.realtime-gateway"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$NEWS_SERVICE_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-news-service","dockerfile":"infra/docker/Dockerfile.news-service"}'
+            add '{"image":"pia-news-service","dockerfile":"infra/docker/Dockerfile.news-service"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$INTELLIGENCE_SERVICE_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-intelligence-service","dockerfile":"infra/docker/Dockerfile.intelligence-service"}'
+            add '{"image":"pia-intelligence-service","dockerfile":"infra/docker/Dockerfile.intelligence-service"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$PIA_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-pia","dockerfile":"infra/docker/Dockerfile.pia"}'
+            add '{"image":"pia-pia","dockerfile":"infra/docker/Dockerfile.pia"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$PUBLIC_WEB_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-public-web","dockerfile":"infra/docker/Dockerfile.public-web"}'
+            add '{"image":"pia-public-web","dockerfile":"infra/docker/Dockerfile.public-web"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$TERMINAL_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-terminal","dockerfile":"infra/docker/Dockerfile.terminal"}'
+            add '{"image":"pia-terminal","dockerfile":"infra/docker/Dockerfile.terminal"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$RSSHUB_CONNECTOR_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-rsshub-connector","dockerfile":"infra/docker/Dockerfile.rsshub-connector"}'
+            add '{"image":"pia-rsshub-connector","dockerfile":"infra/docker/Dockerfile.rsshub-connector"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$DB_MIGRATE_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-db-migrate","dockerfile":"infra/docker/Dockerfile.db-migrate"}'
+            add '{"image":"pia-db-migrate","dockerfile":"infra/docker/Dockerfile.db-migrate"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$SINK_CONNECTOR_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-sink-connector","dockerfile":"infra/docker/Dockerfile.sink-connector"}'
+            add '{"image":"pia-sink-connector","dockerfile":"infra/docker/Dockerfile.sink-connector"}'
           fi
 
           if [[ "$BUILD_ALL" == "true" || "$MACRO_FEED_CHANGED" == "true" ]]; then
-            add '{"image":"atlsd-macro-feed","dockerfile":"infra/docker/Dockerfile.macro-feed"}'
+            add '{"image":"pia-macro-feed","dockerfile":"infra/docker/Dockerfile.macro-feed"}'
           fi
           json="${json}]}";
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
@@ -306,6 +306,7 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+          provenance: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
