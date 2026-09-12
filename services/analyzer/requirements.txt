@@ -14,3 +14,5 @@ beautifulsoup4==4.13.5
 lxml==6.0.2
 deep-translator==1.11.4
 lingua-language-detector==2.1.1
+orjson>=3.10.0
+uvloop>=0.20.0

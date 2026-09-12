@@ -20,10 +20,18 @@ class AdvancedSentimentAnalyzer:
             return
 
         logger.info("Loading HF pipeline with '%s'...", self.model_name)
+        import torch
         from transformers import BertForSequenceClassification, BertTokenizer, pipeline
+
+        # Optimal CPU thread configuration to prevent thread thrashing
+        num_threads = int(os.getenv("TORCH_NUM_THREADS", "2"))
+        torch.set_num_threads(num_threads)
+        torch.set_num_interop_threads(1)
+        logger.info("Configured PyTorch CPU threads to %d", num_threads)
 
         tokenizer = BertTokenizer.from_pretrained(self.model_name)
         model = BertForSequenceClassification.from_pretrained(self.model_name)
+        model.eval()
 
         self.pipeline = pipeline(
             "sentiment-analysis",
@@ -32,7 +40,7 @@ class AdvancedSentimentAnalyzer:
             device=-1,  # CPU only, safe for VPS
             top_k=None,
         )
-        logger.info("HF model and pipeline initialized successfully.")
+        logger.info("HF model and pipeline initialized successfully (torch.inference_mode enabled).")
 
     def _normalize_label(self, label: str) -> str:
         label = label.lower().strip()
@@ -65,11 +73,14 @@ class AdvancedSentimentAnalyzer:
     @lru_cache(maxsize=2048)
     def _cached_inference(self, text: str) -> List[Dict[str, Any]]:
         self.initialize()
-        result = self.pipeline(
-            text,
-            truncation=True,
-            max_length=self.max_length,
-        )
+        import torch
+
+        with torch.inference_mode():
+            result = self.pipeline(
+                text,
+                truncation=True,
+                max_length=self.max_length,
+            )
         return result[0] if result and isinstance(result[0], list) else result
 
     def _distribution(self, predictions: List[Dict[str, Any]]) -> Dict[str, float]:

@@ -1,11 +1,21 @@
 import asyncio
-import json
 import logging
 import math
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
+
+try:
+    import orjson
+
+    def _json_dumps(payload: Any) -> bytes:
+        return orjson.dumps(payload)
+except ImportError:
+    import json
+
+    def _json_dumps(payload: Any) -> bytes:
+        return json.dumps(payload, allow_nan=False).encode()
 
 import nats
 import requests
@@ -171,7 +181,7 @@ async def start_options_worker(nats_url: str, poll_interval: int) -> None:
         for symbol in _symbols():
             try:
                 chain = await asyncio.to_thread(_payloads, trade_client, option_client, api_key, secret_key, symbol)
-                await nats_client.publish(CHAIN_SUBJECT, json.dumps(chain, allow_nan=False).encode())
+                await nats_client.publish(CHAIN_SUBJECT, _json_dumps(chain))
                 logger.info("published Alpaca options payload for %s (%s contracts)", symbol, len(chain["contracts"]))
             except Exception as exc:
                 logger.warning("failed to publish Alpaca options for %s: %s", symbol, exc, exc_info=True)

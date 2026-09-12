@@ -3,6 +3,7 @@ import os
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import ORJSONResponse
 
 from analyzer import AdvancedSentimentAnalyzer
 from event_extractor import extract_event
@@ -41,6 +42,7 @@ app = FastAPI(
     description="Financial news sentiment API with macro event extraction and asset impact mapping.",
     version="3.0.0",
     lifespan=lifespan,
+    default_response_class=ORJSONResponse,
 )
 
 
@@ -58,7 +60,7 @@ async def why_did_it_move(request: WhyMoveRequest):
 
 
 @app.post("/analyze", response_model=AnalysisResponse)
-def analyze(request: AnalysisRequest):
+async def analyze(request: AnalysisRequest):
     if not request.text and not request.url:
         raise HTTPException(status_code=422, detail="Either 'text' or 'url' must be provided.")
 
@@ -100,7 +102,9 @@ def analyze(request: AnalysisRequest):
     )
     analysis_language = "en" if translated else source_language
 
-    sentiment_result = analyzer.analyze(
+    # Non-blocking CPU inference in thread pool to avoid starving NATS / asyncio event loop
+    sentiment_result = await asyncio.to_thread(
+        analyzer.analyze,
         text=model_text,
         title=title if not translated else None,
         language=analysis_language,
@@ -132,6 +136,14 @@ def analyze(request: AnalysisRequest):
 
 if __name__ == "__main__":
     import uvicorn
+
+    try:
+        import uvloop
+
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        logger.info("uvloop fast event loop policy installed successfully.")
+    except Exception as exc:
+        logger.warning("uvloop not available, using default asyncio event loop: %s", exc)
 
     port = int(os.getenv("PORT", 5000))
     workers = int(os.getenv("WORKERS", 1))  # keep 1; model is in-process
