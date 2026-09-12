@@ -38,6 +38,35 @@ pub async fn proxy_request(
                 .body(Body::from(cached))
                 .unwrap();
         }
+
+        // Fast-path: NATS Request-Reply RPC directly to market-data memory (< 1ms)
+        if let Some(nats) = &state.nats {
+            let rpc_res = tokio::time::timeout(
+                std::time::Duration::from_millis(150),
+                nats.request(
+                    atlsd_eventbus::subjects::RPC_MARKET_PRICES_V1,
+                    axum::body::Bytes::new(),
+                ),
+            )
+            .await;
+
+            if let Ok(Ok(msg)) = rpc_res {
+                let payload = msg.payload;
+                {
+                    let mut guard = state.price_cache.write();
+                    *guard = Some(crate::state::CachedPriceSnapshot {
+                        bytes: payload.clone(),
+                        cached_at: std::time::Instant::now(),
+                    });
+                }
+                return Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .header("x-cache", "RPC-HIT")
+                    .body(Body::from(payload))
+                    .unwrap();
+            }
+        }
     }
 
     let query = uri

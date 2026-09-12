@@ -85,9 +85,21 @@ async fn main() {
         .build()
         .unwrap_or_default();
 
+    let nats_client = match async_nats::connect(&cfg.nats_url).await {
+        Ok(client) => {
+            info!(nats_url = %cfg.nats_url, "api-gateway connected to NATS for sub-millisecond RPC");
+            Some(client)
+        }
+        Err(err) => {
+            warn!(error = %err, nats_url = %cfg.nats_url, "api-gateway failed to connect to NATS; falling back to HTTP");
+            None
+        }
+    };
+
     let state = AppState {
         config: cfg.clone(),
         http,
+        nats: nats_client,
         tenant_registry,
         usage_tracker,
         internal_api_key: std::env::var("INTERNAL_API_KEY")
