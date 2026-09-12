@@ -31,6 +31,19 @@ pub async fn run(cfg: Config) {
     let health_bind_addr = cfg.health_bind_addr.clone();
     let health_server = tokio::spawn(crate::health::serve(health_bind_addr, health.clone()));
 
+    // Bind UDS Hot-Path Broadcaster if configured
+    if let Some(path) = &cfg.uds_ipc_path {
+        match atlsd_common::ipc::UdsBroadcaster::bind(path).await {
+            Ok(broadcaster) => {
+                info!(path = %path, "ingestion UDS hot-path broadcaster active");
+                crate::workers::publish_queue::set_uds_broadcaster(broadcaster);
+            }
+            Err(err) => {
+                warn!(error = %err, path = %path, "failed to bind UDS broadcaster; hot-path disabled");
+            }
+        }
+    }
+
     let broker: Arc<dyn EventPublisher> = broker::build_broker(&cfg).await;
 
     let cfg = Arc::new(cfg);

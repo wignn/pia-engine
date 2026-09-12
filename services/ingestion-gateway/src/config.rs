@@ -36,6 +36,7 @@ pub struct Config {
     pub health_bind_addr: String,
     pub health_stale_after_sec: u64,
     pub log_level: String,
+    pub uds_ipc_path: Option<String>,
 }
 
 impl Config {
@@ -167,6 +168,9 @@ impl Config {
             health_bind_addr: get_env("INGESTION_HEALTH_BIND_ADDR", "0.0.0.0:8091"),
             health_stale_after_sec: get_env_u64("INGESTION_HEALTH_STALE_AFTER_SEC", 180),
             log_level: get_env("LOG_LEVEL", "INFO"),
+            uds_ipc_path: env::var("INGESTION_UDS_PATH")
+                .ok()
+                .filter(|s| !s.trim().is_empty()),
         }
     }
 
