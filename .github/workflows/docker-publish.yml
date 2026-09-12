@@ -8,6 +8,10 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -261,6 +265,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      HAS_DOCKERHUB: ${{ secrets.DOCKERHUB_USERNAME != '' }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
@@ -277,6 +283,14 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub (for base image rate limits)
+        if: env.HAS_DOCKERHUB == 'true'
+        uses: docker/login-action@v3
+        continue-on-error: true
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Generate Docker metadata
         id: meta
