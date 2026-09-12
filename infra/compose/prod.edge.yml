@@ -9,7 +9,7 @@ x-default-logging: &default-logging
 services:
   control-plane:
     container_name: world-control-plane
-    image: wign/atlsd-control-plane:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-control-plane:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/health"]
       interval: 30s
@@ -27,7 +27,7 @@ services:
 
   analyzer:
     container_name: world-analyzer-prod
-    image: wign/atlsd-analyzer:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-analyzer:${ATLSD_IMAGE_TAG:-latest}
     ports:
       - "127.0.0.1:5000:5000"
     env_file:
@@ -41,7 +41,7 @@ services:
 
   bot:
     container_name: atlsd-bot
-    image: wign/atlsd-bot:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-bot:${ATLSD_IMAGE_TAG:-latest}
     env_file:
       - ../env/.env.bot
     environment:
@@ -69,7 +69,7 @@ services:
 
   rsshub-connector:
     container_name: atlsd-rsshub-connector
-    image: wign/atlsd-rsshub-connector:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-rsshub-connector:${ATLSD_IMAGE_TAG:-latest}
     env_file:
       - ../env/.env.social-worker
     environment:
@@ -88,7 +88,7 @@ services:
 
 
   macro-feed:
-    image: wign/atlsd-macro-feed:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-macro-feed:${ATLSD_IMAGE_TAG:-latest}
     env_file:
       - ../env/.env.macro-feed
     environment:
@@ -100,7 +100,7 @@ services:
 
   ingestion-gateway:
     container_name: atlsd-ingestion
-    image: wign/atlsd-ingestion:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-ingestion:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8091/health"]
       interval: 30s
@@ -120,7 +120,7 @@ services:
 
   pia:
     container_name: atlsd-pia
-    image: wign/atlsd-pia:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-pia:${ATLSD_IMAGE_TAG:-latest}
     environment:
       CONTROL_PLANE_INTERNAL_URL: http://world-control-plane:8080
       NEXT_PUBLIC_CONTROL_PLANE_URL: https://contorl.wign.dev

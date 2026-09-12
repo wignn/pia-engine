@@ -87,7 +87,7 @@ services:
 
   rsshub-connector:
     container_name: rsshub-connector
-    image: wign/atlsd-rsshub-connector
+    image: ghcr.io/wignn/atlsd-rsshub-connector
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.rsshub-connector
@@ -107,7 +107,7 @@ services:
       - private
 
   db-migrate:
-    image: wign/atlsd-db-migrate
+    image: ghcr.io/wignn/atlsd-db-migrate
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.db-migrate
@@ -133,7 +133,7 @@ services:
 
   api-gateway:
     container_name: api-gateway
-    image: wign/atlsd-api-gateway
+    image: ghcr.io/wignn/atlsd-api-gateway
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.api-gateway
@@ -160,7 +160,7 @@ services:
 
   market-data:
     container_name: market-data
-    image: wign/atlsd-market-data
+    image: ghcr.io/wignn/atlsd-market-data
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.market-data
@@ -185,7 +185,7 @@ services:
 
   realtime-gateway:
     container_name: realtime-gateway
-    image: wign/atlsd-realtime-gateway
+    image: ghcr.io/wignn/atlsd-realtime-gateway
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.realtime-gateway
@@ -208,7 +208,7 @@ services:
 
   news-service:
     container_name: news-service
-    image: wign/atlsd-news-service
+    image: ghcr.io/wignn/atlsd-news-service
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.news-service
@@ -230,7 +230,7 @@ services:
 
   intelligence-service:
     container_name: intelligence-service
-    image: wign/atlsd-intelligence-service
+    image: ghcr.io/wignn/atlsd-intelligence-service
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.intelligence-service
@@ -252,7 +252,7 @@ services:
       - private
   control-plane:
     container_name: world-control-plane
-    image: wign/atlsd-control-plane
+    image: ghcr.io/wignn/atlsd-control-plane
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.control-plane
@@ -273,7 +273,7 @@ services:
 
   pia:
     container_name: pia
-    image: wign/atlsd-pia
+    image: ghcr.io/wignn/atlsd-pia
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.pia
@@ -293,7 +293,7 @@ services:
 
   ingestion-gateway:
     container_name: ingestion-gateway
-    image: wign/atlsd-ingestion
+    image: ghcr.io/wignn/atlsd-ingestion
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.ingestion
@@ -312,7 +312,7 @@ services:
 
   analyzer:
     container_name: world-analyzer
-    image: wign/atlsd-analyzer
+    image: ghcr.io/wignn/atlsd-analyzer
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.analyzer

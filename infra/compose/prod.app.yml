@@ -6,7 +6,7 @@ x-default-logging: &default-logging
 
 services:
   db-migrate:
-    image: wign/atlsd-db-migrate:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-db-migrate:${ATLSD_IMAGE_TAG:-latest}
     restart: "no"
     logging: *default-logging
     env_file:
@@ -24,7 +24,7 @@ services:
       - private
 
   api-gateway:
-    image: wign/atlsd-api-gateway:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-api-gateway:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8000/health || exit 1"]
       interval: 15s
@@ -52,7 +52,7 @@ services:
       - private
 
   market-data:
-    image: wign/atlsd-market-data:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-market-data:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8010/health || exit 1"]
       interval: 30s
@@ -76,7 +76,7 @@ services:
       - private
 
   sink-connector:
-    image: wign/atlsd-sink-connector:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-sink-connector:${ATLSD_IMAGE_TAG:-latest}
     env_file:
       - ../env/.env.market-data
       - ../env/.env.datastores
@@ -93,7 +93,7 @@ services:
       - private
 
   realtime-gateway:
-    image: wign/atlsd-realtime-gateway:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-realtime-gateway:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8020/health || exit 1"]
       interval: 30s
@@ -119,7 +119,7 @@ services:
       - private
 
   news-service:
-    image: wign/atlsd-news-service:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-news-service:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8030/health || exit 1"]
       interval: 30s
@@ -142,7 +142,7 @@ services:
       - private
 
   intelligence-service:
-    image: wign/atlsd-intelligence-service:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-intelligence-service:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8040/health || exit 1"]
       interval: 30s
@@ -163,7 +163,7 @@ services:
       - private
 
   public-web:
-    image: wign/atlsd-public-web:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-public-web:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173/ || exit 1"]
       interval: 15s
@@ -187,7 +187,7 @@ services:
       - private
 
   terminal:
-    image: wign/atlsd-terminal:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-terminal:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5174/ || exit 1"]
       interval: 15s

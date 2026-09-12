@@ -108,7 +108,7 @@ services:
 
   rsshub-connector:
     container_name: rsshub-connector
-    image: wign/atlsd-rsshub-connector:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-rsshub-connector:${ATLSD_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.rsshub-connector
@@ -131,7 +131,7 @@ services:
       - private
 
   db-migrate:
-    image: wign/atlsd-db-migrate:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-db-migrate:${ATLSD_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.db-migrate
@@ -163,7 +163,7 @@ services:
 
   api-gateway:
     container_name: api-gateway
-    image: wign/atlsd-api-gateway:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-api-gateway:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8000/health"]
       interval: 30s
@@ -199,7 +199,7 @@ services:
 
   market-data:
     container_name: market-data
-    image: wign/atlsd-market-data:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-market-data:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8010/health"]
       interval: 30s
@@ -235,7 +235,7 @@ services:
 
   sink-connector:
     container_name: sink-connector
-    image: wign/atlsd-sink-connector:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-sink-connector:${ATLSD_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.sink-connector
@@ -261,7 +261,7 @@ services:
 
   realtime-gateway:
     container_name: realtime-gateway
-    image: wign/atlsd-realtime-gateway:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-realtime-gateway:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8020/health"]
       interval: 30s
@@ -296,7 +296,7 @@ services:
 
   bot:
     container_name: bot
-    image: wign/atlsd-bot:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-bot:${ATLSD_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.bot
@@ -322,7 +322,7 @@ services:
 
   news-service:
     container_name: news-service
-    image: wign/atlsd-news-service:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-news-service:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8030/health"]
       interval: 30s
@@ -353,7 +353,7 @@ services:
 
   intelligence-service:
     container_name: intelligence-service
-    image: wign/atlsd-intelligence-service:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-intelligence-service:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8040/health"]
       interval: 30s
@@ -384,7 +384,7 @@ services:
 
   control-plane:
     container_name: world-control-plane
-    image: wign/atlsd-control-plane:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-control-plane:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/health"]
       interval: 30s
@@ -415,7 +415,7 @@ services:
 
   ingestion-gateway:
     container_name: ingestion-gateway
-    image: wign/atlsd-ingestion:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-ingestion:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8091/health"]
       interval: 30s
@@ -441,7 +441,7 @@ services:
 
   analyzer:
     container_name: world-analyzer-prod
-    image: wign/atlsd-analyzer:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-analyzer:${ATLSD_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.analyzer
@@ -461,7 +461,7 @@ services:
   
   # pia:
   #   container_name: pia
-  #   image: wign/atlsd-pia:latest
+  #   image: ghcr.io/wignn/atlsd-pia:latest
   #   env_file:
   #     - ../env/.env.pia
   #   environment:
@@ -476,7 +476,7 @@ services:
   #     - private
 
   public-web:
-    image: wign/atlsd-public-web:${ATLSD_IMAGE_TAG:-latest}
+    image: ghcr.io/wignn/atlsd-public-web:${ATLSD_IMAGE_TAG:-latest}
     env_file:
       - ../env/.env.public-web
     container_name: atlsd-public-web
