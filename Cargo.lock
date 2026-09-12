@@ -1634,6 +1634,7 @@ dependencies = [
  "chrono",
  "dotenvy",
  "futures-util",
+ "once_cell",
  "redis",
  "reqwest",
  "rustls 0.23.38",
