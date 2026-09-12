@@ -5,6 +5,7 @@ pub mod macro_data;
 pub mod market;
 pub mod news;
 pub mod platform;
+pub mod rpc;
 pub mod scrape;
 pub mod topics;
 

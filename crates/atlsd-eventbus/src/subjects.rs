@@ -39,3 +39,8 @@ pub const ATLSD_MARKET_DEDUP_STREAM: &str = "ATLSD_MARKET_DEDUP";
 pub const ATLSD_NEWS_STREAM: &str = "ATLSD_NEWS";
 pub const ATLSD_INTELLIGENCE_STREAM: &str = "ATLSD_INTELLIGENCE";
 pub const ATLSD_PLATFORM_STREAM: &str = "ATLSD_PLATFORM";
+
+// Inter-service NATS RPC subjects
+pub const RPC_MARKET_PRICES_V1: &str = "rpc.v1.market.prices";
+pub const RPC_MARKET_CANDLES_V1: &str = "rpc.v1.market.candles";
+pub const RPC_CONTROL_USAGE_V1: &str = "rpc.v1.control.usage";
