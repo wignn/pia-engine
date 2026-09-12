@@ -20,6 +20,7 @@ mod institutional;
 mod options;
 mod prices;
 mod rates;
+mod rpc;
 mod session;
 mod spikes;
 mod state;
@@ -146,6 +147,12 @@ async fn main() {
     let alert_state = state.clone();
     tokio::spawn(async move {
         alert_notifier::run(alert_state).await;
+    });
+
+    let rpc_nats_url = cfg.nats_url.clone();
+    let rpc_state = state.clone();
+    tokio::spawn(async move {
+        rpc::run_rpc_responder(rpc_nats_url, rpc_state).await;
     });
 
     if cfg.has_fred() && !cfg.disable_legacy_macro_sync {

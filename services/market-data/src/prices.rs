@@ -45,8 +45,7 @@ pub async fn hydrate_price_cache(state: &AppState) -> anyhow::Result<usize> {
     Ok(count)
 }
 
-pub async fn list_prices(State(state): State<AppState>) -> Response {
-    // 1. Sub-millisecond pre-serialized L1 RAM cache (100ms micro-cache)
+pub async fn compute_prices_snapshot_bytes(state: &AppState) -> (axum::body::Bytes, &'static str) {
     if let Some(bytes) = {
         let guard = state.snapshot_cache.read();
         guard.as_ref().and_then(|(cached_at, b)| {
@@ -57,21 +56,12 @@ pub async fn list_prices(State(state): State<AppState>) -> Response {
             }
         })
     } {
-        return (
-            StatusCode::OK,
-            [
-                (header::CONTENT_TYPE, "application/json"),
-                (HeaderName::from_static("x-cache"), "HIT"),
-            ],
-            axum::body::Body::from(bytes),
-        )
-            .into_response();
+        return (bytes, "HIT");
     }
 
-    // 2. Compute from in-memory price map
     let mut prices: Vec<CachedPrice> = state.prices.read().values().cloned().collect();
     if prices.is_empty() {
-        prices = load_clickhouse_latest_prices(&state).await;
+        prices = load_clickhouse_latest_prices(state).await;
     }
     if prices.is_empty() {
         prices = load_latest_prices(&state.db).await.unwrap_or_default();
@@ -87,12 +77,16 @@ pub async fn list_prices(State(state): State<AppState>) -> Response {
         let mut guard = state.snapshot_cache.write();
         *guard = Some((std::time::Instant::now(), bytes.clone()));
     }
+    (bytes, "MISS")
+}
 
+pub async fn list_prices(State(state): State<AppState>) -> Response {
+    let (bytes, cache_status) = compute_prices_snapshot_bytes(&state).await;
     (
         StatusCode::OK,
         [
             (header::CONTENT_TYPE, "application/json"),
-            (HeaderName::from_static("x-cache"), "MISS"),
+            (HeaderName::from_static("x-cache"), cache_status),
         ],
         axum::body::Body::from(bytes),
     )
