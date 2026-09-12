@@ -10,6 +10,7 @@ mod state;
 mod streams;
 mod tenant;
 mod ticket;
+mod uds_subscriber;
 
 use axum::Json;
 use serde_json::{json, Value};
@@ -89,6 +90,13 @@ async fn main() {
     tokio::spawn(async move {
         nats_subscriber::run(nats_cfg, nats_hub).await;
     });
+
+    if let Some(uds_path) = cfg.uds_ipc_path.clone() {
+        let uds_hub = hub.clone();
+        tokio::spawn(async move {
+            uds_subscriber::run(uds_path, uds_hub).await;
+        });
+    }
 
     let listener = match TcpListener::bind(&cfg.bind_addr).await {
         Ok(listener) => listener,
