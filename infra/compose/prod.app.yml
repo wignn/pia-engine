@@ -105,6 +105,9 @@ services:
     environment:
       EVENTBUS_MODE: nats
       NATS_URL: nats://nats:4222
+      REALTIME_UDS_PATH: /tmp/atlsd-ipc/ticks.sock
+    volumes:
+      - /tmp/atlsd-ipc:/tmp/atlsd-ipc
     ports:
       - "${REALTIME_GATEWAY_PORT:-8020}:8020"
     depends_on:

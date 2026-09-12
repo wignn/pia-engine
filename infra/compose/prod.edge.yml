@@ -109,6 +109,10 @@ services:
       start_period: 15s
     env_file:
       - ../env/.env.ingestion
+    environment:
+      INGESTION_UDS_PATH: /tmp/atlsd-ipc/ticks.sock
+    volumes:
+      - /tmp/atlsd-ipc:/tmp/atlsd-ipc
     restart: always
     logging: *default-logging
     networks:
