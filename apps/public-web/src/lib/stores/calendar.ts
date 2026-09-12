@@ -10,7 +10,7 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 async function fetchCalendar() {
 	calendarLoading.set(true);
 	try {
-		const res = await apiFetch(`/api/v1/forex/calendar?impact=high&limit=15`);
+		const res = await apiFetch(`/api/v1/economic/calendar?impact=high&limit=15`);
 		if (!res.ok) return;
 		const data = await res.json();
 		if (data.items) calendarEvents.set(data.items);

@@ -14,9 +14,9 @@ export async function GET(request: NextRequest) {
   const symbol = request.nextUrl.searchParams.get("symbol") || "BTC";
   const [optionsSummary, yields, fearGreed, news] = await Promise.allSettled([
     read("/api/v1/options/summary"),
-    read("/api/v1/rates/yield-curve?country=US"),
+    read("/api/v1/fixed-income/yield-curve?country=US"),
     read("/api/v1/fear-greed?scope=global"),
-    read("/api/v1/forex/news/latest"),
+    read("/api/v1/news/latest"),
   ]);
 
   const allSnapshots =

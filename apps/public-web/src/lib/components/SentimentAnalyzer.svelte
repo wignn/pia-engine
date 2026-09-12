@@ -13,7 +13,7 @@
 		result = null;
 
 		try {
-			const res = await apiFetch('/api/v1/analyze', {
+			const res = await apiFetch('/api/v1/intelligence/analyze', {
 				method: 'POST',
 				body: JSON.stringify({ text })
 			});

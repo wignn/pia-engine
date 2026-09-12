@@ -5,7 +5,7 @@ const CORE_API_KEY = process.env.CORE_API_KEY || "silvia";
 
 export async function GET() {
   try {
-    const res = await fetch(`${CORE_REST_URL}/api/v1/forex/calendar?impact=high&limit=30`, {
+    const res = await fetch(`${CORE_REST_URL}/api/v1/economic/calendar?impact=high&limit=30`, {
       headers: {
         "x-api-key": CORE_API_KEY,
       },

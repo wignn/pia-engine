@@ -4,7 +4,7 @@ import { CORE_API_KEY, CORE_REST_URL } from "@/lib/config";
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.toString();
   try {
-    const response = await fetch(`${CORE_REST_URL}/api/v1/social/posts${query ? `?${query}` : ""}`, {
+    const response = await fetch(`${CORE_REST_URL}/api/v1/social/feed${query ? `?${query}` : ""}`, {
       headers: { "x-api-key": CORE_API_KEY },
       cache: "no-store",
     });

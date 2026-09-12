@@ -62,7 +62,7 @@
 		try {
 			const params = new URLSearchParams({ platform: 'twitter', limit: String(pageSize) });
 			if (append && nextBefore) params.set('before', nextBefore);
-			const response = await apiFetch(`/api/v1/social/posts?${params}`);
+			const response = await apiFetch(`/api/v1/social/feed?${params}`);
 			if (!response.ok) throw new Error('Social history unavailable');
 			const payload: SocialPage = await response.json();
 			if (payload.error) throw new Error('Social history unavailable');

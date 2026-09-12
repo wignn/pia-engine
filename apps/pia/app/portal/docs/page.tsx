@@ -91,7 +91,7 @@ const REST_ENDPOINTS = [
   },
   {
     method: "GET",
-    path: "/api/v1/social/posts?limit=10",
+    path: "/api/v1/social/feed?limit=10",
     title: "Real-Time Financial Social Pulse",
     desc: "Curated institutional social feeds from verified financial analysts, economists, and central banks via NATS.",
     params: "limit (optional, default 20, max 100), offset (optional cursor)",

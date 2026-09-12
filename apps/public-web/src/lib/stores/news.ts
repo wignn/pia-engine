@@ -21,7 +21,7 @@ function extractNewsItems(data: unknown): NewsItem[] {
 
 async function fetchForexNews() {
 	try {
-		const res = await apiFetch('/api/v1/forex/news/latest?limit=15');
+		const res = await apiFetch('/api/v1/news?category=forex&limit=15');
 		if (!res.ok) {
 			console.warn(`[News] forex fetch failed: ${res.status} ${res.statusText}`);
 			return;
@@ -39,7 +39,7 @@ async function fetchForexNews() {
 
 async function fetchStockNews() {
 	try {
-		const res = await apiFetch('/api/v1/stock/news?limit=15');
+		const res = await apiFetch('/api/v1/news?category=stock&limit=15');
 		if (!res.ok) {
 			console.warn(`[News] stock fetch failed: ${res.status} ${res.statusText}`);
 			return;

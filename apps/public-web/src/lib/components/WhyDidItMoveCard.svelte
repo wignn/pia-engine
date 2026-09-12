@@ -89,7 +89,7 @@
 		loading = true;
 		error = '';
 		try {
-			const res = await apiFetch(`/api/v1/market/why/${encodeURIComponent(upper)}?window=5m`);
+			const res = await apiFetch(`/api/v1/market/insights/${encodeURIComponent(upper)}?window=5m`);
 			if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 			data = (await res.json()) as WhyMoveResponse;
 			loadedSymbol = upper;
