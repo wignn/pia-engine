@@ -161,7 +161,7 @@ deploy_color() {
         -f "$ROOT_DIR/infra/compose/prod.app.yml" \
         --env-file "$ROOT_DIR/infra/env/.env.shared" \
         --env-file "$ROOT_DIR/infra/env/.env.$1" \
-        pull --ignore-buildable
+        pull --ignore-buildable || true
 
     # Run migrations as an explicit one-shot FIRST: visible logs in CI,
     # retried on transient datastore hiccups (the --rm one-shot inside
@@ -276,7 +276,7 @@ $COMPOSE -p atlsd-infra -f "$ROOT_DIR/infra/compose/prod.infra.yml" up -d
 
 echo "🔌 2. Ensuring edge singletons..."
 $COMPOSE -p atlsd-edge -f "$ROOT_DIR/infra/compose/prod.edge.yml" \
-    --env-file "$ROOT_DIR/infra/env/.env.shared" pull --ignore-buildable
+    --env-file "$ROOT_DIR/infra/env/.env.shared" pull --ignore-buildable || true
 $COMPOSE -p atlsd-edge -f "$ROOT_DIR/infra/compose/prod.edge.yml" \
     --env-file "$ROOT_DIR/infra/env/.env.shared" up -d --remove-orphans
 
