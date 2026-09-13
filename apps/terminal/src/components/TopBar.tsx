@@ -117,7 +117,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <header
-      className={`h-[46px] border-b flex items-center justify-between px-3 select-none text-xs shrink-0 transition-colors ${
+      className={`h-[46px] min-h-[46px] border-b flex items-center justify-between px-2 sm:px-3 select-none text-xs shrink-0 transition-colors ${
         isLight
           ? "bg-[#ffffff] border-[#e0e3eb] text-[#131722]"
           : "bg-[#1e222d] border-[#2a2e39] text-[#d1d4dc]"
@@ -165,7 +165,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <div className={`h-4 w-px mx-1 ${isLight ? "bg-[#e0e3eb]" : "bg-[#2a2e39]"}`} />
 
         {/* Timeframe selector */}
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 max-w-[42vw] overflow-x-auto scrollbar-hide">
           {TIMEFRAMES.map((tf) => (
             <button
               key={tf}

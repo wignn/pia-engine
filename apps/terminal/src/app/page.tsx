@@ -765,8 +765,8 @@ export default function TerminalPage() {
         />
 
         {/* Main Workspace View */}
-        <main className="flex-1 h-full overflow-hidden relative">
-          <div className={gridClass}>
+        <main className="min-w-0 flex-1 h-full overflow-hidden relative">
+          <div className={`${gridClass} min-w-0`}>
             {visiblePanes.map((pane, idx) => {
               const meta = findItem(pane.symbol);
               const spanClass = getPaneSpanClass(layout, idx);
@@ -850,7 +850,7 @@ export default function TerminalPage() {
         <aside
           style={{ width: isSidebarCollapsed ? 0 : `${sidebarWidth}px` }}
           className={`
-            fixed inset-y-0 right-0 z-50 w-[85vw] max-w-[360px] shadow-2xl transition-transform duration-300 ease-in-out
+            fixed inset-y-0 right-0 z-50 w-[calc(100vw-1rem)] max-w-[360px] shadow-2xl transition-transform duration-300 ease-in-out
             lg:static lg:z-auto lg:shadow-none lg:translate-x-0 lg:transition-none
             ${isMobileDrawerOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
             ${isSidebarCollapsed ? "lg:hidden" : "lg:flex"}
