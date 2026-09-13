@@ -751,7 +751,7 @@ export default function TerminalPage() {
         theme={settings.theme}
       />
 
-      <div className="flex-1 flex w-full overflow-hidden relative">
+      <div className="min-h-0 flex-1 flex w-full overflow-hidden relative">
         <LeftToolbar
           activeTool={activeTool}
           setActiveTool={setActiveTool}
@@ -765,7 +765,7 @@ export default function TerminalPage() {
         />
 
         {/* Main Workspace View */}
-        <main className="min-w-0 flex-1 h-full overflow-hidden relative">
+        <main className="min-w-0 min-h-0 flex-1 h-full overflow-hidden relative">
           <div className={`${gridClass} min-w-0`}>
             {visiblePanes.map((pane, idx) => {
               const meta = findItem(pane.symbol);

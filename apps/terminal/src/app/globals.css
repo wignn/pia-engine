@@ -24,6 +24,7 @@ body {
 body {
   background-color: var(--tv-bg);
   color: var(--tv-text);
+  min-height: 100%;
   overflow: hidden;
   user-select: none;
   font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif;

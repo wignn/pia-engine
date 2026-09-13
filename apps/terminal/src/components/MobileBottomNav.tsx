@@ -93,7 +93,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   };
 
   return (
-    <nav className="flex md:hidden h-[56px] min-h-[56px] w-full items-center justify-around border-t border-[#2a2e39] bg-[#1e222d] px-0.5 pb-[env(safe-area-inset-bottom)] z-30 select-none">
+    <nav className="md:hidden flex h-[56px] min-h-[56px] w-full items-center justify-around border-t border-[#2a2e39] bg-[#1e222d] px-0.5 pb-[env(safe-area-inset-bottom)] z-30 select-none">
       {navItems.map((item) => {
         const isCurrentActive =
           item.id === "chart"
