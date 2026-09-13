@@ -75,6 +75,45 @@ interface TopBarProps {
 
 const TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1D", "1W"];
 
+const CandlesSvg = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="currentColor">
+    <rect x="4.5" y="1.5" width="1" height="13" />
+    <rect x="3" y="4" width="4" height="7" rx="0.5" />
+    <rect x="10.5" y="2" width="1" height="12" />
+    <rect x="9" y="6" width="4" height="5" fill="none" stroke="currentColor" strokeWidth="1" rx="0.5" />
+  </svg>
+);
+
+const BarsSvg = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="currentColor">
+    <rect x="4.5" y="2" width="1" height="12" />
+    <rect x="2.5" y="5" width="2" height="1" />
+    <rect x="5.5" y="9" width="2" height="1" />
+    <rect x="10.5" y="2" width="1" height="12" />
+    <rect x="8.5" y="8" width="2" height="1" />
+    <rect x="11.5" y="4" width="2" height="1" />
+  </svg>
+);
+
+const LineSvg = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="2,12 6,7 10,10 14,4" />
+  </svg>
+);
+
+const AreaSvg = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 12 L6 7 L10 10 L14 4 L14 14 L2 14 Z" fill="currentColor" fillOpacity="0.25" stroke="currentColor" />
+  </svg>
+);
+
+const HeikinAshiSvg = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="currentColor">
+    <rect x="7.5" y="2" width="1" height="12" />
+    <rect x="5.5" y="5" width="5" height="6" fill="none" stroke="currentColor" strokeWidth="1.2" rx="0.5" />
+  </svg>
+);
+
 export const TopBar: React.FC<TopBarProps> = ({
   symbol,
   timeframe,
@@ -339,15 +378,19 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Chart Style (Candles) */}
         <div className="relative group">
           <button
-            className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer transition-colors ${
+            className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors ${
               isLight ? "hover:bg-[#f0f3fa] text-[#5d606b] hover:text-[#131722]" : "hover:bg-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]"
             }`}
           >
-            <BarChart2 className="w-3.5 h-3.5" />
+            {chartType === "bar" && <BarsSvg />}
+            {chartType === "line" && <LineSvg />}
+            {chartType === "area" && <AreaSvg />}
+            {chartType === "heikin_ashi" && <HeikinAshiSvg />}
+            {(!chartType || chartType === "candlestick") && <CandlesSvg />}
             <span className="hidden lg:inline text-xs font-medium">
-              {chartType === "heikin_ashi" ? "Heikin Ashi" : chartType[0].toUpperCase() + chartType.slice(1)}
+              {chartType === "heikin_ashi" ? "Heikin Ashi" : chartType === "candlestick" ? "Candles" : chartType ? chartType[0].toUpperCase() + chartType.slice(1) : "Candles"}
             </span>
-            <ChevronDown className="w-3 h-3" />
+            <ChevronDown className="w-3 h-3 text-[#787b86]" />
           </button>
           <div
             className={`hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-40 flex-col rounded-lg border p-1 shadow-2xl ${
@@ -355,16 +398,16 @@ export const TopBar: React.FC<TopBarProps> = ({
             }`}
           >
             {([
-              { id: "candlestick", label: "Candles", icon: "🕯️" },
-              { id: "bar", label: "Bars", icon: "📊" },
-              { id: "line", label: "Line", icon: "📈" },
-              { id: "area", label: "Area", icon: "⛰️" },
-              { id: "heikin_ashi", label: "Heikin Ashi", icon: "⛩️" },
+              { id: "candlestick", label: "Candles", icon: <CandlesSvg /> },
+              { id: "bar", label: "Bars", icon: <BarsSvg /> },
+              { id: "line", label: "Line", icon: <LineSvg /> },
+              { id: "area", label: "Area", icon: <AreaSvg /> },
+              { id: "heikin_ashi", label: "Heikin Ashi", icon: <HeikinAshiSvg /> },
             ] as const).map(({ id, label, icon }) => (
               <button
                 key={id}
                 onClick={() => onChartTypeChange?.(id)}
-                className={`flex items-center gap-2 rounded px-2 py-1.5 text-left text-xs cursor-pointer ${
+                className={`flex items-center gap-2.5 rounded px-2.5 py-1.5 text-left text-xs cursor-pointer transition-colors ${
                   chartType === id
                     ? "text-[#2962ff] font-bold bg-[#2962ff]/10"
                     : isLight

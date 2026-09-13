@@ -108,7 +108,14 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({ symbol, theme = "dark" }) 
                 : "text-[#787b86] hover:text-[#d1d4dc]"
             }`}
           >
-            {f === "high" ? "🔥 High Impact" : f}
+            {f === "high" ? (
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#f23645]" />
+                <span>High Impact</span>
+              </span>
+            ) : (
+              f
+            )}
           </button>
         ))}
       </div>

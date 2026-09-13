@@ -101,7 +101,14 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ theme = "dark" }) 
                 : "text-[#787b86] hover:text-[#d1d4dc]"
             }`}
           >
-            {imp === "high" ? "🔴 High Impact" : imp}
+            {imp === "high" ? (
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#f23645]" />
+                <span>High Impact</span>
+              </span>
+            ) : (
+              imp
+            )}
           </button>
         ))}
       </div>
