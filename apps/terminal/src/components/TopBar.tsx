@@ -28,7 +28,8 @@ import {
   Newspaper,
   Radio,
   Brain,
-  Calendar
+  Calendar,
+  Menu
 } from "lucide-react";
 import { Timeframe, IndicatorState, ChartLayout, IndicatorParameters, PaneContentType } from "@/types";
 
@@ -43,6 +44,7 @@ interface TopBarProps {
   changePercent: number;
   digits: number;
   onSearchClick: () => void;
+  onOpenMainMenu?: () => void;
   paneType?: PaneContentType;
   onChangePaneType?: (type: PaneContentType) => void;
   chartType?: "candlestick" | "bar" | "line" | "area" | "heikin_ashi";
@@ -82,6 +84,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   changePercent,
   digits,
   onSearchClick,
+  onOpenMainMenu,
   paneType = "chart",
   onChangePaneType,
   chartType = "candlestick",
@@ -133,10 +136,25 @@ export const TopBar: React.FC<TopBarProps> = ({
           : "bg-[#1e222d] border-[#2a2e39] text-[#d1d4dc]"
       }`}
     >
-      {/* Left Segment: Brand, View Dropdown, Symbol, Interval, Indicators */}
+      {/* Left Segment: Burger Menu, Brand, View Dropdown, Symbol, Interval, Indicators */}
       <div className="flex items-center gap-1.5 h-full">
+        {/* TradingView Burger Menu Button */}
+        <button
+          onClick={onOpenMainMenu}
+          className={`p-1.5 rounded cursor-pointer transition-colors ${
+            isLight ? "hover:bg-[#f0f3fa] text-[#5d606b] hover:text-[#131722]" : "hover:bg-[#2a2e39] text-[#787b86] hover:text-white"
+          }`}
+          title="Main Menu"
+        >
+          <Menu className="w-4 h-4" />
+        </button>
+
         {/* Brand / Logo (PIA Logo) */}
-        <div className={`flex items-center gap-2 pr-2 border-r h-6 mr-0.5 ${isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]"}`}>
+        <div
+          onClick={onOpenMainMenu}
+          className={`flex items-center gap-1.5 pr-2 border-r h-6 mr-0.5 cursor-pointer ${isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]"}`}
+          title="PIA Terminal Menu"
+        >
           <div className="w-5 h-5 rounded overflow-hidden flex items-center justify-center shrink-0">
             <Image
               src="/logo.png"

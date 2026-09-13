@@ -18,6 +18,7 @@ import { ChartTabs } from "@/components/ChartTabs";
 import { SymbolSearchModal } from "@/components/SymbolSearchModal";
 import { SettingsModal } from "@/components/SettingsModal";
 import { IndicatorSettingsModal } from "@/components/IndicatorSettingsModal";
+import { TradingViewMainMenu } from "@/components/TradingViewMainMenu";
 import { INITIAL_WATCHLIST } from "@/lib/constants";
 import { resolveInstrument } from "@/lib/instruments";
 import {
@@ -87,6 +88,7 @@ export default function TerminalPage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isIndicatorSettingsOpen, setIsIndicatorSettingsOpen] = useState(false);
+  const [isMainMenuOpen, setIsMainMenuOpen] = useState(false);
   const [initialSearchQuery, setInitialSearchQuery] = useState("");
   const [rightSidebarTab, setRightSidebarTab] = useState<SidebarTab>("watchlist");
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
@@ -715,6 +717,7 @@ export default function TerminalPage() {
           setInitialSearchQuery("");
           setIsSearchOpen(true);
         }}
+        onOpenMainMenu={() => setIsMainMenuOpen(true)}
         indicators={activePane.indicators}
         chartType={activePane.chartType}
         onChartTypeChange={handleChartTypeChange}
@@ -946,6 +949,16 @@ export default function TerminalPage() {
         params={settings.indicatorParams || DEFAULT_INDICATOR_PARAMS}
         onSave={handleSaveIndicatorParams}
         theme={settings.theme}
+      />
+
+      <TradingViewMainMenu
+        isOpen={isMainMenuOpen}
+        onClose={() => setIsMainMenuOpen(false)}
+        currentPaneType={activePane.type || "chart"}
+        onSelectPaneType={(newType) => handleChangePaneType(activePane.id, newType)}
+        theme={settings.theme}
+        onToggleTheme={handleToggleTheme}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
     </div>
   );
