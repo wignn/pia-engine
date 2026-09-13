@@ -243,23 +243,77 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <div className={`h-4 w-px mx-1 ${isLight ? "bg-[#e0e3eb]" : "bg-[#2a2e39]"}`} />
 
-        {/* Timeframe selector */}
-        <div className="flex items-center gap-0.5 max-w-[42vw] overflow-x-auto scrollbar-hide">
-          {TIMEFRAMES.map((tf) => (
+        {/* Timeframe selector with dropdown */}
+        <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-0.5 max-w-[42vw] overflow-x-auto scrollbar-hide">
+            {TIMEFRAMES.map((tf) => (
+              <button
+                key={tf}
+                onClick={() => setTimeframe(tf)}
+                className={`px-1.5 py-0.5 rounded font-semibold text-xs transition-colors cursor-pointer ${
+                  timeframe === tf
+                    ? "text-[#2962ff] bg-[#2962ff]/10 font-bold"
+                    : isLight
+                    ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#f0f3fa]"
+                    : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39]"
+                }`}
+              >
+                {tf}
+              </button>
+            ))}
+          </div>
+          <div className="relative group">
             <button
-              key={tf}
-              onClick={() => setTimeframe(tf)}
-              className={`px-2 py-1 rounded font-semibold text-xs transition-colors cursor-pointer ${
-                timeframe === tf
-                  ? "text-[#2962ff] bg-[#2962ff]/10 font-bold"
-                  : isLight
-                  ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#f0f3fa]"
-                  : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39]"
+              className={`p-1 rounded cursor-pointer transition-colors ${
+                isLight ? "hover:bg-[#f0f3fa] text-[#5d606b]" : "hover:bg-[#2a2e39] text-[#787b86]"
+              }`}
+              title="All Intervals"
+            >
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            <div
+              className={`hidden group-hover:flex absolute top-full left-0 z-40 mt-1 w-36 flex-col rounded-lg border p-1 shadow-2xl ${
+                isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
               }`}
             >
-              {tf}
-            </button>
-          ))}
+              <div className="text-[9px] uppercase font-bold tracking-wider px-2 py-1 text-[#787b86]">Minutes</div>
+              {(["1m", "5m", "15m"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTimeframe(t)}
+                  className={`rounded px-2 py-1 text-left text-xs cursor-pointer ${
+                    timeframe === t ? "text-[#2962ff] font-bold bg-[#2962ff]/10" : isLight ? "text-[#131722] hover:bg-[#f0f3fa]" : "text-[#d1d4dc] hover:bg-[#2a2e39]"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+              <div className="text-[9px] uppercase font-bold tracking-wider px-2 py-1 text-[#787b86] border-t border-[#2a2e39]/20 mt-1 pt-1">Hours</div>
+              {(["1h", "4h"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTimeframe(t)}
+                  className={`rounded px-2 py-1 text-left text-xs cursor-pointer ${
+                    timeframe === t ? "text-[#2962ff] font-bold bg-[#2962ff]/10" : isLight ? "text-[#131722] hover:bg-[#f0f3fa]" : "text-[#d1d4dc] hover:bg-[#2a2e39]"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+              <div className="text-[9px] uppercase font-bold tracking-wider px-2 py-1 text-[#787b86] border-t border-[#2a2e39]/20 mt-1 pt-1">Days</div>
+              {(["1D", "1W"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTimeframe(t)}
+                  className={`rounded px-2 py-1 text-left text-xs cursor-pointer ${
+                    timeframe === t ? "text-[#2962ff] font-bold bg-[#2962ff]/10" : isLight ? "text-[#131722] hover:bg-[#f0f3fa]" : "text-[#d1d4dc] hover:bg-[#2a2e39]"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className={`h-4 w-px mx-1 ${isLight ? "bg-[#e0e3eb]" : "bg-[#2a2e39]"}`} />
@@ -278,23 +332,30 @@ export const TopBar: React.FC<TopBarProps> = ({
             <ChevronDown className="w-3 h-3" />
           </button>
           <div
-            className={`hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-36 flex-col rounded border p-1 shadow-xl ${
+            className={`hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-40 flex-col rounded-lg border p-1 shadow-2xl ${
               isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
             }`}
           >
-            {(["candlestick", "bar", "line", "area", "heikin_ashi"] as const).map((type) => (
+            {([
+              { id: "candlestick", label: "Candles", icon: "🕯️" },
+              { id: "bar", label: "Bars", icon: "📊" },
+              { id: "line", label: "Line", icon: "📈" },
+              { id: "area", label: "Area", icon: "⛰️" },
+              { id: "heikin_ashi", label: "Heikin Ashi", icon: "⛩️" },
+            ] as const).map(({ id, label, icon }) => (
               <button
-                key={type}
-                onClick={() => onChartTypeChange?.(type)}
-                className={`rounded px-2 py-1.5 text-left text-xs capitalize cursor-pointer ${
-                  chartType === type
+                key={id}
+                onClick={() => onChartTypeChange?.(id)}
+                className={`flex items-center gap-2 rounded px-2 py-1.5 text-left text-xs cursor-pointer ${
+                  chartType === id
                     ? "text-[#2962ff] font-bold bg-[#2962ff]/10"
                     : isLight
                     ? "text-[#131722] hover:bg-[#f0f3fa]"
                     : "text-[#d1d4dc] hover:bg-[#2a2e39]"
                 }`}
               >
-                {type === "heikin_ashi" ? "Heikin Ashi" : type}
+                <span>{icon}</span>
+                <span>{label}</span>
               </button>
             ))}
           </div>
@@ -303,12 +364,12 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Indicators */}
         <div className="relative group">
           <button
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded font-medium cursor-pointer transition-colors ${
+            className={`flex items-center gap-1.5 px-2 py-1 rounded font-medium cursor-pointer transition-colors ${
               isLight ? "hover:bg-[#f0f3fa] text-[#131722]" : "hover:bg-[#2a2e39] text-[#d1d4dc]"
             }`}
           >
-            <TrendingUp className="w-3.5 h-3.5 text-[#2962ff]" />
-            <span>Indicators</span>
+            <span className="font-serif font-bold text-[#2962ff] text-xs">fx</span>
+            <span className="hidden sm:inline">Indicators</span>
           </button>
           <div
             className={`hidden group-hover:flex absolute top-full left-0 z-30 mt-1 w-60 flex-col rounded-xl border p-1.5 shadow-2xl ${
