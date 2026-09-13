@@ -739,16 +739,8 @@ export default function TerminalPage() {
         syncTime={settings.syncTime !== false}
         onToggleSyncTime={handleToggleSyncTime}
         onSave={handleManualSave}
-      />
-
-      <ChartTabs
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onSelectTab={handleSelectTab}
-        onCloseTab={handleCloseTab}
-        onNewTab={handleNewTab}
-        onReorderTabs={handleReorderTabs}
-        theme={settings.theme}
+        paneType={activePane.type || "chart"}
+        onChangePaneType={(newType) => handleChangePaneType(activePane.id, newType)}
       />
 
       <div className="min-h-0 flex-1 flex w-full overflow-hidden relative">

@@ -22,9 +22,15 @@ import {
   Plus,
   Crosshair,
   Link2,
-  Sliders
+  Sliders,
+  BarChart3,
+  Layers,
+  Newspaper,
+  Radio,
+  Brain,
+  Calendar
 } from "lucide-react";
-import { Timeframe, IndicatorState, ChartLayout, IndicatorParameters } from "@/types";
+import { Timeframe, IndicatorState, ChartLayout, IndicatorParameters, PaneContentType } from "@/types";
 
 import { VisualLayoutPicker } from "./VisualLayoutPicker";
 
@@ -37,6 +43,8 @@ interface TopBarProps {
   changePercent: number;
   digits: number;
   onSearchClick: () => void;
+  paneType?: PaneContentType;
+  onChangePaneType?: (type: PaneContentType) => void;
   chartType?: "candlestick" | "bar" | "line" | "area" | "heikin_ashi";
   onChartTypeChange?: (type: "candlestick" | "bar" | "line" | "area" | "heikin_ashi") => void;
   onToggleIndicator?: (indicator: keyof IndicatorState) => void;
@@ -74,6 +82,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   changePercent,
   digits,
   onSearchClick,
+  paneType = "chart",
+  onChangePaneType,
   chartType = "candlestick",
   onChartTypeChange,
   onToggleIndicator,
@@ -117,30 +127,99 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <header
-      className={`h-[46px] min-h-[46px] border-b flex items-center justify-between px-2 sm:px-3 select-none text-xs shrink-0 transition-colors ${
+      className={`h-[38px] min-h-[38px] border-b flex items-center justify-between px-2 sm:px-3 select-none text-xs shrink-0 transition-colors ${
         isLight
           ? "bg-[#ffffff] border-[#e0e3eb] text-[#131722]"
           : "bg-[#1e222d] border-[#2a2e39] text-[#d1d4dc]"
       }`}
     >
-      {/* Left Segment: Symbol, Interval, Indicators */}
+      {/* Left Segment: Brand, View Dropdown, Symbol, Interval, Indicators */}
       <div className="flex items-center gap-1.5 h-full">
         {/* Brand / Logo (PIA Logo) */}
-        <div className={`flex items-center gap-2 pr-2.5 border-r h-7 mr-1 ${isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]"}`}>
-          <div className="w-6 h-6 rounded-md overflow-hidden flex items-center justify-center shrink-0">
+        <div className={`flex items-center gap-2 pr-2 border-r h-6 mr-0.5 ${isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]"}`}>
+          <div className="w-5 h-5 rounded overflow-hidden flex items-center justify-center shrink-0">
             <Image
               src="/logo.png"
               alt="PIA Logo"
-              width={24}
-              height={24}
+              width={20}
+              height={20}
               className="w-full h-full object-contain"
               priority
             />
           </div>
-          <span className={`font-black tracking-wider text-[14px] hidden md:inline ${isLight ? "text-[#131722]" : "text-white"}`}>
+          <span className={`font-black tracking-wider text-[13px] hidden sm:inline ${isLight ? "text-[#131722]" : "text-white"}`}>
             PIA
           </span>
         </div>
+
+        {/* Workspace View Dropdown (Chart, Order Book, News, Social, Intel, Calendar) */}
+        <div className="relative group">
+          <button
+            className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors ${
+              isLight
+                ? "hover:bg-[#f0f3fa] text-[#131722]"
+                : "hover:bg-[#2a2e39] text-[#d1d4dc]"
+            }`}
+          >
+            {paneType === "orderbook" && <Layers className="w-3.5 h-3.5 text-[#089981]" />}
+            {paneType === "news" && <Newspaper className="w-3.5 h-3.5 text-[#f5b942]" />}
+            {paneType === "social" && <Radio className="w-3.5 h-3.5 text-[#e040fb]" />}
+            {paneType === "intelligence" && <Brain className="w-3.5 h-3.5 text-[#00e5ff]" />}
+            {paneType === "calendar" && <Calendar className="w-3.5 h-3.5 text-[#ff5252]" />}
+            {(!paneType || paneType === "chart") && <BarChart3 className="w-3.5 h-3.5 text-[#2962ff]" />}
+            <span className="font-bold text-xs">
+              {paneType === "orderbook"
+                ? "Order Book"
+                : paneType === "intelligence"
+                ? "Market Intel"
+                : paneType === "social"
+                ? "Social Pulse"
+                : paneType === "calendar"
+                ? "Calendar"
+                : paneType === "news"
+                ? "News"
+                : "Chart"}
+            </span>
+            <ChevronDown className="w-3 h-3 text-[#787b86]" />
+          </button>
+          <div
+            className={`hidden group-hover:flex absolute top-full left-0 z-40 mt-1 w-56 flex-col rounded-lg border p-1 shadow-2xl ${
+              isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+            }`}
+          >
+            <div className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 text-[#787b86]">
+              Workspace View
+            </div>
+            {([
+              { id: "chart", label: "Chart View", icon: <BarChart3 className="w-3.5 h-3.5 text-[#2962ff]" />, desc: "Interactive Candlesticks" },
+              { id: "orderbook", label: "DOM & Order Book", icon: <Layers className="w-3.5 h-3.5 text-[#089981]" />, desc: "Market Depth & Level 2" },
+              { id: "news", label: "News Stream", icon: <Newspaper className="w-3.5 h-3.5 text-[#f5b942]" />, desc: "Financial Breaking News" },
+              { id: "social", label: "Social Pulse", icon: <Radio className="w-3.5 h-3.5 text-[#e040fb]" />, desc: "𝕏 Live Posts & Sentiment" },
+              { id: "intelligence", label: "Market Intelligence", icon: <Brain className="w-3.5 h-3.5 text-[#00e5ff]" />, desc: "AI Macro & COT Analysis" },
+              { id: "calendar", label: "Economic Calendar", icon: <Calendar className="w-3.5 h-3.5 text-[#ff5252]" />, desc: "Central Bank & Macro Events" }
+            ] as const).map((item) => (
+              <button
+                key={item.id}
+                onClick={() => onChangePaneType?.(item.id)}
+                className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-xs cursor-pointer transition-colors ${
+                  paneType === item.id || (!paneType && item.id === "chart")
+                    ? "bg-[#2962ff]/10 text-[#2962ff] font-bold"
+                    : isLight
+                    ? "text-[#131722] hover:bg-[#f0f3fa]"
+                    : "text-[#d1d4dc] hover:bg-[#2a2e39]"
+                }`}
+              >
+                {item.icon}
+                <div className="flex flex-col">
+                  <span>{item.label}</span>
+                  <span className="text-[10px] font-normal text-[#787b86]">{item.desc}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className={`h-4 w-px mx-0.5 ${isLight ? "bg-[#e0e3eb]" : "bg-[#2a2e39]"}`} />
 
         {/* Symbol Search Button */}
         <button
