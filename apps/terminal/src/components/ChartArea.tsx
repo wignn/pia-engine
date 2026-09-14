@@ -1168,6 +1168,34 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           )}
         </div>
 
+        {/* Quick Order Placement Floating Widget (TradingView Signature) */}
+        <div className="flex items-center gap-1.5 my-0.5 pointer-events-auto select-none">
+          {/* Sell Box */}
+          <button
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#f23645]/15 border border-[#f23645]/40 text-[#f23645] font-mono text-[10px] font-bold cursor-pointer hover:bg-[#f23645]/25 transition-all shadow-xs"
+            title="Instant Quick Sell"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-[#f23645]" />
+            <span>{(livePrice ? livePrice * 0.9998 : ohlc.close * 0.9998).toFixed(digits)}</span>
+            <span className="uppercase text-[8px] tracking-wider">SELL</span>
+          </button>
+
+          {/* Spread Pill */}
+          <div className={`px-1.5 py-0.5 rounded text-[9px] font-mono border ${isLight ? "bg-white border-[#e0e3eb] text-[#787b86]" : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"}`}>
+            <span>{(digits === 3 || digits === 2 ? "0.4" : "1.2")}</span>
+          </div>
+
+          {/* Buy Box */}
+          <button
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#2962ff]/15 border border-[#2962ff]/40 text-[#2962ff] font-mono text-[10px] font-bold cursor-pointer hover:bg-[#2962ff]/25 transition-all shadow-xs"
+            title="Instant Quick Buy"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-[#2962ff]" />
+            <span>{(livePrice ? livePrice * 1.0002 : ohlc.close * 1.0002).toFixed(digits)}</span>
+            <span className="uppercase text-[8px] tracking-wider">BUY</span>
+          </button>
+        </div>
+
         {/* OHLC Bar Metrics */}
         <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono">
           <div className="flex items-center gap-1">

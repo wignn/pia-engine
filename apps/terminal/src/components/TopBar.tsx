@@ -604,10 +604,10 @@ export const TopBar: React.FC<TopBarProps> = ({
           )}
         </div>
 
-        {/* Quick Save */}
+        {/* Quick Save Layout (TradingView "Tanpa Nama" style) */}
         <button
           onClick={handleSave}
-          className={`hidden sm:flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold cursor-pointer transition-colors ${
+          className={`hidden sm:flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold cursor-pointer transition-colors ${
             isLight ? "hover:bg-[#f0f3fa] text-[#131722]" : "hover:bg-[#2a2e39] text-[#d1d4dc]"
           }`}
           title="Save Layout State"
@@ -615,11 +615,11 @@ export const TopBar: React.FC<TopBarProps> = ({
           {savedFeedback ? (
             <>
               <Check className="w-3 h-3 text-[#089981]" />
-              <span className="text-[#089981]">Saved</span>
+              <span className="text-[#089981]">Tersimpan</span>
             </>
           ) : (
             <>
-              <span>Save</span>
+              <span>Tanpa Nama</span>
               <ChevronDown className="w-3 h-3 text-[#787b86]" />
             </>
           )}
@@ -667,6 +667,15 @@ export const TopBar: React.FC<TopBarProps> = ({
           title="Take a snapshot (PNG)"
         >
           <Camera className="w-3.5 h-3.5" />
+        </button>
+
+        {/* TradingView Publish Button (High-contrast white pill) */}
+        <button
+          onClick={onSnapshot}
+          className="hidden md:inline-flex items-center justify-center px-3.5 py-1 rounded-full bg-white text-[#131722] font-bold text-xs hover:bg-[#f0f3fa] transition-all shadow-xs cursor-pointer ml-1"
+          title="Publish Idea / Snapshot"
+        >
+          Publish
         </button>
       </div>
     </header>
