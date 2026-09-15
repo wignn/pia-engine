@@ -507,7 +507,44 @@ pub async fn get_options_chain(
     )
     .await
     {
-        Ok(contracts) => Json(serde_json::json!({ "data": contracts })),
+        Ok(contracts) => {
+            let symbol = params.symbol.as_deref().unwrap_or_default().trim().to_uppercase();
+            let summary = query_options_summary(&state.db, Some(&symbol))
+                .await
+                .ok()
+                .and_then(|items| items.into_iter().next());
+            let mut expirations: Vec<String> = contracts
+                .iter()
+                .map(|contract| contract.expiration_date.to_string())
+                .collect();
+            expirations.sort();
+            expirations.dedup();
+            let contracts = contracts.into_iter().map(|contract| serde_json::json!({
+                "contract_symbol": contract.contract_symbol,
+                "symbol": contract.symbol,
+                "option_type": contract.option_type,
+                "strike": contract.strike,
+                "expiration": contract.expiration_date,
+                "mark_price": contract.mark_price,
+                "bid": contract.bid,
+                "ask": contract.ask,
+                "last": contract.mark_price,
+                "implied_volatility": contract.implied_volatility,
+                "delta": contract.delta,
+                "gamma": contract.gamma,
+                "theta": contract.theta,
+                "vega": contract.vega,
+                "gex": contract.gex,
+                "open_interest": contract.open_interest,
+                "volume": contract.volume,
+            })).collect::<Vec<_>>();
+            Json(serde_json::json!({
+                "symbol": symbol,
+                "underlying_price": summary.map(|item| item.underlying_price),
+                "expirations": expirations,
+                "contracts": contracts,
+            }))
+        }
         Err(err) => {
             error!(error = %err, "failed to query options chain");
             Json(serde_json::json!({ "error": "internal server error" }))
@@ -528,7 +565,29 @@ pub async fn get_options_gex(
     )
     .await
     {
-        Ok(gex) => Json(serde_json::json!({ "data": gex })),
+        Ok(gex) => {
+            let symbol = params.symbol.as_deref().unwrap_or_default().trim().to_uppercase();
+            let positive: Vec<serde_json::Value> = gex
+                .iter()
+                .filter(|level| level.call_gex > 0.0)
+                .map(|level| serde_json::json!({ "strike": level.strike, "gex": level.call_gex }))
+                .collect();
+            let negative: Vec<serde_json::Value> = gex
+                .iter()
+                .filter(|level| level.put_gex < 0.0)
+                .map(|level| serde_json::json!({ "strike": level.strike, "gex": level.put_gex.abs() }))
+                .collect();
+            let net_gex: f64 = gex.iter().map(|level| level.total_gex).sum();
+            Json(serde_json::json!({
+                "symbol": symbol,
+                "net_gex": net_gex,
+                "total_call_gex": gex.iter().map(|level| level.call_gex).sum::<f64>(),
+                "total_put_gex": gex.iter().map(|level| level.put_gex).sum::<f64>(),
+                "major_positive_levels": positive,
+                "major_negative_levels": negative,
+                "updated_at": Utc::now().to_rfc3339(),
+            }))
+        }
         Err(err) => {
             error!(error = %err, "failed to query options gex");
             Json(serde_json::json!({ "error": "internal server error" }))

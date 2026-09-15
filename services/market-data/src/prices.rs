@@ -85,6 +85,8 @@ pub struct ListSymbolsParams {
     pub asset_type: Option<String>,
     pub search: Option<String>,
     pub exchange: Option<String>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }
 
 pub async fn list_symbols(
@@ -147,9 +149,17 @@ pub async fn list_symbols(
         sym_a.cmp(sym_b)
     });
 
+    let total = items.len();
+    let offset = params.offset.unwrap_or(0).min(total);
+    let limit = params.limit.unwrap_or(total.max(1)).clamp(1, 1000);
+    let items = items.into_iter().skip(offset).take(limit).collect::<Vec<_>>();
+    let next_offset = offset + items.len();
     let payload = json!({
-        "total": items.len(),
+        "total": total,
         "items": items,
+        "offset": offset,
+        "limit": limit,
+        "next_offset": (next_offset < total).then_some(next_offset),
     });
 
     (
@@ -216,8 +226,25 @@ pub async fn get_price(Path(symbol): Path<String>, State(state): State<AppState>
 pub async fn get_orderbook(
     Path(symbol): Path<String>,
     State(state): State<AppState>,
-) -> Json<Value> {
-    let symbol = symbol.to_uppercase();
+) -> Response {
+    let symbol = symbol.trim().to_uppercase();
+
+    // Spot metals are quote/candle instruments in the current feed. They do not
+    // expose a real depth-of-market stream, so never manufacture a book from a
+    // quote snapshot or make clients retry the same unsupported request.
+    if matches!(symbol.as_str(), "XAGUSD") {
+        return (
+            StatusCode::NOT_FOUND,
+            [(header::CONTENT_TYPE, "application/json")],
+            Json(json!({
+                "code": "ORDER_BOOK_NOT_SUPPORTED",
+                "symbol": symbol,
+                "message": "Order book is not supported for this instrument"
+            })),
+        )
+            .into_response();
+    }
+
     let cached = { state.prices.read().get(&symbol).cloned() };
     let price = if cached.is_some() {
         cached
@@ -236,7 +263,8 @@ pub async fn get_orderbook(
                 "asks": [],
                 "timestamp": chrono::Utc::now().timestamp_millis(),
                 "error": "symbol not found"
-            }));
+            }))
+            .into_response();
         }
     };
 
@@ -273,6 +301,7 @@ pub async fn get_orderbook(
         "asks": asks,
         "timestamp": p.timestamp_ms.unwrap_or_else(|| chrono::Utc::now().timestamp_millis()),
     }))
+    .into_response()
 }
 
 pub fn price_json_with_calendar(
