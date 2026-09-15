@@ -216,7 +216,10 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/v1/geosignals", any(crate::proxy::proxy_request))
         .route("/api/v1/options/summary", any(crate::proxy::proxy_request))
-        .route("/api/v1/options/chain", any(crate::proxy::proxy_request))
+        .route(
+            "/api/v1/options/chain",
+            any(crate::proxy::proxy_request),
+        )
         .route(
             "/api/v1/options/chain/{symbol}",
             any(crate::proxy::proxy_request),
