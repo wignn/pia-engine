@@ -138,7 +138,8 @@ pub async fn analyze_text(
 fn fallback_analyze(text: &str) -> String {
     let text_lower = text.to_lowercase();
     let pos = [
-        "surge", "gain", "bullish", "rise", "growth", "rally", "profit", "higher", "positive", "eth", "btc",
+        "surge", "gain", "bullish", "rise", "growth", "rally", "profit", "higher", "positive",
+        "eth", "btc",
     ];
     let neg = [
         "plunge", "loss", "bearish", "drop", "fall", "crash", "decline", "lower", "negative",
