@@ -19,6 +19,7 @@ pub fn build_router(state: AppState) -> Router {
             }),
         )
         .route("/api/v1/market/prices", get(crate::prices::list_prices))
+        .route("/api/v1/market/symbols", get(crate::prices::list_symbols))
         .route(
             "/api/v1/market/prices/{symbol}",
             get(crate::prices::get_price),

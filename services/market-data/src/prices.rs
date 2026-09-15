@@ -1,7 +1,7 @@
 use crate::clickhouse::LatestPriceTick;
 use crate::state::AppState;
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{header, HeaderName, StatusCode},
     response::{IntoResponse, Response},
     Json,
@@ -78,6 +78,109 @@ pub async fn compute_prices_snapshot_bytes(state: &AppState) -> (axum::body::Byt
         *guard = Some((std::time::Instant::now(), bytes.clone()));
     }
     (bytes, "MISS")
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct ListSymbolsParams {
+    pub asset_type: Option<String>,
+    pub search: Option<String>,
+    pub exchange: Option<String>,
+}
+
+pub async fn list_symbols(
+    State(state): State<AppState>,
+    Query(params): Query<ListSymbolsParams>,
+) -> Response {
+    let mut prices: Vec<CachedPrice> = state.prices.read().values().cloned().collect();
+    if prices.is_empty() {
+        prices = load_clickhouse_latest_prices(&state).await;
+    }
+    if prices.is_empty() {
+        prices = load_latest_prices(&state.db).await.unwrap_or_default();
+    }
+
+    let mut items: Vec<Value> = prices
+        .into_iter()
+        .filter(|p| {
+            if let Some(ref at) = params.asset_type {
+                if !p.asset_type.eq_ignore_ascii_case(at) {
+                    return false;
+                }
+            }
+            if let Some(ref ex) = params.exchange {
+                if !p.source.eq_ignore_ascii_case(ex) {
+                    return false;
+                }
+            }
+            if let Some(ref q) = params.search {
+                let q_upper = q.to_uppercase();
+                if !p.symbol.contains(&q_upper) {
+                    return false;
+                }
+            }
+            true
+        })
+        .map(|p| {
+            let exchange_meta = state.calendar.exchange_for_symbol(&p.symbol);
+            let exchange_code = exchange_meta
+                .as_ref()
+                .map(|e| e.exchange_code.clone())
+                .unwrap_or_else(|| p.source.to_uppercase());
+            let (decimals, tick_size) = default_precision_and_tick(&p.symbol, &p.asset_type);
+
+            json!({
+                "symbol": p.symbol,
+                "asset_type": p.asset_type,
+                "exchange": exchange_code,
+                "source": p.source,
+                "price_precision": decimals,
+                "tick_size": tick_size,
+                "is_active": true,
+                "last_price": p.price,
+            })
+        })
+        .collect();
+
+    items.sort_by(|a, b| {
+        let sym_a = a.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+        let sym_b = b.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+        sym_a.cmp(sym_b)
+    });
+
+    let payload = json!({
+        "total": items.len(),
+        "items": items,
+    });
+
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "application/json")],
+        Json(payload),
+    )
+        .into_response()
+}
+
+fn default_precision_and_tick(symbol: &str, asset_type: &str) -> (u32, f64) {
+    match asset_type.to_lowercase().as_str() {
+        "forex" => {
+            if symbol.ends_with("JPY") {
+                (3, 0.001)
+            } else {
+                (5, 0.00001)
+            }
+        }
+        "crypto" => {
+            if symbol.starts_with("BTC") || symbol.starts_with("ETH") {
+                (2, 0.01)
+            } else {
+                (4, 0.0001)
+            }
+        }
+        "commodity" => (3, 0.001),
+        "stock" => (2, 0.01),
+        "rates" => (3, 0.001),
+        _ => (2, 0.01),
+    }
 }
 
 pub async fn list_prices(State(state): State<AppState>) -> Response {
