@@ -22,7 +22,7 @@ pub fn build_router(state: AppState) -> Router {
             }),
         )
         .route("/api/v1/news", get(crate::news::list_unified_news))
-        .route("/api/v1/news/latest", get(crate::news::latest_forex_news))
+        .route("/api/v1/news/latest", get(crate::news::latest_stock_news))
         .route("/api/v1/news/{id}", get(crate::news::get_forex_news))
         .route("/api/v1/economic/calendar", get(crate::news::list_calendar))
         .route("/api/v1/social/feed", get(crate::social::list_posts))

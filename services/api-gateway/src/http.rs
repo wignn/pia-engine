@@ -19,6 +19,7 @@ pub fn build_router(state: AppState) -> Router {
 
     let protected = Router::new()
         .route("/api/v1/market/prices", any(crate::proxy::proxy_request))
+        .route("/api/v1/market/symbols", any(crate::proxy::proxy_request))
         .route(
             "/api/v1/market/prices/{symbol}",
             any(crate::proxy::proxy_request),
@@ -119,6 +120,7 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/economic/categories",
             any(crate::proxy::proxy_request),
         )
+        .route("/api/v1/economic/map", any(crate::proxy::proxy_request))
         .route(
             "/api/v1/fixed-income/yield-curve",
             any(crate::proxy::proxy_request),

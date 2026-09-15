@@ -140,6 +140,7 @@ fn target_base_for_path<'a>(path: &str, config: &'a crate::config::Config) -> Op
         || path.starts_with("/api/v1/economic/latest")
         || path.starts_with("/api/v1/economic/countries")
         || path.starts_with("/api/v1/economic/categories")
+        || path.starts_with("/api/v1/economic/map")
     {
         Some(config.market_data_url.as_str())
     } else if path.starts_with("/api/v1/news")
