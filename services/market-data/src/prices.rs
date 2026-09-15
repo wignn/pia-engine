@@ -152,7 +152,11 @@ pub async fn list_symbols(
     let total = items.len();
     let offset = params.offset.unwrap_or(0).min(total);
     let limit = params.limit.unwrap_or(total.max(1)).clamp(1, 1000);
-    let items = items.into_iter().skip(offset).take(limit).collect::<Vec<_>>();
+    let items = items
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .collect::<Vec<_>>();
     let next_offset = offset + items.len();
     let payload = json!({
         "total": total,
@@ -223,10 +227,7 @@ pub async fn get_price(Path(symbol): Path<String>, State(state): State<AppState>
     }
 }
 
-pub async fn get_orderbook(
-    Path(symbol): Path<String>,
-    State(state): State<AppState>,
-) -> Response {
+pub async fn get_orderbook(Path(symbol): Path<String>, State(state): State<AppState>) -> Response {
     let symbol = symbol.trim().to_uppercase();
 
     // Spot metals are quote/candle instruments in the current feed. They do not

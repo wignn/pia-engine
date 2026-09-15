@@ -508,7 +508,12 @@ pub async fn get_options_chain(
     .await
     {
         Ok(contracts) => {
-            let symbol = params.symbol.as_deref().unwrap_or_default().trim().to_uppercase();
+            let symbol = params
+                .symbol
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .to_uppercase();
             let summary = query_options_summary(&state.db, Some(&symbol))
                 .await
                 .ok()
@@ -519,25 +524,30 @@ pub async fn get_options_chain(
                 .collect();
             expirations.sort();
             expirations.dedup();
-            let contracts = contracts.into_iter().map(|contract| serde_json::json!({
-                "contract_symbol": contract.contract_symbol,
-                "symbol": contract.symbol,
-                "option_type": contract.option_type,
-                "strike": contract.strike,
-                "expiration": contract.expiration_date,
-                "mark_price": contract.mark_price,
-                "bid": contract.bid,
-                "ask": contract.ask,
-                "last": contract.mark_price,
-                "implied_volatility": contract.implied_volatility,
-                "delta": contract.delta,
-                "gamma": contract.gamma,
-                "theta": contract.theta,
-                "vega": contract.vega,
-                "gex": contract.gex,
-                "open_interest": contract.open_interest,
-                "volume": contract.volume,
-            })).collect::<Vec<_>>();
+            let contracts = contracts
+                .into_iter()
+                .map(|contract| {
+                    serde_json::json!({
+                        "contract_symbol": contract.contract_symbol,
+                        "symbol": contract.symbol,
+                        "option_type": contract.option_type,
+                        "strike": contract.strike,
+                        "expiration": contract.expiration_date,
+                        "mark_price": contract.mark_price,
+                        "bid": contract.bid,
+                        "ask": contract.ask,
+                        "last": contract.mark_price,
+                        "implied_volatility": contract.implied_volatility,
+                        "delta": contract.delta,
+                        "gamma": contract.gamma,
+                        "theta": contract.theta,
+                        "vega": contract.vega,
+                        "gex": contract.gex,
+                        "open_interest": contract.open_interest,
+                        "volume": contract.volume,
+                    })
+                })
+                .collect::<Vec<_>>();
             Json(serde_json::json!({
                 "symbol": symbol,
                 "underlying_price": summary.map(|item| item.underlying_price),
@@ -566,7 +576,12 @@ pub async fn get_options_gex(
     .await
     {
         Ok(gex) => {
-            let symbol = params.symbol.as_deref().unwrap_or_default().trim().to_uppercase();
+            let symbol = params
+                .symbol
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .to_uppercase();
             let positive: Vec<serde_json::Value> = gex
                 .iter()
                 .filter(|level| level.call_gex > 0.0)
