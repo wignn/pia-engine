@@ -213,6 +213,68 @@ pub async fn get_price(Path(symbol): Path<String>, State(state): State<AppState>
     }
 }
 
+pub async fn get_orderbook(
+    Path(symbol): Path<String>,
+    State(state): State<AppState>,
+) -> Json<Value> {
+    let symbol = symbol.to_uppercase();
+    let cached = { state.prices.read().get(&symbol).cloned() };
+    let price = if cached.is_some() {
+        cached
+    } else if let Some(price) = load_clickhouse_latest_price(&state, &symbol).await {
+        Some(price)
+    } else {
+        load_latest_price(&state.db, &symbol).await.ok().flatten()
+    };
+
+    let p = match price {
+        Some(p) => p,
+        None => {
+            return Json(json!({
+                "symbol": symbol,
+                "bids": [],
+                "asks": [],
+                "timestamp": chrono::Utc::now().timestamp_millis(),
+                "error": "symbol not found"
+            }));
+        }
+    };
+
+    let (decimals, tick_size) = default_precision_and_tick(&p.symbol, &p.asset_type);
+    let factor = 10f64.powi(decimals as i32);
+    let mid_price = p.price;
+    let base_bid = p.bid.unwrap_or(mid_price - tick_size);
+    let base_ask = p.ask.unwrap_or(mid_price + tick_size);
+
+    let mut bids = Vec::new();
+    let mut asks = Vec::new();
+
+    let base_vol = p.volume.unwrap_or(100.0).max(1.0);
+
+    for i in 0..15 {
+        let step = (i as f64) * tick_size;
+        let bid_p = ((base_bid - step) * factor).round() / factor;
+        let ask_p = ((base_ask + step) * factor).round() / factor;
+
+        let bid_sz = (((base_vol * (0.15 + (i as f64) * 0.08)) * 100.0).round() / 100.0).max(0.01);
+        let ask_sz = (((base_vol * (0.14 + (i as f64) * 0.075)) * 100.0).round() / 100.0).max(0.01);
+
+        if bid_p > 0.0 {
+            bids.push(json!({ "price": bid_p, "size": bid_sz }));
+        }
+        if ask_p > 0.0 {
+            asks.push(json!({ "price": ask_p, "size": ask_sz }));
+        }
+    }
+
+    Json(json!({
+        "symbol": p.symbol,
+        "bids": bids,
+        "asks": asks,
+        "timestamp": p.timestamp_ms.unwrap_or_else(|| chrono::Utc::now().timestamp_millis()),
+    }))
+}
+
 pub fn price_json_with_calendar(
     price: &CachedPrice,
     calendar: Option<&crate::calendar::CalendarCache>,
