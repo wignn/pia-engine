@@ -727,7 +727,6 @@ fn macro_map_indicator(value: Option<&str>) -> Option<(&'static str, &'static st
         "inflation" => Some(("inflation", "Consumer Price Index", "Index")),
         "unemployment" => Some(("unemployment", "Unemployment Rate", "Percent")),
         "gdp" | "gdp_growth" => Some(("gdp", "Real GDP Growth Rate", "Percent")),
-        "interest_rate" | "policy_rate" => None,
         _ => None,
     }
 }
@@ -918,7 +917,7 @@ pub async fn get_macro_map(
         }));
     }
 
-    let timeline = sqlx::query_scalar::<_, String>(
+    let timeline = match sqlx::query_scalar::<_, String>(
         r#"SELECT DISTINCT to_char(observation_date, 'YYYY-MM')
            FROM macro.macro_observations
            WHERE series_id = ANY($1) AND value IS NOT NULL
@@ -929,7 +928,19 @@ pub async fn get_macro_map(
     .bind(cutoff)
     .fetch_all(&state.db)
     .await
-    .unwrap_or_default();
+    {
+        Ok(timeline) => timeline,
+        Err(err) => {
+            error!(error = %err, indicator, "failed to query macro map timeline");
+            return unavailable_macro_map(
+                indicator,
+                indicator_name,
+                unit,
+                params.period.unwrap_or_default(),
+                "The macro timeline store could not be queried",
+            );
+        }
+    };
     let values: Vec<f64> = countries
         .iter()
         .filter_map(|item| item.get("value").and_then(|value| value.as_f64()))
@@ -963,10 +974,7 @@ mod tests {
     #[test]
     fn macro_map_normalizes_supported_aliases() {
         assert_eq!(macro_map_indicator(Some(" GDP_GROWTH ")).unwrap().0, "gdp");
-        assert_eq!(
-            macro_map_indicator(Some("policy_rate")).unwrap().0,
-            "interest_rate"
-        );
+        assert_eq!(macro_map_indicator(Some("policy_rate")), None);
         assert_eq!(macro_map_indicator(Some("unknown")), None);
     }
 
