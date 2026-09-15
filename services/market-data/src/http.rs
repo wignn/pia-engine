@@ -59,6 +59,7 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/economic/indicators",
             get(crate::economic::list_indicators),
         )
+        .route("/api/v1/economic/map", get(crate::economic::get_macro_map))
         .route(
             "/api/v1/economic/indicators/{series_id}",
             get(crate::economic::get_series),

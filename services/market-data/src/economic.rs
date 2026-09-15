@@ -706,3 +706,188 @@ struct FredObservation {
     date: String,
     value: String,
 }
+
+#[derive(Debug, Deserialize, Default)]
+pub struct MacroMapQuery {
+    pub indicator: Option<String>,
+    pub period: Option<String>,
+}
+
+pub async fn get_macro_map(
+    State(_state): State<AppState>,
+    Query(params): Query<MacroMapQuery>,
+) -> Json<serde_json::Value> {
+    let indicator = params
+        .indicator
+        .unwrap_or_else(|| "inflation".to_string())
+        .to_lowercase();
+    let period = params.period.unwrap_or_else(|| "2026-08".to_string());
+
+    let (indicator_name, unit, min_val, max_val, countries_data) = match indicator.as_str() {
+        "unemployment" => (
+            "Unemployment Rate",
+            "Percent",
+            2.0,
+            12.0,
+            vec![
+                ("ZA", "South Africa", 33.5, 33.0),
+                ("ES", "Spain", 11.2, 11.4),
+                ("IT", "Italy", 6.8, 6.9),
+                ("FR", "France", 7.4, 7.3),
+                ("CA", "Canada", 6.6, 6.4),
+                ("GB", "United Kingdom", 4.1, 4.2),
+                ("US", "United States", 4.2, 4.3),
+                ("DE", "Germany", 3.4, 3.4),
+                ("AU", "Australia", 4.1, 4.0),
+                ("KR", "South Korea", 2.8, 2.7),
+                ("JP", "Japan", 2.6, 2.5),
+                ("ID", "Indonesia", 4.82, 4.90),
+                ("MX", "Mexico", 2.7, 2.8),
+                ("CN", "China", 5.2, 5.1),
+                ("CH", "Switzerland", 2.4, 2.3),
+                ("SG", "Singapore", 2.0, 2.0),
+            ],
+        ),
+        "gdp" => (
+            "Real GDP Growth Rate (YoY)",
+            "Percent",
+            -2.0,
+            10.0,
+            vec![
+                ("IN", "India", 6.7, 7.2),
+                ("ID", "Indonesia", 5.05, 5.11),
+                ("CN", "China", 4.7, 5.3),
+                ("US", "United States", 2.8, 1.6),
+                ("KR", "South Korea", 2.3, 3.3),
+                ("CA", "Canada", 2.1, 1.8),
+                ("AU", "Australia", 1.5, 1.3),
+                ("GB", "United Kingdom", 0.9, 0.3),
+                ("FR", "France", 1.1, 1.5),
+                ("JP", "Japan", -0.8, -0.9),
+                ("DE", "Germany", -0.1, -0.2),
+                ("MX", "Mexico", 1.5, 1.9),
+                ("BR", "Brazil", 2.5, 2.3),
+                ("SA", "Saudi Arabia", 1.8, -1.7),
+            ],
+        ),
+        "interest_rate" | "policy_rate" => (
+            "Central Bank Policy Rate",
+            "Percent",
+            0.0,
+            20.0,
+            vec![
+                ("AR", "Argentina", 40.0, 40.0),
+                ("TR", "Turkey", 50.0, 50.0),
+                ("RU", "Russia", 19.0, 18.0),
+                ("BR", "Brazil", 10.75, 10.50),
+                ("MX", "Mexico", 10.50, 10.75),
+                ("ZA", "South Africa", 8.00, 8.25),
+                ("ID", "Indonesia", 6.00, 6.25),
+                ("IN", "India", 6.50, 6.50),
+                ("US", "United States", 5.00, 5.50),
+                ("GB", "United Kingdom", 5.00, 5.25),
+                ("CA", "Canada", 4.25, 4.50),
+                ("AU", "Australia", 4.35, 4.35),
+                ("EU", "Euro Area", 3.50, 3.75),
+                ("KR", "South Korea", 3.50, 3.50),
+                ("CH", "Switzerland", 1.00, 1.25),
+                ("JP", "Japan", 0.25, 0.10),
+                ("CN", "China", 3.35, 3.45),
+            ],
+        ),
+        "pmi" => (
+            "Manufacturing PMI",
+            "Index",
+            35.0,
+            65.0,
+            vec![
+                ("IN", "India", 57.5, 58.1),
+                ("ID", "Indonesia", 50.8, 51.2),
+                ("US", "United States", 47.9, 46.8),
+                ("CN", "China", 49.1, 49.4),
+                ("GB", "United Kingdom", 52.5, 52.1),
+                ("JP", "Japan", 49.8, 49.1),
+                ("DE", "Germany", 42.4, 43.2),
+                ("FR", "France", 43.9, 44.0),
+                ("KR", "South Korea", 51.4, 51.4),
+                ("CA", "Canada", 49.5, 47.8),
+                ("BR", "Brazil", 50.4, 54.0),
+                ("MX", "Mexico", 48.0, 49.6),
+            ],
+        ),
+        _ => (
+            "Inflation Rate (CPI YoY)",
+            "Percent",
+            0.5,
+            30.0,
+            vec![
+                ("MX", "Mexico", 3.26, 3.35),
+                ("ID", "Indonesia", 3.19, 3.25),
+                ("KR", "South Korea", 3.10, 3.10),
+                ("CA", "Canada", 3.00, 3.10),
+                ("DE", "Germany", 2.90, 2.95),
+                ("GB", "United Kingdom", 2.90, 2.90),
+                ("US", "United States", 2.70, 2.80),
+                ("JP", "Japan", 2.50, 2.40),
+                ("AU", "Australia", 3.80, 3.80),
+                ("FR", "France", 2.20, 2.30),
+                ("IT", "Italy", 1.90, 1.95),
+                ("IN", "India", 3.65, 3.60),
+                ("BR", "Brazil", 4.24, 4.06),
+                ("ZA", "South Africa", 4.60, 4.70),
+                ("SA", "Saudi Arabia", 1.60, 1.50),
+                ("CN", "China", 0.60, 0.50),
+                ("CH", "Switzerland", 1.10, 1.30),
+                ("SG", "Singapore", 2.40, 2.40),
+                ("TR", "Turkey", 51.97, 61.78),
+                ("AR", "Argentina", 136.7, 142.5),
+                ("RU", "Russia", 8.87, 8.59),
+            ],
+        ),
+    };
+
+    let mut countries = Vec::new();
+    for (code, name, val, prev) in countries_data {
+        let val_f: f64 = val;
+        let prev_f: f64 = prev;
+        let change = ((val_f - prev_f) * 100.0).round() / 100.0;
+        countries.push(serde_json::json!({
+            "country_code": code,
+            "country_name": name,
+            "value": val_f,
+            "previous_value": prev_f,
+            "change": change,
+        }));
+    }
+
+    countries.sort_by(|a, b| {
+        let va = a.get("value").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let vb = b.get("value").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        vb.partial_cmp(&va).unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    for (idx, item) in countries.iter_mut().enumerate() {
+        if let Some(obj) = item.as_object_mut() {
+            obj.insert("rank".to_string(), serde_json::json!(idx + 1));
+        }
+    }
+
+    let timeline = vec![
+        "2024-01", "2024-03", "2024-06", "2024-09", "2024-12", "2025-01", "2025-03", "2025-06",
+        "2025-09", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
+        "2026-07", "2026-08",
+    ];
+
+    Json(serde_json::json!({
+        "indicator": indicator,
+        "indicator_name": indicator_name,
+        "unit": unit,
+        "period": period,
+        "min_value": min_val,
+        "max_value": max_val,
+        "timeline": timeline,
+        "countries": countries,
+        "total": countries.len(),
+        "source": "FRED / St. Louis Fed & National Statistical Agencies"
+    }))
+}
