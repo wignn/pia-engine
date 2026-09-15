@@ -727,9 +727,7 @@ fn macro_map_indicator(value: Option<&str>) -> Option<(&'static str, &'static st
         "inflation" => Some(("inflation", "Consumer Price Index", "Index")),
         "unemployment" => Some(("unemployment", "Unemployment Rate", "Percent")),
         "gdp" | "gdp_growth" => Some(("gdp", "Real GDP Growth Rate", "Percent")),
-        "interest_rate" | "policy_rate" => {
-            Some(("interest_rate", "Central Bank Policy Rate", "Percent"))
-        }
+        "interest_rate" | "policy_rate" => None,
         _ => None,
     }
 }
@@ -766,6 +764,30 @@ fn macro_map_country_name(code: &str) -> &'static str {
     }
 }
 
+fn unavailable_macro_map(
+    indicator: &str,
+    indicator_name: &str,
+    unit: &str,
+    period: String,
+    reason: &str,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "indicator": indicator,
+        "indicator_name": indicator_name,
+        "unit": unit,
+        "period": period,
+        "min_value": null,
+        "max_value": null,
+        "timeline": [],
+        "countries": [],
+        "total": 0,
+        "source": "FRED / St. Louis Fed",
+        "is_live": false,
+        "unavailable_reason": reason,
+        "error_code": "MACRO_MAP_UNAVAILABLE"
+    }))
+}
+
 fn macro_map_cutoff(period: Option<&str>) -> Result<Option<NaiveDate>, String> {
     let Some(period) = period.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(None);
@@ -795,36 +817,44 @@ pub async fn get_macro_map(
     State(state): State<AppState>,
     Query(params): Query<MacroMapQuery>,
 ) -> Json<serde_json::Value> {
-    let Some((indicator, indicator_name, unit)) = macro_map_indicator(params.indicator.as_deref())
+    let requested_indicator = params
+        .indicator
+        .as_deref()
+        .unwrap_or("inflation")
+        .trim()
+        .to_lowercase();
+    let Some((indicator, indicator_name, unit)) = macro_map_indicator(Some(&requested_indicator))
     else {
-        return Json(serde_json::json!({
-            "error": "unsupported macro map indicator",
-            "countries": [],
-            "is_live": false,
-            "unavailable_reason": "No synchronized series is configured for this indicator"
-        }));
+        return unavailable_macro_map(
+            &requested_indicator,
+            "Macro Map indicator",
+            "",
+            params.period.unwrap_or_default(),
+            "This indicator is not supported by the synchronized FRED registry",
+        );
     };
     let cutoff = match macro_map_cutoff(params.period.as_deref()) {
         Ok(cutoff) => cutoff,
         Err(message) => {
-            return Json(serde_json::json!({ "error": message, "countries": [], "is_live": false }))
+            return unavailable_macro_map(
+                indicator,
+                indicator_name,
+                unit,
+                params.period.unwrap_or_default(),
+                &message,
+            )
         }
     };
     let series = macro_map_series(indicator);
     let series_ids: Vec<String> = series.iter().map(|item| item.id.to_string()).collect();
     if series_ids.is_empty() {
-        return Json(serde_json::json!({
-            "indicator": indicator,
-            "indicator_name": indicator_name,
-            "unit": unit,
-            "period": params.period.unwrap_or_default(),
-            "countries": [],
-            "total": 0,
-            "timeline": [],
-            "source": "FRED",
-            "is_live": false,
-            "unavailable_reason": "No synchronized series is configured for this indicator"
-        }));
+        return unavailable_macro_map(
+            indicator,
+            indicator_name,
+            unit,
+            params.period.unwrap_or_default(),
+            "No synchronized series is configured for this indicator",
+        );
     }
 
     let rows = sqlx::query_as::<_, MacroMapObservation>(
@@ -855,12 +885,13 @@ pub async fn get_macro_map(
         Ok(rows) => rows,
         Err(err) => {
             error!(error = %err, indicator, "failed to query macro map observations");
-            return Json(serde_json::json!({
-                "error": "macro map data unavailable",
-                "countries": [],
-                "is_live": false,
-                "unavailable_reason": "The macro observation store could not be queried"
-            }));
+            return unavailable_macro_map(
+                indicator,
+                indicator_name,
+                unit,
+                params.period.unwrap_or_default(),
+                "The macro observation store could not be queried",
+            );
         }
     };
 
