@@ -97,6 +97,31 @@ const DOVISH_PHRASES: &[&str] = &[
     "disinflation",
 ];
 
+pub fn is_policy_document(bank: &str, title: &str, summary: Option<&str>) -> bool {
+    let text = format!("{} {}", title, summary.unwrap_or_default()).to_lowercase();
+    let policy_terms = [
+        "monetary policy",
+        "interest rate",
+        "rate decision",
+        "policy rate",
+        "federal funds",
+        "fomc",
+        "governing council",
+        "refinancing rate",
+        "policy statement",
+        "press conference",
+        "inflation outlook",
+    ];
+    if policy_terms.iter().any(|term| text.contains(term)) {
+        return true;
+    }
+    match bank.to_uppercase().as_str() {
+        "FED" => text.contains("powell") && (text.contains("inflation") || text.contains("rate")),
+        "ECB" => text.contains("lagarde") && (text.contains("inflation") || text.contains("rate")),
+        _ => text.contains("monetary") && text.contains("policy"),
+    }
+}
+
 pub fn classify_stance(text: &str) -> &'static str {
     let lower = text.trim().to_lowercase();
     if lower.is_empty() {
@@ -431,6 +456,9 @@ async fn sync_central_banks(client: &reqwest::Client, pool: &sqlx::PgPool) -> Re
             };
 
             let full_text = format!("{} {}", title, summary.as_deref().unwrap_or(""));
+            if !is_policy_document(&bank, title, summary.as_deref()) {
+                continue;
+            }
             let stance = classify_stance(&full_text);
             let confidence = calculate_confidence(&full_text, stance);
             let doc_id = generate_doc_id(&bank, &doc_url);
