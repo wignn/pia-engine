@@ -92,7 +92,7 @@ export function useMarketFeed(symbol: string, timeframe: Timeframe): MarketFeedS
         );
         if (!res.ok) throw new Error(`history ${res.status}`);
         const payload = await res.json();
-        const rows: HistoryRow[] = Array.isArray(payload) ? payload : (payload.items ?? []);
+        const rows: HistoryRow[] = Array.isArray(payload) ? payload : (payload.items ?? payload.candles ?? []);
         const responseHasMore = Array.isArray(payload) ? rows.length > 0 : payload.has_more !== false;
 
         if (cancelled) return;
