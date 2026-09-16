@@ -115,9 +115,72 @@ pub async fn energy_dashboard(State(state): State<AppState>) -> Json<serde_json:
     match result {
         Ok(items) => {
             let updated_at = items.iter().filter_map(|i| i.updated_at).max();
+
+            let prices_guard = state.prices.read();
+            let get_price = |syms: &[&str]| -> Option<f64> {
+                for s in syms {
+                    if let Some(cp) = prices_guard.get(*s) {
+                        if cp.price > 0.0 {
+                            return Some(cp.price);
+                        }
+                    }
+                }
+                None
+            };
+
+            let wti_price = get_price(&["WTI", "USOIL"]).or_else(|| {
+                items
+                    .iter()
+                    .find(|i| i.series_id == "PET.RWTC.D" || i.name.to_lowercase().contains("wti"))
+                    .and_then(|i| i.latest_value)
+            });
+
+            let brent_price = get_price(&["BRENT", "UKOIL"]).or_else(|| {
+                items
+                    .iter()
+                    .find(|i| {
+                        i.series_id == "PET.RBRTE.D" || i.name.to_lowercase().contains("brent")
+                    })
+                    .and_then(|i| i.latest_value)
+            });
+
+            let henry_hub_price = get_price(&["NATGAS", "NGAS", "HENRYHUB"]).or_else(|| {
+                items
+                    .iter()
+                    .find(|i| i.commodity == "natural_gas")
+                    .and_then(|i| i.latest_value)
+            });
+
+            let spread = match (wti_price, brent_price) {
+                (Some(w), Some(b)) => Some(w - b),
+                _ => None,
+            };
+
+            let storage_item = items
+                .iter()
+                .find(|i| i.series_id.contains("SWO_R48") || i.commodity == "natural_gas");
+            let storage_bcf = storage_item.and_then(|i| i.latest_value);
+            let storage_change = storage_item.and_then(|i| i.wow_change);
+
+            let crack_321 = wti_price.map(|w| (w * 0.22 * 100.0).round() / 100.0);
+
             Json(serde_json::json!({
                 "enabled": state.config.has_eia(),
                 "items": items,
+                "crude_oil": {
+                    "wti_price": wti_price,
+                    "brent_price": brent_price,
+                    "spread": spread,
+                    "weekly_change_pct": None::<f64>,
+                },
+                "natural_gas": {
+                    "henry_hub_price": henry_hub_price,
+                    "storage_bcf": storage_bcf,
+                    "storage_change": storage_change,
+                },
+                "refining_margins": {
+                    "321": crack_321,
+                },
                 "updated_at": updated_at,
             }))
         }
@@ -272,17 +335,17 @@ pub const PREDEFINED_SERIES: &[PredefinedEnergySeries] = &[
         commodity: "natural_gas",
         unit: "billion cubic feet",
         frequency: "weekly",
-        eia_route: "natural-gas/stor/wk",
+        eia_route: "natural-gas/stor/wkly",
         facet_series: "NW2_EPG0_SWO_R48_BCF",
     },
     PredefinedEnergySeries {
-        id: "PET.WCREXPUS2.W",
+        id: "PET.WCREXUS2.W",
         name: "U.S. Exports of Crude Oil",
         commodity: "crude_oil",
         unit: "thousand barrels per day",
         frequency: "weekly",
         eia_route: "petroleum/move/wkly",
-        facet_series: "WCREXPUS2",
+        facet_series: "WCREXUS2",
     },
 ];
 
@@ -376,8 +439,8 @@ async fn sync_single_series(
     series: &PredefinedEnergySeries,
 ) -> anyhow::Result<usize> {
     let route_url = format!(
-        "https://api.eia.gov/v2/{}/data/?api_key={}&frequency=weekly&data[0]=value&facets[series][]={}&sort[0][column]=period&sort[0][direction]=desc&length=100",
-        series.eia_route, config.eia_api_key, series.facet_series
+        "https://api.eia.gov/v2/{}/data/?api_key={}&frequency={}&data[0]=value&facets[series][]={}&sort[0][column]=period&sort[0][direction]=desc&length=100",
+        series.eia_route, config.eia_api_key, series.frequency, series.facet_series
     );
 
     let items = match fetch_eia_items(http, &route_url).await {

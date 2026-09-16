@@ -63,7 +63,8 @@ impl Config {
             fred_series: list_env("FRED_SERIES"),
             fred_poll_sec: get_env_u64("FRED_POLL_SEC", 21_600).max(21_600),
             ai_service_url: optional_env("AI_SERVICE_URL"),
-            sec_user_agent: optional_env("SEC_USER_AGENT"),
+            sec_user_agent: optional_env("SEC_USER_AGENT")
+                .or_else(|| Some("PIATerminal/1.0 (contact@pia.wign.dev)".to_string())),
             sec_poll_sec: get_env_u64("SEC_POLL_SEC", 3600).max(300),
             gdelt_sync_sec: get_env_u64("GDELT_SYNC_SEC", 900).max(300),
             central_bank_sync_sec: get_env_u64("CENTRAL_BANK_SYNC_SEC", 1800).max(300),

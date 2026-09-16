@@ -193,6 +193,7 @@ async fn sync_sec_data(client: &reqwest::Client, pool: &sqlx::PgPool) -> Result<
     let tickers_url = "https://www.sec.gov/files/company_tickers.json";
     let resp = client
         .get(tickers_url)
+        .header(reqwest::header::ACCEPT_ENCODING, "gzip, deflate")
         .send()
         .await
         .map_err(|e| format!("Failed to fetch company tickers: {}", e))?;
@@ -282,7 +283,12 @@ async fn sync_sec_data(client: &reqwest::Client, pool: &sqlx::PgPool) -> Result<
         tokio::time::sleep(Duration::from_millis(200)).await;
 
         let filings_url = format!("https://data.sec.gov/submissions/CIK{}.json", cik);
-        let resp = match client.get(&filings_url).send().await {
+        let resp = match client
+            .get(&filings_url)
+            .header(reqwest::header::ACCEPT_ENCODING, "gzip, deflate")
+            .send()
+            .await
+        {
             Ok(r) => r,
             Err(err) => {
                 warn!(error = %err, cik = %cik, "failed to fetch SEC submissions");

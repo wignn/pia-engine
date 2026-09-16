@@ -426,35 +426,66 @@ pub fn parse_cot_line(line: &str) -> Option<CotParsedRecord> {
     }
 
     let market_name = fields[0].to_string();
-    if market_name.is_empty() || market_name.eq_ignore_ascii_case("Market_and_Exchange_Names") {
+    if market_name.is_empty()
+        || market_name.to_lowercase().contains("market and exchange")
+        || market_name.to_lowercase().contains("market_and_exchange")
+    {
         return None;
     }
 
-    let report_date = parse_cot_date(fields[1])?;
-    let market_code = fields[2].to_string();
+    // Check if fields[2] is a YYYY-MM-DD date (CFTC annual zip CSV format)
+    let is_modern = fields.len() >= 13
+        && (fields[2].contains('-') || (fields[2].len() == 10 && fields[2].starts_with("20")));
+
+    let (
+        report_date,
+        market_code,
+        open_interest,
+        noncomm_long,
+        noncomm_short,
+        comm_long,
+        comm_short,
+        nonrep_long,
+        nonrep_short,
+    ) = if is_modern {
+        let date = parse_cot_date(fields[2]).or_else(|| parse_cot_date(fields[1]))?;
+        let code = fields[3].to_string();
+        let oi = fields[7].parse::<i64>().ok();
+        let nc_l = fields[8].parse::<i64>().ok();
+        let nc_s = fields[9].parse::<i64>().ok();
+        let c_l = fields[11].parse::<i64>().ok();
+        let c_s = fields[12].parse::<i64>().ok();
+        let nr_l = fields.get(15).and_then(|s| s.parse::<i64>().ok());
+        let nr_s = fields.get(16).and_then(|s| s.parse::<i64>().ok());
+        (date, code, oi, nc_l, nc_s, c_l, c_s, nr_l, nr_s)
+    } else {
+        let date = parse_cot_date(fields[1])?;
+        let code = fields[2].to_string();
+        let oi = fields[3].parse::<i64>().ok();
+        let nc_l = fields[4].parse::<i64>().ok();
+        let nc_s = fields[5].parse::<i64>().ok();
+        let c_l = fields[7].parse::<i64>().ok();
+        let c_s = fields[8].parse::<i64>().ok();
+        let nr_l = fields.get(11).and_then(|s| s.parse::<i64>().ok());
+        let nr_s = fields.get(12).and_then(|s| s.parse::<i64>().ok());
+        (date, code, oi, nc_l, nc_s, c_l, c_s, nr_l, nr_s)
+    };
+
     if market_code.is_empty() {
         return None;
     }
-
-    let open_interest = fields[3].parse::<i64>().ok();
-    let noncommercial_long = fields[4].parse::<i64>().ok();
-    let noncommercial_short = fields[5].parse::<i64>().ok();
-    let commercial_long = fields[7].parse::<i64>().ok();
-    let commercial_short = fields[8].parse::<i64>().ok();
-    let nonreportable_long = fields.get(11).and_then(|s| s.parse::<i64>().ok());
-    let nonreportable_short = fields.get(12).and_then(|s| s.parse::<i64>().ok());
 
     Some(CotParsedRecord {
         market_name,
         report_date,
         market_code,
         open_interest,
-        noncommercial_long,
-        noncommercial_short,
-        commercial_long,
-        commercial_short,
-        nonreportable_long,
-        nonreportable_short,
+        noncommercial_long: noncomm_long,
+        noncommercial_short: noncomm_short,
+        commercial_long: comm_long,
+        commercial_short: comm_short,
+        nonreportable_long: nonrep_long,
+        nonreportable_short: nonrep_short,
     })
 }
 
@@ -519,12 +550,43 @@ async fn fetch_and_sync_cot(
 ) -> anyhow::Result<usize> {
     info!(url = %config.cot_data_url, "fetching CFTC COT public report");
 
-    let resp = http.get(&config.cot_data_url).send().await?;
-    if !resp.status().is_success() {
-        anyhow::bail!("CFTC server returned status {}", resp.status());
-    }
+    let current_year = chrono::Utc::now().format("%Y").to_string();
+    let zip_url = format!(
+        "https://www.cftc.gov/files/dea/history/deacot{}.zip",
+        current_year
+    );
+    let target_url = if config.cot_data_url.ends_with(".zip") {
+        config.cot_data_url.clone()
+    } else if config.cot_data_url.ends_with(".txt") {
+        zip_url
+    } else {
+        config.cot_data_url.clone()
+    };
 
-    let text = resp.text().await?;
+    let resp = http.get(&target_url).send().await?;
+    let text = if target_url.ends_with(".zip") {
+        if !resp.status().is_success() {
+            anyhow::bail!("CFTC zip server returned status {}", resp.status());
+        }
+        let bytes = resp.bytes().await?;
+        let reader = std::io::Cursor::new(bytes);
+        let mut zip = zip::ZipArchive::new(reader)?;
+        let has_annual = zip.file_names().any(|n| n == "annual.txt");
+        let mut file = if has_annual {
+            zip.by_name("annual.txt")?
+        } else {
+            zip.by_index(0)?
+        };
+        let mut s = String::new();
+        std::io::Read::read_to_string(&mut file, &mut s)?;
+        s
+    } else {
+        if !resp.status().is_success() {
+            anyhow::bail!("CFTC server returned status {}", resp.status());
+        }
+        resp.text().await?
+    };
+
     let mut count = 0usize;
 
     for line in text.lines() {

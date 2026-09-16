@@ -100,18 +100,88 @@ struct FeedSourceRow {
     last_latency_ms: Option<i64>,
 }
 
-pub async fn list_calendar(Query(query): Query<CalendarQuery>) -> Json<Value> {
-    let impact_filter = query.impact.as_deref().unwrap_or("high").to_lowercase();
-    let limit = query.limit.unwrap_or(10).clamp(1, 25);
+#[derive(Debug, sqlx::FromRow)]
+struct CalendarDbRow {
+    id: String,
+    country: String,
+    event_name: String,
+    impact: Option<String>,
+    unit: Option<String>,
+    actual: Option<f64>,
+    forecast: Option<f64>,
+    previous: Option<f64>,
+    event_time: Option<chrono::DateTime<chrono::Utc>>,
+    source: String,
+}
+
+pub async fn list_calendar(
+    State(state): State<AppState>,
+    Query(query): Query<CalendarQuery>,
+) -> Json<Value> {
+    let impact_filter = query.impact.as_deref().unwrap_or("all").to_lowercase();
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+
+    let rows = sqlx::query_as::<_, CalendarDbRow>(
+        r#"SELECT id::text, country, event_name, impact, unit, actual, forecast, previous, event_time, source
+           FROM news.economic_calendar_events
+           WHERE ($1 = 'all' OR LOWER(COALESCE(impact, '')) = $1)
+           ORDER BY event_time ASC NULLS LAST
+           LIMIT $2"#,
+    )
+    .bind(&impact_filter)
+    .bind(limit as i64)
+    .fetch_all(&state.db)
+    .await;
+
+    if let Ok(rows) = rows {
+        if !rows.is_empty() {
+            let items: Vec<Value> = rows
+                .into_iter()
+                .map(|r| {
+                    let date_str = r.event_time.map(|t| t.to_rfc3339()).unwrap_or_default();
+                    json!({
+                        "id": r.id,
+                        "title": r.event_name,
+                        "name": r.event_name,
+                        "currency": r.country,
+                        "country": r.country,
+                        "date": date_str,
+                        "time": date_str,
+                        "impact": r.impact.unwrap_or_else(|| "low".to_string()),
+                        "unit": r.unit.unwrap_or_default(),
+                        "forecast": r.forecast.map(|v| v.to_string()).unwrap_or_default(),
+                        "previous": r.previous.map(|v| v.to_string()).unwrap_or_default(),
+                        "actual": r.actual.map(|v| v.to_string()).unwrap_or_default(),
+                        "source": r.source,
+                    })
+                })
+                .collect();
+
+            return Json(json!({
+                "items": items,
+                "events": items,
+                "total": items.len(),
+                "filter": { "impact": impact_filter, "limit": limit },
+                "source": "database",
+                "cache": { "status": "hit" },
+            }));
+        }
+    }
 
     let (events, cache_status) = match get_calendar_events().await {
         Ok(result) => result,
-        Err(error) => return Json(json!({ "error": error })),
+        Err(error) => {
+            return Json(json!({ "items": [], "events": [], "total": 0, "error": error }))
+        }
     };
 
     let arr = match events.as_array() {
         Some(a) => a,
-        None => return Json(json!({ "error": "unexpected calendar format" })),
+        None => {
+            return Json(
+                json!({ "items": [], "events": [], "total": 0, "error": "unexpected calendar format" }),
+            )
+        }
     };
 
     let items: Vec<Value> = arr
@@ -129,19 +199,26 @@ pub async fn list_calendar(Query(query): Query<CalendarQuery>) -> Json<Value> {
         .map(|ev| {
             let country = ev["country"].as_str().unwrap_or("");
             json!({
+                "id": ev["title"].as_str().unwrap_or(""),
                 "title": ev["title"].as_str().unwrap_or(""),
+                "name": ev["title"].as_str().unwrap_or(""),
                 "currency": country,
+                "country": country,
                 "date": ev["date"].as_str().unwrap_or(""),
+                "time": ev["date"].as_str().unwrap_or(""),
                 "impact": ev["impact"].as_str().unwrap_or(""),
+                "unit": "",
                 "forecast": ev["forecast"].as_str().unwrap_or(""),
                 "previous": ev["previous"].as_str().unwrap_or(""),
                 "actual": ev["actual"].as_str().unwrap_or(""),
+                "source": "forexfactory",
             })
         })
         .collect();
 
     Json(json!({
         "items": items,
+        "events": items,
         "total": items.len(),
         "filter": { "impact": impact_filter, "limit": limit },
         "source": "forexfactory",
@@ -389,7 +466,7 @@ pub async fn latest_stock_news(
     .await;
 
     match rows {
-        Ok(rows) => {
+        Ok(rows) if !rows.is_empty() => {
             let items: Vec<Value> = rows
                 .into_iter()
                 .map(|row| {
@@ -410,10 +487,7 @@ pub async fn latest_stock_news(
                 .collect();
             Json(json!({ "items": items, "total": items.len() }))
         }
-        Err(err) => {
-            error!(error = %err, "stock news query failed");
-            Json(json!({ "error": "query failed" }))
-        }
+        _ => latest_forex_news(State(state), Query(query)).await,
     }
 }
 
