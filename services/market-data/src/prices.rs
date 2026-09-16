@@ -301,6 +301,10 @@ pub async fn get_orderbook(Path(symbol): Path<String>, State(state): State<AppSt
         "bids": bids,
         "asks": asks,
         "timestamp": p.timestamp_ms.unwrap_or_else(|| chrono::Utc::now().timestamp_millis()),
+        "source": p.source,
+        "is_live": false,
+        "synthetic": true,
+        "unavailable_reason": "No Level 2 feed is configured; quote-derived depth only"
     }))
     .into_response()
 }
@@ -321,6 +325,16 @@ pub fn price_json_with_calendar(
         "bid": price.bid,
         "ask": price.ask,
         "volume": price.volume,
+        "volume_type": if price.volume.is_some() {
+            if price.feed.as_deref() == Some("crypto") || price.feed.as_deref() == Some("stock") {
+                "exchange"
+            } else {
+                "tick"
+            }
+        } else {
+            "unavailable"
+        },
+        "volume_available": price.volume.is_some(),
         "source": price.source,
         "asset_type": price.asset_type,
         "received_at": price.received_at,
