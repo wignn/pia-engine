@@ -230,22 +230,8 @@ pub async fn get_price(Path(symbol): Path<String>, State(state): State<AppState>
 pub async fn get_orderbook(Path(symbol): Path<String>, State(state): State<AppState>) -> Response {
     let symbol = symbol.trim().to_uppercase();
 
-    // Spot metals are quote/candle instruments in the current feed. They do not
-    // expose a real depth-of-market stream, so never manufacture a book from a
-    // quote snapshot or make clients retry the same unsupported request.
-    if matches!(symbol.as_str(), "XAGUSD") {
-        return (
-            StatusCode::NOT_FOUND,
-            [(header::CONTENT_TYPE, "application/json")],
-            Json(json!({
-                "code": "ORDER_BOOK_NOT_SUPPORTED",
-                "symbol": symbol,
-                "message": "Order book is not supported for this instrument"
-            })),
-        )
-            .into_response();
-    }
-
+    // Quote-derived synthetic depth keeps the panel populated for instruments
+    // without a native Level 2 feed. It is explicitly labeled in the response.
     let cached = { state.prices.read().get(&symbol).cloned() };
     let price = if cached.is_some() {
         cached
@@ -304,7 +290,8 @@ pub async fn get_orderbook(Path(symbol): Path<String>, State(state): State<AppSt
         "source": p.source,
         "is_live": false,
         "synthetic": true,
-        "unavailable_reason": "No Level 2 feed is configured; quote-derived depth only"
+        "depth_type": "quote_derived",
+        "unavailable_reason": "Synthetic depth: generated from latest bid/ask and quote volume"
     }))
     .into_response()
 }
