@@ -10,6 +10,7 @@ import {
   Layers,
   Brain,
   Calendar,
+  Tv,
   GripVertical,
   ChevronDown
 } from "lucide-react";
@@ -82,6 +83,8 @@ export const ChartTabs: React.FC<ChartTabsProps> = ({
         return <Brain className="w-3.5 h-3.5 text-[#a855f7]" />;
       case "calendar":
         return <Calendar className="w-3.5 h-3.5 text-[#f23645]" />;
+      case "live":
+        return <Tv className="w-3.5 h-3.5 text-[#f23645]" />;
       default:
         return <BarChart3 className="w-3.5 h-3.5 text-[#2962ff]" />;
     }
@@ -100,6 +103,8 @@ export const ChartTabs: React.FC<ChartTabsProps> = ({
           return "Market Intel";
         case "calendar":
           return "Economic Calendar";
+        case "live":
+          return "Live TV";
       }
     }
     return tab.symbol;
@@ -301,6 +306,21 @@ export const ChartTabs: React.FC<ChartTabsProps> = ({
               <div className="flex flex-col">
                 <span className="font-semibold">Economic Calendar</span>
                 <span className="text-[10px] text-[#787b86]">CPI, NFP, interest rates</span>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                onNewTab("live");
+                setMenuPos(null);
+              }}
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded cursor-pointer text-left transition-colors ${
+                isLight ? "hover:bg-[#f0f3fa] text-[#131722]" : "hover:bg-[#2a2e39] text-[#d1d4dc]"
+              }`}
+            >
+              <Tv className="w-3.5 h-3.5 text-[#f23645]" />
+              <div className="flex flex-col">
+                <span className="font-semibold">Live Broadcast</span>
+                <span className="text-[10px] text-[#787b86]">Bloomberg, CNBC, FOMC</span>
               </div>
             </button>
           </div>

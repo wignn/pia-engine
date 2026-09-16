@@ -75,7 +75,7 @@ export interface IndicatorState {
   atr?: boolean;
 }
 
-export type TabContentType = "chart" | "news" | "social" | "orderbook" | "intelligence" | "calendar";
+export type TabContentType = "chart" | "news" | "social" | "orderbook" | "intelligence" | "calendar" | "live";
 export type PaneContentType = TabContentType;
 
 export type ChartLayout =

@@ -9,10 +9,11 @@ import {
   Calendar,
   Brain,
   Radio,
+  Tv,
   Settings2 
 } from "lucide-react";
 
-export type SidebarTab = "watchlist" | "news" | "alerts" | "calendar" | "intelligence" | "social" | "orderbook";
+export type SidebarTab = "watchlist" | "news" | "alerts" | "calendar" | "intelligence" | "social" | "orderbook" | "live";
 
 interface RightDockProps {
   activeTab: SidebarTab;
@@ -30,7 +31,8 @@ export const RightDock: React.FC<RightDockProps> = ({ activeTab, setActiveTab, t
     { id: "alerts", label: "Price Alerts", icon: <Bell className="w-4 h-4" /> },
     { id: "calendar", label: "Economic Calendar", icon: <Calendar className="w-4 h-4" /> },
     { id: "intelligence", label: "Market Intelligence", icon: <Brain className="w-4 h-4" /> },
-    { id: "social", label: "Social Pulse", icon: <Radio className="w-4 h-4" /> }
+    { id: "social", label: "Social Pulse", icon: <Radio className="w-4 h-4" /> },
+    { id: "live", label: "Live Broadcast & TV", icon: <Tv className="w-4 h-4 text-[#f23645]" /> }
   ];
 
   return (

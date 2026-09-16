@@ -9,6 +9,7 @@ import {
   Radio,
   Brain,
   Calendar,
+  Tv,
   Grid3X3,
   Sliders,
   Settings,
@@ -87,6 +88,13 @@ export const TradingViewMainMenu: React.FC<TradingViewMainMenuProps> = ({
       label: "Economic Calendar",
       description: "Central bank announcements, CPI, rate decisions",
       icon: <Calendar className="w-4 h-4 text-[#ff5252]" />
+    },
+    {
+      id: "live",
+      label: "Live Broadcast & TV",
+      description: "24/7 Financial TV: Bloomberg, CNBC, FOMC stream",
+      icon: <Tv className="w-4 h-4 text-[#f23645]" />,
+      badge: "LIVE"
     }
   ];
 

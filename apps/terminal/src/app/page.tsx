@@ -12,6 +12,7 @@ import { MarketIntelligencePanel } from "@/components/MarketIntelligencePanel";
 import { SocialPanel } from "@/components/SocialPanel";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { CalendarPanel } from "@/components/CalendarPanel";
+import { LiveStreamPanel } from "@/components/LiveStreamPanel";
 import { OrderBookPanel } from "@/components/OrderBookPanel";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { ChartTabs } from "@/components/ChartTabs";
@@ -904,6 +905,7 @@ export default function TerminalPage() {
               />
             )}
             {rightSidebarTab === "calendar" && <CalendarPanel theme={settings.theme} />}
+            {rightSidebarTab === "live" && <LiveStreamPanel theme={settings.theme} />}
           </div>
         </aside>
 

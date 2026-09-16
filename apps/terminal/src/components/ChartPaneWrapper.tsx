@@ -21,6 +21,7 @@ import { SocialPanel } from "./SocialPanel";
 import { OrderBookPanel } from "./OrderBookPanel";
 import { MarketIntelligencePanel } from "./MarketIntelligencePanel";
 import { CalendarPanel } from "./CalendarPanel";
+import { LiveStreamPanel } from "./LiveStreamPanel";
 import {
   ChartPaneConfig,
   DrawingTool,
@@ -265,6 +266,8 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
           <MarketIntelligencePanel symbol={pane.symbol} theme={theme} />
         ) : paneType === "calendar" ? (
           <CalendarPanel theme={theme} />
+        ) : paneType === "live" ? (
+          <LiveStreamPanel theme={theme} />
         ) : (
           <ChartArea
             paneId={pane.id}
