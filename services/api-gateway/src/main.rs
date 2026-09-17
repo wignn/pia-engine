@@ -2,6 +2,7 @@ mod auth;
 mod config;
 mod http;
 mod proxy;
+mod snapshot;
 mod state;
 mod tenant;
 mod usage;

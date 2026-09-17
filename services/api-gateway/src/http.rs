@@ -1,7 +1,7 @@
 use crate::state::AppState;
 use axum::{
     middleware,
-    routing::{any, get},
+    routing::{any, get, post},
     Json, Router,
 };
 use serde_json::{json, Value};
@@ -15,9 +15,14 @@ pub fn build_router(state: AppState) -> Router {
 
     let public = Router::new()
         .route("/health", get(health))
+        .route("/snapshot/{id}", get(crate::snapshot::get_snapshot))
         .route("/", get(root));
 
     let protected = Router::new()
+        .route(
+            "/api/v1/charts/snapshot",
+            post(crate::snapshot::create_snapshot),
+        )
         .route("/api/v1/market/prices", any(crate::proxy::proxy_request))
         .route("/api/v1/market/symbols", any(crate::proxy::proxy_request))
         .route(
