@@ -147,7 +147,15 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ theme = "dark" }) 
                       title={`${item.impact} impact`}
                     />
                   </div>
-                  <span className="text-[10px] text-[#787b86] font-mono">{item.time}</span>
+                  <span className="text-[10px] text-[#787b86] font-mono">
+                    {item.date
+                      ? `${new Date(item.date).toLocaleDateString([], {
+                          month: "short",
+                          day: "numeric",
+                        })} · `
+                      : ""}
+                    {item.time}
+                  </span>
                 </div>
 
                 <div className={`font-semibold text-xs leading-snug mb-2 ${isLight ? "text-[#131722]" : "text-white"}`}>
