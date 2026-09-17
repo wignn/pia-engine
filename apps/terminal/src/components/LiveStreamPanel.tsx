@@ -40,6 +40,20 @@ const PRESET_CHANNELS: StreamChannel[] = [
     youtubeId: "19106093498", // Federal Reserve Channel / FOMC stream
     description: "FOMC Rate Decisions & Fed Chair Press Conferences",
   },
+  {
+    id: "cnbc_indonesia",
+    name: "CNBC Indonesia Live",
+    category: "markets",
+    youtubeId: "XMjM1m3jXkc",
+    description: "Pasar Saham Indonesia, IHSG, Berita Finansial & Makro",
+  },
+  {
+    id: "idx_channel",
+    name: "IDX Channel Live",
+    category: "markets",
+    youtubeId: "hjCkB9XRpkU",
+    description: "Siaran Langsung Bursa Efek Indonesia, Perdagangan & Emiten",
+  },
 ];
 
 interface LiveStreamPanelProps {
