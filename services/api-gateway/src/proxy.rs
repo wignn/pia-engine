@@ -18,7 +18,6 @@ pub async fn proxy_request(
         return text_response(StatusCode::NOT_FOUND, "route not found");
     };
 
-    // Sub-millisecond L1 RAM cache for global market prices snapshot (100ms micro-cache)
     let is_market_prices = method == Method::GET && path == "/api/v1/market/prices";
     if is_market_prices {
         if let Some(cached) = {
@@ -69,6 +68,41 @@ pub async fn proxy_request(
         }
     }
 
+    // L1 RAM cache for geo-economi map endpoints (macro map: 60s, geosignals map: 15s)
+    let is_cacheable_map =
+        method == Method::GET && (path == "/api/v1/macro/map" || path == "/api/v1/geosignals/map");
+    let cache_key = if is_cacheable_map {
+        Some(uri.to_string())
+    } else {
+        None
+    };
+
+    if let Some(ref key) = cache_key {
+        let ttl = if path.starts_with("/api/v1/macro/map") {
+            std::time::Duration::from_secs(60)
+        } else {
+            std::time::Duration::from_secs(15)
+        };
+
+        if let Some(cached) = {
+            let guard = state.route_cache.read();
+            guard.get(key).and_then(|c| {
+                if c.cached_at.elapsed() < ttl {
+                    Some(c.clone())
+                } else {
+                    None
+                }
+            })
+        } {
+            return Response::builder()
+                .status(StatusCode::OK)
+                .header("content-type", cached.content_type)
+                .header("x-cache", "HIT")
+                .body(Body::from(cached.bytes))
+                .unwrap();
+        }
+    }
+
     let query = uri
         .query()
         .map(|query| format!("?{query}"))
@@ -96,6 +130,12 @@ pub async fn proxy_request(
     match request.body(bytes).send().await {
         Ok(response) => {
             let status = response.status();
+            let content_type = response
+                .headers()
+                .get(axum::http::header::CONTENT_TYPE)
+                .and_then(|h| h.to_str().ok())
+                .unwrap_or("application/json")
+                .to_string();
             let mut builder = Response::builder().status(status);
             for (name, value) in response.headers() {
                 builder = builder.header(name, value);
@@ -108,6 +148,19 @@ pub async fn proxy_request(
                             bytes: bytes.clone(),
                             cached_at: std::time::Instant::now(),
                         });
+                    }
+                    if let Some(ref key) = cache_key {
+                        if status == StatusCode::OK {
+                            let mut guard = state.route_cache.write();
+                            guard.insert(
+                                key.clone(),
+                                crate::state::CachedResponse {
+                                    bytes: bytes.clone(),
+                                    cached_at: std::time::Instant::now(),
+                                    content_type,
+                                },
+                            );
+                        }
                     }
                     builder.body(Body::from(bytes)).unwrap()
                 }
@@ -122,7 +175,9 @@ pub async fn proxy_request(
 }
 
 fn target_base_for_path<'a>(path: &str, config: &'a crate::config::Config) -> Option<&'a str> {
-    if path.starts_with("/api/v1/market/why")
+    if path == "/api/v1/macro/map" || path == "/api/v1/geosignals/map" {
+        Some(config.geo_economi_url.as_str())
+    } else if path.starts_with("/api/v1/market/why")
         || path.starts_with("/api/v1/market/insights")
         || path == "/api/v1/analyze"
         || path == "/api/v1/intelligence/analyze"
@@ -184,7 +239,21 @@ mod tests {
             market_data_url: "http://market-data".to_string(),
             news_service_url: "http://news-service".to_string(),
             intelligence_service_url: "http://intelligence-service".to_string(),
+            geo_economi_url: "http://geo-economi".to_string(),
         }
+    }
+
+    #[test]
+    fn macro_and_geosignals_map_route_to_geo_economi() {
+        let cfg = config();
+        assert_eq!(
+            target_base_for_path("/api/v1/macro/map", &cfg),
+            Some(cfg.geo_economi_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/geosignals/map", &cfg),
+            Some(cfg.geo_economi_url.as_str())
+        );
     }
 
     #[test]
@@ -257,7 +326,7 @@ mod tests {
         );
         assert_eq!(
             target_base_for_path("/api/v1/geosignals/map", &cfg),
-            Some(cfg.news_service_url.as_str())
+            Some(cfg.geo_economi_url.as_str())
         );
         assert_eq!(
             target_base_for_path("/api/v1/geosignals/assets", &cfg),

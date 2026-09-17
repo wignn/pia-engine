@@ -93,6 +93,110 @@ func (s *SignalStore) UpsertBatch(signals []Signal) {
 	}
 }
 
+func (s *SignalStore) SeedChokepoints(now time.Time) {
+	chokepoints := []Signal{
+		{
+			Source:     "maritime-watch",
+			ExternalID: "cp-hormuz",
+			Key:        "Strait of Hormuz",
+			Region:     "Middle East",
+			Category:   CategoryMaritime,
+			Scope:      "regional",
+			Severity:   0.78,
+			Confidence: 0.95,
+			Timestamp:  now,
+			ChokepointsStatus: map[string]string{
+				"Strait of Hormuz": "Elevated Naval Patrols & Vessel Monitoring",
+			},
+		},
+		{
+			Source:     "maritime-watch",
+			ExternalID: "cp-bab-mandeb",
+			Key:        "Bab el-Mandeb",
+			Region:     "Middle East",
+			Category:   CategoryMaritime,
+			Scope:      "regional",
+			Severity:   0.88,
+			Confidence: 0.95,
+			Timestamp:  now,
+			ChokepointsStatus: map[string]string{
+				"Bab el-Mandeb": "Active Vessel Rerouting via Cape of Good Hope",
+			},
+		},
+		{
+			Source:     "maritime-watch",
+			ExternalID: "cp-malacca",
+			Key:        "Strait of Malacca",
+			Region:     "Asia",
+			Category:   CategoryMaritime,
+			Scope:      "regional",
+			Severity:   0.32,
+			Confidence: 0.90,
+			Timestamp:  now,
+			ChokepointsStatus: map[string]string{
+				"Strait of Malacca": "Normal Commercial Transit Flow",
+			},
+		},
+		{
+			Source:     "maritime-watch",
+			ExternalID: "cp-taiwan-strait",
+			Key:        "Taiwan Strait",
+			Region:     "Asia",
+			Category:   CategoryDiplomatic,
+			Scope:      "regional",
+			Severity:   0.65,
+			Confidence: 0.90,
+			Timestamp:  now,
+			ChokepointsStatus: map[string]string{
+				"Taiwan Strait": "Heightened Air & Naval Transit Monitoring",
+			},
+		},
+		{
+			Source:     "maritime-watch",
+			ExternalID: "cp-suez",
+			Key:        "Suez Canal",
+			Region:     "Middle East",
+			Category:   CategoryMaritime,
+			Scope:      "regional",
+			Severity:   0.72,
+			Confidence: 0.95,
+			Timestamp:  now,
+			ChokepointsStatus: map[string]string{
+				"Suez Canal": "Reduced Daily Vessel Convoy Capacity",
+			},
+		},
+		{
+			Source:     "maritime-watch",
+			ExternalID: "cp-black-sea",
+			Key:        "Black Sea Maritime Corridor",
+			Region:     "Europe",
+			Category:   CategoryConflict,
+			Scope:      "regional",
+			Severity:   0.82,
+			Confidence: 0.95,
+			Timestamp:  now,
+			ChokepointsStatus: map[string]string{
+				"Black Sea": "War Risk Insurance Zone Active",
+			},
+		},
+		{
+			Source:     "maritime-watch",
+			ExternalID: "cp-panama",
+			Key:        "Panama Canal",
+			Region:     "Americas",
+			Category:   CategoryMaritime,
+			Scope:      "regional",
+			Severity:   0.45,
+			Confidence: 0.90,
+			Timestamp:  now,
+			ChokepointsStatus: map[string]string{
+				"Panama Canal": "Draft Restrictions & Reservation System Active",
+			},
+		},
+	}
+	s.UpsertBatch(chokepoints)
+}
+
 func (s *SignalStore) Snapshot(filter SignalFilter, now time.Time) GeoSignalsMapResponse {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

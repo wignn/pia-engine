@@ -145,6 +145,7 @@ pub fn build_router(state: AppState) -> Router {
             any(crate::proxy::proxy_request),
         )
         .route("/api/v1/macro/dashboard", any(crate::proxy::proxy_request))
+        .route("/api/v1/macro/map", any(crate::proxy::proxy_request))
         .route("/api/v1/social/posts", any(crate::proxy::proxy_request))
         .route("/api/v1/stock/news", any(crate::proxy::proxy_request))
         .route(

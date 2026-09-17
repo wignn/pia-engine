@@ -16,6 +16,7 @@ import (
 
 func main() {
 	store := NewSignalStore()
+	store.SeedChokepoints(time.Now().UTC())
 	macroStore := NewMacroStore()
 	client := &http.Client{Timeout: 15 * time.Second}
 	geoSources := []Source{

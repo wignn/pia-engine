@@ -12,6 +12,7 @@ pub struct Config {
     pub market_data_url: String,
     pub news_service_url: String,
     pub intelligence_service_url: String,
+    pub geo_economi_url: String,
 }
 
 impl Config {
@@ -47,6 +48,7 @@ impl Config {
             market_data_url: get_env("MARKET_DATA_URL", "http://localhost:8010"),
             news_service_url: get_env("NEWS_SERVICE_URL", "http://localhost:8030"),
             intelligence_service_url: get_env("INTELLIGENCE_SERVICE_URL", "http://localhost:8040"),
+            geo_economi_url: get_env("GEO_ECONOMI_URL", "http://geo-economi:8080"),
         }
     }
 

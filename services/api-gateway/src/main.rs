@@ -106,6 +106,9 @@ async fn main() {
             .ok()
             .filter(|key| !key.trim().is_empty()),
         price_cache: std::sync::Arc::new(parking_lot::RwLock::new(None)),
+        route_cache: std::sync::Arc::new(
+            parking_lot::RwLock::new(std::collections::HashMap::new()),
+        ),
     };
 
     let listener = match TcpListener::bind(&cfg.bind_addr).await {

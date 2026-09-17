@@ -12,6 +12,13 @@ pub struct CachedPriceSnapshot {
 }
 
 #[derive(Clone)]
+pub struct CachedResponse {
+    pub bytes: axum::body::Bytes,
+    pub cached_at: Instant,
+    pub content_type: String,
+}
+
+#[derive(Clone)]
 pub struct AppState {
     pub config: Config,
     pub http: reqwest::Client,
@@ -20,4 +27,5 @@ pub struct AppState {
     pub usage_tracker: Arc<UsageTracker>,
     pub internal_api_key: Option<String>,
     pub price_cache: Arc<parking_lot::RwLock<Option<CachedPriceSnapshot>>>,
+    pub route_cache: Arc<parking_lot::RwLock<std::collections::HashMap<String, CachedResponse>>>,
 }
