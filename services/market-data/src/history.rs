@@ -57,11 +57,11 @@ pub async fn get_history(
 
     match history_res {
         Ok(cached_page) => {
-            if query.before.is_none() && resolution == "1m" {
+            if query.before.is_none() {
                 let live_opt = state.prices.read().get(&symbol).cloned();
                 if let Some(live) = live_opt {
                     let mut page = (*cached_page).clone();
-                    stitch_active_candle(&mut page.items, &live);
+                    stitch_active_candle(&mut page.items, &live, &resolution);
                     return (StatusCode::OK, Json(json!(page)));
                 }
             }
@@ -77,12 +77,27 @@ pub async fn get_history(
     }
 }
 
-pub fn stitch_active_candle(items: &mut Vec<Value>, live: &CachedPrice) {
+fn resolution_to_seconds(res: &str) -> i64 {
+    match res.trim() {
+        "1m" | "1" => 60,
+        "5m" | "5" => 300,
+        "15m" | "15" => 900,
+        "30m" | "30" => 1800,
+        "1h" | "60" => 3600,
+        "4h" | "240" => 14400,
+        "1d" | "D" | "1D" => 86400,
+        "1w" | "W" | "1W" => 604800,
+        _ => 60,
+    }
+}
+
+pub fn stitch_active_candle(items: &mut Vec<Value>, live: &CachedPrice, resolution: &str) {
     let now_ts = live
         .timestamp_ms
         .map(|ms| ms / 1000)
         .unwrap_or_else(|| chrono::Utc::now().timestamp());
-    let current_bucket = (now_ts / 60) * 60;
+    let interval_secs = resolution_to_seconds(resolution);
+    let current_bucket = (now_ts / interval_secs) * interval_secs;
 
     if let Some(latest) = items.last_mut() {
         if let Some(candle_time) = latest.get("time").and_then(Value::as_i64) {
@@ -190,7 +205,7 @@ mod tests {
             feed: None,
         };
 
-        stitch_active_candle(&mut items, &live);
+        stitch_active_candle(&mut items, &live, "1m");
 
         let latest = items.last().unwrap();
         assert_eq!(latest["close"], 50200.0);
@@ -224,7 +239,7 @@ mod tests {
             feed: None,
         };
 
-        stitch_active_candle(&mut items, &live);
+        stitch_active_candle(&mut items, &live, "1m");
 
         assert_eq!(items.len(), 2);
         let latest = items.last().unwrap();
