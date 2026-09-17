@@ -110,6 +110,14 @@ func (s *MacroStore) Snapshot(filter MacroFilter, now time.Time) MacroMapResult 
 	indicator := strings.ToLower(strings.TrimSpace(filter.Indicator))
 	if indicator == "" {
 		indicator = IndicatorInflation
+	} else if indicator == "gdp" {
+		indicator = IndicatorGDPGrowth
+	} else if indicator == "cpi" {
+		indicator = IndicatorInflation
+	} else if indicator == "rates" || indicator == "rate" {
+		indicator = IndicatorInterestRate
+	} else if indicator == "debt" {
+		indicator = IndicatorDebtToGDP
 	}
 	meta := macroMetadata(indicator)
 	result := MacroMapResult{Indicator: indicator, IndicatorName: meta.name, Unit: meta.unit, Countries: []MacroCountry{}, IsLive: false}

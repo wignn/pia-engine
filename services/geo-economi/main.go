@@ -62,6 +62,7 @@ func main() {
 	mux.HandleFunc("GET /healthz", healthHandler)
 	mux.HandleFunc("GET /api/v1/geosignals/map", mapHandler(store))
 	mux.HandleFunc("GET /api/v1/macro/map", macroMapHandler(macroStore))
+	mux.HandleFunc("GET /api/v1/economic/map", macroMapHandler(macroStore))
 
 	server := &http.Server{Addr: envString("PORT", ":8080"), Handler: mux}
 	if !strings.Contains(server.Addr, ":") {

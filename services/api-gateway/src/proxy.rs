@@ -138,6 +138,15 @@ pub async fn proxy_request(
                 .to_string();
             let mut builder = Response::builder().status(status);
             for (name, value) in response.headers() {
+                let n = name.as_str();
+                if n.eq_ignore_ascii_case("transfer-encoding")
+                    || n.eq_ignore_ascii_case("content-length")
+                    || n.eq_ignore_ascii_case("connection")
+                    || n.eq_ignore_ascii_case("keep-alive")
+                    || n.eq_ignore_ascii_case("upgrade")
+                {
+                    continue;
+                }
                 builder = builder.header(name, value);
             }
             match response.bytes().await {
@@ -175,7 +184,10 @@ pub async fn proxy_request(
 }
 
 fn target_base_for_path<'a>(path: &str, config: &'a crate::config::Config) -> Option<&'a str> {
-    if path == "/api/v1/macro/map" || path == "/api/v1/geosignals/map" {
+    if path == "/api/v1/macro/map"
+        || path == "/api/v1/economic/map"
+        || path == "/api/v1/geosignals/map"
+    {
         Some(config.geo_economi_url.as_str())
     } else if path.starts_with("/api/v1/market/why")
         || path.starts_with("/api/v1/market/insights")
@@ -195,7 +207,6 @@ fn target_base_for_path<'a>(path: &str, config: &'a crate::config::Config) -> Op
         || path.starts_with("/api/v1/economic/latest")
         || path.starts_with("/api/v1/economic/countries")
         || path.starts_with("/api/v1/economic/categories")
-        || path.starts_with("/api/v1/economic/map")
     {
         Some(config.market_data_url.as_str())
     } else if path.starts_with("/api/v1/news")
@@ -248,6 +259,10 @@ mod tests {
         let cfg = config();
         assert_eq!(
             target_base_for_path("/api/v1/macro/map", &cfg),
+            Some(cfg.geo_economi_url.as_str())
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/economic/map", &cfg),
             Some(cfg.geo_economi_url.as_str())
         );
         assert_eq!(
