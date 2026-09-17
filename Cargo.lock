@@ -86,6 +86,7 @@ dependencies = [
  "atlsd-eventbus",
  "atlsd-observability",
  "axum",
+ "base64",
  "chrono",
  "dotenvy",
  "futures-util",
