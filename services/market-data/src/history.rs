@@ -159,6 +159,7 @@ pub fn normalize_resolution(raw: &str) -> String {
         "1" | "1m" | "m1" => "1m".to_string(),
         "5" | "5m" | "m5" => "5m".to_string(),
         "15" | "15m" | "m15" => "15m".to_string(),
+        "30" | "30m" | "m30" => "30m".to_string(),
         "60" | "1h" | "h1" => "1h".to_string(),
         "240" | "4h" | "h4" => "4h".to_string(),
         "d" | "1d" => "1D".to_string(),
@@ -175,6 +176,10 @@ mod tests {
     fn normalizes_supported_resolutions() {
         assert_eq!(normalize_resolution("M1"), "1m");
         assert_eq!(normalize_resolution("5"), "5m");
+        assert_eq!(normalize_resolution("15"), "15m");
+        assert_eq!(normalize_resolution("30"), "30m");
+        assert_eq!(normalize_resolution("30m"), "30m");
+        assert_eq!(normalize_resolution("M30"), "30m");
         assert_eq!(normalize_resolution("h1"), "1h");
         assert_eq!(normalize_resolution("bad"), "1m");
     }
@@ -245,6 +250,69 @@ mod tests {
         let latest = items.last().unwrap();
         assert_eq!(latest["time"], 1700000100);
         assert_eq!(latest["close"], 50300.0);
+        assert_eq!(latest["source"], "live_buffer");
+    }
+
+    #[test]
+    fn test_stitch_active_candle_30m_resolution() {
+        // 30m = 1800s
+        let base_30m_bucket = 1700001000 - (1700001000 % 1800);
+        let mut items = vec![json!({
+            "time": base_30m_bucket,
+            "open": 50000.0,
+            "high": 50100.0,
+            "low": 49900.0,
+            "close": 50050.0,
+            "value": 50050.0,
+            "volume": 100.0,
+            "source": "clickhouse_candles_rollup"
+        })];
+
+        // 1. Tick within the same 30m window updates current candle
+        let live_same_bucket = CachedPrice {
+            symbol: "BTCUSDT".to_string(),
+            price: 50400.0,
+            bid: None,
+            ask: None,
+            volume: Some(5.0),
+            source: "binance".to_string(),
+            asset_type: "crypto".to_string(),
+            received_at: Some("2023-11-14T22:10:00Z".to_string()),
+            timestamp_ms: Some((base_30m_bucket + 300) * 1000),
+            feed: None,
+        };
+
+        stitch_active_candle(&mut items, &live_same_bucket, "30m");
+        assert_eq!(items.len(), 1);
+        let latest = items.last().unwrap();
+        assert_eq!(latest["time"], base_30m_bucket);
+        assert_eq!(latest["close"], 50400.0);
+        assert_eq!(latest["high"], 50400.0);
+        assert_eq!(latest["volume"], 105.0);
+
+        // 2. Tick in the next 30m window appends a new candle
+        let live_next_bucket = CachedPrice {
+            symbol: "BTCUSDT".to_string(),
+            price: 50600.0,
+            bid: None,
+            ask: None,
+            volume: Some(12.0),
+            source: "binance".to_string(),
+            asset_type: "crypto".to_string(),
+            received_at: Some("2023-11-14T22:31:00Z".to_string()),
+            timestamp_ms: Some((base_30m_bucket + 1800 + 60) * 1000),
+            feed: None,
+        };
+
+        stitch_active_candle(&mut items, &live_next_bucket, "30m");
+        assert_eq!(items.len(), 2);
+        let latest = items.last().unwrap();
+        assert_eq!(latest["time"], base_30m_bucket + 1800);
+        assert_eq!(latest["open"], 50600.0);
+        assert_eq!(latest["close"], 50600.0);
+        assert_eq!(latest["high"], 50600.0);
+        assert_eq!(latest["low"], 50600.0);
+        assert_eq!(latest["volume"], 12.0);
         assert_eq!(latest["source"], "live_buffer");
     }
 }

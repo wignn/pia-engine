@@ -173,20 +173,8 @@ impl ClickHouseClient {
             limit.saturating_add(1),
             before,
         );
-        let mut rows: Vec<Value> = self.query_json_each_row(&sql).await?;
-        rows.reverse();
-        let page_limit = limit.clamp(1, 1000);
-        let has_more = rows.len() > page_limit;
-        rows.truncate(page_limit);
-        let next_before = rows
-            .first()
-            .and_then(|row| row.get("time"))
-            .and_then(Value::as_i64);
-        Ok(HistoryPage {
-            items: rows,
-            next_before,
-            has_more,
-        })
+        let rows: Vec<Value> = self.query_json_each_row(&sql).await?;
+        Ok(process_latest_history_rows(rows, limit))
     }
 
     pub async fn spike_candidates(
@@ -255,10 +243,27 @@ impl ClickHouseClient {
     }
 }
 
+pub fn process_latest_history_rows(mut rows: Vec<Value>, limit: usize) -> HistoryPage {
+    let page_limit = limit.clamp(1, 1000);
+    let has_more = rows.len() > page_limit;
+    rows.truncate(page_limit);
+    rows.reverse();
+    let next_before = rows
+        .first()
+        .and_then(|row| row.get("time"))
+        .and_then(Value::as_i64);
+    HistoryPage {
+        items: rows,
+        next_before,
+        has_more,
+    }
+}
+
 fn history_bucket_minutes(resolution: &str) -> u32 {
     match resolution {
         "5m" => 5,
         "15m" => 15,
+        "30m" => 30,
         "1h" => 60,
         "4h" => 240,
         "1D" => 1440,
@@ -268,10 +273,13 @@ fn history_bucket_minutes(resolution: &str) -> u32 {
 }
 
 fn clickhouse_bucket_interval(bucket_minutes: u32) -> String {
-    if bucket_minutes.is_multiple_of(60) {
-        format!("INTERVAL {} HOUR", bucket_minutes / 60)
-    } else {
-        format!("INTERVAL {bucket_minutes} MINUTE")
+    match bucket_minutes {
+        10080 => "INTERVAL 1 WEEK".to_string(),
+        1440 => "INTERVAL 1 DAY".to_string(),
+        minutes if minutes.is_multiple_of(60) => {
+            format!("INTERVAL {} HOUR", minutes / 60)
+        }
+        minutes => format!("INTERVAL {minutes} MINUTE"),
     }
 }
 
@@ -384,9 +392,70 @@ mod tests {
     #[test]
     fn history_resolution_helpers_map_supported_intervals() {
         assert_eq!(history_bucket_minutes("5m"), 5);
+        assert_eq!(history_bucket_minutes("15m"), 15);
+        assert_eq!(history_bucket_minutes("30m"), 30);
         assert_eq!(history_bucket_minutes("1h"), 60);
         assert_eq!(clickhouse_bucket_interval(15), "INTERVAL 15 MINUTE");
+        assert_eq!(clickhouse_bucket_interval(30), "INTERVAL 30 MINUTE");
         assert_eq!(clickhouse_bucket_interval(60), "INTERVAL 1 HOUR");
+        assert_eq!(clickhouse_bucket_interval(1440), "INTERVAL 1 DAY");
+        assert_eq!(clickhouse_bucket_interval(10080), "INTERVAL 1 WEEK");
+    }
+
+    #[test]
+    fn latest_history_query_30m_bucket() {
+        let sql = latest_history_sql("market", "BTCUSDT", "30m", 100, None);
+        assert!(sql.contains("toStartOfInterval(bucket_time, INTERVAL 30 MINUTE)"));
+    }
+
+    #[test]
+    fn process_latest_history_rows_retains_newest_and_sets_oldest_cursor() {
+        // ClickHouse returns rows in DESC order (newest first).
+        // If limit is 3, query fetched limit + 1 = 4 rows: [500, 400, 300, 200]
+        let raw_desc_rows = vec![
+            serde_json::json!({ "time": 500, "close": 50.0 }),
+            serde_json::json!({ "time": 400, "close": 40.0 }),
+            serde_json::json!({ "time": 300, "close": 30.0 }),
+            serde_json::json!({ "time": 200, "close": 20.0 }),
+        ];
+
+        let page = process_latest_history_rows(raw_desc_rows, 3);
+
+        // has_more must be true since 4 > 3
+        assert!(page.has_more);
+        // Truncate before reverse means the 3 newest rows (500, 400, 300) are kept,
+        // and after reversing they are in chronological ascending order (300, 400, 500)
+        assert_eq!(page.items.len(), 3);
+        assert_eq!(page.items[0]["time"], 300);
+        assert_eq!(page.items[1]["time"], 400);
+        assert_eq!(page.items[2]["time"], 500);
+
+        // next_before must point to the oldest returned row (300) so subsequent
+        // query for bucket_time < toDateTime(300) fetches candles older than 300
+        assert_eq!(page.next_before, Some(300));
+    }
+
+    #[test]
+    fn process_latest_history_rows_handles_exact_or_under_limit() {
+        let raw_desc_rows = vec![
+            serde_json::json!({ "time": 500, "close": 50.0 }),
+            serde_json::json!({ "time": 400, "close": 40.0 }),
+        ];
+
+        let page = process_latest_history_rows(raw_desc_rows, 3);
+        assert!(!page.has_more);
+        assert_eq!(page.items.len(), 2);
+        assert_eq!(page.items[0]["time"], 400);
+        assert_eq!(page.items[1]["time"], 500);
+        assert_eq!(page.next_before, Some(400));
+    }
+
+    #[test]
+    fn process_latest_history_rows_handles_empty() {
+        let page = process_latest_history_rows(vec![], 10);
+        assert!(!page.has_more);
+        assert!(page.items.is_empty());
+        assert_eq!(page.next_before, None);
     }
 
     #[test]

@@ -10,6 +10,7 @@ mod state;
 mod streams;
 mod tenant;
 mod ticket;
+#[cfg(unix)]
 mod uds_subscriber;
 
 use axum::Json;
@@ -91,11 +92,17 @@ async fn main() {
         nats_subscriber::run(nats_cfg, nats_hub).await;
     });
 
+    #[cfg(unix)]
     if let Some(uds_path) = cfg.uds_ipc_path.clone() {
         let uds_hub = hub.clone();
         tokio::spawn(async move {
             uds_subscriber::run(uds_path, uds_hub).await;
         });
+    }
+
+    #[cfg(not(unix))]
+    if cfg.uds_ipc_path.is_some() {
+        warn!("UDS subscriber is unsupported on this platform; subscriber disabled");
     }
 
     let listener = match TcpListener::bind(&cfg.bind_addr).await {

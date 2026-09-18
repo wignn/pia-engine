@@ -5,19 +5,26 @@ use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
 use crate::health::HealthRegistry;
+#[cfg(unix)]
 use once_cell::sync::OnceCell;
 
+#[cfg(unix)]
 static UDS_BROADCASTER: OnceCell<Arc<atlsd_common::ipc::UdsBroadcaster>> = OnceCell::new();
 
+#[cfg(unix)]
 pub fn set_uds_broadcaster(broadcaster: Arc<atlsd_common::ipc::UdsBroadcaster>) {
     let _ = UDS_BROADCASTER.set(broadcaster);
 }
 
+#[cfg(unix)]
 pub fn broadcast_uds(payload: &[u8]) {
     if let Some(broadcaster) = UDS_BROADCASTER.get() {
         broadcaster.broadcast(payload);
     }
 }
+
+#[cfg(not(unix))]
+pub fn broadcast_uds(_payload: &[u8]) {}
 
 #[derive(Debug)]
 pub struct PublishEvent {

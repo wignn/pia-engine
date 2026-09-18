@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 use atlsd_common::ipc::{UdsBroadcaster, UdsReceiver};
 use std::time::Duration;
 

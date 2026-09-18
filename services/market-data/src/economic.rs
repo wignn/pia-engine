@@ -615,7 +615,7 @@ async fn sync_series(
     // Upsert series metadata
     sqlx::query(
         r#"
-        INSERT INTO macro_series (id, provider, title, category, units, frequency, last_synced_at)
+        INSERT INTO macro.macro_series (id, provider, title, category, units, frequency, last_synced_at)
         VALUES ($1, 'fred', $2, $3, $4, $5, NOW())
         ON CONFLICT (id) DO UPDATE SET
             title = EXCLUDED.title,
@@ -662,7 +662,7 @@ async fn sync_series(
 
         sqlx::query(
             r#"
-            INSERT INTO macro_observations (series_id, observation_date, value, raw_value)
+            INSERT INTO macro.macro_observations (series_id, observation_date, value, raw_value)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (series_id, observation_date) DO UPDATE SET
                 value = EXCLUDED.value,
@@ -682,7 +682,7 @@ async fn sync_series(
 
     sqlx::query(
         r#"
-        UPDATE macro_series SET
+        UPDATE macro.macro_series SET
             observation_start = (SELECT MIN(observation_date) FROM macro_observations WHERE series_id = $1),
             observation_end = (SELECT MAX(observation_date) FROM macro_observations WHERE series_id = $1),
             updated_at = NOW()
@@ -859,11 +859,12 @@ pub async fn get_macro_map(
     let rows = sqlx::query_as::<_, MacroMapObservation>(
         r#"
         WITH observations AS (
-            SELECT series_id, observation_date, value,
-                   ROW_NUMBER() OVER (PARTITION BY series_id ORDER BY observation_date DESC) AS position,
-                   MAX(updated_at) OVER (PARTITION BY series_id) AS updated_at
-            FROM macro.macro_observations
-            WHERE series_id = ANY($1) AND value IS NOT NULL
+            SELECT observations.series_id, observation_date, value,
+                   ROW_NUMBER() OVER (PARTITION BY observations.series_id ORDER BY observation_date DESC) AS position,
+                   series.last_synced_at AS updated_at
+            FROM macro.macro_observations observations
+            LEFT JOIN macro.macro_series series ON series.id = observations.series_id
+            WHERE observations.series_id = ANY($1) AND value IS NOT NULL
               AND ($2::date IS NULL OR observation_date <= $2)
         )
         SELECT current.series_id, current.observation_date, current.value,
@@ -948,6 +949,15 @@ pub async fn get_macro_map(
     let period = params
         .period
         .unwrap_or_else(|| latest_date.map(|date| date.to_string()).unwrap_or_default());
+    if countries.is_empty() {
+        return unavailable_macro_map(
+            indicator,
+            indicator_name,
+            unit,
+            period,
+            "No synchronized observations match the requested period",
+        );
+    }
 
     Json(serde_json::json!({
         "indicator": indicator,
@@ -961,14 +971,18 @@ pub async fn get_macro_map(
         "total": countries.len(),
         "source": "FRED / St. Louis Fed",
         "updated_at": freshest,
-        "is_live": !countries.is_empty(),
-        "unavailable_reason": if countries.is_empty() { Some("No synchronized observations match the requested period") } else { None }
+        "is_live": true,
+        "unavailable_reason": null,
+        "error_code": null
     }))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{macro_map_cutoff, macro_map_indicator, macro_map_series};
+    use super::{
+        macro_map_country_name, macro_map_cutoff, macro_map_indicator, macro_map_series,
+        unavailable_macro_map,
+    };
     use chrono::NaiveDate;
 
     #[test]
@@ -1004,5 +1018,36 @@ mod tests {
         assert!(macro_map_series("unemployment")
             .iter()
             .all(|series| series.title.contains("Unemployment")));
+        assert!(macro_map_series("policy_rate").is_empty());
+    }
+
+    #[test]
+    fn macro_map_handles_empty_and_invalid_periods() {
+        assert_eq!(macro_map_cutoff(None).unwrap(), None);
+        assert_eq!(macro_map_cutoff(Some(" ")).unwrap(), None);
+        assert_eq!(
+            macro_map_cutoff(Some("2025-02")).unwrap(),
+            Some(NaiveDate::from_ymd_opt(2025, 2, 28).unwrap())
+        );
+        assert!(macro_map_cutoff(Some("2024-13")).is_err());
+    }
+
+    #[test]
+    fn unavailable_macro_map_is_explicit_and_contains_no_fallback_data() {
+        let response = unavailable_macro_map(
+            "inflation",
+            "Consumer Price Index",
+            "Index",
+            "2025".to_string(),
+            "No synchronized observations match the requested period",
+        );
+
+        assert_eq!(response.0["is_live"], false);
+        assert_eq!(response.0["error_code"], "MACRO_MAP_UNAVAILABLE");
+        assert_eq!(response.0["min_value"], serde_json::Value::Null);
+        assert_eq!(response.0["max_value"], serde_json::Value::Null);
+        assert_eq!(response.0["countries"], serde_json::json!([]));
+        assert_eq!(response.0["timeline"], serde_json::json!([]));
+        assert_eq!(macro_map_country_name("XX"), "Unknown");
     }
 }
