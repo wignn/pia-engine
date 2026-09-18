@@ -175,23 +175,30 @@ pub async fn list_symbols(
 }
 
 fn default_precision_and_tick(symbol: &str, asset_type: &str) -> (u32, f64) {
+    let sym = symbol.to_uppercase();
+    if sym.starts_with("XAU") || sym == "GOLD" {
+        return (2, 0.20);
+    }
+    if sym.starts_with("XAG") || sym == "SILVER" {
+        return (3, 0.01);
+    }
+    if sym.starts_with("BTC") {
+        return (2, 2.50);
+    }
+    if sym.starts_with("ETH") {
+        return (2, 0.25);
+    }
     match asset_type.to_lowercase().as_str() {
         "forex" => {
             if symbol.ends_with("JPY") {
-                (3, 0.001)
+                (3, 0.01)
             } else {
-                (5, 0.00001)
+                (5, 0.0001)
             }
         }
-        "crypto" => {
-            if symbol.starts_with("BTC") || symbol.starts_with("ETH") {
-                (2, 0.01)
-            } else {
-                (4, 0.0001)
-            }
-        }
-        "commodity" => (3, 0.001),
-        "stock" => (2, 0.01),
+        "crypto" => (2, 0.10),
+        "commodity" => (2, 0.05),
+        "stock" => (2, 0.05),
         "rates" => (3, 0.001),
         _ => (2, 0.01),
     }
@@ -258,8 +265,8 @@ pub async fn get_orderbook(Path(symbol): Path<String>, State(state): State<AppSt
     let (decimals, tick_size) = default_precision_and_tick(&p.symbol, &p.asset_type);
     let factor = 10f64.powi(decimals as i32);
     let mid_price = p.price;
-    let base_bid = p.bid.unwrap_or(mid_price - tick_size);
-    let base_ask = p.ask.unwrap_or(mid_price + tick_size);
+    let base_bid = p.bid.unwrap_or(mid_price - tick_size / 2.0);
+    let base_ask = p.ask.unwrap_or(mid_price + tick_size / 2.0);
 
     let mut bids = Vec::new();
     let mut asks = Vec::new();
@@ -282,10 +289,15 @@ pub async fn get_orderbook(Path(symbol): Path<String>, State(state): State<AppSt
         }
     }
 
+    let spread = ((base_ask - base_bid) * factor).round() / factor;
+    let spread_pct = (((base_ask - base_bid) / mid_price) * 100.0 * 1000.0).round() / 1000.0;
+
     Json(json!({
         "symbol": p.symbol,
         "bids": bids,
         "asks": asks,
+        "spread": spread,
+        "spread_percent": spread_pct,
         "timestamp": p.timestamp_ms.unwrap_or_else(|| chrono::Utc::now().timestamp_millis()),
         "source": p.source,
         "is_live": false,
