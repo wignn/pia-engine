@@ -82,17 +82,6 @@ pub fn parse_stream(raw: &str) -> Result<String, StreamError> {
     )))
 }
 
-pub fn normalize_streams<I, S>(streams: I) -> Result<HashSet<String>, StreamError>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<str>,
-{
-    streams
-        .into_iter()
-        .map(|s| parse_stream(s.as_ref()))
-        .collect()
-}
-
 pub fn normalize_client_streams<I, S>(streams: I) -> Result<HashSet<String>, StreamError>
 where
     I: IntoIterator<Item = S>,
