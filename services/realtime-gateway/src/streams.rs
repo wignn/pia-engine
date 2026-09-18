@@ -93,6 +93,25 @@ where
         .collect()
 }
 
+pub fn normalize_client_streams<I, S>(streams: I) -> Result<HashSet<String>, StreamError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    streams
+        .into_iter()
+        .map(|raw| {
+            let stream = raw.as_ref().trim();
+            let lower = stream.to_lowercase();
+            if !stream.contains(':') && !BASE_STREAMS.contains(&lower.as_str()) {
+                parse_stream(&format!("market_data:{stream}"))
+            } else {
+                parse_stream(stream)
+            }
+        })
+        .collect()
+}
+
 pub fn candidate_streams(channel: &str, data: &Value) -> HashSet<String> {
     let mut streams = HashSet::from(["all".to_string(), channel.to_string()]);
 
@@ -345,6 +364,35 @@ mod tests {
             parse_stream("market_data:xauusd").unwrap(),
             "market_data:XAUUSD"
         );
+    }
+
+    #[test]
+    fn normalize_client_streams_maps_bare_market_symbols() {
+        let streams = normalize_client_streams(["xauusd", "ETHUSDT"]).unwrap();
+        assert!(streams.contains("market_data:XAUUSD"));
+        assert!(streams.contains("market_data:ETHUSDT"));
+    }
+
+    #[test]
+    fn normalize_client_streams_preserves_named_and_prefixed_streams() {
+        let streams = normalize_client_streams([
+            "calendar",
+            "market_data:btcusdt",
+            "x:@FederalReserve",
+            "geosignals:asset:aapl",
+        ])
+        .unwrap();
+        assert!(streams.contains("calendar"));
+        assert!(streams.contains("market_data:BTCUSDT"));
+        assert!(streams.contains("x:federalreserve"));
+        assert!(streams.contains("geosignals:asset:AAPL"));
+    }
+
+    #[test]
+    fn normalize_client_streams_keeps_invalid_prefixed_streams_invalid() {
+        assert!(normalize_client_streams([""]).is_err());
+        assert!(normalize_client_streams(["market_data:"]).is_err());
+        assert!(normalize_client_streams(["unknown:value"]).is_err());
     }
 
     #[test]

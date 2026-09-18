@@ -369,21 +369,7 @@ async fn handle_command(
             .await;
         }
         "SUBSCRIBE" => {
-            let normalized_params: Vec<String> = command
-                .params
-                .into_iter()
-                .map(|p| {
-                    let s = p.trim();
-                    if !s.contains(':')
-                        && !crate::streams::BASE_STREAMS.contains(&s.to_lowercase().as_str())
-                    {
-                        format!("market_data:{}", s.to_uppercase())
-                    } else {
-                        s.to_string()
-                    }
-                })
-                .collect();
-            let streams = match streams::normalize_streams(&normalized_params) {
+            let streams = match streams::normalize_client_streams(&command.params) {
                 Ok(streams) => streams,
                 Err(error) => {
                     send_control(control_tx, streams::error_response(&error, command.id)).await;
@@ -415,7 +401,7 @@ async fn handle_command(
             .await;
         }
         "UNSUBSCRIBE" => {
-            let streams = match streams::normalize_streams(&command.params) {
+            let streams = match streams::normalize_client_streams(&command.params) {
                 Ok(streams) => streams,
                 Err(error) => {
                     send_control(control_tx, streams::error_response(&error, command.id)).await;
