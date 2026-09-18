@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn test_stitch_active_candle_30m_resolution() {
         // 30m = 1800s
-        let base_30m_bucket = 1700001000 - (1700001000 % 1800);
+        let base_30m_bucket = 1700001000;
         let mut items = vec![json!({
             "time": base_30m_bucket,
             "open": 50000.0,
