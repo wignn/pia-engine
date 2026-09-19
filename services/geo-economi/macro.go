@@ -21,20 +21,20 @@ const (
 )
 
 type MacroMapResult struct {
-	Indicator        string         `json:"indicator"`
-	IndicatorName    string         `json:"indicator_name"`
-	Unit             string         `json:"unit"`
-	Period           string         `json:"period"`
-	MinValue         *float64       `json:"min_value"`
-	MaxValue         *float64       `json:"max_value"`
-	Timeline         []string       `json:"timeline"`
-	Countries        []MacroCountry `json:"countries"`
-	Total            int            `json:"total"`
-	Source           string         `json:"source"`
-	IsLive           bool           `json:"is_live"`
-	UpdatedAt        string         `json:"updated_at,omitempty"`
-	UnavailableReason string        `json:"unavailable_reason,omitempty"`
-	ErrorCode         string        `json:"error_code,omitempty"`
+	Indicator         string         `json:"indicator"`
+	IndicatorName     string         `json:"indicator_name"`
+	Unit              string         `json:"unit"`
+	Period            string         `json:"period"`
+	MinValue          *float64       `json:"min_value"`
+	MaxValue          *float64       `json:"max_value"`
+	Timeline          []string       `json:"timeline"`
+	Countries         []MacroCountry `json:"countries"`
+	Total             int            `json:"total"`
+	Source            string         `json:"source"`
+	IsLive            bool           `json:"is_live"`
+	UpdatedAt         string         `json:"updated_at,omitempty"`
+	UnavailableReason string         `json:"unavailable_reason,omitempty"`
+	ErrorCode         string         `json:"error_code,omitempty"`
 }
 
 type MacroCountry struct {

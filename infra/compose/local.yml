@@ -154,28 +154,6 @@ services:
         condition: service_started
       intelligence-service:
         condition: service_started
-      geo-economi:
-        condition: service_healthy
-    restart: always
-    networks:
-      - private
-
-  geo-economi:
-    container_name: geo-economi
-    image: ghcr.io/wignn/pia-geo-economi
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.geo-economi
-    environment:
-      PORT: 8080
-      REFRESH_INTERVAL_SECONDS: 600
-      MACRO_REFRESH_INTERVAL_SECONDS: 21600
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/healthz || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
     restart: always
     networks:
       - private
