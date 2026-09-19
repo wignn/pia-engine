@@ -42,6 +42,15 @@ jobs:
       - name: Cargo test
         run: cargo test --workspace
 
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/geo-economi/go.mod
+
+      - name: Geo-economi test
+        working-directory: services/geo-economi
+        run: go test ./...
+
 
 
   changes:
@@ -155,6 +164,12 @@ jobs:
               - 'infra/docker/Dockerfile.macro-feed'
               - 'infra/compose/prod.edge.yml'
               - '.dockerignore'
+            geo_economi:
+              - 'services/geo-economi/**'
+              - 'infra/docker/Dockerfile.geo-economi'
+              - 'infra/compose/prod.app.yml'
+              - '.github/workflows/docker-publish.yml'
+              - '.dockerignore'
 
       - name: Build Docker matrix
         id: matrix
@@ -177,6 +192,7 @@ jobs:
           DB_MIGRATE_CHANGED: ${{ steps.filter.outputs.db_migrate }}
           SINK_CONNECTOR_CHANGED: ${{ steps.filter.outputs.sink_connector }}
           MACRO_FEED_CHANGED: ${{ steps.filter.outputs.macro_feed }}
+          GEO_ECONOMI_CHANGED: ${{ steps.filter.outputs.geo_economi }}
         run: |
           json='{"include":['
           sep=''
@@ -248,6 +264,10 @@ jobs:
 
           if [[ "$BUILD_ALL" == "true" || "$MACRO_FEED_CHANGED" == "true" ]]; then
             add '{"image":"pia-macro-feed","dockerfile":"infra/docker/Dockerfile.macro-feed"}'
+          fi
+
+          if [[ "$BUILD_ALL" == "true" || "$GEO_ECONOMI_CHANGED" == "true" ]]; then
+            add '{"image":"pia-geo-economi","dockerfile":"infra/docker/Dockerfile.geo-economi"}'
           fi
           json="${json}]}";
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
