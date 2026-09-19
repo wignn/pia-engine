@@ -58,7 +58,10 @@ func TestMacroMapHandler(t *testing.T) {
 	recorder = httptest.NewRecorder()
 	request = httptest.NewRequest(http.MethodGet, "/api/v1/macro/map?indicator=inflation", nil)
 	macroMapHandler(store)(recorder, request)
-	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"isLive":false`) {
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"is_live":false`) {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"error_code":"MACRO_MAP_UNAVAILABLE"`) {
+		t.Fatalf("missing unavailable contract: %s", recorder.Body.String())
 	}
 }

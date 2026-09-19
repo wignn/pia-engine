@@ -21,27 +21,30 @@ const (
 )
 
 type MacroMapResult struct {
-	Indicator     string         `json:"indicator"`
-	IndicatorName string         `json:"indicatorName"`
-	Unit          string         `json:"unit"`
-	Period        string         `json:"period"`
-	MinValue      float64        `json:"minValue,omitempty"`
-	MaxValue      float64        `json:"maxValue,omitempty"`
-	Timeline      []string       `json:"timeline,omitempty"`
-	Countries     []MacroCountry `json:"countries"`
-	Total         int            `json:"total"`
-	IsLive        bool           `json:"isLive"`
-	UpdatedAt     int64          `json:"updatedAt,omitempty"`
+	Indicator        string         `json:"indicator"`
+	IndicatorName    string         `json:"indicator_name"`
+	Unit             string         `json:"unit"`
+	Period           string         `json:"period"`
+	MinValue         *float64       `json:"min_value"`
+	MaxValue         *float64       `json:"max_value"`
+	Timeline         []string       `json:"timeline"`
+	Countries        []MacroCountry `json:"countries"`
+	Total            int            `json:"total"`
+	Source           string         `json:"source"`
+	IsLive           bool           `json:"is_live"`
+	UpdatedAt        string         `json:"updated_at,omitempty"`
+	UnavailableReason string        `json:"unavailable_reason,omitempty"`
+	ErrorCode         string        `json:"error_code,omitempty"`
 }
 
 type MacroCountry struct {
-	ID        string             `json:"id"`
-	Name      string             `json:"name"`
+	ID        string             `json:"country_code"`
+	Name      string             `json:"country_name"`
 	Flag      string             `json:"flag,omitempty"`
 	Region    string             `json:"region"`
 	Ticker    string             `json:"ticker"`
 	Value     *float64           `json:"value,omitempty"`
-	PrevValue *float64           `json:"prevValue,omitempty"`
+	PrevValue *float64           `json:"previous_value,omitempty"`
 	Change    *float64           `json:"change,omitempty"`
 	Unit      string             `json:"unit"`
 	Period    string             `json:"period"`
@@ -120,8 +123,13 @@ func (s *MacroStore) Snapshot(filter MacroFilter, now time.Time) MacroMapResult 
 		indicator = IndicatorDebtToGDP
 	}
 	meta := macroMetadata(indicator)
-	result := MacroMapResult{Indicator: indicator, IndicatorName: meta.name, Unit: meta.unit, Countries: []MacroCountry{}, IsLive: false}
+	result := MacroMapResult{
+		Indicator: indicator, IndicatorName: meta.name, Unit: meta.unit,
+		Timeline: []string{}, Countries: []MacroCountry{}, Source: "World Bank",
+		UnavailableReason: "No live World Bank observations are available", ErrorCode: "MACRO_MAP_UNAVAILABLE",
+	}
 	if !validIndicator(indicator) {
+		result.UnavailableReason = "This macro map indicator is not supported"
 		return result
 	}
 
@@ -171,21 +179,27 @@ func (s *MacroStore) Snapshot(filter MacroFilter, now time.Time) MacroMapResult 
 	}
 	result.Total = len(result.Countries)
 	if result.Total > 0 {
-		result.MinValue = valueOf(result.Countries[0].Value)
-		result.MaxValue = result.MinValue
+		minValue := valueOf(result.Countries[0].Value)
+		maxValue := minValue
 		for _, country := range result.Countries {
 			value := valueOf(country.Value)
-			if value < result.MinValue {
-				result.MinValue = value
+			if value < minValue {
+				minValue = value
 			}
-			if value > result.MaxValue {
-				result.MaxValue = value
+			if value > maxValue {
+				maxValue = value
 			}
 		}
+		result.MinValue = &minValue
+		result.MaxValue = &maxValue
 	}
 	if refreshed := s.refreshed[indicator]; !refreshed.IsZero() {
-		result.UpdatedAt = refreshed.UnixMilli()
-		result.IsLive = now.Sub(refreshed) <= 48*time.Hour
+		result.UpdatedAt = refreshed.UTC().Format(time.RFC3339)
+		result.IsLive = result.Total > 0 && now.Sub(refreshed) <= 48*time.Hour
+	}
+	if result.IsLive {
+		result.UnavailableReason = ""
+		result.ErrorCode = ""
 	}
 	return result
 }
