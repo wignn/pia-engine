@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 
+// async_trait marks the generated future as must-use; the Result return type is too.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait EventPublisher: Send + Sync {
     async fn publish_json(&self, subject: &str, payload: &serde_json::Value) -> anyhow::Result<()> {
