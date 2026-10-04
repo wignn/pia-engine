@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +22,11 @@ class ResearchConfig:
     epochs: int = 20
     batch_size: int = 64
     neutral_return_threshold: float = 0.0002
+    trade_probability_threshold: float = 0.45
+    spread_bps: float = 2.0
+    commission_per_side_bps: float = 0.0
+    slippage_per_side_bps: float = 1.0
+    cost_sensitivity_bps: list[float] = field(default_factory=lambda: [0.0, 2.0, 5.0, 10.0])
 
     @classmethod
     def load(cls, path: str | None = None) -> ResearchConfig:

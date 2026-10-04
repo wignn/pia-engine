@@ -142,10 +142,10 @@ def load_side_channels(config: ResearchConfig, start: str, end: str) -> dict[str
         "cot": """
             SELECT market_code, market_name, report_date, report_type, commercial_long,
                    commercial_short, noncommercial_long, noncommercial_short,
-                   nonreportable_long, nonreportable_short, open_interest, created_at,
-                   created_at AS available_at
+                   nonreportable_long, nonreportable_short, open_interest, created_at, updated_at,
+                   updated_at AS available_at
             FROM macro.cot_reports
-            WHERE created_at BETWEEN %s AND %s
+            WHERE updated_at BETWEEN %s AND %s
         """,
         "fear_greed": """
             SELECT id, scope, date AS event_at, score, label, components, created_at,

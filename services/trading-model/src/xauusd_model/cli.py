@@ -68,7 +68,39 @@ def _parser() -> argparse.ArgumentParser:
     train.add_argument("--from", dest="from_date")
     train.add_argument("--to", dest="to_date")
 
+    evaluate = subparsers.add_parser("evaluate", help="run walk-forward and untouched-final-interval evaluation")
+    evaluate.add_argument("--config", required=True)
+    evaluate.add_argument("--run", required=True)
+
+    predict = subparsers.add_parser("predict", help="create an offline paper prediction for an as-of timestamp")
+    predict.add_argument("--config", required=True)
+    predict.add_argument("--run", required=True)
+    predict.add_argument("--as-of", required=True)
+    predict.add_argument("--output")
+
     return parser
+
+
+def _build_panel(config: ResearchConfig, start: str, end: str, include_text: bool = True):
+    import pandas as pd
+
+    from .features import build_asof_panel
+    from .store import load_market_panel, load_side_channels
+
+    market = load_market_panel(config, start, end)
+    side_channels = load_side_channels(config, start, end)
+    panel = build_asof_panel(market, side_channels)
+    if include_text:
+        from .text import attach_news_embeddings, encode_news
+
+        embeddings = encode_news(
+            side_channels.get("news", pd.DataFrame()),
+            checkpoint=config.finbert_model_id,
+            batch_size=max(1, config.batch_size // 4),
+            cache_dir=Path(config.artifact_dir) / "cache",
+        )
+        panel = attach_news_embeddings(panel, embeddings)
+    return panel
 
 
 def main() -> None:
@@ -78,14 +110,12 @@ def main() -> None:
         print(json.dumps(_inspect_backbone(config, args.run_inference), indent=2))
         return
     if args.command == "report-coverage":
-        from .features import coverage_report
+        from .features import build_asof_panel, coverage_report
         from .store import load_market_panel, load_side_channels
 
         start, end = args.from_date, args.to_date
         market = load_market_panel(config, start, end)
         channels = load_side_channels(config, start, end)
-        from .features import build_asof_panel
-
         panel = build_asof_panel(market, channels)
         report = coverage_report(panel)
         report["requested_window"] = {"from": start, "to": end}
@@ -117,12 +147,6 @@ def main() -> None:
         return
     if args.command == "train":
         from dataclasses import replace
-
-        import pandas as pd
-
-        from .features import build_asof_panel
-        from .store import load_market_panel, load_side_channels
-        from .text import attach_news_embeddings, encode_news
         from .train import fit_candidates
 
         start = args.from_date or config.from_date
@@ -130,18 +154,49 @@ def main() -> None:
         if not start or not end:
             raise SystemExit("training requires --from/--to or from_date/to_date in the JSON config")
         config = replace(config, from_date=start, to_date=end)
-        market = load_market_panel(config, start, end)
-        side_channels = load_side_channels(config, start, end)
-        panel = build_asof_panel(market, side_channels)
-        embeddings = encode_news(
-            side_channels.get("news", pd.DataFrame()),
-            checkpoint=config.finbert_model_id,
-            batch_size=max(1, config.batch_size // 4),
-            cache_dir=Path(config.artifact_dir) / "cache",
-        )
-        panel = attach_news_embeddings(panel, embeddings)
+        panel = _build_panel(config, start, end)
         artifacts = fit_candidates(panel, config)
         print(json.dumps({name: str(path) for name, path in artifacts.items()}, indent=2))
+        return
+    if args.command == "evaluate":
+        from dataclasses import replace
+
+        from .artifacts import write_evaluation, write_model_card
+        from .evaluate import evaluate_run, walk_forward
+
+        run_dir = Path(args.run)
+        manifest = json.loads((run_dir / "run.json").read_text())
+        window = manifest["data_window"]
+        start, end = window["panel_start"], window["panel_end"]
+        config = replace(config, from_date=start, to_date=end)
+        panel = _build_panel(config, start, end)
+        research = walk_forward(panel, config)
+        final = evaluate_run(panel, run_dir, config)
+        prediction_rows = final.pop("predictions")
+        for name, predictions in prediction_rows.items():
+            predictions.to_csv(run_dir / f"predictions-final-{name}.csv", index=False)
+        report = {"walk_forward": research, "final_holdout": final}
+        write_evaluation(run_dir, report)
+        write_model_card(run_dir, report)
+        print(json.dumps(report, indent=2, default=str))
+        return
+    if args.command == "predict":
+        from dataclasses import replace
+
+        from .evaluate import predict_asof
+
+        run_dir = Path(args.run)
+        manifest = json.loads((run_dir / "run.json").read_text())
+        start = manifest["data_window"]["panel_start"]
+        config = replace(config, from_date=start, to_date=args.as_of)
+        panel = _build_panel(config, start, args.as_of)
+        prediction = predict_asof(panel, run_dir, args.as_of)
+        rendered = json.dumps(prediction, indent=2)
+        if args.output:
+            output = Path(args.output)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(rendered + os.linesep)
+        print(rendered)
 
 
 if __name__ == "__main__":

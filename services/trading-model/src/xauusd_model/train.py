@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import platform
 import time
 import uuid
@@ -56,7 +57,7 @@ def _columns(panel: pd.DataFrame) -> tuple[list[str], dict[str, list[str]], dict
         ],
         "macro_position": [column for column in numeric if column.startswith(("macro_", "cot_", "fear_greed_"))],
         "options": [column for column in numeric if column.startswith("options_")],
-        "text": [column for column in numeric if column.startswith("news_embedding_embedding_")],
+        "text": [column for column in numeric if column.startswith("news_embedding_")],
         "chronos": [column for column in numeric if column.startswith("chronos_return_")],
     }
     masks = {
@@ -75,6 +76,22 @@ def _matrix(panel: pd.DataFrame, columns: list[str]) -> np.ndarray:
     if not columns:
         return np.empty((len(panel), 0), dtype=np.float32)
     return panel[columns].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=np.float64)
+
+
+def _temperature(logits: np.ndarray, labels: np.ndarray) -> float:
+    if len(labels) < 8:
+        return 1.0
+    labels = labels.astype(int)
+    best_temperature, best_loss = 1.0, float("inf")
+    for temperature in np.linspace(0.5, 3.0, 51):
+        scaled = logits / temperature
+        scaled -= scaled.max(axis=1, keepdims=True)
+        probabilities = np.exp(scaled)
+        probabilities /= probabilities.sum(axis=1, keepdims=True)
+        loss = -np.log(np.clip(probabilities[np.arange(len(labels)), labels], 1e-8, 1.0)).mean()
+        if loss < best_loss:
+            best_temperature, best_loss = float(temperature), float(loss)
+    return best_temperature
 
 
 def _mask_matrix(panel: pd.DataFrame, columns: list[str]) -> np.ndarray:
@@ -154,7 +171,8 @@ def _chronos_features(panel: pd.DataFrame, config: ResearchConfig) -> tuple[pd.D
                 result[column] = np.nan
         result["chronos_available"] = False
         return result, {
-            "selected_backbone": "price_only_fallback",
+            "selected_backbone": "chronos_unavailable",
+            "fallback_candidate": "price_only",
             "fallback_reason": f"{type(exc).__name__}: {exc}",
         }
 
@@ -165,6 +183,7 @@ def _fit_neural(
     labels: np.ndarray,
     returns_bps: np.ndarray,
     config: ResearchConfig,
+    calibration_indices: np.ndarray,
     price_columns: list[str],
     modality_columns: dict[str, list[str]],
     mask_columns: dict[str, list[str]],
@@ -218,6 +237,21 @@ def _fit_neural(
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
     model.eval()
+    calibration_logits = []
+    with torch.inference_mode():
+        for offset in range(0, len(calibration_indices), max(1, config.batch_size)):
+            selected = calibration_indices[offset : offset + config.batch_size]
+            batch = {
+                "price_seq": torch.tensor(sequences[selected], dtype=torch.float32),
+                "modalities": {
+                    name: torch.tensor(values[selected], dtype=torch.float32) for name, values in modality_arrays.items()
+                },
+                "masks": {name: torch.tensor(values[selected], dtype=torch.bool) for name, values in modality_masks.items()},
+            }
+            calibration_logits.append(model(batch)["direction_logits"].cpu().numpy())
+    calibration_temperature = (
+        _temperature(np.concatenate(calibration_logits), labels[calibration_indices]) if calibration_logits else 1.0
+    )
     torch.save(
         {
             "state_dict": model.state_dict(),
@@ -229,6 +263,7 @@ def _fit_neural(
             "sequence_length": config.sequence_length,
             "quantiles": QUANTILES,
             "return_scale": 10_000,
+            "calibration_temperature": calibration_temperature,
         },
         output_path,
     )
@@ -236,6 +271,8 @@ def _fit_neural(
         "price_features": len(price_columns),
         "modality_dimensions": {name: len(columns) for name, columns in modality_columns.items()},
         "training_rows": len(train_indices),
+        "calibration_rows": len(calibration_indices),
+        "calibration_temperature": calibration_temperature,
         "seed": seed,
     }
 
@@ -246,12 +283,16 @@ def fit_candidates(panel: pd.DataFrame, config: ResearchConfig) -> dict[str, Pat
     panel = panel.sort_values("decision_at").reset_index(drop=True)
     labeled = panel[TARGET].notna().to_numpy()
     valid_indices = np.flatnonzero(labeled)
-    if len(valid_indices) < 40:
-        raise ValueError(f"Only {len(valid_indices)} labeled rows; at least 40 are required for exploratory training")
+    if len(valid_indices) < 80:
+        raise ValueError(f"Only {len(valid_indices)} labeled rows; at least 80 are required for exploratory training")
     cutoff = int(len(valid_indices) * 0.8)
-    train_indices = valid_indices[: max(0, cutoff - 4)]
-    if len(train_indices) < 30:
-        raise ValueError("Too few labeled rows remain after final interval reservation and four-candle purge")
+    development_indices = valid_indices[:cutoff]
+    development_pool = development_indices[:-4]
+    calibration_start = int(len(development_pool) * 0.8)
+    train_indices = development_pool[: max(0, calibration_start - 4)]
+    calibration_indices = development_pool[calibration_start:]
+    if len(train_indices) < 30 or len(calibration_indices) < 8:
+        raise ValueError("Too few rows remain for training/calibration after final reservation and four-candle purges")
 
     panel, backbone = _chronos_features(panel, config)
     target = pd.to_numeric(panel[TARGET], errors="coerce").to_numpy(dtype=float)
@@ -285,11 +326,28 @@ def fit_candidates(panel: pd.DataFrame, config: ResearchConfig) -> dict[str, Pat
     regressor = HistGradientBoostingRegressor(max_iter=100, max_leaf_nodes=15, l2_regularization=1.0, random_state=config.seed)
     classifier.fit(x_train, y_train)
     regressor.fit(x_train, returns_bps[train_indices])
+    calibration_matrix = tree_values[calibration_indices]
+    raw_calibration_probabilities = classifier.predict_proba(calibration_matrix)
+    classes_present = np.asarray(classifier.classes_, dtype=int)
+    aligned_calibration_probabilities = np.full((len(calibration_indices), 3), 1e-8)
+    aligned_calibration_probabilities[:, classes_present] = raw_calibration_probabilities
+    aligned_calibration_probabilities /= aligned_calibration_probabilities.sum(axis=1, keepdims=True)
+    tree_temperature = _temperature(np.log(aligned_calibration_probabilities), classes[calibration_indices])
+    residual_quantiles = np.quantile(
+        returns_bps[calibration_indices] - regressor.predict(calibration_matrix), QUANTILES
+    ).tolist()
     import joblib
 
     tabular_path = run_dir / "tabular.joblib"
     joblib.dump(
-        {"classifier": classifier, "regressor": regressor, "columns": numeric_columns, "transform": tree_transform},
+        {
+            "classifier": classifier,
+            "regressor": regressor,
+            "columns": numeric_columns,
+            "transform": tree_transform,
+            "calibration_temperature": tree_temperature,
+            "residual_quantiles": residual_quantiles,
+        },
         tabular_path,
     )
     artifacts["tabular"] = tabular_path
@@ -301,6 +359,7 @@ def fit_candidates(panel: pd.DataFrame, config: ResearchConfig) -> dict[str, Pat
         classes,
         returns_bps,
         config,
+        calibration_indices,
         price_columns,
         {},
         {},
@@ -316,6 +375,7 @@ def fit_candidates(panel: pd.DataFrame, config: ResearchConfig) -> dict[str, Pat
         classes,
         returns_bps,
         config,
+        calibration_indices,
         price_columns,
         groups,
         masks,
@@ -332,6 +392,9 @@ def fit_candidates(panel: pd.DataFrame, config: ResearchConfig) -> dict[str, Pat
             dependencies[name] = "not-installed"
     manifest = {
         "run_id": run_id,
+        "data_version": hashlib.sha256(
+            pd.util.hash_pandas_object(panel.drop(columns=[TARGET]), index=True).values.tobytes()
+        ).hexdigest(),
         "feature_version": "xauusd-asof-v1",
         "model_versions": {"finbert": config.finbert_model_id, **backbone},
         "data_window": {
@@ -339,10 +402,25 @@ def fit_candidates(panel: pd.DataFrame, config: ResearchConfig) -> dict[str, Pat
             "panel_end": str(panel["decision_at"].max()),
             "training_start": str(panel.iloc[train_indices[0]]["decision_at"]),
             "training_end": str(panel.iloc[train_indices[-1]]["decision_at"]),
+            "calibration_start": str(panel.iloc[calibration_indices[0]]["decision_at"]),
             "untouched_final_start": str(panel.iloc[valid_indices[cutoff]]["decision_at"]),
         },
-        "split": {"train_rows": len(train_indices), "purge_candles": 4, "final_fraction": 0.2},
+        "split": {
+            "train_rows": len(train_indices),
+            "calibration_rows": len(calibration_indices),
+            "purge_candles": 4,
+            "final_boundary_purge_candles": 4,
+            "final_fraction": 0.2,
+            "calibration_fraction_of_development": 0.2,
+        },
         "seed": config.seed,
+        "config": config.to_dict(),
+        "cost_assumptions": {
+            "spread_bps": config.spread_bps,
+            "commission_per_side_bps": config.commission_per_side_bps,
+            "slippage_per_side_bps": config.slippage_per_side_bps,
+            "cost_sensitivity_bps": config.cost_sensitivity_bps,
+        },
         "return_scale": "basis_points (model); divide by 10000 for log return",
         "direction_classes": {"0": "down", "1": "flat", "2": "up"},
         "neutral_return_threshold": config.neutral_return_threshold,

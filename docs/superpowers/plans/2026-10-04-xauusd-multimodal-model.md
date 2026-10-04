@@ -113,7 +113,7 @@
 - [ ] Load the existing FinBERT checkpoint through Transformers to encode only articles available by each decision time; cache embeddings by article/version and never train FinBERT on this local corpus.
 - [ ] Add benchmark candidates: no-change, price-only compact neural sequence model, and gradient-boosted tabular model.
 - [ ] Add modality-specific numeric encoders and a gated cross-attention fusion block with masks for unavailable/stale sources; consume Chronos-2 forecasts as a frozen model feature when the Task 2 spike selects it.
-- [ ] Train direction, one-hour return quantile, and uncertainty outputs. Use seeded runs, chronological splits, at least four-candle purge/embargo, and no fitting or tuning against the untouched final interval.
+- [ ] Train direction, one-hour return quantile, and uncertainty outputs. Use seeded chronological train/calibration/final splits, purge at least four candles at each boundary, and do not fit or tune against the untouched final interval.
 - [ ] Store feature version, source windows, split boundaries, seed, dependencies, checkpoint IDs, and data coverage in each run manifest.
 
 ## Task 5: Evaluate, report, and keep the interface paper-only

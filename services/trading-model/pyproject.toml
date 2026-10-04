@@ -10,6 +10,7 @@ requires-python = ">=3.10"
 dependencies = [
   "clickhouse-connect>=0.8,<1",
   "chronos-forecasting>=2.2,<3",
+  "joblib>=1.4,<2",
   "numpy>=1.26,<3",
   "pandas>=2.2,<4",
   "pyarrow>=18,<25",
