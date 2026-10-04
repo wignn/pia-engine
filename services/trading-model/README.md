@@ -44,6 +44,8 @@ Set `spread_bps`, `commission_per_side_bps`, `slippage_per_side_bps`, and `cost_
 
 The Compose worker loads only an evaluated run containing `run.json`, `evaluation.json`, and its `multimodal.pt` artifact. It reads the latest closed XAUUSD 15-minute candle, builds that row's point-in-time feature panel, and writes one one-hour forecast to `market.market_forecasts`. It never retrains. The unique model/symbol/decision key makes retries idempotent. Missing artifacts, database access, source features, or model weights keep the worker in an unavailable state; no placeholder forecast is written.
 
+The `main` Docker workflow publishes this service as `ghcr.io/wignn/pia-xauusd-model-worker:latest`; production deployment pulls that image before activating the new slot.
+
 To provision a run, train and evaluate it with the commands above. Copy the complete run directory to the host at `var/xauusd-model/<run-id>` and point `var/xauusd-model/active` at that directory. Mounts are read-only in Compose; the separate worker cache volume stores FinBERT embeddings and downloaded model cache data. Artifacts may contain derived source features and embeddings, so follow the source licensing notes above.
 
 Copy `infra/env/.env.trading-model.example` to `infra/env/.env.trading-model` on each deployment host. Set `TRADING_MODEL_POSTGRES_URL` to a dedicated `model_worker_user` connection and set read-only ClickHouse access in `TRADING_MODEL_CLICKHOUSE_URL`. Migration 030 creates the role and grants source reads plus forecast insert/select; a database administrator must provision its password and the connection URL. The file is optional so the app stack can start before credentials or a model are provisioned.
