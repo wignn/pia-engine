@@ -17,9 +17,23 @@ export async function GET(
       `${CORE_REST_URL}/api/v1/market/forecasts/XAUUSD?timeframe=15m`,
       { headers: { "x-api-key": CORE_API_KEY }, cache: "no-store" },
     );
-    const payload = await response.json();
+    const body = await response.text();
+    let payload: unknown;
+    try {
+      payload = JSON.parse(body);
+    } catch {
+      console.error("XAUUSD forecast upstream returned non-JSON", {
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+      });
+      return NextResponse.json(
+        { status: "unavailable", error: "forecast_upstream_non_json", upstream_status: response.status },
+        { status: 502 },
+      );
+    }
     return NextResponse.json(payload, { status: response.status });
-  } catch {
+  } catch (error) {
+    console.error("XAUUSD forecast upstream request failed", error);
     return NextResponse.json({ status: "unavailable", error: "forecast_unavailable" }, { status: 503 });
   }
 }
