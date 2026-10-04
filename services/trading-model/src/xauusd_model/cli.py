@@ -63,6 +63,11 @@ def _parser() -> argparse.ArgumentParser:
     coverage.add_argument("--to", dest="to_date", required=True)
     coverage.add_argument("--output")
 
+    train = subparsers.add_parser("train", help="fit benchmark and multimodal research candidates")
+    train.add_argument("--config", required=True)
+    train.add_argument("--from", dest="from_date")
+    train.add_argument("--to", dest="to_date")
+
     return parser
 
 
@@ -109,6 +114,34 @@ def main() -> None:
             else:
                 output.write_text(rendered + os.linesep)
         print(rendered)
+        return
+    if args.command == "train":
+        from dataclasses import replace
+
+        import pandas as pd
+
+        from .features import build_asof_panel
+        from .store import load_market_panel, load_side_channels
+        from .text import attach_news_embeddings, encode_news
+        from .train import fit_candidates
+
+        start = args.from_date or config.from_date
+        end = args.to_date or config.to_date
+        if not start or not end:
+            raise SystemExit("training requires --from/--to or from_date/to_date in the JSON config")
+        config = replace(config, from_date=start, to_date=end)
+        market = load_market_panel(config, start, end)
+        side_channels = load_side_channels(config, start, end)
+        panel = build_asof_panel(market, side_channels)
+        embeddings = encode_news(
+            side_channels.get("news", pd.DataFrame()),
+            checkpoint=config.finbert_model_id,
+            batch_size=max(1, config.batch_size // 4),
+            cache_dir=Path(config.artifact_dir) / "cache",
+        )
+        panel = attach_news_embeddings(panel, embeddings)
+        artifacts = fit_candidates(panel, config)
+        print(json.dumps({name: str(path) for name, path in artifacts.items()}, indent=2))
 
 
 if __name__ == "__main__":

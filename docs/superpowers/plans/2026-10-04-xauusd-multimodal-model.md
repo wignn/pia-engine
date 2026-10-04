@@ -108,7 +108,7 @@
 **Interfaces:**
 - `text.encode_news(rows: DataFrame, checkpoint: str, batch_size: int) -> DataFrame` returns timestamped FinBERT embeddings plus existing sentiment/relevance metadata.
 - `model.MultimodalForecaster.forward(batch) -> dict[str, Tensor]` returns `direction_logits`, `return_quantiles`, and `uncertainty`.
-- `train.fit_candidates(panel, config) -> dict[str, ArtifactRef]` writes candidate artifacts and run metadata.
+- `train.fit_candidates(panel, config) -> dict[str, Path]` writes candidate artifacts and run metadata.
 
 - [ ] Load the existing FinBERT checkpoint through Transformers to encode only articles available by each decision time; cache embeddings by article/version and never train FinBERT on this local corpus.
 - [ ] Add benchmark candidates: no-change, price-only compact neural sequence model, and gradient-boosted tabular model.

@@ -17,6 +17,11 @@ class ResearchConfig:
     seed: int = 42
     from_date: str | None = None
     to_date: str | None = None
+    include_chronos: bool = True
+    sequence_length: int = 32
+    epochs: int = 20
+    batch_size: int = 64
+    neutral_return_threshold: float = 0.0002
 
     @classmethod
     def load(cls, path: str | None = None) -> ResearchConfig:

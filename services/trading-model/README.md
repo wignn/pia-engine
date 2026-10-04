@@ -20,9 +20,12 @@ Set `TRADING_MODEL_POSTGRES_URL` and `TRADING_MODEL_CLICKHOUSE_URL` to read the 
 xauusd-model inspect-backbone
 xauusd-model inspect-backbone --run-inference
 xauusd-model report-coverage --from 2026-08-01 --to 2026-10-04 --output artifacts/xauusd-research/coverage.json
+xauusd-model train --config research-config.json
 ```
 
 `inspect-backbone` reports model metadata and local memory. It does not download weights unless `--run-inference` is supplied. Chronos-2 is the initial frozen candidate; its point forecasts and quantiles become numeric model inputs. The license is Apache-2.0 for the Chronos forecasting project. If weights cannot be loaded, the run records the reason and uses the price-only fallback.
+
+The JSON training config should specify `from_date` and `to_date` (ISO dates); database URLs remain in environment variables. Training saves a no-change reference, price-only neural model, gradient-boosted baseline, gated multimodal model, and a run manifest. It reserves the last 20% of labeled rows as an untouched interval and purges at least four 15-minute candles before it. Chronos-2 and FinBERT weights load only when training or explicit inference is invoked.
 
 ## Data and artifacts
 

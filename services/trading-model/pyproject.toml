@@ -12,6 +12,7 @@ dependencies = [
   "chronos-forecasting>=2.2,<3",
   "numpy>=1.26,<3",
   "pandas>=2.2,<4",
+  "pyarrow>=18,<25",
   "psutil>=6,<8",
   "psycopg[binary]>=3.2,<4",
   "scikit-learn>=1.5,<2",
