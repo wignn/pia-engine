@@ -34,6 +34,17 @@ export async function GET(
     return NextResponse.json(payload, { status: response.status });
   } catch (error) {
     console.error("XAUUSD forecast upstream request failed", error);
-    return NextResponse.json({ status: "unavailable", error: "forecast_unavailable" }, { status: 503 });
+    const causeCode =
+      error && typeof error === "object" && "cause" in error
+        ? (error.cause as { code?: unknown } | undefined)?.code
+        : undefined;
+    const reason =
+      typeof causeCode === "string" && /^[A-Z0-9_]+$/.test(causeCode)
+        ? causeCode
+        : "UNKNOWN";
+    return NextResponse.json(
+      { status: "unavailable", error: "forecast_unavailable", reason },
+      { status: 503 },
+    );
   }
 }
