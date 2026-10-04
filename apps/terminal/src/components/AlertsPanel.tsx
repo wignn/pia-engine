@@ -218,7 +218,7 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({
           <div className="p-8 text-center text-[#787b86]">
             <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-40" />
             <p className="font-medium">No alerts for {symbol}</p>
-            <p className="text-[11px] opacity-75 mt-1">Click "New Alert" above to create one</p>
+            <p className="text-[11px] opacity-75 mt-1">Click &quot;New Alert&quot; above to create one</p>
           </div>
         ) : (
           symbolAlerts.map((a) => (

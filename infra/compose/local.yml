@@ -328,6 +328,28 @@ services:
       timeout: 5s
       retries: 5
 
+  xauusd-model-worker:
+    container_name: xauusd-model-worker
+    image: ghcr.io/wignn/pia-xauusd-model-worker
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.xauusd-model-worker
+    env_file:
+      - path: ../env/.env.trading-model
+        required: false
+    environment:
+      TRADING_MODEL_RUN_DIR: /models/active
+      TRADING_MODEL_CACHE_DIR: /worker-cache
+    volumes:
+      - ../../var/xauusd-model:/models:ro
+      - xauusd_model_cache:/worker-cache
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - private
+
 networks:
   private:
     external: false
@@ -341,6 +363,6 @@ volumes:
   redis_data:
   nats_data:
   social_worker_data:
-
+  xauusd_model_cache:
 
 

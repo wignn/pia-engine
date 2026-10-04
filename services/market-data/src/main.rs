@@ -13,6 +13,7 @@ mod deadletter;
 mod economic;
 mod energy;
 mod fear_greed;
+mod forecasts;
 mod history;
 mod http;
 mod ingestion;

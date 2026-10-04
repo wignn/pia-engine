@@ -1,0 +1,9 @@
+clickhouse-connect>=0.8,<1
+joblib>=1.4,<2
+numpy>=1.26,<3
+pandas>=2.2,<4
+pyarrow>=18,<25
+psycopg[binary]>=3.2,<4
+scikit-learn>=1.5,<2
+torch>=2.5,<3
+transformers>=4.46,<6

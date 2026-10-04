@@ -38,6 +38,10 @@ pub fn build_router(state: AppState) -> Router {
             any(crate::proxy::proxy_request),
         )
         .route(
+            "/api/v1/market/forecasts/{symbol}",
+            any(crate::proxy::proxy_request),
+        )
+        .route(
             "/api/v1/market/session/{symbol}",
             any(crate::proxy::proxy_request),
         )

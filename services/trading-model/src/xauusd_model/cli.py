@@ -94,6 +94,8 @@ def _parser() -> argparse.ArgumentParser:
     predict.add_argument("--as-of", required=True)
     predict.add_argument("--output")
 
+    subparsers.add_parser("worker", help="persist scheduled forecasts from an evaluated run artifact")
+
     return parser
 
 
@@ -121,7 +123,12 @@ def _build_panel(config: ResearchConfig, start: str, end: str, include_text: boo
 
 def main() -> None:
     args = _parser().parse_args()
-    config = ResearchConfig.load(args.config)
+    config = ResearchConfig.load(getattr(args, "config", None))
+    if args.command == "worker":
+        from .worker import run_worker
+
+        run_worker()
+        return
     if args.command == "inspect-backbone":
         print(json.dumps(_inspect_backbone(config, args.run_inference), indent=2))
         return

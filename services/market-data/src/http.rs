@@ -33,6 +33,10 @@ pub fn build_router(state: AppState) -> Router {
             get(crate::history::get_history),
         )
         .route(
+            "/api/v1/market/forecasts/{symbol}",
+            get(crate::forecasts::latest_forecast),
+        )
+        .route(
             "/api/v1/market/session/{symbol}",
             get(crate::session::get_session),
         )

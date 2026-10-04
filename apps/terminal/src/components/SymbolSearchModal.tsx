@@ -136,7 +136,7 @@ export const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({
         {/* Results List */}
         <div className={`flex-1 overflow-y-auto divide-y ${isLight ? "divide-[#e0e3eb]" : "divide-[#2a2e39]/50"}`}>
           {filtered.length === 0 ? (
-            <div className="p-8 text-center text-[#787b86]">No instruments found for "{query}"</div>
+            <div className="p-8 text-center text-[#787b86]">No instruments found for &quot;{query}&quot;</div>
           ) : (
             filtered.map((item, idx) => {
               const isSelected = idx === selectedIndex;

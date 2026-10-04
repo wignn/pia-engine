@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { ChartArea } from "./ChartArea";
 import { useMarketFeed } from "@/lib/useMarketFeed";
+import { useXauusdForecast } from "@/lib/useXauusdForecast";
 import { NewsPanel } from "./NewsPanel";
 import { SocialPanel } from "./SocialPanel";
 import { OrderBookPanel } from "./OrderBookPanel";
@@ -87,6 +88,11 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
   const isLight = theme === "light";
   const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
   const paneType = pane.type || "chart";
+  const { forecast, state: forecastState } = useXauusdForecast(
+    pane.indicators.aiForecast === true && paneType === "chart",
+    pane.symbol,
+    pane.timeframe,
+  );
 
   const {
     candles,
@@ -276,6 +282,8 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
             timeframe={pane.timeframe}
             chartType={pane.chartType}
             indicators={pane.indicators}
+            forecast={forecast}
+            forecastState={forecastState}
             activeTool={isActive ? activeTool : "cursor"}
             digits={digits}
             candles={candles}

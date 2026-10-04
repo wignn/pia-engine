@@ -441,6 +441,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               Technical Indicators
             </div>
             {([
+              ['aiForecast', 'AI Forecast · XAUUSD 15m'],
               ['sma20', `SMA ${indicatorParams?.smaPeriod || 20} (Moving Average)`],
               ['ema50', `EMA ${indicatorParams?.emaPeriod || 50} (Exponential)`],
               ['vwap', 'VWAP (Volume Weighted)'],

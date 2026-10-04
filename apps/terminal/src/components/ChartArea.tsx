@@ -14,6 +14,7 @@ import {
 import { CandleData, Timeframe, DrawingTool, DrawingItem, DrawingPoint, IndicatorState } from "@/types";
 import { Wifi, WifiOff, Loader2, Trash2, X, Eye, EyeOff } from "lucide-react";
 import { OscillatorPane } from "./OscillatorPane";
+import type { XauusdForecast, XauusdForecastState } from "@/types/forecast";
 
 interface ChartAreaProps {
   paneId?: string;
@@ -22,6 +23,8 @@ interface ChartAreaProps {
   timeframe: Timeframe;
   chartType?: "candlestick" | "bar" | "line" | "area" | "heikin_ashi";
   indicators?: IndicatorState;
+  forecast?: XauusdForecast | null;
+  forecastState?: XauusdForecastState;
   activeTool?: DrawingTool;
   digits: number;
   candles: CandleData[];
@@ -54,6 +57,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   timeframe,
   chartType = "candlestick",
   indicators = { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
+  forecast = null,
+  forecastState = "unavailable",
   activeTool = "cursor",
   digits,
   candles,
@@ -107,6 +112,12 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   const [scaleMode, setScaleMode] = useState<"normal" | "log" | "percent">("normal");
 
   const [ohlc, setOhlc] = useState({ open: 0, high: 0, low: 0, close: 0, change: 0, changePercent: 0 });
+  const forecastDecisionTime = forecast?.decision_at
+    ? Math.floor(new Date(forecast.decision_at).getTime() / 1000)
+    : null;
+  const hasForecastCandle = Boolean(
+    forecastDecisionTime !== null && candles.some((candle) => candle.time + 900 === forecastDecisionTime),
+  );
 
   // Drawings State & Undo/Redo Stacks
   const [drawings, setDrawings] = useState<DrawingItem[]>([]);
@@ -846,6 +857,30 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
     }
   }, [candles, chartType, indicators, symbol, timeframe, settings?.indicatorParams]);
 
+  useEffect(() => {
+    const series = chartType === "line"
+      ? lineRef.current
+      : chartType === "area"
+        ? areaRef.current
+        : chartType === "bar"
+          ? barRef.current
+          : seriesRef.current;
+    if (!series) return;
+    const supported = indicators.aiForecast && symbol === "XAUUSD" && timeframe === "15m";
+    const matchingCandle = Boolean(supported && forecast && hasForecastCandle);
+    series.setMarkers(
+      matchingCandle
+        ? [{
+            time: forecastDecisionTime as Time,
+            position: "aboveBar",
+            color: forecast!.status === "active" ? "#f5b942" : "#787b86",
+            shape: "arrowDown",
+            text: "AI",
+          }]
+        : [],
+    );
+  }, [candles, chartType, forecast, forecastDecisionTime, hasForecastCandle, indicators.aiForecast, symbol, timeframe]);
+
   // Live price streaming update
   useEffect(() => {
     if (!seriesRef.current || !livePrice || candles.length === 0) return;
@@ -1168,6 +1203,44 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           )}
         </div>
 
+        {indicators.aiForecast && (
+          <div
+            className={`pointer-events-auto w-72 rounded border px-2.5 py-2 text-[10px] font-mono shadow-lg ${
+              isLight ? "bg-white/95 border-[#e0e3eb] text-[#131722]" : "bg-[#1e222d]/95 border-[#2a2e39] text-[#d1d4dc]"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="mb-1 flex items-center justify-between font-bold">
+              <span>XAUUSD · 1h Forecast</span>
+              <span className={forecastState === "active" ? "text-[#089981]" : forecastState === "expired" ? "text-[#f5b942]" : "text-[#787b86]"}>
+                {symbol !== "XAUUSD" || timeframe !== "15m" ? "15m XAUUSD only" : !hasForecastCandle && forecast ? "CANDLE NOT LOADED" : forecastState.toUpperCase()}
+              </span>
+            </div>
+            {symbol === "XAUUSD" && timeframe === "15m" && forecast && hasForecastCandle ? (
+              <>
+                <div className="grid grid-cols-3 gap-1 py-1 text-center">
+                  <span>DOWN {(forecast.probabilities!.down * 100).toFixed(0)}%</span>
+                  <span>FLAT {(forecast.probabilities!.flat * 100).toFixed(0)}%</span>
+                  <span>UP {(forecast.probabilities!.up * 100).toFixed(0)}%</span>
+                </div>
+                <div>Expected {(forecast.expected_return! * 100).toFixed(3)}% · uncertainty {(forecast.uncertainty! * 100).toFixed(3)}%</div>
+                <div className="mt-1 grid grid-cols-3 gap-1 text-center">
+                  <span>q10 {(forecast.reference_price! * Math.exp(forecast.return_quantiles!.q10)).toFixed(digits)}</span>
+                  <span>q50 {(forecast.reference_price! * Math.exp(forecast.return_quantiles!.q50)).toFixed(digits)}</span>
+                  <span>q90 {(forecast.reference_price! * Math.exp(forecast.return_quantiles!.q90)).toFixed(digits)}</span>
+                </div>
+                <div className="mt-1 truncate text-[#787b86]">{forecast.model_version} · {new Date(forecast.decision_at!).toLocaleString()}</div>
+                <div className="text-[#787b86]">Horizon ends {new Date(forecast.horizon_end!).toLocaleString()} · paper only</div>
+              </>
+            ) : (
+              <div className="text-[#787b86]">
+                {symbol !== "XAUUSD" || timeframe !== "15m" ? "Switch this pane to XAUUSD 15m." : forecastState === "loading" ? "Loading the latest forecast…" : forecastState === "error" ? "Forecast service is unavailable." : !hasForecastCandle && forecast ? "The decision candle is outside the loaded chart history." : "No evaluated model forecast is available."}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Quick Order Placement Floating Widget (TradingView Signature) */}
         <div className="flex items-center gap-1.5 my-0.5 pointer-events-auto select-none">
           {/* Sell Box */}
@@ -1242,7 +1315,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           <div className="flex flex-col items-center gap-1 text-center">
             <span className="text-[#d1d4dc] font-semibold">No historical data for {symbol}</span>
             <span className="text-[11px] text-[#787b86]">
-              Market may be closed, or this symbol isn't ingested yet.
+              Market may be closed, or this symbol isn&apos;t ingested yet.
             </span>
           </div>
         </div>

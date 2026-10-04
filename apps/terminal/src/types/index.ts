@@ -73,6 +73,7 @@ export interface IndicatorState {
   rsi: boolean;
   macd: boolean;
   atr?: boolean;
+  aiForecast?: boolean;
 }
 
 export type TabContentType = "chart" | "news" | "social" | "orderbook" | "intelligence" | "calendar" | "live";

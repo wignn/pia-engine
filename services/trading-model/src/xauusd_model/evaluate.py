@@ -466,6 +466,74 @@ def predict_artifact(panel: pd.DataFrame, run_dir: Path, name: str) -> pd.DataFr
     raise ValueError(f"unsupported model artifact: {name}")
 
 
+class SavedMultimodalPredictor:
+    """Load one evaluated multimodal artifact and reuse it for each forecast."""
+
+    def __init__(self, run_dir: Path) -> None:
+        import torch
+
+        from .model import MultimodalForecaster
+
+        manifest = json.loads((run_dir / "run.json").read_text())
+        evaluation_path = run_dir / "evaluation.json"
+        if not evaluation_path.is_file():
+            raise ValueError("model run has not been evaluated")
+        final = json.loads(evaluation_path.read_text()).get("final_holdout", {})
+        if int(final.get("models", {}).get("multimodal", {}).get("rows", 0)) < 1:
+            raise ValueError("model run has no evaluated multimodal holdout rows")
+        artifact_name = manifest.get("artifacts", {}).get("multimodal")
+        if not artifact_name:
+            raise ValueError("model run has no multimodal artifact")
+        self.checkpoint = torch.load(run_dir / artifact_name, map_location="cpu", weights_only=True)
+        self.model = MultimodalForecaster(
+            price_features=len(self.checkpoint["price_columns"]),
+            modality_dims={name: len(columns) for name, columns in self.checkpoint["modality_columns"].items()},
+            quantiles=tuple(self.checkpoint["quantiles"]),
+        )
+        self.model.load_state_dict(self.checkpoint["state_dict"])
+        self.model.eval()
+
+    def predict_latest(self, panel: pd.DataFrame) -> dict[str, float]:
+        import torch
+
+        from .train import _mask_matrix, _sequences
+
+        if panel.empty or "close" not in panel:
+            raise ValueError("as-of panel has no eligible XAUUSD row")
+        missing_price_features = set(self.checkpoint["price_columns"]) - set(panel.columns)
+        if missing_price_features:
+            raise ValueError("as-of panel does not match the model price feature schema")
+        # The last row needs the preceding sequence_length - 1 rows as context.
+        length = int(self.checkpoint["sequence_length"])
+        price_history = _apply_transform(panel, self.checkpoint["price_columns"], self.checkpoint["price_transform"])
+        sequence = _sequences(price_history[-length:], length)[-1:]
+        modalities, masks = {}, {}
+        for name, columns in self.checkpoint["modality_columns"].items():
+            modalities[name] = _apply_transform(panel.iloc[[-1]], columns, self.checkpoint["modality_transforms"][name])
+            masks[name] = _mask_matrix(panel.iloc[[-1]], self.checkpoint["mask_columns"].get(name, []))
+        batch = {
+            "price_seq": torch.tensor(sequence, dtype=torch.float32),
+            "modalities": {name: torch.tensor(values, dtype=torch.float32) for name, values in modalities.items()},
+            "masks": {name: torch.tensor(values, dtype=torch.bool) for name, values in masks.items()},
+        }
+        with torch.inference_mode():
+            output = self.model(batch)
+        logits = output["direction_logits"].cpu().numpy()[0] / float(self.checkpoint.get("calibration_temperature", 1.0))
+        probabilities = np.exp(logits - logits.max())
+        probabilities /= probabilities.sum()
+        quantiles = output["return_quantiles"].cpu().numpy()[0] / float(self.checkpoint["return_scale"])
+        return {
+            "down_probability": float(probabilities[0]),
+            "flat_probability": float(probabilities[1]),
+            "up_probability": float(probabilities[2]),
+            "expected_return": float(quantiles[1]),
+            "q10_return": float(quantiles[0]),
+            "q50_return": float(quantiles[1]),
+            "q90_return": float(quantiles[2]),
+            "uncertainty": float(output["uncertainty"].cpu().numpy()[0] / float(self.checkpoint["return_scale"])),
+        }
+
+
 def evaluate_run(panel: pd.DataFrame, run_dir: Path, config: ResearchConfig) -> dict[str, Any]:
     manifest = json.loads((run_dir / "run.json").read_text())
     final_start = pd.to_datetime(manifest["data_window"]["untouched_final_start"], utc=True)
