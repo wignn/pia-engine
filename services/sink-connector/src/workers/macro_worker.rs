@@ -4,6 +4,7 @@ use atlsd_contracts::macro_data::{MacroEvent, MacroPayload};
 use atlsd_eventbus::subjects;
 use futures_util::StreamExt;
 use sqlx::PgPool;
+use sqlx::{Postgres, Transaction};
 use std::time::Duration;
 use tracing::{error, info, warn};
 
@@ -132,6 +133,7 @@ pub async fn write_macro_event(
 ) -> anyhow::Result<()> {
     match event.decode_payload()? {
         MacroPayload::Rate(rate) => {
+            let mut tx = pool.begin().await?;
             sqlx::query(
                 r#"INSERT INTO macro.macro_rates
                    (source, country, tenor, date, value, unit, raw_series_id, created_at, updated_at)
@@ -146,10 +148,22 @@ pub async fn write_macro_event(
             .bind(rate.value)
             .bind(&rate.unit)
             .bind(&rate.series_id)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
+            append_macro_observation(
+                &mut tx,
+                event,
+                "rate",
+                &format!("{}:{}:{}", rate.country, rate.tenor, rate.series_id),
+                rate.date,
+                rate.value,
+                Some(rate.value.to_string()),
+            )
+            .await?;
+            tx.commit().await?;
         }
         MacroPayload::Spread(spread) => {
+            let mut tx = pool.begin().await?;
             sqlx::query(
                 r#"INSERT INTO macro.macro_rate_spreads
                    (country, spread, date, value, created_at, updated_at)
@@ -160,8 +174,19 @@ pub async fn write_macro_event(
             .bind(&spread.spread)
             .bind(spread.date)
             .bind(spread.value)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
+            append_macro_observation(
+                &mut tx,
+                event,
+                "spread",
+                &format!("{}:{}", spread.country, spread.spread),
+                spread.date,
+                spread.value,
+                Some(spread.value.to_string()),
+            )
+            .await?;
+            tx.commit().await?;
         }
         MacroPayload::Series(series) => {
             let mut tx = pool.begin().await?;
@@ -194,6 +219,16 @@ pub async fn write_macro_event(
             .bind(series.value)
             .bind(&series.raw_value)
             .execute(&mut *tx)
+            .await?;
+            append_macro_observation(
+                &mut tx,
+                event,
+                "series",
+                &series.series_id,
+                series.date,
+                series.value,
+                series.raw_value.clone(),
+            )
             .await?;
             tx.commit().await?;
         }
@@ -228,6 +263,38 @@ pub async fn write_macro_event(
             );
         }
     }
+    Ok(())
+}
+
+async fn append_macro_observation(
+    tx: &mut Transaction<'_, Postgres>,
+    event: &MacroEvent,
+    observation_type: &str,
+    series_key: &str,
+    observation_date: chrono::NaiveDate,
+    value: f64,
+    raw_value: Option<String>,
+) -> Result<(), sqlx::Error> {
+    let source_payload = serde_json::to_string(&event.payload)
+        .map_err(|err| sqlx::Error::Protocol(err.to_string()))?;
+    sqlx::query(
+        r#"INSERT INTO macro.macro_observation_history
+           (event_id, source, observation_type, series_key, observation_date, value,
+            raw_value, available_at, source_payload)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
+           ON CONFLICT (event_id, observation_type) DO NOTHING"#,
+    )
+    .bind(&event.event_id)
+    .bind(&event.source)
+    .bind(observation_type)
+    .bind(series_key)
+    .bind(observation_date)
+    .bind(value)
+    .bind(raw_value)
+    .bind(event.observed_at)
+    .bind(source_payload)
+    .execute(&mut **tx)
+    .await?;
     Ok(())
 }
 

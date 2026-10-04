@@ -322,6 +322,27 @@ pub async fn upsert_options_summary(
         .map(|dt| dt.with_timezone(&Utc))
         .unwrap_or_else(Utc::now);
 
+    let source_payload =
+        serde_json::to_string(payload).map_err(|err| sqlx::Error::Protocol(err.to_string()))?;
+    sqlx::query(
+        r#"INSERT INTO market.options_snapshot_history
+           (symbol, observed_at, underlying_price, put_call_ratio, max_pain_strike,
+            total_open_interest, total_volume, total_gex, iv_atm, source_payload)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)"#,
+    )
+    .bind(&payload.symbol)
+    .bind(updated_at)
+    .bind(payload.underlying_price)
+    .bind(payload.put_call_ratio)
+    .bind(payload.max_pain_strike)
+    .bind(payload.total_open_interest)
+    .bind(payload.total_volume)
+    .bind(payload.total_gex)
+    .bind(payload.iv_atm)
+    .bind(source_payload)
+    .execute(pool)
+    .await?;
+
     sqlx::query(
         r#"
         INSERT INTO options_snapshots (
@@ -366,6 +387,52 @@ pub async fn upsert_options_chain(
         .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
         .map(|dt| dt.with_timezone(&Utc))
         .unwrap_or_else(Utc::now);
+
+    let source_payload =
+        serde_json::to_string(payload).map_err(|err| sqlx::Error::Protocol(err.to_string()))?;
+    let snapshot_id: i64 = sqlx::query_scalar(
+        r#"INSERT INTO market.options_snapshot_history
+           (symbol, observed_at, underlying_price, source_payload)
+           VALUES ($1,$2,$3,$4::jsonb)
+           RETURNING snapshot_id"#,
+    )
+    .bind(&payload.symbol)
+    .bind(updated_at)
+    .bind(payload.underlying_price)
+    .bind(source_payload)
+    .fetch_one(pool)
+    .await?;
+
+    for contract in &payload.contracts {
+        let expiration_date = NaiveDate::parse_from_str(&contract.expiration_date, "%Y-%m-%d")
+            .unwrap_or_else(|_| Utc::now().date_naive());
+        sqlx::query(
+            r#"INSERT INTO market.options_contract_history (
+                snapshot_id, contract_symbol, symbol, option_type, strike, expiration_date,
+                mark_price, bid, ask, implied_volatility, delta, gamma, theta, vega, gex,
+                open_interest, volume
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)"#,
+        )
+        .bind(snapshot_id)
+        .bind(&contract.contract_symbol)
+        .bind(&contract.symbol)
+        .bind(&contract.option_type)
+        .bind(contract.strike)
+        .bind(expiration_date)
+        .bind(contract.mark_price)
+        .bind(contract.bid)
+        .bind(contract.ask)
+        .bind(contract.implied_volatility)
+        .bind(contract.delta)
+        .bind(contract.gamma)
+        .bind(contract.theta)
+        .bind(contract.vega)
+        .bind(contract.gex)
+        .bind(contract.open_interest)
+        .bind(contract.volume)
+        .execute(pool)
+        .await?;
+    }
 
     let underlying_price = payload.underlying_price.unwrap_or(0.0);
     let mut total_open_interest = 0_i64;
