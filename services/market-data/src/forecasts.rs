@@ -60,7 +60,7 @@ pub async fn latest_forecast(
                   data_version, feature_version, source_masks, source_age_seconds
            FROM market.market_forecasts
            WHERE symbol = $1 AND timeframe = $2
-           ORDER BY decision_at DESC
+           ORDER BY decision_at DESC, created_at DESC, forecast_id DESC
            LIMIT 1"#,
     )
     .bind(&symbol)

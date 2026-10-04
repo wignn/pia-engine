@@ -115,9 +115,10 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   const forecastDecisionTime = forecast?.decision_at
     ? Math.floor(new Date(forecast.decision_at).getTime() / 1000)
     : null;
-  const hasForecastCandle = Boolean(
-    forecastDecisionTime !== null && candles.some((candle) => candle.time + 900 === forecastDecisionTime),
-  );
+  const matchingForecastCandle = forecastDecisionTime === null
+    ? undefined
+    : candles.find((candle) => candle.time + 900 === forecastDecisionTime);
+  const hasForecastCandle = Boolean(matchingForecastCandle);
 
   // Drawings State & Undo/Redo Stacks
   const [drawings, setDrawings] = useState<DrawingItem[]>([]);
@@ -867,11 +868,13 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           : seriesRef.current;
     if (!series) return;
     const supported = indicators.aiForecast && symbol === "XAUUSD" && timeframe === "15m";
-    const matchingCandle = Boolean(supported && forecast && hasForecastCandle);
+    const matchingCandle = forecastDecisionTime === null
+      ? undefined
+      : candles.find((candle) => candle.time + 900 === forecastDecisionTime);
     series.setMarkers(
-      matchingCandle
+      supported && forecast && matchingCandle
         ? [{
-            time: forecastDecisionTime as Time,
+            time: matchingCandle.time as Time,
             position: "aboveBar",
             color: forecast!.status === "active" ? "#f5b942" : "#787b86",
             shape: "arrowDown",
@@ -879,7 +882,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           }]
         : [],
     );
-  }, [candles, chartType, forecast, forecastDecisionTime, hasForecastCandle, indicators.aiForecast, symbol, timeframe]);
+  }, [candles, chartType, forecast, forecastDecisionTime, indicators.aiForecast, symbol, timeframe]);
 
   // Live price streaming update
   useEffect(() => {

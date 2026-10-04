@@ -498,7 +498,7 @@ class SavedMultimodalPredictor:
 
         from .train import _mask_matrix, _sequences
 
-        if panel.empty or "close" not in panel:
+        if panel.empty or "xau_15m_close" not in panel:
             raise ValueError("as-of panel has no eligible XAUUSD row")
         missing_price_features = set(self.checkpoint["price_columns"]) - set(panel.columns)
         if missing_price_features:

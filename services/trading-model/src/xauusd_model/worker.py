@@ -126,12 +126,14 @@ def _forecast_for(config: ResearchConfig, predictor: SavedMultimodalPredictor, m
     as_of = decision_at.isoformat()
     context_start = (decision_at - timedelta(minutes=15 * (config.sequence_length - 1))).isoformat()
     panel = _build_panel(config, context_start, as_of)
-    panel = panel[pd.to_datetime(panel["decision_at"], utc=True) == pd.Timestamp(decision_at)].reset_index(drop=True)
-    if panel.empty:
+    decision_rows = panel[pd.to_datetime(panel["decision_at"], utc=True) == pd.Timestamp(decision_at)]
+    if decision_rows.empty:
         raise ValueError(f"no feature row available for closed candle at {as_of}")
+    if len(panel) < config.sequence_length:
+        raise ValueError(f"insufficient price history for {config.sequence_length}-row model context")
+    row = decision_rows.iloc[-1]
     values = predictor.predict_latest(panel)
-    row = panel.iloc[-1]
-    price = float(row["close"])
+    price = float(row["xau_15m_close"])
     if not math.isfinite(price) or price <= 0:
         raise ValueError("XAUUSD reference price must be positive")
     if not all(math.isfinite(value) for value in values.values()):
