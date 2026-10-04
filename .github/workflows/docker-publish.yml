@@ -140,6 +140,7 @@ jobs:
             terminal:
               - 'apps/terminal/**'
               - 'infra/docker/Dockerfile.terminal'
+              - '.github/workflows/docker-publish.yml'
               - '.dockerignore'
             xauusd_model_worker:
               - 'services/trading-model/**'
