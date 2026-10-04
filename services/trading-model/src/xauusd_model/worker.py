@@ -157,6 +157,10 @@ def _forecast_for(config: ResearchConfig, predictor: SavedMultimodalPredictor, m
 
 
 def run_worker() -> None:
+    logging.basicConfig(
+        level=os.getenv("TRADING_MODEL_LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
     interval = max(15, int(os.getenv("TRADING_MODEL_POLL_SECONDS", "30")))
     predictor = None
     config = None
