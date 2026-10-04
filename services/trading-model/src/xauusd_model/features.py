@@ -272,6 +272,8 @@ def build_asof_panel(
     market: pd.DataFrame,
     side_channels: dict[str, pd.DataFrame],
     freshness: dict[str, timedelta] | None = None,
+    decision_start: str | None = None,
+    decision_end: str | None = None,
 ) -> pd.DataFrame:
     limits = {**SOURCE_FRESHNESS, **(freshness or {})}
     if market.empty:
@@ -342,6 +344,16 @@ def build_asof_panel(
     else:
         _add_latest_numeric(panel, "options_chain", pd.DataFrame(), limits["options"])
     panel.replace([np.inf, -np.inf], np.nan, inplace=True)
+    if decision_start is not None:
+        panel = panel[pd.to_datetime(panel["decision_at"], utc=True) >= pd.to_datetime(decision_start, utc=True)]
+    if decision_end is not None:
+        end = pd.to_datetime(decision_end, utc=True)
+        if len(decision_end) == 10:
+            end += pd.Timedelta(days=1)
+            panel = panel[pd.to_datetime(panel["decision_at"], utc=True) < end]
+        else:
+            panel = panel[pd.to_datetime(panel["decision_at"], utc=True) <= end]
+    panel = panel.reset_index(drop=True)
     return panel
 
 

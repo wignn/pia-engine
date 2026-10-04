@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS market.options_snapshot_history (
     snapshot_kind TEXT NOT NULL CHECK (snapshot_kind IN ('summary', 'chain')),
     symbol TEXT NOT NULL,
     observed_at TIMESTAMPTZ NOT NULL,
+    source_observed_at TIMESTAMPTZ,
     underlying_price DOUBLE PRECISION,
     put_call_ratio DOUBLE PRECISION,
     max_pain_strike DOUBLE PRECISION,

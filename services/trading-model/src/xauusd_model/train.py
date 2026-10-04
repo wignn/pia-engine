@@ -151,10 +151,12 @@ def _chronos_features(panel: pd.DataFrame, config: ResearchConfig) -> tuple[pd.D
         result["chronos_available"] = False
         for batch_start in range(0, len(histories), max(1, config.batch_size)):
             batch = histories[batch_start : batch_start + config.batch_size]
-            forecasts = pipeline.predict(batch, prediction_length=4, quantile_levels=list(QUANTILES))
+            forecasts, _ = pipeline.predict_quantiles(
+                batch, prediction_length=4, quantile_levels=list(QUANTILES)
+            )
             for offset, forecast in enumerate(forecasts):
                 position = positions[batch_start + offset]
-                values = forecast[0, :, -1].detach().cpu().numpy()
+                values = forecast[0, -1, :].detach().cpu().numpy()
                 current = price[position]
                 for name, value in zip(columns, values):
                     result.loc[position, name] = (float(value) - current) * 10_000

@@ -14,11 +14,14 @@ def _inspect_backbone(config: ResearchConfig, run_inference: bool) -> dict:
     import psutil
     import torch
 
+    official_model = config.model_id == "amazon/chronos-2"
     result = {
         "model_id": config.model_id,
-        "license": "Apache-2.0 (Chronos forecasting project)",
-        "model_parameters": 120_000_000,
-        "supports_multivariate_and_covariate_forecasting": True,
+        "license": "Apache-2.0" if official_model else "verify model-specific license",
+        "model_parameters": 120_000_000 if official_model else None,
+        "supports_multivariate_and_covariate_forecasting": True if official_model else None,
+        "metadata_source": "https://github.com/amazon-science/chronos-forecasting",
+        "model_card": f"https://huggingface.co/{config.model_id}",
         "python": platform.python_version(),
         "cpu_memory_available_bytes": psutil.virtual_memory().available,
         "cuda_available": torch.cuda.is_available(),
@@ -37,11 +40,24 @@ def _inspect_backbone(config: ResearchConfig, run_inference: bool) -> dict:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         started = time.perf_counter()
         pipeline = Chronos2Pipeline.from_pretrained(config.model_id, device_map=device)
-        forecast = pipeline.predict(torch.linspace(1.0, 2.0, 32), prediction_length=4)
+        levels = [0.1, 0.5, 0.9]
+        forecasts, _ = pipeline.predict_quantiles(
+            [
+                {
+                    "target": torch.linspace(1.0, 2.0, 32),
+                    "past_covariates": {"market_return": torch.zeros(32)},
+                }
+            ],
+            prediction_length=4,
+            quantile_levels=levels,
+        )
+        forecast = forecasts[0]
+        if tuple(forecast.shape) != (1, 4, len(levels)):
+            raise RuntimeError(f"unexpected covariate forecast shape: {tuple(forecast.shape)}")
         result["inference_seconds"] = time.perf_counter() - started
         result["inference_status"] = "ok"
         result["device"] = device
-        result["forecast_shape"] = list(forecast[0].shape)
+        result["forecast_shape"] = list(forecast.shape)
     except Exception as exc:
         result["selected_backbone"] = "price_only"
         result["inference_status"] = "fallback"
@@ -89,7 +105,7 @@ def _build_panel(config: ResearchConfig, start: str, end: str, include_text: boo
 
     market = load_market_panel(config, start, end)
     side_channels = load_side_channels(config, start, end)
-    panel = build_asof_panel(market, side_channels)
+    panel = build_asof_panel(market, side_channels, decision_start=start, decision_end=end)
     if include_text:
         from .text import attach_news_embeddings, encode_news
 
@@ -116,7 +132,7 @@ def main() -> None:
         start, end = args.from_date, args.to_date
         market = load_market_panel(config, start, end)
         channels = load_side_channels(config, start, end)
-        panel = build_asof_panel(market, channels)
+        panel = build_asof_panel(market, channels, decision_start=start, decision_end=end)
         report = coverage_report(panel)
         report["requested_window"] = {"from": start, "to": end}
         report["config"] = config.to_dict()

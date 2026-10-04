@@ -2,7 +2,7 @@ use axum::extract::{Query, State};
 use axum::Json;
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use tracing::{error, info, warn};
 
 use atlsd_eventbus::{subjects, EventBusMode};
@@ -314,24 +314,36 @@ pub async fn upsert_options_summary(
     pool: &PgPool,
     payload: &OptionsSummaryPayload,
 ) -> Result<(), sqlx::Error> {
+    let received_at = Utc::now();
+    let mut tx = pool.begin().await?;
+    upsert_options_summary_tx(&mut tx, payload, received_at).await?;
+    tx.commit().await
+}
+
+async fn upsert_options_summary_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    payload: &OptionsSummaryPayload,
+    received_at: DateTime<Utc>,
+) -> Result<(), sqlx::Error> {
     let id = payload.id.clone().unwrap_or_else(|| payload.symbol.clone());
-    let updated_at = payload
+    let source_updated_at = payload
         .updated_at
         .as_deref()
         .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-        .map(|dt| dt.with_timezone(&Utc))
-        .unwrap_or_else(Utc::now);
+        .map(|dt| dt.with_timezone(&Utc));
+    let updated_at = source_updated_at.unwrap_or(received_at);
 
     let source_payload =
         serde_json::to_string(payload).map_err(|err| sqlx::Error::Protocol(err.to_string()))?;
     sqlx::query(
         r#"INSERT INTO market.options_snapshot_history
-           (snapshot_kind, symbol, observed_at, underlying_price, put_call_ratio, max_pain_strike,
+           (snapshot_kind, symbol, observed_at, source_observed_at, underlying_price, put_call_ratio, max_pain_strike,
             total_open_interest, total_volume, total_gex, iv_atm, source_payload)
-           VALUES ('summary',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)"#,
+           VALUES ('summary',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)"#,
     )
     .bind(&payload.symbol)
-    .bind(updated_at)
+    .bind(received_at)
+    .bind(source_updated_at)
     .bind(payload.underlying_price)
     .bind(payload.put_call_ratio)
     .bind(payload.max_pain_strike)
@@ -340,7 +352,7 @@ pub async fn upsert_options_summary(
     .bind(payload.total_gex)
     .bind(payload.iv_atm)
     .bind(source_payload)
-    .execute(pool)
+    .execute(&mut **tx)
     .await?;
 
     sqlx::query(
@@ -371,7 +383,7 @@ pub async fn upsert_options_summary(
     .bind(payload.total_gex)
     .bind(payload.iv_atm)
     .bind(updated_at)
-    .execute(pool)
+    .execute(&mut **tx)
     .await?;
 
     Ok(())
@@ -381,26 +393,29 @@ pub async fn upsert_options_chain(
     pool: &PgPool,
     payload: &OptionsChainPayload,
 ) -> Result<(), sqlx::Error> {
-    let updated_at = payload
+    let received_at = Utc::now();
+    let source_updated_at = payload
         .updated_at
         .as_deref()
         .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-        .map(|dt| dt.with_timezone(&Utc))
-        .unwrap_or_else(Utc::now);
+        .map(|dt| dt.with_timezone(&Utc));
+    let updated_at = source_updated_at.unwrap_or(received_at);
+    let mut tx = pool.begin().await?;
 
     let source_payload =
         serde_json::to_string(payload).map_err(|err| sqlx::Error::Protocol(err.to_string()))?;
     let snapshot_id: i64 = sqlx::query_scalar(
         r#"INSERT INTO market.options_snapshot_history
-           (snapshot_kind, symbol, observed_at, underlying_price, source_payload)
-           VALUES ('chain',$1,$2,$3,$4::jsonb)
+           (snapshot_kind, symbol, observed_at, source_observed_at, underlying_price, source_payload)
+           VALUES ('chain',$1,$2,$3,$4,$5::jsonb)
            RETURNING snapshot_id"#,
     )
     .bind(&payload.symbol)
-    .bind(updated_at)
+    .bind(received_at)
+    .bind(source_updated_at)
     .bind(payload.underlying_price)
     .bind(source_payload)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await?;
 
     for contract in &payload.contracts {
@@ -430,7 +445,7 @@ pub async fn upsert_options_chain(
         .bind(contract.gex)
         .bind(contract.open_interest)
         .bind(contract.volume)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     }
 
@@ -518,7 +533,7 @@ pub async fn upsert_options_chain(
         .bind(contract.open_interest)
         .bind(contract.volume)
         .bind(updated_at)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     }
 
@@ -539,10 +554,10 @@ pub async fn upsert_options_chain(
             iv_atm: iv_atm.map(|(_, iv)| iv),
             updated_at: payload.updated_at.clone(),
         };
-        upsert_options_summary(pool, &summary).await?;
+        upsert_options_summary_tx(&mut tx, &summary, received_at).await?;
     }
 
-    Ok(())
+    tx.commit().await
 }
 
 // Axum Handlers
