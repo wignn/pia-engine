@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS market.options_snapshot_history (
     snapshot_id BIGSERIAL PRIMARY KEY,
+    snapshot_kind TEXT NOT NULL CHECK (snapshot_kind IN ('summary', 'chain')),
     symbol TEXT NOT NULL,
     observed_at TIMESTAMPTZ NOT NULL,
     underlying_price DOUBLE PRECISION,

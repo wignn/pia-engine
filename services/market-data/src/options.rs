@@ -326,9 +326,9 @@ pub async fn upsert_options_summary(
         serde_json::to_string(payload).map_err(|err| sqlx::Error::Protocol(err.to_string()))?;
     sqlx::query(
         r#"INSERT INTO market.options_snapshot_history
-           (symbol, observed_at, underlying_price, put_call_ratio, max_pain_strike,
+           (snapshot_kind, symbol, observed_at, underlying_price, put_call_ratio, max_pain_strike,
             total_open_interest, total_volume, total_gex, iv_atm, source_payload)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)"#,
+           VALUES ('summary',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)"#,
     )
     .bind(&payload.symbol)
     .bind(updated_at)
@@ -392,8 +392,8 @@ pub async fn upsert_options_chain(
         serde_json::to_string(payload).map_err(|err| sqlx::Error::Protocol(err.to_string()))?;
     let snapshot_id: i64 = sqlx::query_scalar(
         r#"INSERT INTO market.options_snapshot_history
-           (symbol, observed_at, underlying_price, source_payload)
-           VALUES ($1,$2,$3,$4::jsonb)
+           (snapshot_kind, symbol, observed_at, underlying_price, source_payload)
+           VALUES ('chain',$1,$2,$3,$4::jsonb)
            RETURNING snapshot_id"#,
     )
     .bind(&payload.symbol)

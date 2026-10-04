@@ -89,7 +89,25 @@ def main() -> None:
         if args.output:
             output = Path(args.output)
             output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_text(rendered + os.linesep)
+            if output.suffix.lower() == ".md":
+                lines = [
+                    "# XAUUSD source coverage",
+                    "",
+                    f"Window: `{start}` to `{end}`",
+                    f"Decision rows: {report.get('rows', 0)}; labeled rows: {report.get('target_rows', 0)}",
+                    "",
+                    "| Source | Coverage | Rows | Median age (s) | 95th percentile age (s) |",
+                    "| --- | ---: | ---: | ---: | ---: |",
+                ]
+                for name, source in report.get("sources", {}).items():
+                    lines.append(
+                        f"| {name} | {source['available_fraction']:.1%} | {source['available_rows']} | "
+                        f"{source['age_seconds_p50'] if source['age_seconds_p50'] is not None else '—'} | "
+                        f"{source['age_seconds_p95'] if source['age_seconds_p95'] is not None else '—'} |"
+                    )
+                output.write_text("\n".join(lines) + os.linesep)
+            else:
+                output.write_text(rendered + os.linesep)
         print(rendered)
 
 

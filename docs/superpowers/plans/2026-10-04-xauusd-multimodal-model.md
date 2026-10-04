@@ -55,6 +55,7 @@
 
 - [ ] Add `options_snapshot_history` with generated snapshot ID, symbol, `observed_at`, underlying price, summary metrics, and JSONB source payload; index `(symbol, observed_at)`.
 - [ ] Add `options_contract_history` keyed by snapshot ID and contract symbol, with the contract fields needed for IV, open interest, volume, and Greeks; store each incoming chain as a new snapshot before/with the existing upsert.
+- [ ] Tag option snapshot history rows as `summary` or `chain` so point-in-time joins can select the correct payload without ambiguous same-time rows.
 - [ ] Add `macro_observation_history` with source/type, series key, observation date, value/raw value, and `available_at`; index the as-of lookup keys. Append a row for new or revised macro rates, spreads, and series observations using `event.observed_at`.
 - [ ] Keep current-state upsert behavior intact; ensure a history-write failure is surfaced as an ingestion error rather than silently claiming that the point-in-time record was saved.
 - [ ] Manually inspect migration SQL and the existing ingest call paths to confirm the history tables preserve multiple versions and do not alter the public/current-state query shape.
@@ -83,9 +84,9 @@
 - Modify: `services/trading-model/src/xauusd_model/cli.py`
 
 **Interfaces:**
-- `store.load_market_panel(start: datetime, end: datetime) -> DataFrame`
-- `store.load_side_channels(start: datetime, end: datetime) -> dict[str, DataFrame]`
-- `features.build_asof_panel(market: DataFrame, side_channels: dict[str, DataFrame], freshness: dict[str, timedelta]) -> DataFrame`
+- `store.load_market_panel(config: ResearchConfig, start: str, end: str) -> DataFrame`
+- `store.load_side_channels(config: ResearchConfig, start: str, end: str) -> dict[str, DataFrame]`
+- `features.build_asof_panel(market: DataFrame, side_channels: dict[str, DataFrame], freshness: dict[str, timedelta] | None = None) -> DataFrame`
 - `features.coverage_report(panel: DataFrame) -> dict`
 - Panel rows use UTC `decision_at`, `target_end`, per-source values, `{source}_age_seconds`, and `{source}_available` columns.
 
