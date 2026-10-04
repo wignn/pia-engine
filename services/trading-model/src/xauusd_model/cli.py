@@ -1,0 +1,97 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import platform
+import time
+from pathlib import Path
+
+from .config import ResearchConfig
+
+
+def _inspect_backbone(config: ResearchConfig, run_inference: bool) -> dict:
+    import psutil
+    import torch
+
+    result = {
+        "model_id": config.model_id,
+        "license": "Apache-2.0 (Chronos forecasting project)",
+        "model_parameters": 120_000_000,
+        "supports_multivariate_and_covariate_forecasting": True,
+        "python": platform.python_version(),
+        "cpu_memory_available_bytes": psutil.virtual_memory().available,
+        "cuda_available": torch.cuda.is_available(),
+        "selected_backbone": config.model_id,
+        "inference_seconds": None,
+        "inference_status": "not run; pass --run-inference to load model weights",
+    }
+    if torch.cuda.is_available():
+        result["cuda_memory_free_bytes"] = torch.cuda.mem_get_info()[0]
+    if not run_inference:
+        return result
+
+    try:
+        from chronos import Chronos2Pipeline
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        started = time.perf_counter()
+        pipeline = Chronos2Pipeline.from_pretrained(config.model_id, device_map=device)
+        forecast = pipeline.predict(torch.linspace(1.0, 2.0, 32), prediction_length=4)
+        result["inference_seconds"] = time.perf_counter() - started
+        result["inference_status"] = "ok"
+        result["device"] = device
+        result["forecast_shape"] = list(forecast[0].shape)
+    except Exception as exc:
+        result["selected_backbone"] = "price_only"
+        result["inference_status"] = "fallback"
+        result["fallback_reason"] = f"{type(exc).__name__}: {exc}"
+    return result
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="xauusd-model")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    inspect = subparsers.add_parser("inspect-backbone", help="inspect Chronos-2 suitability")
+    inspect.add_argument("--config")
+    inspect.add_argument("--run-inference", action="store_true", help="download/load weights and time a small CPU/GPU forecast")
+
+    coverage = subparsers.add_parser("report-coverage", help="report point-in-time source coverage")
+    coverage.add_argument("--config")
+    coverage.add_argument("--from", dest="from_date", required=True)
+    coverage.add_argument("--to", dest="to_date", required=True)
+    coverage.add_argument("--output")
+
+    return parser
+
+
+def main() -> None:
+    args = _parser().parse_args()
+    config = ResearchConfig.load(args.config)
+    if args.command == "inspect-backbone":
+        print(json.dumps(_inspect_backbone(config, args.run_inference), indent=2))
+        return
+    if args.command == "report-coverage":
+        from .features import coverage_report
+        from .store import load_market_panel, load_side_channels
+
+        start, end = args.from_date, args.to_date
+        market = load_market_panel(config, start, end)
+        channels = load_side_channels(config, start, end)
+        from .features import build_asof_panel
+
+        panel = build_asof_panel(market, channels)
+        report = coverage_report(panel)
+        report["requested_window"] = {"from": start, "to": end}
+        report["config"] = config.to_dict()
+        rendered = json.dumps(report, indent=2, default=str)
+        if args.output:
+            output = Path(args.output)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(rendered + os.linesep)
+        print(rendered)
+
+
+if __name__ == "__main__":
+    main()

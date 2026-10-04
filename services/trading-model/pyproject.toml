@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling>=1.26,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "atlsd-xauusd-research"
+version = "0.1.0"
+description = "Offline, point-in-time multimodal XAUUSD forecasting research"
+requires-python = ">=3.10"
+dependencies = [
+  "clickhouse-connect>=0.8,<1",
+  "chronos-forecasting>=2.2,<3",
+  "numpy>=1.26,<3",
+  "pandas>=2.2,<4",
+  "psutil>=6,<8",
+  "psycopg[binary]>=3.2,<4",
+  "scikit-learn>=1.5,<2",
+  "torch>=2.5,<3",
+  "transformers>=4.46,<6",
+]
+
+[project.scripts]
+xauusd-model = "xauusd_model.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/xauusd_model"]
