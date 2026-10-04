@@ -369,6 +369,7 @@ jobs:
           username: ${{ secrets.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           port: ${{ secrets.PROD_SSH_PORT || 22 }}
+          command_timeout: 20m
           envs: GHCR_TOKEN,GHCR_ACTOR
           script: |
             set -euo pipefail
@@ -391,6 +392,5 @@ jobs:
             echo "pruning dangling images from previous deploys"
             docker image prune -f
             echo "deploy completed and verified (commit $(git rev-parse --short HEAD))"
-
 
 
