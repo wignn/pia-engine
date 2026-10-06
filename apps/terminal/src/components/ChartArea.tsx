@@ -1117,12 +1117,10 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
               >
                 {symbol !== "XAUUSD" || timeframe !== "15m"
                   ? "15m XAUUSD only"
-                  : !hasForecastCandle && forecast
-                  ? "CANDLE NOT LOADED"
                   : forecastState.toUpperCase()}
               </span>
             </div>
-            {symbol === "XAUUSD" && timeframe === "15m" && forecast && hasForecastCandle ? (
+            {symbol === "XAUUSD" && timeframe === "15m" && forecast && forecast.probabilities ? (
               <>
                 <div className="grid grid-cols-3 gap-1 py-1 text-center">
                   <span>DOWN {(forecast.probabilities!.down * 100).toFixed(0)}%</span>
@@ -1172,8 +1170,6 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
                   ? "Loading the latest forecast…"
                   : forecastState === "error"
                   ? "Forecast service is unavailable."
-                  : !hasForecastCandle && forecast
-                  ? "The decision candle is outside the loaded chart history."
                   : "No evaluated model forecast is available."}
               </div>
             )}
