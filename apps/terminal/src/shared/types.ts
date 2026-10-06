@@ -364,6 +364,18 @@ export interface GeoAssetImpactItem {
   supplyDisruptionRisk: 'high' | 'medium' | 'low'
 }
 
+export interface EnergyInventoryItem {
+  name: string
+  commodity: string
+  latestDate?: string
+  latestValue?: number
+  previousDate?: string
+  previousValue?: number
+  unit: string
+  wowChange?: number
+  seriesId?: string
+}
+
 export interface EnergyDashboardData {
   wtiPrice?: number
   brentPrice?: number
@@ -374,6 +386,7 @@ export interface EnergyDashboardData {
   storageVs5YrAvgPct?: number
   crackSpread321?: number
   refiningMarginStatus?: 'expanding' | 'compressing' | 'stable'
+  items?: EnergyInventoryItem[]
   updatedAt: number
 }
 

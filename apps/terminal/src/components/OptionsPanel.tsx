@@ -1,11 +1,30 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useMarketStore } from '@/stores/useMarketStore'
 import { THEME_TOKENS } from '@/theme/tokens'
-import type { OptionChainData, OptionGexData, OptionSummaryData } from '@/shared/types'
+import type { OptionChainData, OptionGexData, OptionSummaryData, OptionContractData } from '@/shared/types'
+
+const AVAILABLE_OPTIONS_SYMBOLS = [
+  { id: 'GLD', label: 'GLD (Gold)' },
+  { id: 'SPY', label: 'SPY (S&P 500)' },
+  { id: 'QQQ', label: 'QQQ (Nasdaq)' },
+  { id: 'AAPL', label: 'AAPL' },
+  { id: 'NVDA', label: 'NVDA' },
+  { id: 'TSLA', label: 'TSLA' },
+  { id: 'MSFT', label: 'MSFT' },
+  { id: 'BTC', label: 'BTC' },
+  { id: 'ETH', label: 'ETH' }
+]
 
 export const OptionsPanel: React.FC = () => {
-  const { symbol, symbols } = useMarketStore()
-  const symInfo = symbol ? symbols.find((item) => item.symbol === symbol) : undefined
+  const { symbol } = useMarketStore()
+  const initialUnderlying = useMemo(() => {
+    const clean = (symbol || '').trim().toUpperCase()
+    if (clean === 'XAUUSD' || clean === 'GOLD') return 'GLD'
+    if (AVAILABLE_OPTIONS_SYMBOLS.some((s) => s.id === clean)) return clean
+    return 'GLD'
+  }, [symbol])
+
+  const [activeUnderlying, setActiveUnderlying] = useState<string>(initialUnderlying)
   const [chain, setChain] = useState<OptionChainData | null>(null)
   const [gex, setGex] = useState<OptionGexData | null>(null)
   const [summary, setSummary] = useState<OptionSummaryData | null>(null)
@@ -13,14 +32,20 @@ export const OptionsPanel: React.FC = () => {
   const [selectedExp, setSelectedExp] = useState<string>('')
   const [isLoading, setIsLoading] = useState<boolean>(true)
 
+  // Sync underlying if chart symbol changes to supported asset
+  useEffect(() => {
+    const clean = (symbol || '').trim().toUpperCase()
+    if (clean === 'XAUUSD' || clean === 'GOLD') setActiveUnderlying('GLD')
+    else if (AVAILABLE_OPTIONS_SYMBOLS.some((s) => s.id === clean)) setActiveUnderlying(clean)
+  }, [symbol])
+
   const loadOptionsData = useCallback(
     async (showLoading = false) => {
-      if (!symbol) return
       try {
         if (showLoading) setIsLoading(true)
         const [cData, gData, sData] = await Promise.all([
-          symInfo?.capabilities.options ? window.api.options.getChain(symbol) : Promise.resolve(null),
-          symInfo?.capabilities.gex ? window.api.options.getGex(symbol) : Promise.resolve(null),
+          window.api.options.getChain(activeUnderlying),
+          window.api.options.getGex(activeUnderlying),
           window.api.options.getSummary()
         ])
         setChain(cData)
@@ -35,22 +60,15 @@ export const OptionsPanel: React.FC = () => {
         setIsLoading(false)
       }
     },
-    [symbol, symInfo]
+    [activeUnderlying]
   )
 
   useEffect(() => {
     let cancelled = false
-    if (!symbol) {
-      setChain(null)
-      setGex(null)
-      setIsLoading(false)
-      return () => {
-        cancelled = true
-      }
-    }
+    setIsLoading(true)
     Promise.all([
-      symInfo?.capabilities.options ? window.api.options.getChain(symbol) : Promise.resolve(null),
-      symInfo?.capabilities.gex ? window.api.options.getGex(symbol) : Promise.resolve(null),
+      window.api.options.getChain(activeUnderlying),
+      window.api.options.getGex(activeUnderlying),
       window.api.options.getSummary()
     ])
       .then(([cData, gData, sData]) => {
@@ -74,7 +92,7 @@ export const OptionsPanel: React.FC = () => {
     return () => {
       cancelled = true
     }
-  }, [symbol, symInfo])
+  }, [activeUnderlying])
 
   const formatGex = (val?: number): string => {
     if (val === undefined) return 'Unavailable'
@@ -95,6 +113,24 @@ export const OptionsPanel: React.FC = () => {
       ...gex.levels.map((l) => Math.max(Math.abs(l.callGex ?? 0), Math.abs(l.putGex ?? 0)))
     )
   }, [gex])
+
+  const chainRows = useMemo(() => {
+    if (!chain || !Array.isArray(chain.calls)) return []
+    const calls = selectedExp ? chain.calls.filter((c) => c.expiration === selectedExp) : chain.calls
+    const puts = selectedExp ? chain.puts.filter((p) => p.expiration === selectedExp) : chain.puts
+    const strikeMap = new Map<number, { strike: number; call?: OptionContractData; put?: OptionContractData }>()
+    calls.forEach((c) => {
+      const entry = strikeMap.get(c.strike) || { strike: c.strike }
+      entry.call = c
+      strikeMap.set(c.strike, entry)
+    })
+    puts.forEach((p) => {
+      const entry = strikeMap.get(p.strike) || { strike: p.strike }
+      entry.put = p
+      strikeMap.set(p.strike, entry)
+    })
+    return Array.from(strikeMap.values()).sort((a, b) => a.strike - b.strike)
+  }, [chain, selectedExp])
 
   return (
     <div
@@ -130,7 +166,7 @@ export const OptionsPanel: React.FC = () => {
               fontWeight: 600
             }}
           >
-            {symbol}
+            {activeUnderlying}
           </span>
         </div>
 
@@ -156,6 +192,35 @@ export const OptionsPanel: React.FC = () => {
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
           </svg>
         </button>
+      </div>
+
+      {/* Underlying Asset Switcher */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 4,
+          padding: '6px 12px',
+          overflowX: 'auto',
+          backgroundColor: THEME_TOKENS.colors.bgApp,
+          borderBottom: `1px solid ${THEME_TOKENS.colors.borderSubtle}`
+        }}
+      >
+        {AVAILABLE_OPTIONS_SYMBOLS.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setActiveUnderlying(s.id)}
+            className={`tv-btn ${activeUnderlying === s.id ? 'active' : ''}`}
+            style={{
+              fontSize: 10,
+              padding: '2px 6px',
+              whiteSpace: 'nowrap',
+              fontWeight: activeUnderlying === s.id ? 700 : 500
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
       </div>
 
       {/* Sub-Navigation Tabs */}
@@ -465,6 +530,15 @@ export const OptionsPanel: React.FC = () => {
             )}
 
             {/* Chain Table */}
+            {chain.underlyingPrice !== undefined && chain.underlyingPrice > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', fontSize: 11, backgroundColor: THEME_TOKENS.colors.bgApp, borderRadius: 3, marginBottom: 8 }}>
+                <span style={{ color: THEME_TOKENS.colors.textSecondary }}>Underlying Ref:</span>
+                <span style={{ fontWeight: 700, fontFamily: THEME_TOKENS.typography?.fontMono, color: THEME_TOKENS.colors.textBright }}>
+                  ${chain.underlyingPrice.toFixed(2)}
+                </span>
+              </div>
+            )}
+
             <div
               style={{
                 display: 'grid',
@@ -477,19 +551,24 @@ export const OptionsPanel: React.FC = () => {
                 textAlign: 'center'
               }}
             >
-              <span style={{ color: THEME_TOKENS.colors.bullish }}>CALL BID</span>
+              <span style={{ color: THEME_TOKENS.colors.bullish }}>CALL PRICE</span>
               <span style={{ color: THEME_TOKENS.colors.bullish }}>IV</span>
               <span>STRIKE</span>
-              <span style={{ color: THEME_TOKENS.colors.bearish }}>PUT BID</span>
+              <span style={{ color: THEME_TOKENS.colors.bearish }}>PUT PRICE</span>
               <span style={{ color: THEME_TOKENS.colors.bearish }}>IV</span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {chain.calls.map((call, idx) => {
-                const put = chain.puts[idx]
+              {chainRows.map((row) => {
+                const call = row.call
+                const put = row.put
+                const callPrice = call?.last && call.last > 0 ? call.last : (call?.bid && call.bid > 0 ? call.bid : (call?.ask && call.ask > 0 ? call.ask : 0))
+                const putPrice = put?.last && put.last > 0 ? put.last : (put?.bid && put.bid > 0 ? put.bid : (put?.ask && put.ask > 0 ? put.ask : 0))
+                const isAtm = chain.underlyingPrice && Math.abs(row.strike - chain.underlyingPrice) <= (chain.underlyingPrice * 0.015)
+
                 return (
                   <div
-                    key={call.strike}
+                    key={row.strike}
                     style={{
                       display: 'grid',
                       gridTemplateColumns: '1fr 1fr 1.2fr 1fr 1fr',
@@ -497,27 +576,28 @@ export const OptionsPanel: React.FC = () => {
                       fontSize: 10,
                       textAlign: 'center',
                       fontFamily: THEME_TOKENS.typography?.fontMono,
+                      backgroundColor: isAtm ? `${THEME_TOKENS.colors.accent}15` : 'transparent',
                       borderBottom: `1px solid ${THEME_TOKENS.colors.borderSubtle}`
                     }}
                   >
-                    <span style={{ color: THEME_TOKENS.colors.textPrimary }}>
-                      {call.bid === undefined ? 'Unavailable' : `$${call.bid.toFixed(2)}`}
+                    <span style={{ color: call ? THEME_TOKENS.colors.textPrimary : THEME_TOKENS.colors.textSecondary }}>
+                      {callPrice > 0 ? `$${callPrice.toFixed(2)}` : call ? '$0.00' : '--'}
                     </span>
                     <span style={{ color: THEME_TOKENS.colors.textSecondary }}>
-                      {call.impliedVolatility === undefined
-                        ? 'Unavailable'
-                        : `${(call.impliedVolatility * 100).toFixed(1)}%`}
+                      {call?.impliedVolatility !== undefined
+                        ? `${(call.impliedVolatility * 100).toFixed(0)}%`
+                        : '--'}
                     </span>
-                    <span style={{ fontWeight: 700, color: THEME_TOKENS.colors.accent }}>
-                      ${call.strike}
+                    <span style={{ fontWeight: 700, color: isAtm ? THEME_TOKENS.colors.accent : THEME_TOKENS.colors.textBright }}>
+                      ${row.strike}
                     </span>
-                    <span style={{ color: THEME_TOKENS.colors.textPrimary }}>
-                      {put?.bid === undefined ? 'Unavailable' : `$${put.bid.toFixed(2)}`}
+                    <span style={{ color: put ? THEME_TOKENS.colors.textPrimary : THEME_TOKENS.colors.textSecondary }}>
+                      {putPrice > 0 ? `$${putPrice.toFixed(2)}` : put ? '$0.00' : '--'}
                     </span>
                     <span style={{ color: THEME_TOKENS.colors.textSecondary }}>
-                      {put?.impliedVolatility === undefined
-                        ? 'Unavailable'
-                        : `${(put.impliedVolatility * 100).toFixed(1)}%`}
+                      {put?.impliedVolatility !== undefined
+                        ? `${(put.impliedVolatility * 100).toFixed(0)}%`
+                        : '--'}
                     </span>
                   </div>
                 )

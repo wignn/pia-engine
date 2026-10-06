@@ -749,13 +749,33 @@ export const browserTerminalApi = {
       try {
         const res = await fetch("/api/v1/energy/dashboard").then((r) => r.json());
         if (!res) return null;
+        const rawItems = Array.isArray(res.items) ? res.items : [];
+        const items = rawItems
+          .filter((it: any) => it && it.name && it.latest_value !== null && it.latest_value !== undefined)
+          .map((it: any) => ({
+            name: it.name,
+            commodity: it.commodity || "petroleum",
+            latestDate: it.latest_date || new Date().toISOString().split("T")[0],
+            latestValue: Number(it.latest_value),
+            previousDate: it.previous_date,
+            previousValue: it.previous_value !== null && it.previous_value !== undefined ? Number(it.previous_value) : undefined,
+            unit: it.unit || "barrels",
+            wowChange: it.wow_change !== null && it.wow_change !== undefined ? Number(it.wow_change) : undefined,
+            seriesId: it.series_id,
+          }));
+
+        const crack321 = res.refining_margins ? Number(res.refining_margins["321"] ?? 19.12) : 19.12;
         return {
-          wtiPrice: res.crude_oil?.wti_price ?? 86.89,
-          brentPrice: res.crude_oil?.brent_price ?? 93.97,
-          wtiBrentSpread: res.crude_oil?.spread ?? -7.08,
-          henryHubPrice: res.natural_gas?.henry_hub_price ?? 2.784,
-          naturalGasStorageBcf: res.natural_gas?.storage_bcf ?? 3415.0,
-          crackSpread321: res.refining_margins ? Number(res.refining_margins["321"] ?? 19.12) : 19.12,
+          wtiPrice: Number(res.crude_oil?.wti_price ?? 86.89),
+          brentPrice: Number(res.crude_oil?.brent_price ?? 93.97),
+          wtiBrentSpread: Number(res.crude_oil?.spread ?? -7.08),
+          crudeChangePct: res.crude_oil?.weekly_change_pct ? Number(res.crude_oil.weekly_change_pct) : 1.15,
+          henryHubPrice: Number(res.natural_gas?.henry_hub_price ?? 2.784),
+          naturalGasStorageBcf: Number(res.natural_gas?.storage_bcf ?? 3415.0),
+          storageVs5YrAvgPct: Number(res.natural_gas?.storage_change ?? 64.0),
+          crackSpread321: crack321,
+          refiningMarginStatus: crack321 >= 18 ? "expanding" : crack321 <= 12 ? "compressing" : "stable",
+          items,
           updatedAt: res.updated_at ? new Date(res.updated_at).getTime() : Date.now(),
         };
       } catch {
@@ -775,28 +795,45 @@ export const browserTerminalApi = {
   sec: {
     getFilings: async (params?: any): Promise<SecFilingItemData[]> => {
       try {
-        const search = params?.symbol ? `?ticker=${encodeURIComponent(params.symbol)}` : "";
+        const query = new URLSearchParams();
+        query.set("limit", "100");
+        if (params?.symbol && params.symbol !== "ALL") {
+          query.set("ticker", params.symbol);
+        }
+        const search = `?${query.toString()}`;
         const res = await fetch(`/api/v1/sec/filings${search}`).then((r) => r.json());
         const items = Array.isArray(res) ? res : res.items || res.data || [];
-        return items.map((i: any) => {
-          const rawForm = i.form_type || "OTHER";
+        const mapped = items.map((i: any) => {
+          const rawForm = String(i.form_type || "OTHER").trim().toUpperCase();
           const formType: SecFilingItemData["formType"] =
-            rawForm === "10-K" || rawForm === "10-Q" || rawForm === "8-K" || rawForm === "4" || rawForm === "13F"
-              ? rawForm
-              : "OTHER";
+            rawForm.startsWith("10-K") ? "10-K" :
+            rawForm.startsWith("10-Q") ? "10-Q" :
+            rawForm.startsWith("8-K") ? "8-K" :
+            rawForm === "4" ? "4" :
+            rawForm.startsWith("13F") ? "13F" :
+            "OTHER";
           const companyName = i.company_name || i.raw_json?.companyName || i.title || i.ticker || "";
           return {
             id: String(i.id || i.accession_number || Math.random()),
             symbol: i.symbol || i.ticker || "",
             companyName,
             formType,
+            rawFormType: rawForm,
             filedDate: i.filing_date || i.created_at || new Date().toISOString().split("T")[0],
             title: i.title || `${rawForm} Filing - ${companyName || i.ticker || ""}`,
             description: i.description || `Form ${rawForm} submitted to SEC EDGAR database.`,
-            reportUrl: i.report_url || i.document_url || "#",
+            reportUrl: i.report_url || i.document_url || `https://www.sec.gov/edgar/searchedgar/companysearch`,
             isInsiderTrade: rawForm === "4",
           };
         });
+
+        if (params?.formType && params.formType !== "ALL") {
+          const target = params.formType.toUpperCase();
+          return mapped.filter((item: any) =>
+            item.formType === target || item.rawFormType.startsWith(target)
+          );
+        }
+        return mapped;
       } catch {
         return [];
       }

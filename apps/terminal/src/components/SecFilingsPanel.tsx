@@ -3,19 +3,22 @@ import { useMarketStore } from '@/stores/useMarketStore'
 import { THEME_TOKENS } from '@/theme/tokens'
 import type { SecFilingItemData } from '@/shared/types'
 
+const TICKER_LIST = ['ALL', 'AAPL', 'NVDA', 'TSLA', 'MSFT', 'AMZN', 'GOOGL', 'META']
+
 export const SecFilingsPanel: React.FC = () => {
   const { symbol, setSymbol } = useMarketStore()
   const [filings, setFilings] = useState<SecFilingItemData[]>([])
   const [selectedForm, setSelectedForm] = useState<string>('ALL')
-  const [filterBySymbol, setFilterBySymbol] = useState<boolean>(false)
+  const [selectedTicker, setSelectedTicker] = useState<string>('ALL')
   const [isLoading, setIsLoading] = useState<boolean>(true)
 
   const loadFilings = useCallback(
     async (showLoading = false) => {
       try {
         if (showLoading) setIsLoading(true)
+        const targetTicker = selectedTicker !== 'ALL' ? selectedTicker : undefined
         const data = await window.api.sec.getFilings({
-          symbol: filterBySymbol ? (symbol ?? undefined) : undefined,
+          symbol: targetTicker,
           formType: selectedForm !== 'ALL' ? selectedForm : undefined
         })
         setFilings(data)
@@ -25,14 +28,16 @@ export const SecFilingsPanel: React.FC = () => {
         setIsLoading(false)
       }
     },
-    [symbol, filterBySymbol, selectedForm]
+    [selectedTicker, selectedForm]
   )
 
   useEffect(() => {
     let cancelled = false
+    setIsLoading(true)
+    const targetTicker = selectedTicker !== 'ALL' ? selectedTicker : undefined
     window.api.sec
       .getFilings({
-        symbol: filterBySymbol ? (symbol ?? undefined) : undefined,
+        symbol: targetTicker,
         formType: selectedForm !== 'ALL' ? selectedForm : undefined
       })
       .then((data) => {
@@ -51,7 +56,7 @@ export const SecFilingsPanel: React.FC = () => {
     return () => {
       cancelled = true
     }
-  }, [symbol, filterBySymbol, selectedForm])
+  }, [selectedTicker, selectedForm])
 
   const handleOpenReport = (url?: string): void => {
     if (!url) return
@@ -134,25 +139,35 @@ export const SecFilingsPanel: React.FC = () => {
           gap: 6
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* Symbol toggle */}
-          <button
-            type="button"
-            onClick={() => setFilterBySymbol(!filterBySymbol)}
-            className={`tv-btn ${filterBySymbol ? 'active' : ''}`}
-            style={{ fontSize: 11, padding: '3px 8px' }}
-          >
-            {filterBySymbol ? `Symbol: ${symbol}` : 'All Symbols'}
-          </button>
+        {/* Company Ticker Pills */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', flex: 1 }}>
+            {TICKER_LIST.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setSelectedTicker(t)}
+                className={`tv-btn ${selectedTicker === t ? 'active' : ''}`}
+                style={{
+                  fontSize: 10,
+                  padding: '2px 6px',
+                  whiteSpace: 'nowrap',
+                  fontWeight: selectedTicker === t ? 700 : 500
+                }}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
 
-          <span style={{ fontSize: 10, color: THEME_TOKENS.colors.textSecondary }}>
+          <span style={{ fontSize: 10, color: THEME_TOKENS.colors.textSecondary, whiteSpace: 'nowrap' }}>
             {filings.length} Filings
           </span>
         </div>
 
         {/* Form Type Pills */}
         <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
-          {['ALL', '10-K', '10-Q', '8-K', '4'].map((form) => (
+          {['ALL', '10-K', '10-Q', '8-K', '4', '144'].map((form) => (
             <button
               key={form}
               type="button"

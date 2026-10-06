@@ -366,6 +366,83 @@ export const EnergyPanel: React.FC = () => {
                 </span>
               </div>
             </div>
+
+            {/* EIA Weekly Petroleum & Gas Inventories Table */}
+            {energy.items && energy.items.length > 0 && (
+              <div
+                style={{
+                  backgroundColor: THEME_TOKENS.colors.bgApp,
+                  padding: 12,
+                  borderRadius: 4,
+                  border: `1px solid ${THEME_TOKENS.colors.borderSubtle}`
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: THEME_TOKENS.colors.textSecondary,
+                    marginBottom: 8,
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  EIA Weekly Inventories & Flow
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {energy.items.map((item, idx) => {
+                    const isPos = item.wowChange !== undefined && item.wowChange >= 0
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '6px 8px',
+                          borderRadius: 3,
+                          backgroundColor: THEME_TOKENS.colors.bgSurface,
+                          border: `1px solid ${THEME_TOKENS.colors.borderSubtle}`,
+                          fontSize: 11
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontWeight: 600, color: THEME_TOKENS.colors.textBright }}>
+                            {item.name}
+                          </span>
+                          <span style={{ fontSize: 10, color: THEME_TOKENS.colors.textSecondary }}>
+                            As of {item.latestDate} · {item.unit}
+                          </span>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div
+                            style={{
+                              fontFamily: THEME_TOKENS.typography?.fontMono,
+                              fontWeight: 700,
+                              color: THEME_TOKENS.colors.textPrimary
+                            }}
+                          >
+                            {item.latestValue?.toLocaleString()}
+                          </div>
+                          {item.wowChange !== undefined && (
+                            <div
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 600,
+                                color: isPos ? THEME_TOKENS.colors.bullish : THEME_TOKENS.colors.bearish
+                              }}
+                            >
+                              {isPos ? '▲ +' : '▼ '}
+                              {item.wowChange.toLocaleString()} WoW
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
