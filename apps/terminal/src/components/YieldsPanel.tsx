@@ -47,7 +47,7 @@ export const YieldsPanel: React.FC = () => {
 
   // Generate SVG path for yield curve visualization
   const svgCurveData = useMemo(() => {
-    if (!curve || curve.points.length < 2) return null
+    if (!curve || !Array.isArray(curve.points) || curve.points.length < 2) return null
     const points = curve.points
     const width = 280
     const height = 110
@@ -316,7 +316,7 @@ export const YieldsPanel: React.FC = () => {
         )}
 
         {/* Tenor Table */}
-        {curve && (
+        {curve && Array.isArray(curve.points) && curve.points.length > 0 && (
           <div>
             <div
               style={{

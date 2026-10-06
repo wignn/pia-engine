@@ -232,7 +232,40 @@ export const browserTerminalApi = {
       try {
         const res = await fetch(`/api/v1/options/gex/${encodeURIComponent(symbol)}`);
         const json = await res.json();
-        return json.data || json;
+        const raw = json?.data || json || {};
+        const levels: any[] = [];
+        const posMap = new Map<number, number>();
+        const negMap = new Map<number, number>();
+        if (Array.isArray(raw.major_positive_levels)) {
+          raw.major_positive_levels.forEach((l: any) => posMap.set(Number(l.strike), Number(l.gex)));
+        }
+        if (Array.isArray(raw.major_negative_levels)) {
+          raw.major_negative_levels.forEach((l: any) => negMap.set(Number(l.strike), Number(l.gex)));
+        }
+        if (Array.isArray(raw.levels)) {
+          raw.levels.forEach((l: any) => levels.push(l));
+        } else {
+          const strikes = Array.from(new Set([...posMap.keys(), ...negMap.keys()])).sort((a, b) => a - b);
+          for (const s of strikes) {
+            const cGex = posMap.get(s) ?? 0;
+            const pGex = negMap.get(s) ?? 0;
+            levels.push({
+              strike: s,
+              callGex: cGex,
+              putGex: pGex,
+              netGex: cGex - pGex,
+            });
+          }
+        }
+        return {
+          symbol: raw.symbol || symbol,
+          netGex: raw.net_gex ?? raw.netGex ?? 0,
+          zeroGammaLevel: raw.zero_gamma ?? raw.zeroGammaLevel,
+          callWall: raw.call_wall ?? raw.callWall,
+          putWall: raw.put_wall ?? raw.putWall,
+          levels,
+          updatedAt: Date.now(),
+        };
       } catch {
         return null;
       }
@@ -298,16 +331,69 @@ export const browserTerminalApi = {
   fixedIncome: {
     getYieldCurve: async (): Promise<YieldCurveResult | null> => {
       try {
-        const res = await fetch("/api/v1/fixed-income/yield-curve");
-        return await res.json();
+        const raw = await fetch("/api/v1/fixed-income/yield-curve").then((r) => r.json());
+        const wrapped = raw as any;
+        const payload = wrapped?.data && typeof wrapped.data === "object" ? wrapped.data : raw;
+        const pointRows = Array.isArray(payload?.points)
+          ? payload.points
+          : Array.isArray(payload?.bonds)
+          ? payload.bonds
+          : [];
+        const normalizeYield = (p: any) => ({
+          tenor: p.tenor || p.symbol || p.name || "",
+          yield: Number(p.yield ?? p.yield_value ?? p.value ?? 0),
+          previousYield: p.previous_yield !== undefined ? Number(p.previous_yield) : undefined,
+        });
+        const points = pointRows
+          .map(normalizeYield)
+          .filter((p: any) => p.tenor && Number.isFinite(p.yield));
+        return {
+          date: payload?.date || payload?.as_of || new Date().toISOString().split("T")[0],
+          points,
+          updatedAt: Date.now(),
+        };
       } catch {
         return null;
       }
     },
     getSpreads: async (): Promise<YieldSpreadResult | null> => {
       try {
-        const res = await fetch("/api/v1/fixed-income/spreads");
-        return await res.json();
+        const raw = await fetch("/api/v1/fixed-income/spreads").then((r) => r.json());
+        const payload = (raw?.data && typeof raw.data === "object" ? raw.data : raw) as any;
+        const rows = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload?.items)
+          ? payload.items
+          : [];
+        const valueOf = (short: string, long: string) => {
+          const normalized = `${short}${long}`.toLowerCase();
+          const row = rows.find((item: any) =>
+            String(item?.spread ?? item?.name ?? "")
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, "")
+              .includes(normalized),
+          );
+          return row?.value !== undefined ? Number(row.value) : undefined;
+        };
+        const spread2y10y =
+          payload?.spread2y10y ??
+          payload?.spread_2y_10y ??
+          valueOf("2y", "10y") ??
+          valueOf("2s", "10s");
+        const spread3m10y =
+          payload?.spread3m10y ??
+          payload?.spread_3m_10y ??
+          valueOf("3m", "10y") ??
+          valueOf("3m", "10s");
+        return {
+          date: new Date().toISOString().split("T")[0],
+          spread2Y10Y: spread2y10y !== undefined ? Number(spread2y10y) : undefined,
+          spread3M10Y: spread3m10y !== undefined ? Number(spread3m10y) : undefined,
+          isInverted: spread2y10y !== undefined ? Number(spread2y10y) < 0 : undefined,
+          updatedAt: Date.now(),
+        };
       } catch {
         return null;
       }

@@ -89,7 +89,7 @@ export const OptionsPanel: React.FC = () => {
     val === undefined ? 'Unavailable' : val.toFixed(digits)
 
   const maxAbsGex = useMemo(() => {
-    if (!gex || gex.levels.length === 0) return 1
+    if (!gex || !Array.isArray(gex.levels) || gex.levels.length === 0) return 1
     return Math.max(
       1,
       ...gex.levels.map((l) => Math.max(Math.abs(l.callGex ?? 0), Math.abs(l.putGex ?? 0)))
@@ -373,7 +373,7 @@ export const OptionsPanel: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {gex.levels.map((lvl) => {
+              {Array.isArray(gex.levels) && gex.levels.map((lvl) => {
                 const callPct = Math.min(
                   100,
                   Math.round((Math.abs(lvl.callGex ?? 0) / maxAbsGex) * 100)
