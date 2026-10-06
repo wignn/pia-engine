@@ -81,7 +81,7 @@
     },
     "apps/terminal": {
       "name": "@atlsd/terminal",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "clsx": "^2.1.1",
         "klinecharts": "10.0.3",
@@ -91,6 +91,7 @@
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "tailwind-merge": "^2.5.5",
+        "zustand": "5.0.15",
       },
       "devDependencies": {
         "@types/node": "^20.0.0",
