@@ -34,7 +34,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ theme = "dark" }) 
       const res = await fetch("/api/calendar", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
-        setEvents(data.items ?? []);
+        setEvents(data.events ?? data.items ?? (Array.isArray(data) ? data : []));
       }
     } catch {
       // ignore
