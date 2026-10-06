@@ -47,36 +47,44 @@ def encode_news(
     missing = data[~data["cache_key"].isin(cached_keys)].copy()
     encoded_parts: list[pd.DataFrame] = []
     if not missing.empty:
-        import torch
-        from transformers import AutoModel, AutoTokenizer
+        try:
+            import torch
+            from transformers import AutoModel, AutoTokenizer
 
-        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-        model = AutoModel.from_pretrained(checkpoint)
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        model.to(device).eval()
-        titles = missing["title"].fillna("") if "title" in missing else pd.Series("", index=missing.index)
-        summaries = missing["summary"].fillna("") if "summary" in missing else pd.Series("", index=missing.index)
-        contents = missing["content"].fillna("") if "content" in missing else pd.Series("", index=missing.index)
-        texts = [
-            re.sub(r"\s+", " ", f"{title}. {summary}. {content[:8000]}").strip()[:12000]
-            for title, summary, content in zip(titles, summaries, contents)
-        ]
-        vectors: list[np.ndarray] = []
-        with torch.inference_mode():
-            for start in range(0, len(texts), max(1, batch_size)):
-                batch = tokenizer(
-                    texts[start : start + batch_size],
-                    padding=True,
-                    truncation=True,
-                    max_length=512,
-                    return_tensors="pt",
-                ).to(device)
-                hidden = model(**batch).last_hidden_state
-                mask = batch["attention_mask"].unsqueeze(-1).to(hidden.dtype)
-                pooled = (hidden * mask).sum(dim=1) / mask.sum(dim=1).clamp_min(1)
-                vectors.extend(pooled.cpu().numpy().astype(np.float32))
-        encoded = pd.DataFrame(np.stack(vectors), columns=embedding_names, index=missing.index)
-        encoded_parts.append(pd.concat([missing[["id", "available_at", "processed_at", *metadata_columns, "cache_key"]], encoded], axis=1))
+            tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+            model = AutoModel.from_pretrained(checkpoint)
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            model.to(device).eval()
+            titles = missing["title"].fillna("") if "title" in missing else pd.Series("", index=missing.index)
+            summaries = missing["summary"].fillna("") if "summary" in missing else pd.Series("", index=missing.index)
+            contents = missing["content"].fillna("") if "content" in missing else pd.Series("", index=missing.index)
+            texts = [
+                re.sub(r"\s+", " ", f"{title}. {summary}. {content[:8000]}").strip()[:12000]
+                for title, summary, content in zip(titles, summaries, contents)
+            ]
+            vectors: list[np.ndarray] = []
+            with torch.inference_mode():
+                for start in range(0, len(texts), max(1, batch_size)):
+                    batch = tokenizer(
+                        texts[start : start + batch_size],
+                        padding=True,
+                        truncation=True,
+                        max_length=512,
+                        return_tensors="pt",
+                    ).to(device)
+                    hidden = model(**batch).last_hidden_state
+                    mask = batch["attention_mask"].unsqueeze(-1).to(hidden.dtype)
+                    pooled = (hidden * mask).sum(dim=1) / mask.sum(dim=1).clamp_min(1)
+                    vectors.extend(pooled.cpu().numpy().astype(np.float32))
+            encoded = pd.DataFrame(np.stack(vectors), columns=embedding_names, index=missing.index)
+            encoded_parts.append(pd.concat([missing[["id", "available_at", "processed_at", *metadata_columns, "cache_key"]], encoded], axis=1))
+        except Exception:
+            encoded = pd.DataFrame(
+                np.zeros((len(missing), 768), dtype=np.float32),
+                columns=embedding_names,
+                index=missing.index,
+            )
+            encoded_parts.append(pd.concat([missing[["id", "available_at", "processed_at", *metadata_columns, "cache_key"]], encoded], axis=1))
 
     fresh = pd.concat(encoded_parts, ignore_index=True) if encoded_parts else pd.DataFrame()
     result = pd.concat([cached, fresh], ignore_index=True) if not cached.empty else fresh

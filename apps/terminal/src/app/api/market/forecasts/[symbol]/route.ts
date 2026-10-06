@@ -17,6 +17,12 @@ export async function GET(
       `${CORE_REST_URL}/api/v1/market/forecasts/XAUUSD?timeframe=15m`,
       { headers: { "x-api-key": CORE_API_KEY }, cache: "no-store" },
     );
+    if (response.status === 404) {
+      return NextResponse.json(
+        { status: "unavailable", symbol: "XAUUSD", timeframe: "15m", forecast: null },
+        { status: 200 },
+      );
+    }
     const body = await response.text();
     let payload: unknown;
     try {

@@ -18,7 +18,17 @@ import {
   Keyboard,
   ShieldCheck,
   Search,
-  ExternalLink
+  ExternalLink,
+  LayoutDashboard,
+  Map,
+  LayoutGrid,
+  PieChart,
+  Globe2,
+  TrendingUp,
+  ShieldAlert,
+  Zap,
+  FileText,
+  Briefcase
 } from "lucide-react";
 import { PaneContentType } from "@/types";
 
@@ -57,6 +67,69 @@ export const TradingViewMainMenu: React.FC<TradingViewMainMenuProps> = ({
       label: "Supercharts",
       description: "Financial charts with multi-pane analysis & indicators",
       icon: <BarChart3 className="w-4 h-4 text-[#2962ff]" />
+    },
+    {
+      id: "controlpanel",
+      label: "Financial War Room",
+      description: "Customizable 12-col dashboard with TV, mini charts & depth",
+      icon: <LayoutDashboard className="w-4 h-4 text-[#3b82f6]" />,
+      badge: "PRO"
+    },
+    {
+      id: "macromaps",
+      label: "Macro World Map",
+      description: "Global macroeconomic choropleth (Inflation, Rates, GDP)",
+      icon: <Map className="w-4 h-4 text-[#10b981]" />,
+      badge: "NEW"
+    },
+    {
+      id: "hub",
+      label: "Supercharts Hub",
+      description: "Layout gallery, rapid asset suites & custom workspaces",
+      icon: <LayoutGrid className="w-4 h-4 text-[#a855f7]" />
+    },
+    {
+      id: "options",
+      label: "Options & GEX Analysis",
+      description: "Put/Call ratios, Gamma Exposure profile & Max Pain",
+      icon: <PieChart className="w-4 h-4 text-[#00e5ff]" />
+    },
+    {
+      id: "macro",
+      label: "Macro & Central Banks",
+      description: "Fear & Greed index, COT positioning & Fed/ECB stance",
+      icon: <Globe2 className="w-4 h-4 text-[#f59e0b]" />
+    },
+    {
+      id: "yields",
+      label: "Treasury Yields & Spreads",
+      description: "US Sovereign yield curve, 2s10s & 3m10y spreads",
+      icon: <TrendingUp className="w-4 h-4 text-[#10b981]" />
+    },
+    {
+      id: "geosignals",
+      label: "Geopolitical Signals",
+      description: "Real-time flash event stream & affected asset matrices",
+      icon: <ShieldAlert className="w-4 h-4 text-[#f43f5e]" />
+    },
+    {
+      id: "energy",
+      label: "Energy Complex",
+      description: "Crude oil (WTI/Brent), natural gas & storage telemetry",
+      icon: <Zap className="w-4 h-4 text-[#eab308]" />
+    },
+    {
+      id: "sec",
+      label: "SEC Filings",
+      description: "Real-time EDGAR corporate disclosures (10-K, 10-Q, 8-K)",
+      icon: <FileText className="w-4 h-4 text-[#8b5cf6]" />
+    },
+    {
+      id: "paper",
+      label: "Paper Trading Simulator",
+      description: "Institutional practice trading with real-time mark-to-market",
+      icon: <Briefcase className="w-4 h-4 text-[#06b6d4]" />,
+      badge: "LIVE"
     },
     {
       id: "orderbook",

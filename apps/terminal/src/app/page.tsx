@@ -20,6 +20,15 @@ import { SymbolSearchModal } from "@/components/SymbolSearchModal";
 import { SettingsModal } from "@/components/SettingsModal";
 import { IndicatorSettingsModal } from "@/components/IndicatorSettingsModal";
 import { TradingViewMainMenu } from "@/components/TradingViewMainMenu";
+import "@/lib/terminal-api";
+import { OptionsPanel } from "@/components/OptionsPanel";
+import { MacroPanel } from "@/components/MacroPanel";
+import { YieldsPanel } from "@/components/YieldsPanel";
+import { GeoSignalsPanel } from "@/components/GeoSignalsPanel";
+import { EnergyPanel } from "@/components/EnergyPanel";
+import { SecFilingsPanel } from "@/components/SecFilingsPanel";
+import { PaperTradingPanel } from "@/components/PaperTradingPanel";
+import { BottomStatusBar } from "@/components/BottomStatusBar";
 import { INITIAL_WATCHLIST } from "@/lib/constants";
 import { resolveInstrument } from "@/lib/instruments";
 import {
@@ -906,6 +915,13 @@ export default function TerminalPage() {
             )}
             {rightSidebarTab === "calendar" && <CalendarPanel theme={settings.theme} />}
             {rightSidebarTab === "live" && <LiveStreamPanel theme={settings.theme} />}
+            {rightSidebarTab === "options" && <OptionsPanel />}
+            {rightSidebarTab === "macro" && <MacroPanel />}
+            {rightSidebarTab === "yields" && <YieldsPanel />}
+            {rightSidebarTab === "geosignals" && <GeoSignalsPanel />}
+            {rightSidebarTab === "energy" && <EnergyPanel />}
+            {rightSidebarTab === "sec" && <SecFilingsPanel />}
+            {rightSidebarTab === "paper" && <PaperTradingPanel />}
           </div>
         </aside>
 
@@ -915,6 +931,9 @@ export default function TerminalPage() {
           theme={settings.theme}
         />
       </div>
+
+      {/* Institutional Desktop Bottom Status Bar */}
+      <BottomStatusBar />
 
       {/* Mobile Bottom Navigation (< md) */}
       <MobileBottomNav

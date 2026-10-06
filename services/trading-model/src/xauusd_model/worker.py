@@ -21,10 +21,22 @@ def _required_env(name: str) -> str:
     return value
 
 
-def _latest_closed_decision(config: ResearchConfig) -> datetime | None:
+def _clickhouse_client(url_str: str):
+    import urllib.parse
     import clickhouse_connect
 
-    client = clickhouse_connect.get_client(url=config.clickhouse_url)
+    parsed = urllib.parse.urlparse(url_str)
+    return clickhouse_connect.get_client(
+        host=parsed.hostname or "localhost",
+        port=parsed.port or 8123,
+        username=parsed.username or "default",
+        password=parsed.password or "",
+        database=parsed.path.lstrip("/") or "default",
+    )
+
+
+def _latest_closed_decision(config: ResearchConfig) -> datetime | None:
+    client = _clickhouse_client(config.clickhouse_url)
     try:
         row = client.query(
             """SELECT max(time) AS candle_time
@@ -58,7 +70,7 @@ def _unprocessed_decisions(config: ResearchConfig, model_version: str) -> list[d
     if last_stored is None:
         return [latest]
 
-    client = clickhouse_connect.get_client(url=config.clickhouse_url)
+    client = _clickhouse_client(config.clickhouse_url)
     try:
         rows = client.query(
             """SELECT DISTINCT time
@@ -124,7 +136,7 @@ def _forecast_for(config: ResearchConfig, predictor: SavedMultimodalPredictor, m
     from .cli import _build_panel
 
     as_of = decision_at.isoformat()
-    context_start = (decision_at - timedelta(minutes=15 * (config.sequence_length - 1))).isoformat()
+    context_start = (decision_at - timedelta(days=2)).isoformat()
     panel = _build_panel(config, context_start, as_of)
     decision_rows = panel[pd.to_datetime(panel["decision_at"], utc=True) == pd.Timestamp(decision_at)]
     if decision_rows.empty:

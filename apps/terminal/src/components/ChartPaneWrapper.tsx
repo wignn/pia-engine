@@ -12,7 +12,17 @@ import {
   Columns,
   Rows,
   X,
-  Maximize2
+  Maximize2,
+  PieChart,
+  Globe2,
+  TrendingUp,
+  ShieldAlert,
+  Zap,
+  FileText,
+  Briefcase,
+  LayoutDashboard,
+  Map,
+  LayoutGrid
 } from "lucide-react";
 import { ChartArea } from "./ChartArea";
 import { useMarketFeed } from "@/lib/useMarketFeed";
@@ -23,6 +33,16 @@ import { OrderBookPanel } from "./OrderBookPanel";
 import { MarketIntelligencePanel } from "./MarketIntelligencePanel";
 import { CalendarPanel } from "./CalendarPanel";
 import { LiveStreamPanel } from "./LiveStreamPanel";
+import { OptionsPanel } from "./OptionsPanel";
+import { MacroPanel } from "./MacroPanel";
+import { YieldsPanel } from "./YieldsPanel";
+import { GeoSignalsPanel } from "./GeoSignalsPanel";
+import { EnergyPanel } from "./EnergyPanel";
+import { SecFilingsPanel } from "./SecFilingsPanel";
+import { PaperTradingPanel } from "./PaperTradingPanel";
+import { ControlPanelView } from "./controlpanel/ControlPanelView";
+import { MacroMapsView } from "./macromaps/MacroMapsView";
+import { SuperchartsHub } from "./hub/SuperchartsHub";
 import {
   ChartPaneConfig,
   DrawingTool,
@@ -111,6 +131,16 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
     { id: "social", label: "Social Pulse", icon: <Radio className="w-3.5 h-3.5 text-[#e040fb]" /> },
     { id: "intelligence", label: "Market Intel", icon: <Brain className="w-3.5 h-3.5 text-[#00e5ff]" /> },
     { id: "calendar", label: "Economic Calendar", icon: <Calendar className="w-3.5 h-3.5 text-[#ff5252]" /> },
+    { id: "options", label: "Options & GEX", icon: <PieChart className="w-3.5 h-3.5 text-[#00e5ff]" /> },
+    { id: "macro", label: "Macro & Central Banks", icon: <Globe2 className="w-3.5 h-3.5 text-[#f59e0b]" /> },
+    { id: "yields", label: "Treasury Yields", icon: <TrendingUp className="w-3.5 h-3.5 text-[#10b981]" /> },
+    { id: "geosignals", label: "Geopolitical Signals", icon: <ShieldAlert className="w-3.5 h-3.5 text-[#f43f5e]" /> },
+    { id: "energy", label: "Energy Complex", icon: <Zap className="w-3.5 h-3.5 text-[#eab308]" /> },
+    { id: "sec", label: "SEC Filings", icon: <FileText className="w-3.5 h-3.5 text-[#8b5cf6]" /> },
+    { id: "paper", label: "Paper Trading", icon: <Briefcase className="w-3.5 h-3.5 text-[#06b6d4]" /> },
+    { id: "controlpanel", label: "Financial War Room", icon: <LayoutDashboard className="w-3.5 h-3.5 text-[#3b82f6]" /> },
+    { id: "macromaps", label: "Macro World Map", icon: <Map className="w-3.5 h-3.5 text-[#10b981]" /> },
+    { id: "hub", label: "Supercharts Hub", icon: <LayoutGrid className="w-3.5 h-3.5 text-[#a855f7]" /> },
   ];
 
   const currentTypeMeta = paneTypes.find((t) => t.id === paneType) || paneTypes[0];
@@ -274,6 +304,26 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
           <CalendarPanel theme={theme} />
         ) : paneType === "live" ? (
           <LiveStreamPanel theme={theme} />
+        ) : paneType === "options" ? (
+          <OptionsPanel />
+        ) : paneType === "macro" ? (
+          <MacroPanel />
+        ) : paneType === "yields" ? (
+          <YieldsPanel />
+        ) : paneType === "geosignals" ? (
+          <GeoSignalsPanel />
+        ) : paneType === "energy" ? (
+          <EnergyPanel />
+        ) : paneType === "sec" ? (
+          <SecFilingsPanel />
+        ) : paneType === "paper" ? (
+          <PaperTradingPanel />
+        ) : paneType === "controlpanel" ? (
+          <ControlPanelView />
+        ) : paneType === "macromaps" ? (
+          <MacroMapsView />
+        ) : paneType === "hub" ? (
+          <SuperchartsHub />
         ) : (
           <ChartArea
             paneId={pane.id}

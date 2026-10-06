@@ -29,7 +29,15 @@ import {
   Radio,
   Brain,
   Calendar,
-  Menu
+  Menu,
+  PieChart,
+  Globe2,
+  ShieldAlert,
+  Zap,
+  FileText,
+  Briefcase,
+  LayoutDashboard,
+  Map
 } from "lucide-react";
 import { Timeframe, IndicatorState, ChartLayout, IndicatorParameters, PaneContentType } from "@/types";
 
@@ -235,12 +243,32 @@ export const TopBar: React.FC<TopBarProps> = ({
                 ? "Calendar"
                 : paneType === "news"
                 ? "News"
+                : paneType === "options"
+                ? "Options & GEX"
+                : paneType === "macro"
+                ? "Macro & Central Banks"
+                : paneType === "yields"
+                ? "Treasury Yields"
+                : paneType === "geosignals"
+                ? "Geo Signals"
+                : paneType === "energy"
+                ? "Energy Complex"
+                : paneType === "sec"
+                ? "SEC Filings"
+                : paneType === "paper"
+                ? "Paper Trading"
+                : paneType === "controlpanel"
+                ? "War Room"
+                : paneType === "macromaps"
+                ? "Macro Map"
+                : paneType === "hub"
+                ? "Supercharts Hub"
                 : "Chart"}
             </span>
             <ChevronDown className="w-3 h-3 text-[#787b86]" />
           </button>
           <div
-            className={`hidden group-hover:flex absolute top-full left-0 z-40 mt-1 w-56 flex-col rounded-lg border p-1 shadow-2xl ${
+            className={`hidden group-hover:flex absolute top-full left-0 z-40 mt-1 w-64 max-h-[85vh] overflow-y-auto flex-col rounded-lg border p-1 shadow-2xl ${
               isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
             }`}
           >
@@ -249,7 +277,17 @@ export const TopBar: React.FC<TopBarProps> = ({
             </div>
             {([
               { id: "chart", label: "Chart View", icon: <BarChart3 className="w-3.5 h-3.5 text-[#2962ff]" />, desc: "Interactive Candlesticks" },
+              { id: "controlpanel", label: "Financial War Room", icon: <LayoutDashboard className="w-3.5 h-3.5 text-[#3b82f6]" />, desc: "Multi-Widget Command Center" },
+              { id: "macromaps", label: "Macro World Map", icon: <Map className="w-3.5 h-3.5 text-[#10b981]" />, desc: "Global Macroeconomic Choropleth" },
+              { id: "hub", label: "Supercharts Hub", icon: <LayoutGrid className="w-3.5 h-3.5 text-[#a855f7]" />, desc: "Templates & Rapid Suite Launcher" },
               { id: "orderbook", label: "DOM & Order Book", icon: <Layers className="w-3.5 h-3.5 text-[#089981]" />, desc: "Market Depth & Level 2" },
+              { id: "options", label: "Options & GEX", icon: <PieChart className="w-3.5 h-3.5 text-[#00e5ff]" />, desc: "Chains, Gamma Exposure & Max Pain" },
+              { id: "macro", label: "Macro & Central Banks", icon: <Globe2 className="w-3.5 h-3.5 text-[#f59e0b]" />, desc: "Fear & Greed, COT, Central Banks" },
+              { id: "yields", label: "Treasury Yields", icon: <TrendingUp className="w-3.5 h-3.5 text-[#10b981]" />, desc: "US Sovereign Curve & Spreads" },
+              { id: "geosignals", label: "Geopolitical Signals", icon: <ShieldAlert className="w-3.5 h-3.5 text-[#f43f5e]" />, desc: "Realtime Flash Events & Impact" },
+              { id: "energy", label: "Energy Complex", icon: <Zap className="w-3.5 h-3.5 text-[#eab308]" />, desc: "WTI, Brent, Gas Telemetry" },
+              { id: "sec", label: "SEC Filings", icon: <FileText className="w-3.5 h-3.5 text-[#8b5cf6]" />, desc: "10-K, 10-Q & 8-K Disclosures" },
+              { id: "paper", label: "Paper Trading", icon: <Briefcase className="w-3.5 h-3.5 text-[#06b6d4]" />, desc: "Institutional Simulation Account" },
               { id: "news", label: "News Stream", icon: <Newspaper className="w-3.5 h-3.5 text-[#f5b942]" />, desc: "Financial Breaking News" },
               { id: "social", label: "Social Pulse", icon: <Radio className="w-3.5 h-3.5 text-[#e040fb]" />, desc: "𝕏 Live Posts & Sentiment" },
               { id: "intelligence", label: "Market Intelligence", icon: <Brain className="w-3.5 h-3.5 text-[#00e5ff]" />, desc: "AI Macro & COT Analysis" },

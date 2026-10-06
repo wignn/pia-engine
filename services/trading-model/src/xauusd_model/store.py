@@ -26,15 +26,28 @@ def _sql_time(value: datetime) -> str:
     return value.strftime("%Y-%m-%d %H:%M:%S") + ".000"
 
 
+def _clickhouse_client(url_str: str):
+    import urllib.parse
+    import clickhouse_connect
+
+    parsed = urllib.parse.urlparse(url_str)
+    return clickhouse_connect.get_client(
+        host=parsed.hostname or "localhost",
+        port=parsed.port or 8123,
+        username=parsed.username or "default",
+        password=parsed.password or "",
+        database=parsed.path.lstrip("/") or "default",
+    )
+
+
 def load_market_panel(config: ResearchConfig, start: str, end: str) -> pd.DataFrame:
     if not config.clickhouse_url:
         raise ValueError("Set TRADING_MODEL_CLICKHOUSE_URL to read candle history")
-    import clickhouse_connect
 
     from_time = _utc(start) - timedelta(days=90)
     to_time = _utc(end, end_of_day=True) + timedelta(hours=1)
     symbols = ",".join(f"'{symbol}'" for symbol in MARKET_SYMBOLS)
-    client = clickhouse_connect.get_client(url=config.clickhouse_url)
+    client = _clickhouse_client(config.clickhouse_url)
     rows: list[pd.DataFrame] = []
     try:
         for resolution in MARKET_RESOLUTIONS:

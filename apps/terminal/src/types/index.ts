@@ -76,7 +76,24 @@ export interface IndicatorState {
   aiForecast?: boolean;
 }
 
-export type TabContentType = "chart" | "news" | "social" | "orderbook" | "intelligence" | "calendar" | "live";
+export type TabContentType =
+  | "chart"
+  | "news"
+  | "social"
+  | "orderbook"
+  | "intelligence"
+  | "calendar"
+  | "live"
+  | "options"
+  | "macro"
+  | "yields"
+  | "geosignals"
+  | "energy"
+  | "sec"
+  | "paper"
+  | "controlpanel"
+  | "macromaps"
+  | "hub";
 export type PaneContentType = TabContentType;
 
 export type ChartLayout =
