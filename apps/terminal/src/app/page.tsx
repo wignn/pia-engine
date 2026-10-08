@@ -659,33 +659,56 @@ export default function TerminalPage() {
         for (const it of data.items) bySym[String(it.symbol ?? "").toUpperCase()] = it;
 
         setWatchlist((list) => {
+          // 1. Build map of clean symbols from live data (prefer clean symbol over trailing M)
+          const cleanHits = new Map<string, any>();
+          for (const it of data.items) {
+            const sym = String(it.symbol ?? "").toUpperCase().trim();
+            if (!sym || typeof it.price !== "number" || it.price <= 0) continue;
+            const cleanSym = sym.endsWith("M") && sym.length >= 5 ? sym.slice(0, -1) : sym;
+            if (!cleanHits.has(cleanSym) || sym === cleanSym) {
+              cleanHits.set(cleanSym, it);
+            }
+          }
+
+          // 2. Keep and update existing items only if they have real live data
           const existingSyms = new Set<string>();
-          const updated = list.map((w) => {
-            const sym = w.symbol.toUpperCase();
-            existingSyms.add(sym);
-            const hit = bySym[sym];
-            if (!hit || typeof hit.price !== "number") return w;
+          const updated: WatchlistItem[] = [];
+
+          for (const w of list) {
+            const sym = w.symbol.toUpperCase().trim();
+            const cleanSym = sym.endsWith("M") && sym.length >= 5 ? sym.slice(0, -1) : sym;
+            const hit = cleanHits.get(cleanSym);
+            if (!hit) {
+              // Empty / inactive pair -> remove
+              continue;
+            }
+            existingSyms.add(cleanSym);
             const change = w.price ? hit.price - (w.price - w.change) : 0;
-            return {
+            const meta = resolveInstrument(cleanSym, hit.asset_type);
+            updated.push({
               ...w,
+              symbol: cleanSym,
+              name: meta.name || w.name,
+              category: meta.category,
+              provider: meta.provider,
+              digits: meta.digits,
               price: hit.price,
               change,
               changePercent: w.price
                 ? Number(((change / (hit.price - change)) * 100).toFixed(2))
                 : 0,
-            };
-          });
+            });
+          }
 
-          const additions: WatchlistItem[] = [];
-          for (const it of data.items) {
-            const sym = String(it.symbol ?? "").toUpperCase();
-            if (!sym || existingSyms.has(sym) || typeof it.price !== "number") continue;
+          // 3. Add any new real instruments from MT5 / market data
+          for (const [sym, hit] of cleanHits.entries()) {
+            if (existingSyms.has(sym)) continue;
             existingSyms.add(sym);
-            const meta = resolveInstrument(sym, it.asset_type);
-            additions.push({
+            const meta = resolveInstrument(sym, hit.asset_type);
+            updated.push({
               symbol: sym,
               name: meta.name,
-              price: it.price,
+              price: hit.price,
               change: 0,
               changePercent: 0,
               category: meta.category,
@@ -694,7 +717,7 @@ export default function TerminalPage() {
             });
           }
 
-          return additions.length > 0 ? [...updated, ...additions] : updated;
+          return updated;
         });
       } catch {
         /* ignore */

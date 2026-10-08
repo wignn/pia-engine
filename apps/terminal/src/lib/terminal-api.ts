@@ -38,6 +38,7 @@ import type {
   CountryMacroData,
 } from "@/shared/types";
 import { resolveOptionsUnderlying } from "@/shared/market-utils";
+import { resolveInstrument } from "./instruments";
 
 const DEFAULT_PAPER: PaperAccount = {
   balance: 100000,
@@ -56,22 +57,34 @@ export const browserTerminalApi = {
         const res = await fetch("/api/market/prices");
         const json = await res.json();
         const items = json.data || json.items || [];
-        return items.map((item: any) => ({
-          symbol: item.symbol,
-          name: item.name || item.symbol,
-          category: item.category || "crypto",
-          pricePrecision: item.digits || 2,
-          volumePrecision: 2,
-          minMove: Math.pow(10, -(item.digits || 2)),
-          capabilities: {
-            quote: true,
-            candles: true,
-            trades: true,
-            orderBook: true,
-            options: true,
-            gex: true,
-          },
-        }));
+        const cleanMap = new Map<string, any>();
+        for (const item of items) {
+          const sym = String(item.symbol || "").toUpperCase().trim();
+          if (!sym || typeof item.price !== "number" || item.price <= 0) continue;
+          const cleanSym = sym.endsWith("M") && sym.length >= 5 ? sym.slice(0, -1) : sym;
+          if (!cleanMap.has(cleanSym) || sym === cleanSym) {
+            cleanMap.set(cleanSym, item);
+          }
+        }
+        return Array.from(cleanMap.entries()).map(([sym, item]) => {
+          const meta = resolveInstrument(sym, item.asset_type);
+          return {
+            symbol: sym,
+            name: meta.name,
+            category: meta.category,
+            pricePrecision: meta.digits,
+            volumePrecision: 2,
+            minMove: Math.pow(10, -meta.digits),
+            capabilities: {
+              quote: true,
+              candles: true,
+              trades: true,
+              orderBook: true,
+              options: ["GLD", "SPY", "AAPL"].includes(sym),
+              gex: ["GLD", "SPY", "AAPL"].includes(sym),
+            },
+          };
+        });
       } catch {
         return [];
       }
