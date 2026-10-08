@@ -157,6 +157,8 @@ export interface NewsArticle {
   url: string;
   published_at: string;
   impact_level?: "low" | "medium" | "high";
-  sentiment?: "bullish" | "bearish" | "neutral";
+  sentiment?: "bullish" | "bearish" | "neutral" | "positive" | "negative";
   summary?: string;
+  content?: string;
+  media_url?: string;
 }

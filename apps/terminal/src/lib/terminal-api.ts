@@ -1062,9 +1062,15 @@ export const browserTerminalApi = {
           id: item.id || `news-${idx}`,
           title: item.title || item.original_title || "Market Update",
           summary: item.summary || "",
+          content: item.content || item.original_content || item.summary || "",
           url: item.url || item.original_url || "https://wign.dev",
           source: item.source_name || item.source || "Financial Wire",
           publishedAt: item.published_at ? new Date(item.published_at).getTime() : Date.now(),
+          imageUrl: item.media_url || item.mediaUrl || item.imageUrl || undefined,
+          mediaUrl: item.media_url || item.mediaUrl || item.imageUrl || undefined,
+          media_url: item.media_url || item.mediaUrl || item.imageUrl || undefined,
+          sentiment: item.sentiment || "neutral",
+          impact_level: item.impact_level || "medium",
         }));
       } catch {
         return [];

@@ -922,7 +922,14 @@ export default function TerminalPage() {
               />
             )}
             {rightSidebarTab === "news" && (
-              <NewsPanel symbol={selectedItem.symbol} theme={settings.theme} />
+              <NewsPanel
+                symbol={selectedItem.symbol}
+                theme={settings.theme}
+                onSelectSymbol={(sym) => {
+                  const item = findItem(sym);
+                  if (item) handleSelectSymbol(item);
+                }}
+              />
             )}
             {rightSidebarTab === "intelligence" && (
               <MarketIntelligencePanel symbol={selectedItem.symbol} theme={settings.theme} />

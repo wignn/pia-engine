@@ -5,16 +5,32 @@ import { NextResponse } from "next/server";
 const CORE_REST_URL = process.env.CORE_REST_URL || "http://traffic-router";
 const CORE_API_KEY = process.env.CORE_API_KEY || "silvia";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const res = await fetch(`${CORE_REST_URL}/api/v1/news/latest`, {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    const limit = searchParams.get("limit") || "40";
+    const q = searchParams.get("q") || searchParams.get("symbol") || "";
+
+    const targetUrl = id
+      ? `${CORE_REST_URL}/api/v1/news/${encodeURIComponent(id)}`
+      : `${CORE_REST_URL}/api/v1/news?limit=${encodeURIComponent(limit)}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+
+    const res = await fetch(targetUrl, {
       headers: {
         "x-api-key": CORE_API_KEY,
       },
-      next: { revalidate: 30 },
+      cache: "no-store",
     });
 
     if (!res.ok) {
+      const fallback = await fetch(`${CORE_REST_URL}/api/v1/news/latest?limit=${encodeURIComponent(limit)}`, {
+        headers: { "x-api-key": CORE_API_KEY },
+        cache: "no-store",
+      });
+      if (fallback.ok) {
+        return NextResponse.json(await fallback.json());
+      }
       return NextResponse.json({ items: [] }, { status: res.status });
     }
 

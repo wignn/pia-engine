@@ -146,6 +146,11 @@ export interface NewsArticle {
   publishedAt: number
   category?: string
   imageUrl?: string
+  mediaUrl?: string
+  media_url?: string
+  content?: string
+  sentiment?: string
+  impact_level?: string
 }
 
 export interface PriceAlert {

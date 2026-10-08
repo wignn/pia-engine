@@ -76,6 +76,8 @@ type ForexNewsRow = (
     Option<String>,
     Option<chrono::DateTime<chrono::Utc>>,
     Option<chrono::DateTime<chrono::Utc>>,
+    Option<String>,
+    Option<String>,
 );
 
 #[derive(sqlx::FromRow)]
@@ -409,7 +411,7 @@ pub async fn list_forex_news(
     let source = query.source.unwrap_or_default();
 
     let rows = sqlx::query_as::<_, ForexNewsRow>(
-        "SELECT a.id::text, a.original_title, a.summary, COALESCE(s.name, 'Unknown') AS source_name, a.original_url, an.sentiment, an.impact_level, a.published_at, a.processed_at FROM news.forex_news_articles a LEFT JOIN news.forex_news_sources s ON a.source_id = s.id LEFT JOIN news.forex_news_analyses an ON a.id = an.article_id WHERE a.is_processed = TRUE AND ($2 = '' OR COALESCE(s.name, '') ILIKE '%' || $2 || '%') AND ($3 = '' OR a.original_title ILIKE '%' || $3 || '%' OR COALESCE(a.summary, '') ILIKE '%' || $3 || '%') ORDER BY COALESCE(a.processed_at, a.published_at, a.created_at) DESC LIMIT $1",
+        "SELECT a.id::text, a.original_title, a.summary, COALESCE(s.name, 'Unknown') AS source_name, a.original_url, an.sentiment, an.impact_level, a.published_at, a.processed_at, a.media_url, a.original_content FROM news.forex_news_articles a LEFT JOIN news.forex_news_sources s ON a.source_id = s.id LEFT JOIN news.forex_news_analyses an ON a.id = an.article_id WHERE a.is_processed = TRUE AND ($2 = '' OR COALESCE(s.name, '') ILIKE '%' || $2 || '%') AND ($3 = '' OR a.original_title ILIKE '%' || $3 || '%' OR COALESCE(a.summary, '') ILIKE '%' || $3 || '%') ORDER BY COALESCE(a.processed_at, a.published_at, a.created_at) DESC LIMIT $1",
     )
     .bind(limit)
     .bind(source)
@@ -426,7 +428,7 @@ pub async fn latest_forex_news(
 ) -> Json<Value> {
     let limit = query.limit.unwrap_or(10).clamp(1, 50);
     let rows = sqlx::query_as::<_, ForexNewsRow>(
-        "SELECT a.id::text, a.original_title, a.summary, COALESCE(s.name, 'Unknown') AS source_name, a.original_url, an.sentiment, an.impact_level, a.published_at, a.processed_at FROM news.forex_news_articles a LEFT JOIN news.forex_news_sources s ON a.source_id = s.id LEFT JOIN news.forex_news_analyses an ON a.id = an.article_id WHERE a.is_processed = TRUE ORDER BY COALESCE(a.processed_at, a.published_at, a.created_at) DESC LIMIT $1",
+        "SELECT a.id::text, a.original_title, a.summary, COALESCE(s.name, 'Unknown') AS source_name, a.original_url, an.sentiment, an.impact_level, a.published_at, a.processed_at, a.media_url, a.original_content FROM news.forex_news_articles a LEFT JOIN news.forex_news_sources s ON a.source_id = s.id LEFT JOIN news.forex_news_analyses an ON a.id = an.article_id WHERE a.is_processed = TRUE ORDER BY COALESCE(a.processed_at, a.published_at, a.created_at) DESC LIMIT $1",
     )
     .bind(limit)
     .fetch_all(&state.db)
@@ -436,8 +438,8 @@ pub async fn latest_forex_news(
 }
 
 pub async fn get_forex_news(State(state): State<AppState>, Path(id): Path<String>) -> Json<Value> {
-    let row = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<chrono::DateTime<chrono::Utc>>, Option<chrono::DateTime<chrono::Utc>>)>(
-        "SELECT a.id::text, a.original_title, a.summary, COALESCE(s.name, 'Unknown') AS source_name, a.original_url, an.sentiment, an.impact_level, a.published_at, a.processed_at FROM news.forex_news_articles a LEFT JOIN news.forex_news_sources s ON a.source_id = s.id LEFT JOIN news.forex_news_analyses an ON a.id = an.article_id WHERE a.id::text = $1",
+    let row = sqlx::query_as::<_, ForexNewsRow>(
+        "SELECT a.id::text, a.original_title, a.summary, COALESCE(s.name, 'Unknown') AS source_name, a.original_url, an.sentiment, an.impact_level, a.published_at, a.processed_at, a.media_url, a.original_content FROM news.forex_news_articles a LEFT JOIN news.forex_news_sources s ON a.source_id = s.id LEFT JOIN news.forex_news_analyses an ON a.id = an.article_id WHERE a.id::text = $1",
     )
     .bind(id)
     .fetch_optional(&state.db)
@@ -531,6 +533,8 @@ fn forex_row_json(row: ForexNewsRow) -> Value {
         "impact_level": row.6,
         "published_at": row.7,
         "processed_at": row.8,
+        "media_url": row.9,
+        "content": row.10,
     })
 }
 
