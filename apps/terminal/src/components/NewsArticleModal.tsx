@@ -63,10 +63,14 @@ export const NewsArticleModal: React.FC<NewsArticleModalProps> = ({
   const [copied, setCopied] = React.useState(false);
   const isLight = theme === "light";
 
-  if (!isOpen || !article) return null;
-
-  const rawContent = decodeHtml(article.content || article.summary || "");
-  const cleanSummary = decodeHtml(article.summary || "");
+  const rawContent = useMemo(
+    () => decodeHtml(article?.content || article?.summary || ""),
+    [article?.content, article?.summary]
+  );
+  const cleanSummary = useMemo(
+    () => decodeHtml(article?.summary || ""),
+    [article?.summary]
+  );
 
   // Parse bullet points / key takeaways
   const { bullets, paragraphs } = useMemo(() => {
@@ -121,11 +125,12 @@ export const NewsArticleModal: React.FC<NewsArticleModalProps> = ({
   }, [rawContent, cleanSummary]);
 
   const tickers = useMemo(
-    () => extractTickers(`${article.title} ${rawContent}`),
-    [article.title, rawContent]
+    () => (article ? extractTickers(`${article.title} ${rawContent}`) : []),
+    [article, rawContent]
   );
 
   const formattedDate = useMemo(() => {
+    if (!article?.published_at) return "";
     try {
       const d = new Date(article.published_at);
       return d.toLocaleDateString("id-ID", {
@@ -138,7 +143,9 @@ export const NewsArticleModal: React.FC<NewsArticleModalProps> = ({
     } catch {
       return article.published_at;
     }
-  }, [article.published_at]);
+  }, [article?.published_at]);
+
+  if (!isOpen || !article) return null;
 
   const isHigh = article.impact_level === "high";
   const isPositive =
