@@ -110,6 +110,7 @@ services:
     command: "-js -m 8222 -sd /data"
     ports:
       - "127.0.0.1:4222:4222"
+      - "100.123.252.42:4222:4222"
       - "127.0.0.1:8222:8222"
     volumes:
       - nats_data:/data
