@@ -588,6 +588,25 @@ export default function TerminalPage() {
         setIsMobileDrawerOpen(false);
         return;
       }
+      // Undo / Redo Shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
+        e.preventDefault();
+        setUndoTrigger((c) => c + 1);
+        return;
+      }
+      if (
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "z")
+      ) {
+        e.preventDefault();
+        setRedoTrigger((c) => c + 1);
+        return;
+      }
+
+      if (e.key === "Escape" || (e.key.toLowerCase() === "v" && !e.ctrlKey && !e.metaKey && !e.altKey)) {
+        setActiveTool("cursor");
+        return;
+      }
       if (e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         setActiveTool("trendline");
         return;
@@ -598,6 +617,14 @@ export default function TerminalPage() {
       }
       if (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         setActiveTool("fibonacci");
+        return;
+      }
+      if (e.key.toLowerCase() === "r" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        setActiveTool("rectangle");
+        return;
+      }
+      if (e.key.toLowerCase() === "p" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        setActiveTool("parallel_channel");
         return;
       }
       if (e.key.toLowerCase() === "m" && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -789,6 +816,10 @@ export default function TerminalPage() {
           onToggleDrawingModeLock={() => setIsDrawingModeLocked((v) => !v)}
           isDrawingsHidden={isDrawingsHidden}
           onToggleHideDrawings={() => setIsDrawingsHidden((v) => !v)}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={() => setUndoTrigger((c) => c + 1)}
+          onRedo={() => setRedoTrigger((c) => c + 1)}
           theme={settings.theme}
         />
 

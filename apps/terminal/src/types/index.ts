@@ -21,7 +21,20 @@ export interface CandleData {
 export type Timeframe = "1m" | "5m" | "15m" | "1h" | "4h" | "1D" | "1W";
 export type ChartType = "candlestick" | "bar" | "line" | "area" | "heikin_ashi";
 
-export type DrawingTool = "cursor" | "trendline" | "horizontal" | "fibonacci" | "measure";
+export type DrawingTool =
+  | "cursor"
+  | "trendline"
+  | "ray"
+  | "horizontal"
+  | "horizontal_ray"
+  | "vertical"
+  | "parallel_channel"
+  | "fibonacci"
+  | "rectangle"
+  | "circle"
+  | "price_line"
+  | "text"
+  | "measure";
 
 export interface DrawingPoint {
   x: number;

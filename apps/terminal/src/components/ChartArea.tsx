@@ -698,14 +698,60 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
     if (!chart || activeTool === "cursor") return;
 
     let overlayName = "segment";
-    if (activeTool === "trendline") overlayName = "segment";
-    else if (activeTool === "horizontal") overlayName = "horizontalStraightLine";
-    else if (activeTool === "fibonacci") overlayName = "fibonacciLine";
-    else if (activeTool === "measure") overlayName = "measure";
+    let overlayStyles: any = undefined;
+
+    if (activeTool === "trendline") {
+      overlayName = "segment";
+      overlayStyles = { line: { color: "#2962ff", size: 1.5 } };
+    } else if (activeTool === "ray") {
+      overlayName = "rayLine";
+      overlayStyles = { line: { color: "#2962ff", size: 1.5 } };
+    } else if (activeTool === "horizontal") {
+      overlayName = "horizontalStraightLine";
+      overlayStyles = { line: { color: "#2962ff", size: 1.5 } };
+    } else if (activeTool === "horizontal_ray") {
+      overlayName = "horizontalRayLine";
+      overlayStyles = { line: { color: "#2962ff", size: 1.5 } };
+    } else if (activeTool === "vertical") {
+      overlayName = "verticalStraightLine";
+      overlayStyles = { line: { color: "#f5b942", size: 1.5, style: "dashed" } };
+    } else if (activeTool === "parallel_channel") {
+      overlayName = "priceChannelLine";
+      overlayStyles = {
+        polygon: { color: "rgba(41, 98, 255, 0.12)" },
+        line: { color: "#2962ff", size: 1.5 },
+      };
+    } else if (activeTool === "fibonacci") {
+      overlayName = "fibonacciLine";
+    } else if (activeTool === "rectangle") {
+      overlayName = "rect";
+      overlayStyles = {
+        polygon: { color: "rgba(8, 153, 129, 0.15)" },
+        rect: { borderColor: "#089981", borderSize: 1.5 },
+      };
+    } else if (activeTool === "circle") {
+      overlayName = "circle";
+      overlayStyles = {
+        circle: { color: "rgba(242, 54, 69, 0.12)", borderColor: "#f23645", borderSize: 1.5 },
+      };
+    } else if (activeTool === "price_line") {
+      overlayName = "priceLine";
+      overlayStyles = { line: { color: "#f5b942", size: 1.5 } };
+    } else if (activeTool === "text") {
+      overlayName = "text";
+      overlayStyles = { text: { color: "#ffffff", size: 12, weight: "bold" } };
+    } else if (activeTool === "measure") {
+      overlayName = "rect";
+      overlayStyles = {
+        polygon: { color: "rgba(41, 98, 255, 0.2)" },
+        rect: { borderColor: "#2962ff", borderSize: 1.5, borderStyle: "dashed" },
+      };
+    }
 
     const id = chart.createOverlay({
       name: overlayName,
       groupId: "user_drawings",
+      styles: overlayStyles,
       onDrawEnd: () => {
         if (!isDrawingModeLocked) {
           onDrawingFinished?.();
