@@ -8,7 +8,7 @@ export function useXauusdForecast(enabled: boolean, symbol: string, timeframe: s
   const [state, setState] = useState<XauusdForecastState>("unavailable");
 
   useEffect(() => {
-    if (!enabled || symbol !== "XAUUSD" || timeframe !== "15m") {
+    if (!enabled || symbol !== "XAUUSD") {
       setForecast(null);
       setState("unavailable");
       return;
@@ -37,7 +37,7 @@ export function useXauusdForecast(enabled: boolean, symbol: string, timeframe: s
       disposed = true;
       window.clearInterval(timer);
     };
-  }, [enabled, symbol, timeframe]);
+  }, [enabled, symbol]);
 
   return { forecast, state };
 }

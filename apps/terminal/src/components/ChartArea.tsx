@@ -1161,12 +1161,12 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
                     : "text-[#787b86]"
                 }
               >
-                {symbol !== "XAUUSD" || timeframe !== "15m"
-                  ? "15m XAUUSD only"
+                {symbol !== "XAUUSD"
+                  ? "XAUUSD only"
                   : forecastState.toUpperCase()}
               </span>
             </div>
-            {symbol === "XAUUSD" && timeframe === "15m" && forecast && forecast.probabilities ? (
+            {symbol === "XAUUSD" && forecast && forecast.probabilities ? (
               <>
                 <div className="grid grid-cols-3 gap-1 py-1 text-center">
                   <span>DOWN {(forecast.probabilities!.down * 100).toFixed(0)}%</span>
@@ -1210,8 +1210,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
               </>
             ) : (
               <div className="text-[#787b86]">
-                {symbol !== "XAUUSD" || timeframe !== "15m"
-                  ? "Switch this pane to XAUUSD 15m."
+                {symbol !== "XAUUSD"
+                  ? "Switch this pane to XAUUSD."
                   : forecastState === "loading"
                   ? "Loading the latest forecast…"
                   : forecastState === "error"
