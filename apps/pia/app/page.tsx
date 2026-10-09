@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const apiBase = "https://api-engine.wign.dev";
 
 const pathways = [
@@ -31,10 +33,10 @@ export default function Home() {
   return (
     <main className="pia-home" id="main-content">
       <header className="pia-home-nav">
-        <a className="pia-home-brand" href="/" aria-label="PIA home">
+        <Link className="pia-home-brand" href="/" aria-label="PIA home">
           <span className="pia-brand-mark">P</span>
           <span>PIA <small>MARKET DATA PLATFORM</small></span>
-        </a>
+        </Link>
         <nav aria-label="Main navigation">
           <a href="https://atlsd.wign.dev/">Public Web</a>
           <a href="/portal/docs">Developers</a>
@@ -94,11 +96,11 @@ export default function Home() {
           <p>Install the SDK, create an API key in your account, and use it from your server-side application. Keep the secret out of browser code.</p>
           <a href="/portal/docs">SDK guides and API reference <span aria-hidden="true">→</span></a>
         </div>
-        <pre className="pia-code"><code><span className="pia-code-muted">// Install: npm install @piaa/sdk</span>{"\n"}<span className="pia-code-keyword">import</span> {"{ PiaClient }"} <span className="pia-code-keyword">from</span> <span className="pia-code-string">&quot;@piaa/sdk&quot;</span>{"\n\n"}<span className="pia-code-keyword">const</span> client = <span className="pia-code-keyword">new</span> PiaClient({"{ "}<span className="pia-code-prop">apiKey</span>: process.env.PIA_API_KEY{" }"}){"\n"}<span className="pia-code-keyword">const</span> prices = <span className="pia-code-keyword">await</span> client.market.getPrices(){"\n"}console.log(prices)</code></pre>
+        <pre className="pia-code"><code><span className="pia-code-muted">{"// Install: npm install @piaa/sdk"}</span>{"\n"}<span className="pia-code-keyword">import</span> {"{ PiaClient }"} <span className="pia-code-keyword">from</span> <span className="pia-code-string">&quot;@piaa/sdk&quot;</span>{"\n\n"}<span className="pia-code-keyword">const</span> client = <span className="pia-code-keyword">new</span> PiaClient({"{ "}<span className="pia-code-prop">apiKey</span>: process.env.PIA_API_KEY{" }"}){"\n"}<span className="pia-code-keyword">const</span> prices = <span className="pia-code-keyword">await</span> client.market.getPrices(){"\n"}console.log(prices)</code></pre>
       </section>
 
       <footer className="pia-home-footer">
-        <a className="pia-home-brand" href="/"><span className="pia-brand-mark">P</span><span>PIA <small>MARKET DATA PLATFORM</small></span></a>
+        <Link className="pia-home-brand" href="/"><span className="pia-brand-mark">P</span><span>PIA <small>MARKET DATA PLATFORM</small></span></Link>
         <span>API · SDK · SAAS</span>
         <a href="/portal/docs">Documentation <span aria-hidden="true">↗</span></a>
       </footer>
