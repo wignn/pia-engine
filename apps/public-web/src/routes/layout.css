@@ -10,10 +10,10 @@
 	--color-text: var(--text-main);
 	--color-text-muted: var(--text-muted);
 	--color-text-dim: var(--text-dim);
-	--color-accent: #c86622;
-	--color-accent-glow: #e4863d;
-	--color-green: #2f8f64;
-	--color-red: #c85550;
+	--color-accent: #326b4d;
+	--color-accent-glow: #5d9773;
+	--color-green: #367855;
+	--color-red: #a95750;
 	--color-blue: #5f7fa8;
 	--color-amber: #c78927;
 	--font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
@@ -33,8 +33,8 @@
 	--text-main: #171716;
 	--text-muted: #625f59;
 	--text-dim: #8e8a81;
-	--hero-glow: rgba(210, 112, 32, 0.14);
-	--hero-glow-soft: rgba(210, 112, 32, 0.06);
+	--hero-glow: rgba(50, 107, 77, 0.14);
+	--hero-glow-soft: rgba(50, 107, 77, 0.06);
 	--shadow-card: 0 1px 2px rgba(23, 23, 22, 0.05);
 }
 
@@ -48,8 +48,8 @@
 	--text-main: #f3efe7;
 	--text-muted: #b9b2a7;
 	--text-dim: #847d72;
-	--hero-glow: rgba(255, 179, 0, 0.13);
-	--hero-glow-soft: rgba(255, 179, 0, 0.05);
+	--hero-glow: rgba(93, 151, 115, 0.17);
+	--hero-glow-soft: rgba(93, 151, 115, 0.06);
 	--shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
@@ -232,5 +232,10 @@ body {
 	font-family: var(--font-mono);
 }
 .hero-glow {
-	background: radial-gradient(circle at 72% 44%, var(--hero-glow) 0%, var(--hero-glow-soft) 22%, transparent 50%);
+	background: radial-gradient(
+		circle at 72% 44%,
+		var(--hero-glow) 0%,
+		var(--hero-glow-soft) 22%,
+		transparent 50%
+	);
 }

@@ -1,10 +1,11 @@
 <script lang="ts">
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { Search, Maximize2, Minimize2, BarChart2, Info } from 'lucide-svelte';
 	import { marketStore } from '$lib/stores/websocket.svelte';
 	import type { PriceData } from '$lib/types';
 	import { apiFetch } from '$lib/api';
 	import { getSymbolMeta, getAssetCategory } from '$lib/symbol-meta';
-	import { US_EQUITIES, IDX_EQUITIES, OTHER_MARKETS, getCompanyInfo } from '$lib/market-companies';
+	import { US_EQUITIES, IDX_EQUITIES, getCompanyInfo } from '$lib/market-companies';
 
 	interface Props {
 		onselect: (symbol: string) => void;
@@ -20,12 +21,11 @@
 	let containerWidth = $state(900);
 	let containerHeight = $state(620);
 
-	let initialPrices = $state<Map<string, number>>(new Map());
-	let sparklines = $state<Record<string, number[]>>({});
-	let sparklineLoading = $state<Record<string, boolean>>({});
+	let initialPrices = $state<Record<string, number>>({});
+	const referenceRequests = new SvelteSet<string>();
 
 	// Hover tooltip state
-	let hoveredNode = $state<any>(null);
+	let hoveredNode = $state<TreeMapNode | null>(null);
 	let tooltipX = $state(0);
 	let tooltipY = $state(0);
 
@@ -40,100 +40,33 @@
 		{ id: 'idx', name: 'Indonesia (IDX)' }
 	];
 
-	// Realistic baseline reference percentages for US stocks when no history is loaded yet
-	const DEFAULT_US_BENCHMARK_PCT: Record<string, number> = {
-		AAPL: -0.93,
-		MSFT: -1.45,
-		GOOGL: -1.06,
-		AMZN: -0.62,
-		NVDA: -1.82,
-		META: -1.15,
-		TSLA: -2.30,
-		BRKB: -0.76,
-		LLY: -1.75,
-		AVGO: -1.42,
-		JPM: -0.73,
-		WMT: -0.67,
-		V: -0.87,
-		UNH: -1.25,
-		XOM: -0.95,
-		MA: -1.04,
-		COST: -0.88,
-		HD: -1.35,
-		JNJ: -2.06,
-		ABBV: -0.85,
-		BAC: -1.12,
-		CRM: -4.18,
-		NFLX: -2.65,
-		KO: -0.45,
-		CVX: -0.82,
-		AMD: -2.75,
-		PEP: -0.52,
-		ADBE: -3.10,
-		ORCL: -1.20,
-		MCD: -0.68,
-		CSCO: -1.15,
-		NOW: -4.90,
-		QCOM: -1.85,
-		IBM: -0.92,
-		DIS: -1.40,
-		TXN: -1.65,
-		AMGN: -7.08,
-		INTC: -3.20,
-		PLTR: -0.90,
-		NKE: -1.75,
-		WFC: -0.95,
-		GS: -1.05,
-		MS: -1.15,
-		C: -1.30,
-		BLK: -0.85,
-		AXP: -0.78,
-		MRK: -1.10,
-		PFE: -1.45,
-		ASML: -2.40,
-		TSM: -1.85,
-		AMAT: -2.90,
-		LRCX: -3.15,
-		MU: -2.50,
-		PANW: -1.95,
-		OXY: -1.10,
-		SLB: -1.40,
-		COP: -0.85
-	};
+	interface HeatmapItem {
+		symbol: string;
+		price: number;
+		category: string;
+		pct: { value: number | null; string: string };
+		details: ReturnType<typeof getSymbolMeta>;
+		data: PriceData;
+	}
+
+	interface TreeMapNode {
+		id: string;
+		weight: number;
+		x: number;
+		y: number;
+		w: number;
+		h: number;
+		data: HeatmapItem;
+	}
 
 	function getSymbolDetails(itemOrSymbol: PriceData | string) {
 		return getSymbolMeta(typeof itemOrSymbol === 'string' ? itemOrSymbol : itemOrSymbol.symbol);
 	}
 
-	// Capture initial prices for performance tracking
-	$effect(() => {
-		for (const p of allPrices) {
-			if (!initialPrices.has(p.symbol) && p.price > 0) {
-				// If we have a benchmark pct, set baseline accordingly so pct matches immediately
-				const symUpper = p.symbol.toUpperCase();
-				if (DEFAULT_US_BENCHMARK_PCT[symUpper] !== undefined) {
-					const targetPct = DEFAULT_US_BENCHMARK_PCT[symUpper];
-					const base = p.price / (1 + targetPct / 100);
-					initialPrices.set(p.symbol, base);
-				} else {
-					initialPrices.set(p.symbol, p.price);
-				}
-			}
-		}
-	});
-
-	// Percent Change helper
-	function getPercentChange(p: PriceData): { value: number; string: string } {
-		const base = initialPrices.get(p.symbol);
-		if (!base || base === 0) {
-			const symUpper = p.symbol.toUpperCase();
-			if (DEFAULT_US_BENCHMARK_PCT[symUpper] !== undefined) {
-				const pct = DEFAULT_US_BENCHMARK_PCT[symUpper];
-				const sign = pct >= 0 ? '+' : '';
-				return { value: pct, string: `${sign}${pct.toFixed(2)}%` };
-			}
-			return { value: 0, string: '0.00%' };
-		}
+	// Percent change is measured against the previous completed daily candle.
+	function getPercentChange(p: PriceData): { value: number | null; string: string } {
+		const base = initialPrices[p.symbol.toUpperCase()];
+		if (!base || base <= 0 || p.price <= 0) return { value: null, string: '—' };
 		const pct = ((p.price - base) / base) * 100;
 		const sign = pct >= 0 ? '+' : '';
 		return {
@@ -143,8 +76,8 @@
 	}
 
 	// Flash Map for real-time WebSocket ticks
-	let flashMap = $state<Map<string, 'up' | 'down'>>(new Map());
-	const activeTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+	let flashMap = new SvelteMap<string, 'up' | 'down'>();
+	const activeTimeouts = new SvelteMap<string, ReturnType<typeof setTimeout>>();
 
 	$effect(() => {
 		const now = Date.now();
@@ -177,56 +110,30 @@
 		};
 	});
 
-	// Sparkline data loading
-	async function loadHistoricalData(sym: string, initialPrice: number): Promise<number[]> {
+	async function loadReferencePrice(sym: string): Promise<void> {
 		const upperSym = sym.toUpperCase();
-		const limit = 20;
 
 		try {
-			const res = await apiFetch(`/api/v1/market/history/${upperSym}`);
+			const res = await apiFetch(`/api/v1/market/history/${upperSym}?resolution=1D&limit=2`);
 			if (res.ok) {
 				const data = await res.json();
-				const rows = Array.isArray(data)
-					? data
-					: data && typeof data === 'object' && 'items' in data && Array.isArray((data as any).items)
-						? (data as any).items
-						: [];
-				if (Array.isArray(rows) && rows.length > 0) {
-					const sliceData = rows.slice(-limit);
-					if (sliceData.length > 0) {
-						// Oldest candle in the slice is our session base
-						const firstVal = Number(sliceData[0].close ?? sliceData[0].value ?? 0);
-						if (firstVal > 0) {
-							initialPrices.set(upperSym, firstVal);
-						}
-						return sliceData.map((item: any) => Number(item.close ?? item.value ?? 0));
-					}
-				}
+				const payload = data as { items?: Array<{ close?: number; value?: number }> };
+				const rows = Array.isArray(payload?.items) ? payload.items : [];
+				const reference = rows.length > 1 ? rows.at(-2) : rows[0];
+				const close = Number(reference?.close ?? reference?.value);
+				if (Number.isFinite(close) && close > 0) initialPrices[upperSym] = close;
 			}
-		} catch (e) {
-			// Fallback silently
+		} catch {
+			// Missing historical data stays neutral; never invent a return.
 		}
-
-		// Fallback generated points for visual sparkline
-		const fallbackData = [];
-		let price = initialPrice > 0 ? initialPrice : 100.0;
-		for (let i = 0; i < limit; i++) {
-			const change = (Math.random() - 0.5) * (price * 0.001);
-			price = price + change;
-			fallbackData.push(price);
-		}
-		return fallbackData;
 	}
 
 	$effect(() => {
-		for (const p of allPrices) {
-			const sym = p.symbol;
-			if (!sparklines[sym] && !sparklineLoading[sym]) {
-				sparklineLoading[sym] = true;
-				loadHistoricalData(sym, p.price).then((hist) => {
-					sparklines[sym] = hist;
-					sparklineLoading[sym] = false;
-				});
+		for (const p of processedPrices) {
+			const sym = p.symbol.toUpperCase();
+			if (!initialPrices[sym] && !referenceRequests.has(sym)) {
+				referenceRequests.add(sym);
+				void loadReferencePrice(sym);
 			}
 		}
 	});
@@ -234,76 +141,43 @@
 	// Filter and Sort Processing
 	let processedPrices = $derived.by(() => {
 		// Pool of all available prices in store
-		const priceBySym = new Map<string, PriceData>();
+		const priceBySym: Record<string, PriceData> = Object.create(null);
 		for (const p of allPrices) {
-			priceBySym.set(p.symbol.toUpperCase(), p);
+			priceBySym[p.symbol.toUpperCase()] = p;
 		}
 
-		let list: {
-			symbol: string;
-			price: number;
-			category: string;
-			pct: { value: number; string: string };
-			details: ReturnType<typeof getSymbolMeta>;
-			data: PriceData;
-		}[] = [];
+		let list: HeatmapItem[] = [];
 
 		if (activeCategory === 'sp500') {
 			// Curated list of S&P 500 Equities (matches user's screenshot)
-			for (const [sym, info] of Object.entries(US_EQUITIES)) {
-				const existing = priceBySym.get(sym);
-				const price = existing ? existing.price : 100.0;
+			for (const sym of Object.keys(US_EQUITIES)) {
+				const existing = priceBySym[sym];
+				if (!existing || existing.price <= 0) continue;
 				const details = getSymbolMeta(sym);
-				const pData: PriceData = existing || {
-					symbol: sym,
-					price,
-					bid: null,
-					ask: null,
-					volume: null,
-					source: 'synthetic',
-					asset_type: 'stock',
-					received_at: null,
-					direction: 'none',
-					prev_price: price,
-					updated_at: Date.now()
-				};
-				const pct = getPercentChange(pData);
+				const pct = getPercentChange(existing);
 				list.push({
 					symbol: sym,
-					price,
+					price: existing.price,
 					category: 'sp500',
 					pct,
 					details,
-					data: pData
+					data: existing
 				});
 			}
 		} else if (activeCategory === 'idx') {
 			// Indonesian Equities
-			for (const [sym, info] of Object.entries(IDX_EQUITIES)) {
-				const existing = priceBySym.get(sym);
-				const price = existing ? existing.price : 1000.0;
+			for (const sym of Object.keys(IDX_EQUITIES)) {
+				const existing = priceBySym[sym];
+				if (!existing || existing.price <= 0) continue;
 				const details = getSymbolMeta(sym);
-				const pData: PriceData = existing || {
-					symbol: sym,
-					price,
-					bid: null,
-					ask: null,
-					volume: null,
-					source: 'synthetic',
-					asset_type: 'stock',
-					received_at: null,
-					direction: 'none',
-					prev_price: price,
-					updated_at: Date.now()
-				};
-				const pct = getPercentChange(pData);
+				const pct = getPercentChange(existing);
 				list.push({
 					symbol: sym,
-					price,
+					price: existing.price,
 					category: 'idx',
 					pct,
 					details,
-					data: pData
+					data: existing
 				});
 			}
 		} else {
@@ -350,16 +224,6 @@
 			return comp.marketCapBillion;
 		}
 		return 50;
-	}
-
-	interface TreeMapNode {
-		id: string;
-		weight: number;
-		x: number;
-		y: number;
-		w: number;
-		h: number;
-		data: any;
 	}
 
 	// Squarified Treemap Algorithm implementation
@@ -462,7 +326,7 @@
 	}
 
 	function computeTreeMap(
-		nodes: { id: string; weight: number; data?: any }[],
+		nodes: { id: string; weight: number; data: HeatmapItem }[],
 		x: number,
 		y: number,
 		w: number,
@@ -519,37 +383,16 @@
 	});
 
 	// Authentic Finviz / TradingView financial color scale
-	function getHeatmapBgColor(pct: number): string {
-		if (isNaN(pct) || pct === 0) {
-			return '#1e222d'; // Neutral dark slate
-		}
-
-		if (pct < 0) {
-			const val = Math.min(Math.abs(pct), 7.0);
-			if (val >= 6.0) return '#ef4444'; // Bright vivid red (< -6%)
-			if (val >= 4.5) return '#dc2626';
-			if (val >= 3.5) return '#c5221f';
-			if (val >= 2.5) return '#b91c1c';
-			if (val >= 1.8) return '#991b1b';
-			if (val >= 1.2) return '#881337';
-			if (val >= 0.7) return '#701a20';
-			if (val >= 0.3) return '#581c1c';
-			return '#451212'; // Very mild loss
-		} else {
-			const val = Math.min(pct, 7.0);
-			if (val >= 6.0) return '#22c55e'; // Bright neon green (> +6%)
-			if (val >= 4.5) return '#16a34a';
-			if (val >= 3.5) return '#15803d';
-			if (val >= 2.5) return '#166534';
-			if (val >= 1.8) return '#14532d';
-			if (val >= 1.2) return '#064e3b';
-			if (val >= 0.7) return '#064433';
-			if (val >= 0.3) return '#043528';
-			return '#022c22'; // Very mild gain
-		}
+	function getHeatmapBgColor(pct: number | null): string {
+		if (pct === null || !Number.isFinite(pct) || pct === 0) return '#526057';
+		const strength = Math.min(Math.abs(pct), 5) / 5;
+		const alpha = (0.2 + strength * 0.8).toFixed(2);
+		return pct > 0
+			? `color-mix(in srgb, #317451 ${Number(alpha) * 100}%, #173b2b)`
+			: `color-mix(in srgb, #b45b50 ${Number(alpha) * 100}%, #4a2928)`;
 	}
 
-	function handleCellMouseEnter(e: MouseEvent, node: any) {
+	function handleCellMouseEnter(e: MouseEvent, node: TreeMapNode) {
 		hoveredNode = node;
 		updateTooltipPosition(e);
 	}
@@ -571,22 +414,22 @@
 </script>
 
 <div
-	class="flex flex-col overflow-hidden rounded-xl border border-[#27272a] bg-[#0c0d12] shadow-2xl transition-all duration-300
+	class="flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-xl transition-all duration-300
 	{isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'h-[640px] w-full'}"
 >
 	<!-- Top Control Bar -->
 	<div
-		class="z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#27272a] bg-[#12131a] px-4 py-2.5"
+		class="z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-2.5"
 	>
 		<!-- Category Tabs -->
 		<div class="scrollbar-none flex items-center gap-1.5 overflow-x-auto pb-0.5">
-			{#each categories as cat}
+			{#each categories as cat (cat.id)}
 				<button
 					onclick={() => (activeCategory = cat.id)}
 					class="cursor-pointer rounded-md px-3 py-1.5 text-xs font-bold whitespace-nowrap transition-all
 					{activeCategory === cat.id
-						? 'bg-[#2962ff] text-white shadow-sm'
-						: 'bg-[#1a1c26] text-[#94a3b8] hover:bg-[#262837] hover:text-white'}"
+						? 'bg-accent text-white shadow-sm'
+						: 'bg-surface-2 text-text-muted hover:bg-accent/10 hover:text-text'}"
 				>
 					{cat.name}
 				</button>
@@ -598,13 +441,13 @@
 			<!-- Search -->
 			<div class="group relative w-44 sm:w-52">
 				<Search
-					class="absolute top-2 left-2.5 h-3.5 w-3.5 text-[#64748b] transition-colors group-focus-within:text-[#2962ff]"
+					class="absolute top-2 left-2.5 h-3.5 w-3.5 text-text-dim transition-colors group-focus-within:text-accent"
 				/>
 				<input
 					type="text"
 					bind:value={searchQuery}
 					placeholder="Search ticker, sector..."
-					class="w-full rounded-md border border-[#27272a] bg-[#181924] py-1.5 pr-3 pl-8 text-xs font-semibold text-white placeholder-[#64748b] transition-all focus:border-[#2962ff] focus:outline-none"
+					class="w-full rounded-md border border-border bg-bg py-1.5 pr-3 pl-8 text-xs font-semibold text-text transition-all placeholder:text-text-dim focus:border-accent focus:outline-none"
 				/>
 			</div>
 
@@ -635,12 +478,14 @@
 
 	<!-- Treemap Canvas Area -->
 	<div
-		class="relative flex-1 overflow-hidden bg-black select-none"
+		class="relative flex-1 overflow-hidden bg-surface-2 select-none"
 		bind:clientWidth={containerWidth}
 		bind:clientHeight={containerHeight}
 	>
 		{#if processedPrices.length === 0}
-			<div class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-[#64748b]">
+			<div
+				class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-[#64748b]"
+			>
 				<p class="text-sm font-semibold">No assets found</p>
 				<p class="mt-1 text-xs">Try selecting a different market or clearing your search.</p>
 			</div>
@@ -650,7 +495,6 @@
 				{@const bgColor = getHeatmapBgColor(pctVal)}
 				{@const flash = flashMap.get(node.id)}
 				{@const displaySym = node.data.details.displaySymbol || node.id}
-				{@const logoSvg = node.data.details.svgLogo}
 				{@const localLogo = node.data.details.logo?.url}
 
 				<button
@@ -659,7 +503,7 @@
 					onmouseenter={(e) => handleCellMouseEnter(e, node)}
 					onmousemove={handleCellMouseMove}
 					onmouseleave={handleCellMouseLeave}
-					class="heatmap-tile absolute flex cursor-pointer flex-col items-center justify-center overflow-hidden border border-black text-center transition-all duration-200 hover:z-30 hover:brightness-125
+					class="heatmap-tile absolute flex cursor-pointer flex-col items-center justify-center overflow-hidden border border-black/30 text-center transition-all duration-200 hover:z-30 hover:brightness-125
 					{flash === 'up' ? 'cell-flash-green' : flash === 'down' ? 'cell-flash-red' : ''}"
 					style="left: {node.x}px; top: {node.y}px; width: {node.w}px; height: {node.h}px; background-color: {bgColor};"
 				>
@@ -668,11 +512,11 @@
 						<div class="flex h-full w-full flex-col items-center justify-center p-2">
 							<!-- Logo badge -->
 							{#if node.h >= 95}
-								<div class="mb-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/40 p-1.5 shadow-md">
-									{#if logoSvg}
-										{@html logoSvg}
-									{:else if localLogo}
-										<img src={localLogo} alt={displaySym} class="h-full w-full rounded-full object-contain" />
+								<div
+									class="mb-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/40 p-1.5 shadow-md"
+								>
+									{#if localLogo}
+										<img src={localLogo} alt="" class="h-full w-full rounded-full object-contain" />
 									{:else}
 										<span class="text-xs font-black text-white/80">{displaySym.slice(0, 3)}</span>
 									{/if}
@@ -680,7 +524,9 @@
 							{/if}
 
 							<!-- Ticker -->
-							<div class="text-base leading-tight font-black tracking-tight text-white drop-shadow-sm sm:text-lg">
+							<div
+								class="text-base leading-tight font-black tracking-tight text-white drop-shadow-sm sm:text-lg"
+							>
 								{displaySym}
 							</div>
 
@@ -693,17 +539,20 @@
 						<!-- MEDIUM TILE (e.g. LLY, JPM, WMT, V, MA, JNJ, ABBV, PLTR, AMGN, NOW, CRM, NFLX) -->
 						<div class="flex h-full w-full flex-col items-center justify-center p-1">
 							{#if node.h >= 68 && node.w >= 80}
-								<div class="mb-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/35 p-1 shadow-sm">
-									{#if logoSvg}
-										{@html logoSvg}
-									{:else if localLogo}
-										<img src={localLogo} alt={displaySym} class="h-full w-full rounded-full object-contain" />
+								<div
+									class="mb-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/35 p-1 shadow-sm"
+								>
+									{#if localLogo}
+										<img src={localLogo} alt="" class="h-full w-full rounded-full object-contain" />
 									{:else}
-										<span class="text-[9px] font-black text-white/80">{displaySym.slice(0, 2)}</span>
+										<span class="text-[9px] font-black text-white/80">{displaySym.slice(0, 2)}</span
+										>
 									{/if}
 								</div>
 							{/if}
-							<div class="text-xs leading-tight font-black tracking-tight text-white drop-shadow-sm sm:text-sm">
+							<div
+								class="text-xs leading-tight font-black tracking-tight text-white drop-shadow-sm sm:text-sm"
+							>
 								{displaySym}
 							</div>
 							<div class="text-[11px] leading-tight font-bold text-white/90">
@@ -726,7 +575,9 @@
 						<!-- MICRO TILE -->
 						<div class="flex h-full w-full items-center justify-center">
 							{#if node.w >= 20 && node.h >= 14}
-								<span class="text-[8px] leading-none font-bold text-white/80">{displaySym.slice(0, 3)}</span>
+								<span class="text-[8px] leading-none font-bold text-white/80"
+									>{displaySym.slice(0, 3)}</span
+								>
 							{/if}
 						</div>
 					{/if}
@@ -736,7 +587,9 @@
 	</div>
 
 	<!-- Bottom Legend Scale -->
-	<div class="z-20 flex shrink-0 items-center justify-between border-t border-[#27272a] bg-[#12131a] px-4 py-2 text-[11px] text-[#94a3b8]">
+	<div
+		class="z-20 flex shrink-0 items-center justify-between border-t border-border bg-surface px-4 py-2 text-[11px] text-text-muted"
+	>
 		<div class="flex items-center gap-1.5 font-medium">
 			<Info class="h-3.5 w-3.5 text-[#2962ff]" />
 			<span>Showing {processedPrices.length} assets • Click tile to open detailed chart</span>
@@ -744,17 +597,17 @@
 
 		<!-- Gradient Legend -->
 		<div class="flex items-center gap-1.5 font-mono text-[10px]">
-			<span>-4%</span>
-			<div class="flex h-2.5 items-center gap-0.5 overflow-hidden rounded-sm border border-black/60">
-				<div class="h-full w-3.5 bg-[#ef4444]"></div>
-				<div class="h-full w-3.5 bg-[#b91c1c]"></div>
-				<div class="h-full w-3.5 bg-[#701a20]"></div>
-				<div class="h-full w-3.5 bg-[#1e222d]"></div>
-				<div class="h-full w-3.5 bg-[#064e3b]"></div>
-				<div class="h-full w-3.5 bg-[#16a34a]"></div>
-				<div class="h-full w-3.5 bg-[#22c55e]"></div>
+			<span>-5%</span>
+			<div
+				class="flex h-2.5 items-center gap-0.5 overflow-hidden rounded-sm border border-black/60"
+			>
+				<div class="h-full w-3.5 bg-[#4a2928]"></div>
+				<div class="h-full w-3.5 bg-[#b45b50]"></div>
+				<div class="h-full w-3.5 bg-[#526057]"></div>
+				<div class="h-full w-3.5 bg-[#173b2b]"></div>
+				<div class="h-full w-3.5 bg-[#317451]"></div>
 			</div>
-			<span>+4%</span>
+			<span>+5%</span>
 		</div>
 	</div>
 </div>
@@ -782,7 +635,12 @@
 		<div class="mt-2 space-y-1 text-xs">
 			<div class="flex justify-between">
 				<span class="text-[#71717a]">Price:</span>
-				<span class="font-mono font-bold">${Number(d.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+				<span class="font-mono font-bold"
+					>${Number(d.price).toLocaleString(undefined, {
+						minimumFractionDigits: 2,
+						maximumFractionDigits: 2
+					})}</span
+				>
 			</div>
 			{#if d.details.sector}
 				<div class="flex justify-between">
@@ -811,9 +669,14 @@
 	}
 
 	.heatmap-tile {
-		border-radius: 0px;
-		outline: none !important;
+		border-radius: 3px;
+		outline: none;
 		user-select: none;
+	}
+	.heatmap-tile:focus-visible {
+		z-index: 40;
+		outline: 2px solid #f4f4ef;
+		outline-offset: -3px;
 	}
 
 	@keyframes local-pulse {

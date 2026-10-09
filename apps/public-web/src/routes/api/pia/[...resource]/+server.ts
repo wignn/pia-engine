@@ -1,4 +1,5 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
 import { createPiaClient } from '$lib/server/pia-sdk.server';
 
 export const GET: RequestHandler = async ({ params, url }) => {
@@ -25,7 +26,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 				break;
 			case 'options/summary':
 				if (!symbol) return json({ error: 'symbol is required' }, { status: 400 });
-				data = await client.options.getSummary(symbol);
+				data = await client.options.getSummary();
 				break;
 			case 'options/chain':
 				if (!symbol) return json({ error: 'symbol is required' }, { status: 400 });
@@ -36,14 +37,21 @@ export const GET: RequestHandler = async ({ params, url }) => {
 				data = await client.options.getGex(symbol);
 				break;
 			default:
-				return json({ error: 'This feed is not available through the PIA SDK proxy' }, { status: 404 });
+				return json(
+					{ error: 'This feed is not available through the PIA SDK proxy' },
+					{ status: 404 }
+				);
 		}
 
 		return json(data);
 	} catch (error) {
 		const statusCode =
-			error && typeof error === 'object' && 'statusCode' in error &&
-			typeof error.statusCode === 'number' && error.statusCode >= 400 && error.statusCode < 600
+			error &&
+			typeof error === 'object' &&
+			'statusCode' in error &&
+			typeof error.statusCode === 'number' &&
+			error.statusCode >= 400 &&
+			error.statusCode < 600
 				? error.statusCode
 				: 502;
 		const message = error instanceof Error ? error.message : 'The PIA API request failed';
