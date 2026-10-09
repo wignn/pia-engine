@@ -6,8 +6,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "PIA — Realtime Financial Intelligence & ATLSD Engine",
-  description: "High-performance real-time market infrastructure, options analytics, macro intelligence, and integrated Discord bot platform.",
+  title: "PIA — Market Data API, SDK & SaaS",
+  description: "Explore market data on Public Web, integrate with PIA REST and realtime SDKs, and manage developer access from your SaaS account.",
   icons: {
     icon: [
       { url: "/logo.png", type: "image/png" },
