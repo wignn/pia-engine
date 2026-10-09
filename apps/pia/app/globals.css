@@ -1192,57 +1192,6 @@ h2 {
   .admin-topbar { padding-inline: 26px; }
   .admin-stat-grid { grid-template-columns: repeat(2, 1fr); }
 }
-/* Public PIA product + developer landing */
-.pia-home { min-height: 100vh; padding: 0 clamp(22px, 6vw, 92px); color: #17211e; background: #f4f4ef; }
-.pia-home-nav { min-height: 82px; display: flex; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 1px solid #d9ddd5; font-size: 12px; }
-.pia-home-brand { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 750; letter-spacing: -.04em; }
-.pia-home-brand small { display: block; margin-top: 4px; color: #748078; font: 8px var(--font-geist-mono), monospace; letter-spacing: .12em; }
-.pia-brand-mark { display: grid; width: 34px; height: 34px; place-items: center; color: #f4f4ef; background: #163d32; font: 20px var(--font-display); }
-.pia-home-nav nav { display: flex; align-items: center; gap: clamp(16px, 3vw, 42px); color: #5c6860; }
-.pia-home-nav nav a:hover,.pia-home-footer a:hover { color: #176b4e; }
-.pia-nav-cta,.pia-button-primary { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 18px; padding: 0 16px; color: #f4f4ef; background: #163d32; font-size: 12px; font-weight: 650; }
-.pia-home-intro { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(320px,.9fr); gap: clamp(48px,9vw,140px); align-items: center; max-width: 1440px; min-height: 610px; margin: auto; padding: 84px 0 92px; }
-.pia-home-eyebrow { display: flex; align-items: center; gap: 9px; color: #547166; font: 9px var(--font-geist-mono),monospace; letter-spacing: .13em; }
-.pia-home-eyebrow span,.pia-diagram-dot { width: 7px; height: 7px; border-radius: 50%; background: #42a67a; box-shadow: 0 0 0 4px rgba(66,166,122,.13); }
-.pia-home-copy h1 { margin: 28px 0 20px; color: #17211e; font: 400 clamp(46px,6.4vw,84px)/.98 var(--font-display); letter-spacing: -.045em; }
-.pia-home-copy h1 em { color: #327254; font-weight: 400; }
-.pia-home-lede { max-width: 540px; color: #647068; font-size: 15px; line-height: 1.75; }
-.pia-home-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
-.pia-button-secondary { display: inline-flex; min-height: 42px; align-items: center; gap: 16px; padding: 0 16px; border: 1px solid #cbd2ca; color: #26352d; font-size: 12px; }
-.pia-home-base { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 44px; color: #89928a; font: 9px var(--font-geist-mono),monospace; letter-spacing: .1em; }
-.pia-home-base code { color: #4c5c52; font-size: 10px; letter-spacing: 0; }
-.pia-home-diagram { padding: 24px; border: 1px solid #d5dcd3; background: #fafbf7; }
-.pia-diagram-top,.pia-diagram-foot { display: flex; justify-content: space-between; color: #859087; font: 9px var(--font-geist-mono),monospace; letter-spacing: .12em; }
-.pia-diagram-source { display: flex; align-items: center; gap: 12px; margin: 44px 0 0; padding: 18px; border: 1px solid #bfd2c5; color: #234b38; background: #eef5ee; font: 10px var(--font-geist-mono),monospace; letter-spacing: .08em; }
-.pia-diagram-connector { width: 1px; height: 30px; margin-left: 27px; background: #b9c7bc; }
-.pia-diagram-branches { display: grid; grid-template-columns: 1fr; border-top: 1px solid #dce1da; }
-.pia-diagram-branches a { display: grid; grid-template-columns: 38px 1fr auto; gap: 8px; align-items: center; min-height: 65px; border-bottom: 1px solid #dce1da; }
-.pia-diagram-branches a b { color: #70a186; font: 10px var(--font-geist-mono),monospace; }
-.pia-diagram-branches strong { color: #29392f; font: 10px var(--font-geist-mono),monospace; letter-spacing: .05em; }
-.pia-diagram-branches small { color: #7b877e; font-size: 10px; }
-.pia-diagram-branches a:hover strong { color: #24704d; }
-.pia-diagram-foot { justify-content: flex-start; margin: 20px 0 0; }
-.pia-home-paths { max-width: 1440px; margin: auto; padding: 70px 0 86px; border-top: 1px solid #d9ddd5; }
-.pia-section-heading { display: flex; justify-content: space-between; align-items: end; gap: 30px; margin-bottom: 28px; }
-.pia-section-heading h2,.pia-quickstart-copy h2 { margin: 12px 0 0; color: #1c2a22; font: 400 clamp(30px,4vw,46px)/1.08 var(--font-display); letter-spacing: -.03em; }
-.pia-section-heading > p { max-width: 390px; margin: 0; color: #657168; font-size: 12px; line-height: 1.7; }
-.pia-path-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border: 1px solid #d7ddd4; }
-.pia-path { min-height: 230px; padding: 22px; border-right: 1px solid #d7ddd4; }
-.pia-path:last-child { border: 0; }
-.pia-path-meta { display: flex; justify-content: space-between; color: #819087; font: 9px var(--font-geist-mono),monospace; letter-spacing: .08em; }
-.pia-path h3 { margin: 40px 0 10px; color: #1d2a23; font: 400 25px var(--font-display); }
-.pia-path p,.pia-quickstart-copy > p:last-of-type { min-height: 44px; color: #6b776f; font-size: 12px; line-height: 1.6; }
-.pia-path > a,.pia-quickstart-copy > a { display: inline-flex; gap: 10px; margin-top: 22px; color: #27684b; font-size: 11px; font-weight: 650; }
-.pia-home-quickstart { display: grid; grid-template-columns: .8fr 1.2fr; gap: 55px; align-items: center; max-width: 1440px; margin: 0 auto; padding: 54px 0 76px; border-top: 1px solid #d9ddd5; }
-.pia-quickstart-copy h2 { font-size: clamp(30px,4vw,42px); }
-.pia-quickstart-copy > p:last-of-type { min-height: auto; max-width: 420px; margin-top: 18px; }
-.pia-code { overflow-x: auto; margin: 0; padding: 24px; border: 1px solid #344b3e; color: #e5eee5; background: #172a22; font: 12px/1.9 var(--font-geist-mono),monospace; }
-.pia-code-muted { color: #8ea398; }.pia-code-keyword { color: #8ccda9; }.pia-code-string { color: #e8c482; }.pia-code-prop { color: #a7cde8; }
-.pia-home-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 78px; border-top: 1px solid #d9ddd5; color: #7b877f; font: 9px var(--font-geist-mono),monospace; letter-spacing: .1em; }
-.pia-home-footer > a:last-child { color: #42634f; }
-@media (max-width: 850px) { .pia-home-intro { grid-template-columns: 1fr; min-height: auto; padding: 74px 0; }.pia-home-diagram { max-width: 600px; }.pia-home-quickstart { grid-template-columns: 1fr; gap: 28px; }.pia-section-heading { display: block; }.pia-section-heading > p { margin-top: 14px; } }
-@media (max-width: 620px) { .pia-home-nav { min-height: 70px; }.pia-home-nav nav { display: none; }.pia-home-nav .pia-nav-cta { min-height: 38px; padding: 0 11px; }.pia-home-intro { padding: 62px 0; }.pia-home-copy h1 { font-size: clamp(42px,12vw,64px); }.pia-home-base { margin-top: 28px; }.pia-home-diagram { padding: 17px; }.pia-diagram-branches a { grid-template-columns: 30px 1fr; padding: 10px 0; }.pia-diagram-branches small { grid-column: 2; }.pia-path-grid { grid-template-columns: 1fr; }.pia-path { min-height: 0; border-right: 0; border-bottom: 1px solid #d7ddd4; }.pia-path h3 { margin-top: 25px; }.pia-path p { min-height: 0; }.pia-home-footer { flex-wrap: wrap; padding: 18px 0; }.pia-home-footer > span { display: none; } }
-
 @media (max-width: 700px) {
   .portal-section { padding-top: 100px; }
   .portal-section .portal-content { padding-inline: 24px; }
