@@ -495,7 +495,9 @@
 				{@const bgColor = getHeatmapBgColor(pctVal)}
 				{@const flash = flashMap.get(node.id)}
 				{@const displaySym = node.data.details.displaySymbol || node.id}
-				{@const localLogo = node.data.details.logo?.url}
+				{@const logoSrc = node.data.details.svgLogo
+					? `data:image/svg+xml,${encodeURIComponent(node.data.details.svgLogo)}`
+					: node.data.details.logo?.url}
 
 				<button
 					type="button"
@@ -515,8 +517,8 @@
 								<div
 									class="mb-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/40 p-1.5 shadow-md"
 								>
-									{#if localLogo}
-										<img src={localLogo} alt="" class="h-full w-full rounded-full object-contain" />
+									{#if logoSrc}
+										<img src={logoSrc} alt="" class="h-full w-full rounded-full object-contain" />
 									{:else}
 										<span class="text-xs font-black text-white/80">{displaySym.slice(0, 3)}</span>
 									{/if}
@@ -542,8 +544,8 @@
 								<div
 									class="mb-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/35 p-1 shadow-sm"
 								>
-									{#if localLogo}
-										<img src={localLogo} alt="" class="h-full w-full rounded-full object-contain" />
+									{#if logoSrc}
+										<img src={logoSrc} alt="" class="h-full w-full rounded-full object-contain" />
 									{:else}
 										<span class="text-[9px] font-black text-white/80">{displaySym.slice(0, 2)}</span
 										>
