@@ -6,9 +6,11 @@
 		title: string;
 		items: NewsItem[];
 		loading?: boolean;
+		error?: string | null;
+		onretry?: () => void;
 	}
 
-	let { title, items, loading = false }: Props = $props();
+	let { title, items, loading = false, error = null, onretry }: Props = $props();
 
 	function getTitle(item: NewsItem): string {
 		return item.translated_title || item.original_title || item.title || item.summary || '';
@@ -125,7 +127,12 @@
 		<div
 			class="rounded-lg border border-dashed border-border bg-surface-2/30 py-12 text-center text-sm font-medium text-text-muted"
 		>
-			No news available
+			{#if error}
+				<p>News unavailable: {error}</p>
+				{#if onretry}<button class="mt-3 text-accent underline" onclick={onretry}>Retry</button>{/if}
+			{:else}
+				No news available
+			{/if}
 		</div>
 	{:else}
 		<div class="flex flex-col gap-3">

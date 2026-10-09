@@ -1,8 +1,9 @@
 import { ArchitectureDiagram } from "@/src/components/ArchitectureDiagramPage";
 import { ArchitectureSection } from "@/src/components/ArchitectureSection";
-import { LenisProvider } from "@/src/components/LenisProvider";
 import { FeatureSection } from "@/src/components/FeatureSection";
+import { Footer } from "@/src/components/Footer";
 import { Hero } from "@/src/components/Hero";
+import { LenisProvider } from "@/src/components/LenisProvider";
 import { Navbar } from "@/src/components/Navbar";
 import { Portal } from "@/src/components/Motion";
 import { ScrollCanvas } from "@/src/components/ScrollCanvas";
@@ -12,7 +13,7 @@ import { TechStackSection } from "@/src/components/TechStackSection";
 
 export default function Home() {
   return (
-    <main className="relative page-sections">
+    <main id="main-content" className="relative page-sections">
       <LenisProvider />
       <ScrollChoreography />
       <ScrollCanvas />
@@ -21,9 +22,9 @@ export default function Home() {
       <SectionTransition><FeatureSection /></SectionTransition>
       <SectionTransition><ArchitectureSection /></SectionTransition>
       <SectionTransition><TechStackSection /></SectionTransition>
-        <ArchitectureDiagram embedded />
+      <ArchitectureDiagram embedded />
       <SectionTransition><Portal /></SectionTransition>
-    
+      <Footer />
     </main>
   );
 }

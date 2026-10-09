@@ -41,12 +41,12 @@ const components = [
 
 export function ArchitectureSection() {
   return (
-    <section className="arch-section" id="architecture">
+    <section className="arch-section" id="architecture" aria-labelledby="arch-heading">
 
       <div className="arch-container">
         <div className="arch-header">
           <p className="eyebrow"><span className="eyebrow-line" />SYSTEM TOPOLOGY</p>
-          <h2>HIGH-PERFORMANCE<br /><em>MICROSERVICES ARCHITECTURE</em></h2>
+          <h2 id="arch-heading">HIGH-PERFORMANCE<br /><em>MICROSERVICES ARCHITECTURE</em></h2>
           <p className="arch-sub">
             Architected with event-driven principles and clear layer separation to guarantee minimal latency, multi-tenant scalability, and data durability.
           </p>

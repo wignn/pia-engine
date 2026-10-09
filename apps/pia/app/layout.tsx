@@ -23,7 +23,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <link rel="icon" href="/logo.png" type="image/png" />
       </head>
-      <body>{children}</body>
+      <body>
+        <a href="#main-content" className="skip-link">Skip to main content</a>
+        {children}
+      </body>
     </html>
   );
 }

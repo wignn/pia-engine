@@ -1,5 +1,4 @@
 import { CORE_WS_URL } from '$lib/config';
-import { apiFetch } from '$lib/api';
 import type { PriceData, NewsItem } from '$lib/types';
 
 const priceMap = $state<Record<string, PriceData>>({});
@@ -196,7 +195,7 @@ function scheduleReconnect() {
 
 async function fetchInitialPrices() {
 	try {
-		const res = await apiFetch('/api/v1/market/prices');
+		const res = await fetch('/api/pia/market/prices');
 		if (!res.ok) return;
 
 		const data = await res.json();

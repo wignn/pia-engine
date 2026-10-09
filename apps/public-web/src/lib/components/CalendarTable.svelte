@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { calendarEvents, calendarLoading } from '$lib/stores/calendar';
+	import { calendarError, calendarEvents, calendarLoading, startCalendarPolling } from '$lib/stores/calendar';
 
 	function formatDate(iso: string): string {
 		if (!iso) return '—';
@@ -45,6 +45,11 @@
 	{#if $calendarLoading}
 		<div class="p-8 text-center text-sm text-text-muted">
 			<div class="animate-pulse">Loading calendar...</div>
+		</div>
+	{:else if $calendarError}
+		<div class="p-8 text-center text-sm text-red">
+			<p>Calendar unavailable: {$calendarError}</p>
+			<button class="mt-3 text-accent underline" onclick={startCalendarPolling}>Retry</button>
 		</div>
 	{:else if $calendarEvents.length === 0}
 		<div class="p-8 text-center text-sm text-text-muted">No upcoming events</div>

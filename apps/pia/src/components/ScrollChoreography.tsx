@@ -3,7 +3,7 @@
 import { animate, stagger } from "animejs";
 import { useEffect, useRef } from "react";
 
-const SECTION_IDS = ["top", "features", "architecture", "techstack", "portal"];
+const SECTION_IDS = ["top", "features", "architecture", "techstack", "architecture-map", "portal"];
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 export function ScrollChoreography() {

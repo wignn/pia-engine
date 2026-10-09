@@ -3,7 +3,7 @@ import { env as publicEnv } from '$env/dynamic/public';
 import { json, type RequestEvent } from '@sveltejs/kit';
 import { CORE_REST_URL, CORE_WS_URL } from '$lib/config';
 
-function apiKey() {
+export function coreApiKey() {
 	return privateEnv.API_KEY || privateEnv.CORE_API_KEY || publicEnv.PUBLIC_API_KEY || '';
 }
 
@@ -35,7 +35,7 @@ function responseHeaders(response: Response) {
 }
 
 export async function proxyCore(event: RequestEvent, path: string) {
-	const key = apiKey();
+	const key = coreApiKey();
 	if (!key) return json({ error: 'Server API key is not configured' }, { status: 500 });
 
 	const url = new URL(joinUrl(CORE_REST_URL, path));
@@ -65,7 +65,7 @@ export async function proxyCore(event: RequestEvent, path: string) {
 }
 
 export async function createRealtimeSession() {
-	const key = apiKey();
+	const key = coreApiKey();
 	if (!key) return null;
 
 	try {

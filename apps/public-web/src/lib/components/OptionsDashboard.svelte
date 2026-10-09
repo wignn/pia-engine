@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { RefreshCw, AlertCircle } from 'lucide-svelte';
-	import { apiFetch } from '$lib/api';
 	import type { OptionsSnapshot, OptionsContract, OptionsGexItem } from '$lib/types';
 	import OptionsSummaryCards from '$lib/components/OptionsSummaryCards.svelte';
 	import OptionsGexChart from '$lib/components/OptionsGexChart.svelte';
@@ -33,9 +32,9 @@
 
 		try {
 			const [summaryRes, chainRes, gexRes] = await Promise.all([
-				apiFetch(`/api/v1/options/summary?symbol=${encodeURIComponent(sym)}`),
-				apiFetch(`/api/v1/options/chain?symbol=${encodeURIComponent(sym)}`),
-				apiFetch(`/api/v1/options/gex?symbol=${encodeURIComponent(sym)}`)
+				fetch(`/api/pia/options/summary?symbol=${encodeURIComponent(sym)}`),
+				fetch(`/api/pia/options/chain?symbol=${encodeURIComponent(sym)}`),
+				fetch(`/api/pia/options/gex?symbol=${encodeURIComponent(sym)}`)
 			]);
 
 			if (currentId !== requestId) return;
@@ -47,6 +46,9 @@
 			const summaryJson = await summaryRes.json();
 			const chainJson = await chainRes.json();
 			const gexJson = await gexRes.json();
+			if (summaryJson?.error || chainJson?.error || gexJson?.error) {
+				throw new Error(summaryJson?.error || chainJson?.error || gexJson?.error);
+			}
 
 			if (currentId !== requestId) return;
 

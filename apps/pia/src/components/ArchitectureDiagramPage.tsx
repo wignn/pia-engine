@@ -96,7 +96,12 @@ export function ArchitectureDiagram({ embedded = false }: ArchitectureDiagramPro
       </section>
 
       <figure className="architecture-figure">
-        <div className="architecture-diagram-frame">
+        <div
+          className="architecture-diagram-frame"
+          role="region"
+          aria-label="System architecture diagram (scrollable)"
+          tabIndex={0}
+        >
           <svg className="architecture-diagram" viewBox="0 0 1400 1500" role="img" aria-labelledby="architecture-diagram-title architecture-diagram-description">
             <title id="architecture-diagram-title">ATLSD Engine top-to-bottom architecture flowchart</title>
             <desc id="architecture-diagram-description">External sources flow into ingestion, durable events and cache, then domain services, persistence and analyzer services, public gateways, and client surfaces.</desc>
@@ -112,13 +117,13 @@ export function ArchitectureDiagram({ embedded = false }: ArchitectureDiagramPro
             <g>{(Object.keys(nodes) as NodeId[]).map((id) => <DiagramNode node={nodes[id]} key={id} />)}</g>
           </svg>
         </div>
-        {/* <figcaption className="architecture-caption">
-          <span><i className="legend-line" /> primary data flow</span>
-          <span><i className="legend-line is-dashed" /> transitional compatibility path</span>
-          <span><i className="legend-node is-service" /> service</span>
-          <span><i className="legend-node is-store" /> durable store</span>
+        <figcaption className="architecture-caption">
+          <span><i className="legend-line" aria-hidden="true" /> primary data flow</span>
+          <span><i className="legend-line is-dashed" aria-hidden="true" /> transitional compatibility path</span>
+          <span><i className="legend-node is-service" aria-hidden="true" /> service</span>
+          <span><i className="legend-node is-store" aria-hidden="true" /> durable store</span>
           <p>The diagram is a public system overview. It describes product-level boundaries, not private deployment configuration or live infrastructure health.</p>
-        </figcaption> */}
+        </figcaption>
       </figure>
     </section>
   );

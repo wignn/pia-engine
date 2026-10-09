@@ -5,6 +5,7 @@ import type { NewsItem } from '$lib/types';
 export const forexNews = writable<NewsItem[]>([]);
 export const stockNews = writable<NewsItem[]>([]);
 export const newsLoading = writable(false);
+export const newsError = writable<string | null>(null);
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -21,19 +22,21 @@ function extractNewsItems(data: unknown): NewsItem[] {
 
 async function fetchForexNews() {
 	try {
-		const res = await apiFetch('/api/v1/news?category=forex&limit=15');
+		const res = await fetch('/api/pia/news');
 		if (!res.ok) {
-			console.warn(`[News] forex fetch failed: ${res.status} ${res.statusText}`);
+			const body = await res.json().catch(() => null);
+			newsError.set(body?.error || `News request failed (${res.status})`);
 			return;
 		}
 		const data = await res.json();
 		if (data.error) {
-			console.warn('[News] forex API error:', data.error);
+			newsError.set(data.error);
 			return;
 		}
-		forexNews.set(extractNewsItems(data));
+		forexNews.set(extractNewsItems(data).slice(0, 15));
 	} catch (e) {
 		console.warn('[News] forex fetch error:', e);
+		newsError.set(e instanceof Error ? e.message : 'News could not be loaded');
 	}
 }
 
@@ -57,8 +60,12 @@ async function fetchStockNews() {
 
 export async function fetchAllNews() {
 	newsLoading.set(true);
-	await Promise.all([fetchForexNews(), fetchStockNews()]);
-	newsLoading.set(false);
+	newsError.set(null);
+	try {
+		await Promise.all([fetchForexNews(), fetchStockNews()]);
+	} finally {
+		newsLoading.set(false);
+	}
 }
 
 export function startNewsPolling(intervalMs = 60_000) {

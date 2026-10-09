@@ -8,7 +8,7 @@
 		marketStore,
 		realtimeNewsStore
 	} from '$lib/stores/websocket.svelte';
-	import { forexNews, newsLoading, startNewsPolling, stopNewsPolling } from '$lib/stores/news';
+	import { fetchAllNews, forexNews, newsError, newsLoading, startNewsPolling, stopNewsPolling } from '$lib/stores/news';
 	import { startCalendarPolling, stopCalendarPolling } from '$lib/stores/calendar';
 	import { startMacroPolling, stopMacroPolling } from '$lib/stores/macro';
 	import TickerStrip from '$lib/components/TickerStrip.svelte';
@@ -431,6 +431,8 @@
 							title="Forex & Global"
 							items={realtimeNewsStore.mergeForex($forexNews)}
 							loading={$newsLoading}
+							error={$newsError}
+							onretry={fetchAllNews}
 						/>
 					</div>
 				</div>

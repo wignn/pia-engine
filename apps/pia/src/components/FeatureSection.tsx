@@ -9,12 +9,12 @@ const features = [
 
 export function FeatureSection() {
   return (
-    <section className="features relative overflow-hidden" id="features">
+    <section className="features relative overflow-hidden" id="features" aria-labelledby="features-heading">
       <div className="section-intro relative z-10">
         <p className="eyebrow"><span className="eyebrow-line" />SYSTEM CAPABILITIES</p>
-        <h2>ENGINE ARCHITECTURE &<br /><em>FINANCIAL INTELLIGENCE</em></h2>
+        <h2 id="features-heading">ENGINE ARCHITECTURE &<br /><em>FINANCIAL INTELLIGENCE</em></h2>
       </div>
-      <div className="feature-list relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="feature-list relative z-10">
         {features.map(([number, title, body]) => (
           <article className="feature-card" key={number}>
             <span className="feature-number">{number}</span>

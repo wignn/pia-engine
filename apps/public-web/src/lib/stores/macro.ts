@@ -192,8 +192,8 @@ export async function fetchMacroData() {
 	});
 
 	const [yieldResult, fearGreedResult, componentsResult, historyResult] = await Promise.allSettled([
-		fetchJson('/api/v1/fixed-income/yield-curve?country=US'),
-		fetchJson('/api/v1/fear-greed?scope=global'),
+		fetchJson('/api/pia/rates/yield-curve'),
+		fetchJson('/api/pia/fear-greed'),
 		fetchJson('/api/v1/fear-greed/components?scope=global'),
 		fetchJson('/api/v1/fear-greed/history?scope=global&limit=30')
 	]);
