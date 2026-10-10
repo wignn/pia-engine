@@ -77,6 +77,8 @@ export const MacroPanel: React.FC = () => {
     return THEME_TOKENS.colors.bullish // Extreme Greed
   }
 
+  const fgScore = Math.max(0, Math.min(100, fearGreed?.score ?? 50))
+
   const getStanceColor = (stance: string): string => {
     if (stance === 'Hawkish') return THEME_TOKENS.colors.bearish
     if (stance === 'Dovish') return THEME_TOKENS.colors.bullish
@@ -273,24 +275,12 @@ export const MacroPanel: React.FC = () => {
                 {fearGreed.rating}
               </div>
 
-              {/* Progress Slider */}
-              <div
-                style={{
-                  height: 6,
-                  backgroundColor: THEME_TOKENS.colors.bgSurface,
-                  borderRadius: 3,
-                  marginTop: 12,
-                  overflow: 'hidden'
-                }}
-              >
-                <div
-                  style={{
-                    height: '100%',
-                    width: `${fearGreed.score}%`,
-                    backgroundColor: getFgColor(fearGreed.score),
-                    borderRadius: 3
-                  }}
-                />
+              {/* Semicircular market-sentiment gauge */}
+              <div role="img" aria-label={`Market sentiment ${fgScore} out of 100`} style={{ position: 'relative', width: 200, height: 102, overflow: 'hidden', margin: '14px auto 0' }}>
+                <div style={{ position: 'absolute', inset: 0, width: 200, height: 200, borderRadius: '50%', background: 'conic-gradient(from 270deg, #ef4444 0deg 45deg, #f59e0b 45deg 90deg, #3b82f6 90deg 135deg, #10b981 135deg 180deg, transparent 180deg 360deg)' }} />
+                <div style={{ position: 'absolute', left: 20, top: 20, width: 160, height: 160, borderRadius: '50%', backgroundColor: THEME_TOKENS.colors.bgApp }} />
+                <div style={{ position: 'absolute', bottom: 0, left: '50%', width: 72, height: 3, borderRadius: 3, backgroundColor: THEME_TOKENS.colors.textBright, transformOrigin: 'left center', transform: `rotate(${-180 + fgScore * 1.8}deg)` }} />
+                <div style={{ position: 'absolute', bottom: -4, left: '50%', width: 12, height: 12, borderRadius: '50%', backgroundColor: THEME_TOKENS.colors.accent, border: '2px solid white', transform: 'translateX(-50%)' }} />
               </div>
 
               {/* Historical Benchmarks */}

@@ -19,7 +19,7 @@ export interface CandleData {
 }
 
 export type Timeframe = "1m" | "5m" | "15m" | "1h" | "4h" | "1D" | "1W";
-export type ChartType = "candlestick" | "bar" | "line" | "area" | "heikin_ashi";
+export type ChartType = "candlestick" | "hollow" | "bar" | "line" | "area" | "heikin_ashi";
 
 export type DrawingTool =
   | "cursor"
@@ -29,7 +29,9 @@ export type DrawingTool =
   | "horizontal_ray"
   | "vertical"
   | "parallel_channel"
+  | "trend_channel"
   | "fibonacci"
+  | "fib_extension"
   | "rectangle"
   | "circle"
   | "price_line"
@@ -86,7 +88,6 @@ export interface IndicatorState {
   rsi: boolean;
   macd: boolean;
   atr?: boolean;
-  aiForecast?: boolean;
 }
 
 export type TabContentType =

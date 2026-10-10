@@ -165,27 +165,19 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({
 
   return (
     <div
-      className={`w-full flex flex-col h-full select-none text-xs transition-colors ${
-        isLight
-          ? "bg-[#ffffff] border-[#e0e3eb] text-[#131722]"
-          : "bg-[#181b24] border-[#2a2e39] text-[#d1d4dc]"
-      }`}
+      className="w-full flex flex-col h-full select-none text-xs transition-colors bg-card border-border text-foreground"
     >
       {/* Header */}
       <div
-        className={`h-[44px] border-b flex items-center justify-between px-3 shrink-0 ${
-          isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#141720] border-[#2a2e39]"
-        }`}
+        className="h-[44px] border-b border-border flex items-center justify-between px-3 shrink-0 bg-card/60"
       >
         <div className="flex items-center gap-2 font-bold text-sm">
-          <Newspaper className="w-4 h-4 text-[#2962ff]" />
-          <span className={isLight ? "text-[#131722]" : "text-white"}>
+          <Newspaper className="w-4 h-4 text-primary" />
+          <span className="text-foreground">
             News Stream
           </span>
           <span
-            className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
-              isLight ? "bg-[#f0f3fa] text-[#5d606b]" : "bg-[#252a36] text-[#787b86]"
-            }`}
+            className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-muted text-muted-foreground"
           >
             {filteredArticles.length}
           </span>
@@ -193,11 +185,7 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({
 
         <button
           onClick={fetchNews}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            isLight
-              ? "hover:bg-[#f0f3fa] text-[#5d606b] hover:text-[#131722]"
-              : "hover:bg-[#252a36] text-[#787b86] hover:text-white"
-          }`}
+          className="p-1.5 rounded-lg transition-colors cursor-pointer text-muted-foreground hover:text-foreground hover:bg-muted"
           title="Refresh Feed"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -206,26 +194,20 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({
 
       {/* Search Input Bar */}
       <div
-        className={`px-3 py-2 border-b flex items-center gap-2 ${
-          isLight ? "bg-[#f8f9fc] border-[#e0e3eb]" : "bg-[#141720]/70 border-[#2a2e39]"
-        }`}
+        className="px-3 py-2 border-b border-border flex items-center gap-2 bg-background/50"
       >
-        <Search className="w-3.5 h-3.5 text-[#787b86] shrink-0" />
+        <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <input
           type="text"
           placeholder="Search news, forex, metals, stocks..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className={`w-full bg-transparent border-none outline-hidden text-[11px] font-medium ${
-            isLight
-              ? "text-[#131722] placeholder-[#8e929d]"
-              : "text-white placeholder-[#787b86]"
-          }`}
+          className="w-full bg-transparent border-none outline-hidden text-[11px] font-medium text-foreground placeholder-muted-foreground"
         />
         {searchQuery && (
           <button
             onClick={() => setSearchQuery("")}
-            className="text-[10px] text-[#787b86] hover:text-white px-1"
+            className="text-[10px] text-muted-foreground hover:text-foreground"
           >
             Clear
           </button>
@@ -234,9 +216,7 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({
 
       {/* Filter Tabs */}
       <div
-        className={`flex items-center gap-1 px-3 py-1.5 border-b overflow-x-auto text-[11px] shrink-0 scrollbar-none ${
-          isLight ? "bg-[#f0f3fa] border-[#e0e3eb]" : "bg-[#12141c] border-[#2a2e39]"
-        }`}
+        className="flex items-center gap-1 px-3 py-1.5 border-b border-border overflow-x-auto text-[11px] shrink-0 scrollbar-none bg-background/30"
       >
         {(
           [
@@ -254,12 +234,8 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({
             onClick={() => setFilter(t.id)}
             className={`px-2.5 py-1 rounded-md whitespace-nowrap font-medium transition-all cursor-pointer ${
               filter === t.id
-                ? isLight
-                  ? "bg-[#ffffff] text-[#131722] font-bold shadow-xs"
-                  : "bg-[#252a36] text-white font-bold shadow-xs"
-                : isLight
-                ? "text-[#5d606b] hover:text-[#131722]"
-                : "text-[#787b86] hover:text-[#d1d4dc]"
+                ? "bg-primary/15 text-primary border border-primary/30 font-bold shadow-xs"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
             }`}
           >
             {t.label}
@@ -269,9 +245,7 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({
 
       {/* Articles Stream List */}
       <div
-        className={`flex-1 overflow-y-auto divide-y ${
-          isLight ? "divide-[#e0e3eb]" : "divide-[#2a2e39]/60"
-        }`}
+        className="flex-1 overflow-y-auto divide-y divide-border/60"
       >
         {loading && articles.length === 0 ? (
           <div className="p-8 text-center text-[#787b86] flex flex-col items-center gap-2">
@@ -295,11 +269,7 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({
               <div
                 key={article.id}
                 onClick={() => handleOpenArticle(article)}
-                className={`p-3.5 transition-all cursor-pointer group flex gap-3 ${
-                  isLight
-                    ? "hover:bg-[#f8f9fc]"
-                    : "hover:bg-[#202532]"
-                }`}
+                className="p-3.5 transition-all cursor-pointer group flex gap-3 hover:bg-muted/40"
               >
                 {/* Left Content Area */}
                 <div className="flex-1 min-w-0 flex flex-col justify-between">
@@ -308,33 +278,25 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({
                     <span
                       className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${
                         isHigh
-                          ? "bg-[#f23645]/15 text-[#f23645]"
-                          : isLight
-                          ? "bg-[#f0f3fa] text-[#5d606b]"
-                          : "bg-[#141720] text-[#787b86]"
+                          ? "bg-down/15 text-down"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {article.source}
                     </span>
 
                     {ago && (
-                      <div className="flex items-center gap-1 text-[10px] text-[#787b86] font-mono">
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
                         <Clock className="w-3 h-3" />
                         <span>{ago}</span>
                       </div>
                     )}
 
-                    {isHigh && <Flame className="w-3 h-3 text-[#f23645]" />}
+                    {isHigh && <Flame className="w-3 h-3 text-down" />}
                   </div>
 
                   {/* Title Headline */}
-                  <h3
-                    className={`font-semibold text-xs leading-snug line-clamp-2 mb-1.5 transition-colors ${
-                      isLight
-                        ? "text-[#131722] group-hover:text-[#2962ff]"
-                        : "text-[#d1d4dc] group-hover:text-white"
-                    }`}
-                  >
+                  <h3 className="font-semibold text-xs leading-snug line-clamp-2 mb-1.5 transition-colors text-foreground group-hover:text-primary">
                     {article.title}
                   </h3>
 
@@ -376,7 +338,7 @@ export const NewsPanel: React.FC<NewsPanelProps> = ({
                         rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}
                         className="p-1 hover:text-white hover:bg-black/20 rounded transition-colors"
-                        title="Buka link asli"
+                        title="Open original link"
                       >
                         <ExternalLink className="w-3 h-3 opacity-60 hover:opacity-100" />
                       </a>

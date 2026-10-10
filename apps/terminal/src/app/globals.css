@@ -2,16 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,500;1,600;1,700&display=swap");
+
 :root {
-  --tv-bg: #131722;
-  --tv-panel: #1e222d;
-  --tv-border: #2a2e39;
-  --tv-hover: #2a2e39;
-  --tv-text: #d1d4dc;
-  --tv-muted: #787b86;
-  --tv-green: #089981;
-  --tv-red: #f23645;
-  --tv-blue: #2962ff;
+  --background: #f7f6f2;
+  --foreground: #1c1e1c;
+  --card: #ffffff;
+  --card-foreground: #1c1e1c;
+  --border: #e3e6e1;
+  --muted: #edf0ea;
+  --muted-foreground: #6b736b;
+  --primary: #456e3b;
+  --primary-foreground: #ffffff;
+  --up: #1f946d;
+  --down: #d93838;
+
+  --tv-bg: var(--background);
+  --tv-panel: var(--card);
+  --tv-border: var(--border);
+  --tv-hover: var(--muted);
+  --tv-text: var(--foreground);
+  --tv-muted: var(--muted-foreground);
+  --tv-green: var(--up);
+  --tv-red: var(--down);
+  --tv-blue: var(--primary);
+  --tv-surface: var(--card);
+}
+
+.dark {
+  --background: #141615;
+  --foreground: #f0ede6;
+  --card: #1c1e1c;
+  --card-foreground: #f0ede6;
+  --border: rgba(255, 255, 255, 0.08);
+  --muted: #242724;
+  --muted-foreground: #8a948a;
+  --primary: #a3c98b;
+  --primary-foreground: #141615;
+  --up: #26b288;
+  --down: #ef4444;
+
+  --tv-bg: var(--background);
+  --tv-panel: var(--card);
+  --tv-border: var(--border);
+  --tv-hover: var(--muted);
+  --tv-text: var(--foreground);
+  --tv-muted: var(--muted-foreground);
+  --tv-green: var(--up);
+  --tv-red: var(--down);
+  --tv-blue: var(--primary);
+  --tv-surface: var(--card);
 }
 
 html,
@@ -27,7 +67,9 @@ body {
   min-height: 100%;
   overflow: hidden;
   user-select: none;
-  font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu,
+    sans-serif;
 }
 
 /* Custom Scrollbar for TradingView Look */

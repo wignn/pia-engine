@@ -133,7 +133,7 @@ export const NewsArticleModal: React.FC<NewsArticleModalProps> = ({
     if (!article?.published_at) return "";
     try {
       const d = new Date(article.published_at);
-      return d.toLocaleDateString("id-ID", {
+      return d.toLocaleDateString("en-US", {
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -434,7 +434,7 @@ export const NewsArticleModal: React.FC<NewsArticleModalProps> = ({
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#2962ff] hover:bg-[#1e53e5] text-white font-bold text-xs shadow-md hover:shadow-lg transition-all cursor-pointer"
             >
-              <span>Buka Artikel Lengkap di {article.source}</span>
+              <span>Open full article at {article.source}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </a>
           </div>

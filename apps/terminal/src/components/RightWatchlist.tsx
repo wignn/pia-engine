@@ -132,19 +132,15 @@ export const RightWatchlist: React.FC<RightWatchlistProps> = ({
 
   return (
     <aside
-      className={`w-full flex flex-col h-full select-none text-xs overflow-hidden transition-colors ${
-        isLight ? "bg-[#ffffff] border-[#e0e3eb] text-[#131722]" : "bg-[#1e222d] border-[#2a2e39] text-[#d1d4dc]"
-      }`}
+      className="w-full flex flex-col h-full select-none text-xs overflow-hidden transition-colors bg-card border-border text-foreground"
     >
-      {/* Top Header: "Daftar Pantau" (TradingView signature title) */}
+      {/* Watchlist header */}
       <div
-        className={`h-[38px] border-b flex items-center justify-between px-3 shrink-0 ${
-          isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
-        }`}
+        className="h-[38px] border-b border-border flex items-center justify-between px-3 shrink-0 bg-card/60"
       >
         <div className="flex items-center gap-1.5 font-bold text-xs">
-          <span className={isLight ? "text-[#131722]" : "text-white"}>Daftar Pantau</span>
-          <ChevronDown className="w-3.5 h-3.5 text-[#787b86]" />
+          <span className="text-foreground">Watchlist</span>
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
         </div>
         <div className="flex items-center gap-1.5">
           <button
@@ -186,7 +182,7 @@ export const RightWatchlist: React.FC<RightWatchlistProps> = ({
             <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[#787b86]" />
             <input
               type="text"
-              placeholder="Cari simbol di watchlist..."
+              placeholder="Search watchlist..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
@@ -210,22 +206,20 @@ export const RightWatchlist: React.FC<RightWatchlistProps> = ({
 
       {/* Table Column Headers: Symbol | Last | Chg | Chg% */}
       <div
-        className={`h-6 px-3 border-b grid grid-cols-12 items-center text-[10px] font-mono tracking-wider shrink-0 ${
-          isLight ? "bg-[#f8f9fc] border-[#e0e3eb] text-[#787b86]" : "bg-[#141722] border-[#2a2e39] text-[#787b86]"
-        }`}
+        className="h-6 px-3 border-b border-border bg-muted/40 grid grid-cols-12 items-center text-[10px] font-mono tracking-wider shrink-0 text-muted-foreground"
       >
         <button
           onClick={() => handleSort("symbol")}
           className="col-span-5 text-left font-bold flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
         >
-          <span>Simbol</span>
+          <span>Symbol</span>
           {sortBy === "symbol" && (sortDir === "asc" ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />)}
         </button>
         <button
           onClick={() => handleSort("price")}
           className="col-span-4 text-right font-bold flex items-center justify-end gap-1 hover:text-white transition-colors cursor-pointer"
         >
-          <span>Terakhir</span>
+          <span>Last</span>
           {sortBy === "price" && (sortDir === "asc" ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />)}
         </button>
         <button
@@ -243,11 +237,9 @@ export const RightWatchlist: React.FC<RightWatchlistProps> = ({
           <div key={sectionTitle}>
             {/* Group Header (e.g. SAHAM (STOCK), FOREX, CRYPTO) */}
             <div
-              className={`px-3 py-1 text-[9px] font-bold tracking-wider uppercase border-y flex items-center justify-between ${
-                isLight ? "bg-[#f0f3fa] border-[#e0e3eb] text-[#5d606b]" : "bg-[#181b24] border-[#2a2e39] text-[#787b86]"
-              }`}
+              className="px-3 py-1 text-[9px] font-bold tracking-wider uppercase border-y border-border bg-muted/20 flex items-center justify-between text-muted-foreground"
             >
-              <span>{sectionTitle === "STOCKS" ? "SAHAM (STOCK)" : sectionTitle}</span>
+              <span>{sectionTitle}</span>
               <span className="opacity-60">{sectionItems.length}</span>
             </div>
 
@@ -348,7 +340,7 @@ export const RightWatchlist: React.FC<RightWatchlistProps> = ({
             {/* Market Status Indicator */}
             <div className="flex items-center gap-1.5 mt-1">
               <span className="w-1.5 h-1.5 rounded-full bg-[#089981]" />
-              <span className="text-[10px] text-[#089981] font-semibold">Pasar buka (Market open)</span>
+              <span className="text-[10px] text-[#089981] font-semibold">Market open</span>
             </div>
           </div>
 
@@ -361,12 +353,12 @@ export const RightWatchlist: React.FC<RightWatchlistProps> = ({
             >
               <div className="flex items-center justify-between text-[10px] text-[#787b86] mb-1">
                 <span className="font-semibold uppercase tracking-wider text-[#2962ff]">
-                  Berita • {newsHeadline?.time || "Terbaru"}
+                  NEWS · {newsHeadline?.time || "Latest"}
                 </span>
-                <span className="hover:text-white cursor-pointer transition-colors">Lihat lainnya &gt;</span>
+                <span className="hover:text-white cursor-pointer transition-colors">View more &gt;</span>
               </div>
               <p className={`text-xs font-medium leading-snug line-clamp-2 ${isLight ? "text-[#131722]" : "text-[#d1d4dc]"}`}>
-                {newsHeadline?.title || `Harga ${selectedItem.symbol} bergerak dinamis seiring update likuiditas pasar global.`}
+                {newsHeadline?.title || `${selectedItem.symbol} is trading as global market liquidity evolves.`}
               </p>
             </div>
           </div>
@@ -374,8 +366,8 @@ export const RightWatchlist: React.FC<RightWatchlistProps> = ({
           {/* Multi-Timeframe Performance 6-Tile Grid */}
           <div className="p-3">
             <div className="text-[10px] uppercase font-bold tracking-wider text-[#787b86] mb-2 flex items-center justify-between">
-              <span>Kinerja (Performance)</span>
-              <span className="text-[9px] font-normal lowercase">periode historis</span>
+              <span>Performance</span>
+              <span className="text-[9px] font-normal lowercase">historical returns</span>
             </div>
 
             <div className="grid grid-cols-3 gap-1.5">

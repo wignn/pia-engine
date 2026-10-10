@@ -10,15 +10,7 @@ import {
   Brain,
   Calendar,
   Tv,
-  Grid3X3,
-  Sliders,
-  Settings,
-  Moon,
-  Sun,
-  Keyboard,
   ShieldCheck,
-  Search,
-  ExternalLink,
   LayoutDashboard,
   Map,
   LayoutGrid,
@@ -38,8 +30,6 @@ interface TradingViewMainMenuProps {
   currentPaneType?: PaneContentType;
   onSelectPaneType: (type: PaneContentType) => void;
   theme?: "dark" | "light";
-  onToggleTheme?: () => void;
-  onOpenSettings?: () => void;
 }
 
 export const TradingViewMainMenu: React.FC<TradingViewMainMenuProps> = ({
@@ -48,8 +38,6 @@ export const TradingViewMainMenu: React.FC<TradingViewMainMenuProps> = ({
   currentPaneType = "chart",
   onSelectPaneType,
   theme = "dark",
-  onToggleTheme,
-  onOpenSettings
 }) => {
   const isLight = theme === "light";
 
@@ -57,6 +45,7 @@ export const TradingViewMainMenu: React.FC<TradingViewMainMenuProps> = ({
 
   const productItems: {
     id: PaneContentType;
+    group: "Markets" | "Research" | "Trading" | "Workspaces";
     label: string;
     description: string;
     icon: React.ReactNode;
@@ -64,12 +53,14 @@ export const TradingViewMainMenu: React.FC<TradingViewMainMenuProps> = ({
   }[] = [
     {
       id: "chart",
+      group: "Markets",
       label: "Supercharts",
       description: "Financial charts with multi-pane analysis & indicators",
       icon: <BarChart3 className="w-4 h-4 text-[#2962ff]" />
     },
     {
       id: "controlpanel",
+      group: "Workspaces",
       label: "Financial War Room",
       description: "Customizable 12-col dashboard with TV, mini charts & depth",
       icon: <LayoutDashboard className="w-4 h-4 text-[#3b82f6]" />,
@@ -77,6 +68,7 @@ export const TradingViewMainMenu: React.FC<TradingViewMainMenuProps> = ({
     },
     {
       id: "macromaps",
+      group: "Markets",
       label: "Macro World Map",
       description: "Global macroeconomic choropleth (Inflation, Rates, GDP)",
       icon: <Map className="w-4 h-4 text-[#10b981]" />,
@@ -84,48 +76,56 @@ export const TradingViewMainMenu: React.FC<TradingViewMainMenuProps> = ({
     },
     {
       id: "hub",
+      group: "Workspaces",
       label: "Supercharts Hub",
       description: "Layout gallery, rapid asset suites & custom workspaces",
       icon: <LayoutGrid className="w-4 h-4 text-[#a855f7]" />
     },
     {
       id: "options",
+      group: "Research",
       label: "Options & GEX Analysis",
       description: "Put/Call ratios, Gamma Exposure profile & Max Pain",
       icon: <PieChart className="w-4 h-4 text-[#00e5ff]" />
     },
     {
       id: "macro",
+      group: "Research",
       label: "Macro & Central Banks",
       description: "Fear & Greed index, COT positioning & Fed/ECB stance",
       icon: <Globe2 className="w-4 h-4 text-[#f59e0b]" />
     },
     {
       id: "yields",
+      group: "Research",
       label: "Treasury Yields & Spreads",
       description: "US Sovereign yield curve, 2s10s & 3m10y spreads",
       icon: <TrendingUp className="w-4 h-4 text-[#10b981]" />
     },
     {
       id: "geosignals",
+      group: "Research",
       label: "Geopolitical Signals",
       description: "Real-time flash event stream & affected asset matrices",
       icon: <ShieldAlert className="w-4 h-4 text-[#f43f5e]" />
     },
     {
       id: "energy",
+      group: "Research",
       label: "Energy Complex",
       description: "Crude oil (WTI/Brent), natural gas & storage telemetry",
       icon: <Zap className="w-4 h-4 text-[#eab308]" />
     },
     {
       id: "sec",
+      group: "Research",
       label: "SEC Filings",
       description: "Real-time EDGAR corporate disclosures (10-K, 10-Q, 8-K)",
       icon: <FileText className="w-4 h-4 text-[#8b5cf6]" />
     },
     {
       id: "paper",
+      group: "Trading",
       label: "Paper Trading Simulator",
       description: "Institutional practice trading with real-time mark-to-market",
       icon: <Briefcase className="w-4 h-4 text-[#06b6d4]" />,
@@ -133,18 +133,21 @@ export const TradingViewMainMenu: React.FC<TradingViewMainMenuProps> = ({
     },
     {
       id: "orderbook",
+      group: "Markets",
       label: "DOM & Order Book",
       description: "Level 2 market depth and live transaction flow",
       icon: <Layers className="w-4 h-4 text-[#089981]" />
     },
     {
       id: "news",
+      group: "Research",
       label: "News & Market Wire",
       description: "Breaking global macro headlines & corporate filings",
       icon: <Newspaper className="w-4 h-4 text-[#f5b942]" />
     },
     {
       id: "social",
+      group: "Research",
       label: "Social Pulse",
       description: "Real-time 𝕏/Twitter verified sentiment streams",
       icon: <Radio className="w-4 h-4 text-[#e040fb]" />,
@@ -152,18 +155,21 @@ export const TradingViewMainMenu: React.FC<TradingViewMainMenuProps> = ({
     },
     {
       id: "intelligence",
+      group: "Research",
       label: "Market Intelligence",
       description: "AI institutional signals, COT reports, & liquidity",
       icon: <Brain className="w-4 h-4 text-[#00e5ff]" />
     },
     {
       id: "calendar",
+      group: "Research",
       label: "Economic Calendar",
       description: "Central bank announcements, CPI, rate decisions",
       icon: <Calendar className="w-4 h-4 text-[#ff5252]" />
     },
     {
       id: "live",
+      group: "Research",
       label: "Live Broadcast & TV",
       description: "24/7 Financial TV: Bloomberg, CNBC, FOMC stream",
       icon: <Tv className="w-4 h-4 text-[#f23645]" />,
@@ -200,7 +206,7 @@ export const TradingViewMainMenu: React.FC<TradingViewMainMenuProps> = ({
                 PIA TERMINAL
               </span>
               <span className="text-[10px] text-[#787b86] block -mt-1 font-mono">
-                TradingView Standard
+                Market Workspaces
               </span>
             </div>
           </div>
@@ -215,124 +221,47 @@ export const TradingViewMainMenu: React.FC<TradingViewMainMenuProps> = ({
         </div>
 
         {/* Scrollable Navigation Body */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-4 text-xs">
-          {/* Section: Products */}
-          <div>
-            <div className="text-[10px] uppercase font-bold tracking-wider px-2 pb-1.5 text-[#787b86]">
-              Products & Workspace
-            </div>
-            <div className="space-y-0.5">
-              {productItems.map((item) => {
-                const isCurrent = currentPaneType === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      onSelectPaneType(item.id);
-                      onClose();
-                    }}
-                    className={`w-full flex items-start gap-3 rounded-lg px-3 py-2 text-left cursor-pointer transition-all ${
-                      isCurrent
-                        ? "bg-[#2962ff]/15 text-[#2962ff] font-bold"
-                        : isLight
-                        ? "hover:bg-[#f0f3fa] text-[#131722]"
-                        : "hover:bg-[#2a2e39] text-[#d1d4dc]"
-                    }`}
-                  >
-                    <div className="mt-0.5 shrink-0">{item.icon}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold">{item.label}</span>
-                        {item.badge && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#e040fb]/20 text-[#e040fb]">
-                            {item.badge}
+        <div className="flex-1 overflow-y-auto p-3 text-xs">
+          {(["Markets", "Research", "Trading", "Workspaces"] as const).map((group) => {
+            const items = productItems.filter((item) => item.group === group);
+            return (
+              <details key={group} open={group === "Markets"} className="border-b border-border/70 py-1 last:border-0">
+                <summary className="cursor-pointer list-none px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="flex items-center justify-between">{group}<span className="font-mono">{items.length}</span></span>
+                </summary>
+                <div className="space-y-0.5 pb-2">
+                  {items.map((item) => {
+                    const isCurrent = currentPaneType === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          onSelectPaneType(item.id);
+                          onClose();
+                        }}
+                        className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors ${
+                          isCurrent
+                            ? "bg-primary/10 text-primary"
+                            : isLight
+                            ? "text-[#131722] hover:bg-[#f0f3fa]"
+                            : "text-[#d1d4dc] hover:bg-[#2a2e39]"
+                        }`}
+                      >
+                        <span className="shrink-0">{item.icon}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold">{item.label}</span>
+                            {item.badge && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary">{item.badge}</span>}
                           </span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-[#787b86] font-normal leading-tight mt-0.5 truncate">
-                        {item.description}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className={`border-t ${isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]"}`} />
-
-          {/* Section: Community & Feeds */}
-          <div>
-            <div className="text-[10px] uppercase font-bold tracking-wider px-2 pb-1.5 text-[#787b86]">
-              Community & Feeds
-            </div>
-            <div className="space-y-0.5">
-              <button
-                onClick={() => {
-                  onSelectPaneType("social");
-                  onClose();
-                }}
-                className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left cursor-pointer transition-colors ${
-                  isLight ? "hover:bg-[#f0f3fa] text-[#131722]" : "hover:bg-[#2a2e39] text-[#d1d4dc]"
-                }`}
-              >
-                <Radio className="w-4 h-4 text-[#e040fb]" />
-                <span className="text-xs font-medium">Trade Ideas & Live Pulse</span>
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPaneType("news");
-                  onClose();
-                }}
-                className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left cursor-pointer transition-colors ${
-                  isLight ? "hover:bg-[#f0f3fa] text-[#131722]" : "hover:bg-[#2a2e39] text-[#d1d4dc]"
-                }`}
-              >
-                <Newspaper className="w-4 h-4 text-[#f5b942]" />
-                <span className="text-xs font-medium">Market Wire Releases</span>
-              </button>
-            </div>
-          </div>
-
-          <div className={`border-t ${isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]"}`} />
-
-          {/* Section: Preferences & System */}
-          <div>
-            <div className="text-[10px] uppercase font-bold tracking-wider px-2 pb-1.5 text-[#787b86]">
-              System & Preferences
-            </div>
-            <div className="space-y-0.5">
-              {/* Theme Toggle */}
-              <button
-                onClick={onToggleTheme}
-                className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-left cursor-pointer transition-colors ${
-                  isLight ? "hover:bg-[#f0f3fa] text-[#131722]" : "hover:bg-[#2a2e39] text-[#d1d4dc]"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {isLight ? <Moon className="w-4 h-4 text-[#787b86]" /> : <Sun className="w-4 h-4 text-[#f5b942]" />}
-                  <span className="text-xs font-medium">Color Theme</span>
+                          <span className="mt-0.5 block truncate text-[10px] font-normal leading-tight text-muted-foreground">{item.description}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-                <span className="text-[11px] font-semibold text-[#2962ff]">
-                  {isLight ? "Light Mode" : "Dark Mode"}
-                </span>
-              </button>
-
-              {/* Settings Dialog */}
-              <button
-                onClick={() => {
-                  onClose();
-                  onOpenSettings?.();
-                }}
-                className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left cursor-pointer transition-colors ${
-                  isLight ? "hover:bg-[#f0f3fa] text-[#131722]" : "hover:bg-[#2a2e39] text-[#d1d4dc]"
-                }`}
-              >
-                <Settings className="w-4 h-4 text-[#787b86]" />
-                <span className="text-xs font-medium">Chart & Visual Settings...</span>
-              </button>
-            </div>
-          </div>
+              </details>
+            );
+          })}
         </div>
 
         {/* Drawer Footer Status */}

@@ -45,14 +45,14 @@ const PRESET_CHANNELS: StreamChannel[] = [
     name: "CNBC Indonesia Live",
     category: "markets",
     youtubeId: "XMjM1m3jXkc",
-    description: "Pasar Saham Indonesia, IHSG, Berita Finansial & Makro",
+    description: "Indonesian equities, IHSG, financial and macro news",
   },
   {
     id: "idx_channel",
     name: "IDX Channel Live",
     category: "markets",
     youtubeId: "hjCkB9XRpkU",
-    description: "Siaran Langsung Bursa Efek Indonesia, Perdagangan & Emiten",
+    description: "Live Indonesia Stock Exchange coverage and company updates",
   },
 ];
 

@@ -41,7 +41,7 @@ export const KNOWN_INSTRUMENTS: Record<string, KnownInstrumentMeta> = {
   STOXX50: { name: "Euro Stoxx 50 Index", category: "indices", provider: "MT5", digits: 2 },
   DXY: { name: "U.S. Dollar Currency Index", category: "indices", provider: "TVC", digits: 3 },
   SPX: { name: "S&P 500 Composite", category: "indices", provider: "GLOBAL", digits: 2 },
-  IHSG: { name: "Jakarta Composite Index (IDX)", category: "indices", provider: "IDX", digits: 2 },
+  IHSG: { name: "Jakarta Composite Index", category: "indices", provider: "IDX", digits: 2 },
   HSI: { name: "Hang Seng Index Hong Kong", category: "indices", provider: "HKEX", digits: 2 },
   SSEC: { name: "Shanghai Composite Index", category: "indices", provider: "SSE", digits: 2 },
   KOSPI: { name: "Korea Composite Stock Price Index", category: "indices", provider: "KRX", digits: 2 },

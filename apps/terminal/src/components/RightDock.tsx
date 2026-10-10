@@ -66,9 +66,7 @@ export const RightDock: React.FC<RightDockProps> = ({ activeTab, setActiveTab, t
 
   return (
     <div
-      className={`hidden lg:flex w-[45px] border-l flex-col items-center py-2 justify-between select-none z-10 shrink-0 transition-colors overflow-y-auto ${
-        isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
-      }`}
+      className="hidden lg:flex w-[45px] border-l border-border bg-card/60 flex-col items-center py-2 justify-between select-none z-10 shrink-0 transition-colors overflow-y-auto"
     >
       <div className="flex flex-col items-center gap-1 w-full">
         {tabs.map((tab) => {

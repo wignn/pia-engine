@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   Minus,
   MoveRight,
+  SquareDashed,
   SeparatorVertical,
   Columns,
   Percent,
@@ -21,6 +22,8 @@ import {
   Eye,
   EyeOff,
   Undo2,
+  Save,
+  FolderOpen,
   Redo2,
   ChevronRight,
   Pencil,
@@ -60,8 +63,9 @@ const TOOL_GROUPS: ToolGroup[] = [
       { id: "ray", label: "Ray Line", shortcut: "Alt+T", icon: <ArrowUpRight className="w-4 h-4" /> },
       { id: "horizontal", label: "Horizontal Line (S&R)", shortcut: "H", icon: <Minus className="w-4 h-4" /> },
       { id: "horizontal_ray", label: "Horizontal Ray", shortcut: "Alt+H", icon: <MoveRight className="w-4 h-4" /> },
-      { id: "vertical", label: "Vertical Time Line", shortcut: "V", icon: <SeparatorVertical className="w-4 h-4" /> },
+      { id: "vertical", label: "Vertical Time Line", shortcut: "Alt+V", icon: <SeparatorVertical className="w-4 h-4" /> },
       { id: "parallel_channel", label: "Parallel Channel", shortcut: "P", icon: <Columns className="w-4 h-4" /> },
+      { id: "trend_channel", label: "Trend Channel", shortcut: "Alt+P", icon: <SquareDashed className="w-4 h-4" /> },
     ],
   },
   {
@@ -70,6 +74,7 @@ const TOOL_GROUPS: ToolGroup[] = [
     defaultTool: "fibonacci",
     tools: [
       { id: "fibonacci", label: "Fibonacci Retracement", shortcut: "F", icon: <Percent className="w-4 h-4" /> },
+      { id: "fib_extension", label: "Fibonacci Extension", shortcut: "Shift+F", icon: <TrendingUp className="w-4 h-4" /> },
     ],
   },
   {
@@ -113,6 +118,8 @@ interface LeftToolbarProps {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  onSaveDrawings?: () => void;
+  onLoadDrawings?: () => void;
   theme?: "dark" | "light";
 }
 
@@ -129,6 +136,8 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
   canRedo = false,
   onUndo,
   onRedo,
+  onSaveDrawings,
+  onLoadDrawings,
   theme = "dark",
 }) => {
   const isLight = theme === "light";
@@ -326,6 +335,22 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
           {isDrawingModeLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
         </button>
 
+        {/* Save / Load drawing templates */}
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={onSaveDrawings}
+            disabled={drawingsCount === 0}
+            aria-label="Save drawing set"
+            className={`w-7 h-7 rounded-lg flex items-center justify-center disabled:opacity-30 ${isLight ? "text-[#5d606b] hover:bg-[#f0f3fa]" : "text-[#787b86] hover:bg-[#252a36] hover:text-[#d1d4dc]"}`}
+            title="Save drawings for this symbol and timeframe"
+          ><Save className="w-3.5 h-3.5" /></button>
+          <button
+            onClick={onLoadDrawings}
+            aria-label="Load saved drawings"
+            className={`w-7 h-7 rounded-lg flex items-center justify-center ${isLight ? "text-[#5d606b] hover:bg-[#f0f3fa]" : "text-[#787b86] hover:bg-[#252a36] hover:text-[#d1d4dc]"}`}
+            title="Load saved drawings"
+          ><FolderOpen className="w-3.5 h-3.5" /></button>
+        </div>
         {/* Hide / Show All Drawings */}
         <button
           onClick={onToggleHideDrawings}

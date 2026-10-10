@@ -3,7 +3,8 @@ import { KNOWN_INSTRUMENTS } from "./instruments";
 
 export const INITIAL_WATCHLIST: WatchlistItem[] = Object.entries(KNOWN_INSTRUMENTS).map(([symbol, meta]) => {
   let defaultPrice = 100.0;
-  if (symbol === "BTCUSDT") defaultPrice = 78840.0;
+  if (symbol === "IHSG") defaultPrice = 6093.76;
+  else if (symbol === "BTCUSDT") defaultPrice = 78840.0;
   else if (symbol === "ETHUSDT") defaultPrice = 2499.66;
   else if (symbol === "XAUUSD") defaultPrice = 4376.19;
   else if (symbol === "XAGUSD") defaultPrice = 66.22;

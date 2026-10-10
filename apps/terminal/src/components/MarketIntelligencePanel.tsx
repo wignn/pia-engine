@@ -255,24 +255,13 @@ export const MarketIntelligencePanel: React.FC<Props> = ({ symbol, theme = "dark
             <span className="text-[11px] text-[#787b86] font-medium">/ 100 Global Market Sentiment</span>
           </div>
 
-          {/* Multi-segment Sentiment Bar */}
-          <div className="relative w-full mb-3">
-            <div className="h-2 w-full rounded-full overflow-hidden flex">
-              <div className="w-1/4 h-full bg-[#ef4444]" title="Extreme Fear (0-25)" />
-              <div className="w-1/4 h-full bg-[#f59e0b]" title="Fear (25-50)" />
-              <div className="w-1/4 h-full bg-[#3b82f6]" title="Neutral (50-75)" />
-              <div className="w-1/4 h-full bg-[#10b981]" title="Extreme Greed (75-100)" />
-            </div>
-            {/* Pointer Marker */}
-            <div
-              style={{ left: `${Math.max(2, Math.min(98, fgScore))}%` }}
-              className="absolute -top-1 w-2.5 h-4 -translate-x-1/2 bg-white dark:bg-[#ffffff] rounded-xs shadow-md border border-black/40 pointer-events-none"
-            />
-            <div className="flex justify-between text-[9px] font-mono text-[#787b86] mt-1.5">
-              <span>0 Extreme Fear</span>
-              <span>50 Neutral</span>
-              <span>100 Extreme Greed</span>
-            </div>
+          {/* Semicircular sentiment gauge with needle */}
+          <div className="relative mx-auto mb-3 h-[108px] w-[216px] overflow-hidden" role="img" aria-label={`Fear and Greed score ${fgScore} out of 100`}>
+            <div className="absolute left-0 top-0 h-[216px] w-[216px] rounded-full" style={{ background: "conic-gradient(from 270deg at 50% 50%, #ef4444 0deg 45deg, #f59e0b 45deg 90deg, #3b82f6 90deg 135deg, #10b981 135deg 180deg, transparent 180deg 360deg)" }} />
+            <div className={`absolute left-[22px] top-[22px] h-[172px] w-[172px] rounded-full ${isLight ? "bg-[#f8f9fc]" : "bg-[#141722]"}`} />
+            <div className="absolute bottom-0 left-1/2 h-[3px] w-[76px] origin-left rounded-full bg-[#d1d4dc]" style={{ transform: `rotate(${-180 + Math.max(0, Math.min(100, fgScore)) * 1.8}deg)` }} />
+            <div className="absolute bottom-[-4px] left-1/2 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white bg-[#2962ff]" />
+            <div className="absolute bottom-1 left-0 right-0 text-center font-mono text-[11px] text-[#787b86]">0 <span className="mx-8">50</span> 100</div>
           </div>
 
           {/* Sub-components breakdown */}

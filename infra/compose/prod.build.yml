@@ -22,6 +22,3 @@ services:
 
   analyzer:
     pull_policy: build
-
-  xauusd-model-worker:
-    pull_policy: build

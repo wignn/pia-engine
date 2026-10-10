@@ -1,20 +1,28 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import type { Chart as KLineChartInstance, KLineData, Period, PeriodType } from "klinecharts";
-import { CandleData, Timeframe, DrawingTool, IndicatorState } from "@/types";
+import type {
+  Chart as KLineChartInstance,
+  KLineData,
+  Period,
+  PeriodType,
+} from "klinecharts";
+import {
+  CandleData,
+  Timeframe,
+  DrawingTool,
+  IndicatorState,
+  ChartType,
+} from "@/types";
 import { Wifi, WifiOff, Loader2, X } from "lucide-react";
-import type { XauusdForecast, XauusdForecastState } from "@/types/forecast";
 
 interface ChartAreaProps {
   paneId?: string;
   symbol: string;
   provider: string;
   timeframe: Timeframe;
-  chartType?: "candlestick" | "bar" | "line" | "area" | "heikin_ashi";
+  chartType?: ChartType;
   indicators?: IndicatorState;
-  forecast?: XauusdForecast | null;
-  forecastState?: XauusdForecastState;
   activeTool?: DrawingTool;
   digits: number;
   candles: CandleData[];
@@ -78,7 +86,8 @@ const computeHeikinAshi = (raw: CandleData[]): KLineData[] => {
     const open =
       i === 0
         ? (c.open + c.close) / 2
-        : ((result[i - 1].open as number) + (result[i - 1].close as number)) / 2;
+        : ((result[i - 1].open as number) + (result[i - 1].close as number)) /
+          2;
     result.push({
       timestamp: c.time * 1000,
       open,
@@ -97,9 +106,13 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   provider,
   timeframe,
   chartType = "candlestick",
-  indicators = { sma20: false, ema50: false, bollinger: false, rsi: false, macd: false },
-  forecast = null,
-  forecastState = "unavailable",
+  indicators = {
+    sma20: false,
+    ema50: false,
+    bollinger: false,
+    rsi: false,
+    macd: false,
+  },
   activeTool = "cursor",
   digits,
   candles,
@@ -125,9 +138,20 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<KLineChartInstance | null>(null);
-  const klinechartsModuleRef = useRef<typeof import("klinecharts") | null>(null);
+  const [chartReady, setChartReady] = useState(false);
+  const klinechartsModuleRef = useRef<typeof import("klinecharts") | null>(
+    null,
+  );
   const subscribeCallbackRef = useRef<((data: KLineData) => void) | null>(null);
 
+  const onDrawingFinishedRef = useRef(onDrawingFinished);
+  onDrawingFinishedRef.current = onDrawingFinished;
+  const isDrawingModeLockedRef = useRef(isDrawingModeLocked);
+  isDrawingModeLockedRef.current = isDrawingModeLocked;
+  const onCanUndoRedoChangeRef = useRef(onCanUndoRedoChange);
+  onCanUndoRedoChangeRef.current = onCanUndoRedoChange;
+  const onDrawingsCountChangeRef = useRef(onDrawingsCountChange);
+  onDrawingsCountChangeRef.current = onDrawingsCountChange;
   const candlesRef = useRef(candles);
   candlesRef.current = candles;
   const hasMoreHistoryRef = useRef(hasMoreHistory);
@@ -138,11 +162,17 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   chartTypeRef.current = chartType;
 
   // Scale Mode: normal, log, percent
-  const [scaleMode, setScaleMode] = useState<"normal" | "log" | "percent">("normal");
+  const [scaleMode, setScaleMode] = useState<"normal" | "log" | "percent">(
+    "normal",
+  );
 
   // Drawings state & undo/redo tracking
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [redoStack, setRedoStack] = useState<any[]>([]);
+  const undoStackRef = useRef(undoStack);
+  undoStackRef.current = undoStack;
+  const redoStackRef = useRef(redoStack);
+  redoStackRef.current = redoStack;
   const selectedDrawingIdRef = useRef<string | null>(null);
 
   // OHLC display state
@@ -153,25 +183,73 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
     close: 0,
     change: 0,
     changePercent: 0,
+    volume: 0,
+    timestamp: 0,
   });
 
   const isLight = (settings?.theme || theme) === "light";
 
-  const forecastDecisionTime = forecast?.decision_at
-    ? Math.floor(new Date(forecast.decision_at).getTime() / 1000)
-    : null;
-  const matchingForecastCandle =
-    forecastDecisionTime === null
-      ? undefined
-      : candles.find((candle) => candle.time + 900 === forecastDecisionTime);
-  const hasForecastCandle = Boolean(matchingForecastCandle);
+  const drawingsEventHandlerRef = useRef<(event: Event) => void>(() => {});
+  useEffect(() => {
+    const listener = (event: Event) => drawingsEventHandlerRef.current(event);
+    window.addEventListener("pia-drawings", listener);
+    return () => window.removeEventListener("pia-drawings", listener);
+  }, []);
+  useEffect(() => {
+    drawingsEventHandlerRef.current = (event: Event) => {
+      const { key, action } =
+        (event as CustomEvent<{ key?: string; action?: string }>).detail || {};
+      if (
+        !key ||
+        !paneId ||
+        key !== `pia_drawings:${symbol}:${timeframe}` ||
+        !chartRef.current
+      )
+        return;
+      try {
+        if (action === "save") {
+          const overlays = chartRef.current.getOverlays({
+            groupId: "user_drawings",
+          });
+          localStorage.setItem(
+            key,
+            JSON.stringify(overlays.map(({ id: _id, ...overlay }) => overlay)),
+          );
+        } else if (action === "load") {
+          const saved: unknown = JSON.parse(localStorage.getItem(key) || "[]");
+          if (!Array.isArray(saved)) return;
+          chartRef.current.removeOverlay({ groupId: "user_drawings" });
+          const ids = saved.flatMap((item) => {
+            if (
+              !item ||
+              typeof item !== "object" ||
+              typeof item.name !== "string" ||
+              !Array.isArray(item.points)
+            )
+              return [];
+            const id = chartRef.current?.createOverlay({
+              ...item,
+              groupId: "user_drawings",
+            });
+            return typeof id === "string" ? [id] : [];
+          });
+          setUndoStack(ids);
+          setRedoStack([]);
+          onDrawingsCountChangeRef.current?.(ids.length);
+          onCanUndoRedoChangeRef.current?.(ids.length > 0, false);
+        }
+      } catch {
+        console.warn("[ChartArea] Could not read/write saved drawings.");
+      }
+    };
+  }, [paneId, symbol, timeframe]);
 
   const updateDrawingsCount = useCallback(() => {
     const chart = chartRef.current;
     if (!chart) return;
     const overlays = chart.getOverlays({ groupId: "user_drawings" });
-    onDrawingsCountChange?.(overlays.length);
-  }, [onDrawingsCountChange]);
+    onDrawingsCountChangeRef.current?.(overlays.length);
+  }, []);
 
   // Dynamic import and chart initialization
   useEffect(() => {
@@ -205,7 +283,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
                 const tr = Math.max(
                   kLine.high - kLine.low,
                   Math.abs(kLine.high - prevClose),
-                  Math.abs(kLine.low - prevClose)
+                  Math.abs(kLine.low - prevClose),
                 );
                 trSum += tr;
                 if (i < p - 1) return {};
@@ -241,7 +319,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
                   lastDay = day;
                 }
                 const vol =
-                  typeof kLine.volume === "number" && kLine.volume > 0 ? kLine.volume : 1;
+                  typeof kLine.volume === "number" && kLine.volume > 0
+                    ? kLine.volume
+                    : 1;
                 const typical = (kLine.high + kLine.low + kLine.close) / 3;
                 cumVol += vol;
                 cumTypicalVol += typical * vol;
@@ -255,7 +335,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
         if (!klinecharts.getSupportedOverlays().includes("measure")) {
           klinecharts.registerOverlay({
             name: "measure",
-            totalStep: 3,
+            totalStep: 2,
             needDefaultPointFigure: true,
             needDefaultXAxisFigure: true,
             needDefaultYAxisFigure: true,
@@ -289,7 +369,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
                     },
                     styles: {
                       style: "stroke_fill",
-                      color: isPos ? "rgba(8, 153, 129, 0.15)" : "rgba(242, 54, 69, 0.15)",
+                      color: isPos
+                        ? "rgba(8, 153, 129, 0.15)"
+                        : "rgba(242, 54, 69, 0.15)",
                       borderColor: color,
                       borderSize: 1,
                       borderStyle: "dashed",
@@ -321,7 +403,10 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           });
         }
       } catch (err) {
-        console.warn("[ChartArea] indicator/overlay registration warning:", err);
+        console.warn(
+          "[ChartArea] indicator/overlay registration warning:",
+          err,
+        );
       }
 
       // Initialize chart instance
@@ -331,28 +416,32 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       });
       if (!chartInstance) return;
       chartRef.current = chartInstance;
+      setChartReady(true);
 
-      // Apply institutional styles
+      // Apply institutional styles matching PIA technical theme
       chartInstance.setStyles({
         grid: {
           show: settings?.gridVisible !== false,
-          horizontal: { color: isLight ? "#f0f3fa" : "#1f2431" },
-          vertical: { color: isLight ? "#f0f3fa" : "#1f2431" },
+          horizontal: { color: isLight ? "#e8ebe5" : "#1f221f" },
+          vertical: { color: isLight ? "#e8ebe5" : "#1f221f" },
         },
         candle: {
           type:
             chartTypeRef.current === "bar"
               ? "ohlc"
-              : chartTypeRef.current === "area" || chartTypeRef.current === "line"
-              ? "area"
-              : "candle_solid",
+              : chartTypeRef.current === "area" ||
+                  chartTypeRef.current === "line"
+                ? "area"
+                : chartTypeRef.current === "hollow"
+                  ? "candle_stroke"
+                  : "candle_solid",
           bar: {
-            upColor: settings?.upColor || "#089981",
-            downColor: settings?.downColor || "#f23645",
-            upBorderColor: settings?.upColor || "#089981",
-            downBorderColor: settings?.downColor || "#f23645",
-            upWickColor: settings?.upColor || "#089981",
-            downWickColor: settings?.downColor || "#f23645",
+            upColor: settings?.upColor || "#26b288",
+            downColor: settings?.downColor || "#ef4444",
+            upBorderColor: settings?.upColor || "#26b288",
+            downBorderColor: settings?.downColor || "#ef4444",
+            upWickColor: settings?.upColor || "#26b288",
+            downWickColor: settings?.downColor || "#ef4444",
           },
           tooltip: {
             showRule: "follow_cross",
@@ -389,6 +478,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
                 close: last.close,
                 change: ch,
                 changePercent: chp,
+                volume: last.volume || 0,
+                timestamp: last.time || 0,
               });
             }
           } else if (params.type === "forward") {
@@ -423,7 +514,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
             window.dispatchEvent(
               new CustomEvent("terminal-crosshair-sync", {
                 detail: { sourceId: paneId, clear: true },
-              })
+              }),
             );
           }
           if (candlesRef.current.length > 0) {
@@ -437,6 +528,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
               close: last.close,
               change: ch,
               changePercent: chp,
+              volume: last.volume || 0,
+              timestamp: last.time || 0,
             });
           }
           return;
@@ -452,6 +545,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           close: k.close,
           change: ch,
           changePercent: chp,
+          volume: k.volume || 0,
+          timestamp: Math.floor((k.timestamp || 0) / 1000),
         });
 
         if (paneId) {
@@ -461,7 +556,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
                 sourceId: paneId,
                 time: Math.floor(k.timestamp / 1000),
               },
-            })
+            }),
           );
         }
       });
@@ -505,23 +600,25 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
     chart.setStyles({
       grid: {
         show: settings?.gridVisible !== false,
-        horizontal: { color: isLight ? "#f0f3fa" : "#1f2431" },
-        vertical: { color: isLight ? "#f0f3fa" : "#1f2431" },
+        horizontal: { color: isLight ? "#e8ebe5" : "#1f221f" },
+        vertical: { color: isLight ? "#e8ebe5" : "#1f221f" },
       },
       candle: {
         type:
           chartType === "bar"
             ? "ohlc"
             : chartType === "area" || chartType === "line"
-            ? "area"
-            : "candle_solid",
+              ? "area"
+              : chartType === "hollow"
+                ? "candle_stroke"
+                : "candle_solid",
         bar: {
-          upColor: settings?.upColor || "#089981",
-          downColor: settings?.downColor || "#f23645",
-          upBorderColor: settings?.upColor || "#089981",
-          downBorderColor: settings?.downColor || "#f23645",
-          upWickColor: settings?.upColor || "#089981",
-          downWickColor: settings?.downColor || "#f23645",
+          upColor: settings?.upColor || "#26b288",
+          downColor: settings?.downColor || "#ef4444",
+          upBorderColor: settings?.upColor || "#26b288",
+          downBorderColor: settings?.downColor || "#ef4444",
+          upWickColor: settings?.upColor || "#26b288",
+          downWickColor: settings?.downColor || "#ef4444",
         },
       },
     });
@@ -554,7 +651,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           paneId: "candle_pane",
           styles: { lines: [{ color: "#f5b942", size: 2 }] },
         },
-        false
+        false,
       );
     } else {
       chart.removeIndicator({ id: "ind_sma" });
@@ -571,7 +668,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           paneId: "candle_pane",
           styles: { lines: [{ color: "#2962ff", size: 2 }] },
         },
-        false
+        false,
       );
     } else {
       chart.removeIndicator({ id: "ind_ema" });
@@ -587,7 +684,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           paneId: "candle_pane",
           styles: { lines: [{ color: "#a855f7", size: 2 }] },
         },
-        false
+        false,
       );
     } else {
       chart.removeIndicator({ id: "ind_vwap" });
@@ -610,7 +707,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
             ],
           },
         },
-        false
+        false,
       );
     } else {
       chart.removeIndicator({ id: "ind_boll" });
@@ -627,7 +724,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           paneId: "pane_rsi",
           styles: { lines: [{ color: "#ab47bc", size: 2 }] },
         },
-        false
+        false,
       );
       chart.setPaneOptions({ id: "pane_rsi", height: 100, minHeight: 60 });
     } else {
@@ -644,7 +741,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           calcParams: [macdFast, macdSlow, macdSignal],
           paneId: "pane_macd",
         },
-        false
+        false,
       );
       chart.setPaneOptions({ id: "pane_macd", height: 110, minHeight: 60 });
     } else {
@@ -662,7 +759,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           paneId: "pane_atr",
           styles: { lines: [{ color: "#f59e0b", size: 2 }] },
         },
-        false
+        false,
       );
       chart.setPaneOptions({ id: "pane_atr", height: 90, minHeight: 50 });
     } else {
@@ -714,15 +811,29 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       overlayStyles = { line: { color: "#2962ff", size: 1.5 } };
     } else if (activeTool === "vertical") {
       overlayName = "verticalStraightLine";
-      overlayStyles = { line: { color: "#f5b942", size: 1.5, style: "dashed" } };
+      overlayStyles = {
+        line: { color: "#f5b942", size: 1.5, style: "dashed" },
+      };
     } else if (activeTool === "parallel_channel") {
       overlayName = "priceChannelLine";
       overlayStyles = {
         polygon: { color: "rgba(41, 98, 255, 0.12)" },
         line: { color: "#2962ff", size: 1.5 },
       };
+    } else if (activeTool === "trend_channel") {
+      overlayName = "priceChannelLine";
+      overlayStyles = {
+        polygon: { color: "rgba(8, 153, 129, 0.12)" },
+        line: { color: "#089981", size: 1.5 },
+      };
     } else if (activeTool === "fibonacci") {
       overlayName = "fibonacciLine";
+      overlayStyles = { line: { color: "#f5b942", size: 1.5 } };
+    } else if (activeTool === "fib_extension") {
+      overlayName = "fibonacciLine";
+      overlayStyles = {
+        line: { color: "#f5b942", size: 1.5, style: "dashed" },
+      };
     } else if (activeTool === "rectangle") {
       overlayName = "rect";
       overlayStyles = {
@@ -732,7 +843,11 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
     } else if (activeTool === "circle") {
       overlayName = "circle";
       overlayStyles = {
-        circle: { color: "rgba(242, 54, 69, 0.12)", borderColor: "#f23645", borderSize: 1.5 },
+        circle: {
+          color: "rgba(242, 54, 69, 0.12)",
+          borderColor: "#f23645",
+          borderSize: 1.5,
+        },
       };
     } else if (activeTool === "price_line") {
       overlayName = "priceLine";
@@ -741,10 +856,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       overlayName = "text";
       overlayStyles = { text: { color: "#ffffff", size: 12, weight: "bold" } };
     } else if (activeTool === "measure") {
-      overlayName = "rect";
+      overlayName = "measure";
       overlayStyles = {
-        polygon: { color: "rgba(41, 98, 255, 0.2)" },
-        rect: { borderColor: "#2962ff", borderSize: 1.5, borderStyle: "dashed" },
+        line: { color: "#2962ff", size: 1.5, style: "dashed" },
       };
     }
 
@@ -753,41 +867,40 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       groupId: "user_drawings",
       styles: overlayStyles,
       onDrawEnd: () => {
-        if (!isDrawingModeLocked) {
-          onDrawingFinished?.();
+        if (!isDrawingModeLockedRef.current) {
+          onDrawingFinishedRef.current?.();
         }
         updateDrawingsCount();
       },
-      onRemoved: () => {
-        updateDrawingsCount();
-      },
+      onRemoved: () => updateDrawingsCount(),
       onSelected: (event) => {
         selectedDrawingIdRef.current = event.overlay.id;
       },
       onDeselected: () => {
-        if (selectedDrawingIdRef.current === id) {
-          selectedDrawingIdRef.current = null;
-        }
+        selectedDrawingIdRef.current = null;
       },
     });
 
     if (id && typeof id === "string") {
       setUndoStack((prev) => [...prev, id]);
       setRedoStack([]);
-      onCanUndoRedoChange?.(true, false);
+      onCanUndoRedoChangeRef.current?.(true, false);
     }
-  }, [activeTool, isDrawingModeLocked, onDrawingFinished, onCanUndoRedoChange, updateDrawingsCount]);
+  }, [activeTool, chartReady, isDrawingModeLocked, updateDrawingsCount]);
 
   // Clear drawings trigger
   const lastHandledClearRef = useRef(clearDrawingsTrigger);
   useEffect(() => {
-    if (clearDrawingsTrigger > 0 && clearDrawingsTrigger !== lastHandledClearRef.current) {
+    if (
+      clearDrawingsTrigger > 0 &&
+      clearDrawingsTrigger !== lastHandledClearRef.current
+    ) {
       lastHandledClearRef.current = clearDrawingsTrigger;
       chartRef.current?.removeOverlay({ groupId: "user_drawings" });
       setUndoStack([]);
       setRedoStack([]);
-      onDrawingsCountChange?.(0);
-      onCanUndoRedoChange?.(false, false);
+      onDrawingsCountChangeRef.current?.(0);
+      onCanUndoRedoChangeRef.current?.(false, false);
     } else if (clearDrawingsTrigger === 0) {
       lastHandledClearRef.current = 0;
     }
@@ -860,7 +973,10 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       const target = e.target as HTMLElement | null;
       if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
 
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedDrawingIdRef.current) {
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        selectedDrawingIdRef.current
+      ) {
         chartRef.current?.removeOverlay({ id: selectedDrawingIdRef.current });
         selectedDrawingIdRef.current = null;
         updateDrawingsCount();
@@ -892,7 +1008,11 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       lastHandledSnapshotRef.current = snapshotTrigger;
       try {
         const bg = isLight ? "#ffffff" : "#131722";
-        const base64Url = chartRef.current.getConvertPictureUrl(true, "png", bg);
+        const base64Url = chartRef.current.getConvertPictureUrl(
+          true,
+          "png",
+          bg,
+        );
         if (base64Url) {
           const img = new Image();
           img.onload = () => {
@@ -904,7 +1024,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
               ctx.drawImage(img, 0, 0);
 
               // Footer watermark banner
-              ctx.fillStyle = isLight ? "rgba(240, 243, 250, 0.92)" : "rgba(19, 23, 34, 0.92)";
+              ctx.fillStyle = isLight
+                ? "rgba(240, 243, 250, 0.92)"
+                : "rgba(19, 23, 34, 0.92)";
               ctx.fillRect(0, canvas.height - 38, canvas.width, 38);
 
               // Brand logo text
@@ -918,7 +1040,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
               ctx.fillText(
                 `${symbol} · ${timeframe} · ${new Date().toISOString().replace("T", " ").substring(0, 19)} UTC`,
                 145,
-                canvas.height - 14
+                canvas.height - 14,
               );
 
               const watermarkedUrl = canvas.toDataURL("image/png");
@@ -964,7 +1086,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   };
 
   // Quick Range Selector
-  const handleQuickRange = (range: "1D" | "5D" | "1M" | "3M" | "6M" | "1Y" | "ALL") => {
+  const handleQuickRange = (
+    range: "1D" | "5D" | "1M" | "3M" | "6M" | "1Y" | "ALL",
+  ) => {
     const chart = chartRef.current;
     if (!chart || candles.length === 0) return;
 
@@ -988,44 +1112,77 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
   const isUp = ohlc.close >= ohlc.open;
   const hasData = candles.length > 0;
 
+  const dateStr = ohlc.timestamp
+    ? new Date(ohlc.timestamp * 1000).toLocaleDateString("en-US", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : new Date().toLocaleDateString("en-US", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+
   return (
     <div
       className={`relative w-full h-full flex flex-col ${
-        isLight ? "bg-white text-[#131722]" : "bg-[#131722] text-[#d1d4dc]"
+        isLight ? "bg-card text-foreground" : "bg-background text-foreground"
       } overflow-hidden select-none`}
     >
-      {/* Chart Legend & Status Bar */}
-      <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 pointer-events-none">
+      {/* Top Tabular OHLC Bar (PIA Technical) */}
+      <div className="tabular flex h-8 shrink-0 items-center gap-x-4 overflow-x-auto border-b border-border px-3 font-mono text-[11px] whitespace-nowrap sm:px-4 bg-card/40 text-foreground select-none no-scrollbar">
+        <span className="text-muted-foreground">{dateStr}</span>
+        <span>
+          <abbr className="text-muted-foreground no-underline" title="Open">
+            O{" "}
+          </abbr>
+          {ohlc.open > 0 ? ohlc.open.toFixed(digits) : "—"}
+        </span>
+        <span>
+          <abbr className="text-muted-foreground no-underline" title="High">
+            H{" "}
+          </abbr>
+          {ohlc.high > 0 ? ohlc.high.toFixed(digits) : "—"}
+        </span>
+        <span>
+          <abbr className="text-muted-foreground no-underline" title="Low">
+            L{" "}
+          </abbr>
+          {ohlc.low > 0 ? ohlc.low.toFixed(digits) : "—"}
+        </span>
+        <span>
+          <abbr className="text-muted-foreground no-underline" title="Close">
+            C{" "}
+          </abbr>
+          {ohlc.close > 0 ? ohlc.close.toFixed(digits) : "—"}
+        </span>
+        <span
+          className={isUp ? "text-up font-medium" : "text-down font-medium"}
+        >
+          {isUp ? "+" : ""}
+          {ohlc.change.toFixed(digits)} ({isUp ? "+" : ""}
+          {ohlc.changePercent.toFixed(2)}%)
+        </span>
+        <span>
+          <span className="text-muted-foreground">Vol </span>
+          {ohlc.volume > 0 ? ohlc.volume.toLocaleString("en-US") : "—"}
+        </span>
+      </div>
+
+      {/* Chart Active Indicator Pills & Optional AI Forecast */}
+      <div className="absolute top-10 left-3 z-10 flex flex-col gap-1.5 pointer-events-none">
         <div className="flex flex-wrap items-center gap-1.5 pointer-events-auto">
-          <span
-            className={`font-bold text-sm tracking-wide ${
-              isLight ? "text-[#131722]" : "text-white"
-            }`}
-          >
-            {symbol}
-          </span>
-          <span className="text-xs text-[#787b86] font-medium">{timeframe}</span>
-          <span
-            className={`text-[10px] text-[#787b86] font-mono border px-1.5 py-0.5 rounded ${
-              isLight ? "bg-[#f0f3fa] border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
-            }`}
-          >
-            {provider}
-          </span>
-          <span
-            className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
-              connected ? "bg-[#089981]/15 text-[#089981]" : "bg-[#787b86]/15 text-[#787b86]"
-            }`}
-          >
-            {connected ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
-            {connected ? "LIVE" : "DISCONNECTED"}
-          </span>
 
           {/* Quick Indicator Pills */}
           {indicators.sma20 && (
             <div
               className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#f5b942] ${
-                isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+                isLight
+                  ? "bg-white border-[#e0e3eb]"
+                  : "bg-[#1e222d] border-[#2a2e39]"
               }`}
             >
               <span>SMA {settings?.indicatorParams?.smaPeriod || 20}</span>
@@ -1041,7 +1198,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           {indicators.ema50 && (
             <div
               className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#2962ff] ${
-                isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+                isLight
+                  ? "bg-white border-[#e0e3eb]"
+                  : "bg-[#1e222d] border-[#2a2e39]"
               }`}
             >
               <span>EMA {settings?.indicatorParams?.emaPeriod || 50}</span>
@@ -1057,7 +1216,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           {indicators.vwap && (
             <div
               className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#a855f7] ${
-                isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+                isLight
+                  ? "bg-white border-[#e0e3eb]"
+                  : "bg-[#1e222d] border-[#2a2e39]"
               }`}
             >
               <span>VWAP</span>
@@ -1073,7 +1234,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           {indicators.bollinger && (
             <div
               className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#089981] ${
-                isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+                isLight
+                  ? "bg-white border-[#e0e3eb]"
+                  : "bg-[#1e222d] border-[#2a2e39]"
               }`}
             >
               <span>
@@ -1092,7 +1255,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           {indicators.rsi && (
             <div
               className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#ab47bc] ${
-                isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+                isLight
+                  ? "bg-white border-[#e0e3eb]"
+                  : "bg-[#1e222d] border-[#2a2e39]"
               }`}
             >
               <span>RSI {settings?.indicatorParams?.rsiPeriod || 14}</span>
@@ -1108,7 +1273,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           {indicators.atr && (
             <div
               className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#f59e0b] ${
-                isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+                isLight
+                  ? "bg-white border-[#e0e3eb]"
+                  : "bg-[#1e222d] border-[#2a2e39]"
               }`}
             >
               <span>ATR {settings?.indicatorParams?.atrPeriod || 14}</span>
@@ -1124,7 +1291,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           {indicators.macd && (
             <div
               className={`group flex items-center gap-1 text-[10px] font-mono border px-1.5 py-0.5 rounded text-[#2962ff] ${
-                isLight ? "bg-white border-[#e0e3eb]" : "bg-[#1e222d] border-[#2a2e39]"
+                isLight
+                  ? "bg-white border-[#e0e3eb]"
+                  : "bg-[#1e222d] border-[#2a2e39]"
               }`}
             >
               <span>MACD</span>
@@ -1139,130 +1308,14 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
           )}
         </div>
 
-        {/* AI Forecast Overlay Card (for XAUUSD 15m) */}
-        {indicators.aiForecast && (
-          <div
-            className={`pointer-events-auto w-72 rounded border px-2.5 py-2 text-[10px] font-mono shadow-lg ${
-              isLight
-                ? "bg-white/95 border-[#e0e3eb] text-[#131722]"
-                : "bg-[#1e222d]/95 border-[#2a2e39] text-[#d1d4dc]"
-            }`}
-            role="status"
-            aria-live="polite"
-          >
-            <div className="mb-1 flex items-center justify-between font-bold">
-              <span>XAUUSD · 1h Forecast</span>
-              <span
-                className={
-                  forecastState === "active"
-                    ? "text-[#089981]"
-                    : forecastState === "expired"
-                    ? "text-[#f5b942]"
-                    : "text-[#787b86]"
-                }
-              >
-                {symbol !== "XAUUSD"
-                  ? "XAUUSD only"
-                  : forecastState.toUpperCase()}
-              </span>
-            </div>
-            {symbol === "XAUUSD" && forecast && forecast.probabilities ? (
-              <>
-                <div className="grid grid-cols-3 gap-1 py-1 text-center">
-                  <span>DOWN {(forecast.probabilities!.down * 100).toFixed(0)}%</span>
-                  <span>FLAT {(forecast.probabilities!.flat * 100).toFixed(0)}%</span>
-                  <span>UP {(forecast.probabilities!.up * 100).toFixed(0)}%</span>
-                </div>
-                <div>
-                  Expected {(forecast.expected_return! * 100).toFixed(3)}% · uncertainty{" "}
-                  {(forecast.uncertainty! * 100).toFixed(3)}%
-                </div>
-                <div className="mt-1 grid grid-cols-3 gap-1 text-center">
-                  <span>
-                    q10{" "}
-                    {(
-                      forecast.reference_price! *
-                      Math.exp(forecast.return_quantiles!.q10)
-                    ).toFixed(digits)}
-                  </span>
-                  <span>
-                    q50{" "}
-                    {(
-                      forecast.reference_price! *
-                      Math.exp(forecast.return_quantiles!.q50)
-                    ).toFixed(digits)}
-                  </span>
-                  <span>
-                    q90{" "}
-                    {(
-                      forecast.reference_price! *
-                      Math.exp(forecast.return_quantiles!.q90)
-                    ).toFixed(digits)}
-                  </span>
-                </div>
-                <div className="mt-1 truncate text-[#787b86]">
-                  {forecast.model_version} ·{" "}
-                  {new Date(forecast.decision_at!).toLocaleString()}
-                </div>
-                <div className="text-[#787b86]">
-                  Horizon ends {new Date(forecast.horizon_end!).toLocaleString()} · paper only
-                </div>
-              </>
-            ) : (
-              <div className="text-[#787b86]">
-                {symbol !== "XAUUSD"
-                  ? "Switch this pane to XAUUSD."
-                  : forecastState === "loading"
-                  ? "Loading the latest forecast…"
-                  : forecastState === "error"
-                  ? "Forecast service is unavailable."
-                  : "No evaluated model forecast is available."}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* OHLC Bar Metrics */}
-        <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono">
-          <div className="flex items-center gap-1">
-            <span className="text-[#787b86]">O</span>
-            <span className={isLight ? "text-[#131722]" : "text-[#d1d4dc]"}>
-              {ohlc.open.toFixed(digits)}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[#787b86]">H</span>
-            <span className={isLight ? "text-[#131722]" : "text-[#d1d4dc]"}>
-              {ohlc.high.toFixed(digits)}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[#787b86]">L</span>
-            <span className={isLight ? "text-[#131722]" : "text-[#d1d4dc]"}>
-              {ohlc.low.toFixed(digits)}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[#787b86]">C</span>
-            <span className={isUp ? "text-[#089981]" : "text-[#f23645]"}>
-              {ohlc.close.toFixed(digits)}
-            </span>
-          </div>
-          <div className="flex items-center gap-1 font-semibold">
-            <span className={isUp ? "text-[#089981]" : "text-[#f23645]"}>
-              {isUp ? "+" : ""}
-              {ohlc.change.toFixed(digits)} ({isUp ? "+" : ""}
-              {ohlc.changePercent.toFixed(2)}%)
-            </span>
-          </div>
-        </div>
       </div>
 
       {/* Loading Overlays */}
       {loading && !loadingOlder && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#131722]/60 pointer-events-none">
           <div className="flex items-center gap-2 text-[#787b86] text-sm">
-            <Loader2 className="w-4 h-4 animate-spin" /> Loading {symbol} history…
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading {symbol}{" "}
+            history…
           </div>
         </div>
       )}
@@ -1274,7 +1327,9 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       {!loading && !hasData && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <div className="flex flex-col items-center gap-1 text-center">
-            <span className="text-[#d1d4dc] font-semibold">No historical data for {symbol}</span>
+            <span className="text-[#d1d4dc] font-semibold">
+              No historical data for {symbol}
+            </span>
             <span className="text-[11px] text-[#787b86]">
               Market may be closed, or this symbol isn&apos;t ingested yet.
             </span>
@@ -1284,61 +1339,6 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
 
       {/* Primary Chart Canvas */}
       <div ref={chartContainerRef} className="w-full flex-1" />
-
-      {/* Quick Timeframe Range Bar & Scale Mode Controls */}
-      <div
-        className={`h-7 border-t flex items-center justify-between px-2 text-[11px] font-mono select-none shrink-0 z-20 ${
-          isLight
-            ? "bg-[#f0f3fa] border-[#e0e3eb] text-[#5d606b]"
-            : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
-        }`}
-      >
-        {/* Left: Quick Range Fit */}
-        <div className="flex items-center gap-1 text-[#787b86]">
-          {(["1D", "5D", "1M", "3M", "6M", "1Y", "ALL"] as const).map((rng) => (
-            <button
-              key={rng}
-              onClick={() => handleQuickRange(rng)}
-              className="px-1.5 py-0.5 rounded hover:text-white hover:bg-[#2a2e39] transition-colors cursor-pointer"
-            >
-              {rng}
-            </button>
-          ))}
-        </div>
-
-        {/* Right: Auto, Log, % Scale Controls */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => handleToggleScale("normal")}
-            className="px-1.5 py-0.5 rounded text-[#787b86] hover:text-white hover:bg-[#2a2e39] font-bold cursor-pointer"
-            title="Auto Fit Scale"
-          >
-            auto
-          </button>
-          <button
-            onClick={() => handleToggleScale("log")}
-            className={`px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
-              scaleMode === "log"
-                ? "bg-[#2962ff] text-white font-bold"
-                : "text-[#787b86] hover:text-white"
-            }`}
-            title="Logarithmic Scale"
-          >
-            log
-          </button>
-          <button
-            onClick={() => handleToggleScale("percent")}
-            className={`px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
-              scaleMode === "percent"
-                ? "bg-[#2962ff] text-white font-bold"
-                : "text-[#787b86] hover:text-white"
-            }`}
-            title="Percentage Scale"
-          >
-            %
-          </button>
-        </div>
-      </div>
     </div>
   );
 };
