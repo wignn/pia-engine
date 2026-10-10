@@ -360,12 +360,18 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
       - name: Deploy production over SSH
         uses: appleboy/ssh-action@v1.2.0
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_ACTOR: ${{ github.actor }}
         with:
+          # PROD_SSH_HOST must resolve to the production host's Tailscale IP or MagicDNS name.
           host: ${{ secrets.PROD_SSH_HOST }}
           username: ${{ secrets.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
@@ -393,5 +399,3 @@ jobs:
             echo "pruning dangling images from previous deploys"
             docker image prune -f
             echo "deploy completed and verified (commit $(git rev-parse --short HEAD))"
-
-
