@@ -104,7 +104,6 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
   canClosePane = false,
   showPaneHeader = false,
 }) => {
-  const isLight = theme === "light";
   const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
   const paneType = pane.type || "chart";
   const {
@@ -118,22 +117,22 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
   } = useMarketFeed(pane.symbol, pane.timeframe);
 
   const paneTypes: { id: PaneContentType; label: string; icon: React.ReactNode }[] = [
-    { id: "chart", label: "Chart View", icon: <BarChart3 className="w-3.5 h-3.5 text-[#2962ff]" /> },
-    { id: "orderbook", label: "DOM & Order Book", icon: <Layers className="w-3.5 h-3.5 text-[#089981]" /> },
-    { id: "news", label: "News Stream", icon: <Newspaper className="w-3.5 h-3.5 text-[#f5b942]" /> },
-    { id: "social", label: "Social Pulse", icon: <Radio className="w-3.5 h-3.5 text-[#e040fb]" /> },
-    { id: "intelligence", label: "Market Intel", icon: <Brain className="w-3.5 h-3.5 text-[#00e5ff]" /> },
-    { id: "calendar", label: "Economic Calendar", icon: <Calendar className="w-3.5 h-3.5 text-[#ff5252]" /> },
-    { id: "options", label: "Options & GEX", icon: <PieChart className="w-3.5 h-3.5 text-[#00e5ff]" /> },
-    { id: "macro", label: "Macro & Central Banks", icon: <Globe2 className="w-3.5 h-3.5 text-[#f59e0b]" /> },
-    { id: "yields", label: "Treasury Yields", icon: <TrendingUp className="w-3.5 h-3.5 text-[#10b981]" /> },
-    { id: "geosignals", label: "Geopolitical Signals", icon: <ShieldAlert className="w-3.5 h-3.5 text-[#f43f5e]" /> },
-    { id: "energy", label: "Energy Complex", icon: <Zap className="w-3.5 h-3.5 text-[#eab308]" /> },
-    { id: "sec", label: "SEC Filings", icon: <FileText className="w-3.5 h-3.5 text-[#8b5cf6]" /> },
-    { id: "paper", label: "Paper Trading", icon: <Briefcase className="w-3.5 h-3.5 text-[#06b6d4]" /> },
-    { id: "controlpanel", label: "Financial War Room", icon: <LayoutDashboard className="w-3.5 h-3.5 text-[#3b82f6]" /> },
-    { id: "macromaps", label: "Macro World Map", icon: <Map className="w-3.5 h-3.5 text-[#10b981]" /> },
-    { id: "hub", label: "Supercharts Hub", icon: <LayoutGrid className="w-3.5 h-3.5 text-[#a855f7]" /> },
+    { id: "chart", label: "Chart", icon: <BarChart3 className="size-3.5 text-muted-foreground" /> },
+    { id: "orderbook", label: "Order book", icon: <Layers className="size-3.5 text-muted-foreground" /> },
+    { id: "news", label: "News", icon: <Newspaper className="size-3.5 text-muted-foreground" /> },
+    { id: "social", label: "Social pulse", icon: <Radio className="size-3.5 text-muted-foreground" /> },
+    { id: "intelligence", label: "Market intelligence", icon: <Brain className="size-3.5 text-muted-foreground" /> },
+    { id: "calendar", label: "Economic calendar", icon: <Calendar className="size-3.5 text-muted-foreground" /> },
+    { id: "options", label: "Options & GEX", icon: <PieChart className="size-3.5 text-muted-foreground" /> },
+    { id: "macro", label: "Macro & central banks", icon: <Globe2 className="size-3.5 text-muted-foreground" /> },
+    { id: "yields", label: "Treasury yields", icon: <TrendingUp className="size-3.5 text-muted-foreground" /> },
+    { id: "geosignals", label: "Geopolitical signals", icon: <ShieldAlert className="size-3.5 text-muted-foreground" /> },
+    { id: "energy", label: "Energy markets", icon: <Zap className="size-3.5 text-muted-foreground" /> },
+    { id: "sec", label: "SEC filings", icon: <FileText className="size-3.5 text-muted-foreground" /> },
+    { id: "paper", label: "Paper trading", icon: <Briefcase className="size-3.5 text-muted-foreground" /> },
+    { id: "controlpanel", label: "Market dashboard", icon: <LayoutDashboard className="size-3.5 text-muted-foreground" /> },
+    { id: "macromaps", label: "Macro map", icon: <Map className="size-3.5 text-muted-foreground" /> },
+    { id: "hub", label: "Workspace gallery", icon: <LayoutGrid className="size-3.5 text-muted-foreground" /> },
   ];
 
   const currentTypeMeta = paneTypes.find((t) => t.id === paneType) || paneTypes[0];
@@ -141,51 +140,25 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
   return (
     <div
       onClick={onActivate}
-      className={`relative w-full h-full flex flex-col overflow-hidden transition-all ${
-        isActive
-          ? "ring-1 ring-[#2962ff] z-10"
-          : isLight
-          ? "opacity-95 hover:opacity-100"
-          : "opacity-90 hover:opacity-100"
-      }`}
+      className={`relative flex h-full w-full flex-col overflow-visible ${isActive ? "z-10" : "z-0"}`}
     >
       {/* Dynamic Pane Header Bar (Custom Arrangement Toolbar) */}
       {showPaneHeader && (
-        <div
-          className={`h-7 px-2 border-b flex items-center justify-between text-[11px] font-mono shrink-0 select-none z-20 ${
-            isActive
-              ? isLight
-                ? "bg-[#e8f0fe] border-[#2962ff]/40 text-[#131722]"
-                : "bg-[#1f293d] border-[#2962ff]/50 text-white"
-              : isLight
-              ? "bg-[#f8f9fc] border-[#e0e3eb] text-[#5d606b]"
-              : "bg-[#181b24] border-[#2a2e39] text-[#787b86]"
-          }`}
-        >
+        <div className={`z-20 flex h-8 shrink-0 items-center justify-between border-b border-l-2 border-border bg-card px-2 font-mono text-[11px] ${isActive ? "border-l-primary text-foreground" : "border-l-transparent text-muted-foreground"}`}>
           {/* Left: Content Type Switcher */}
-          <div className="relative flex items-center gap-1.5">
+          <div className="relative flex min-w-0 items-center gap-1.5">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setIsTypeMenuOpen((v) => !v);
               }}
-              className={`flex items-center gap-1 px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
-                isLight ? "hover:bg-[#e0e3eb] text-[#131722]" : "hover:bg-[#2a2e39] text-white"
-              }`}
+              className="flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground transition-colors hover:bg-muted"
+              title="Change pane view"
             >
-              {currentTypeMeta.icon}
-              <span className="font-bold text-[10px]">{currentTypeMeta.label}</span>
-              <ChevronDown className="w-3 h-3 opacity-60" />
+              <span className="truncate">{paneType === "chart" ? pane.symbol : currentTypeMeta.label}</span>
+              <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
             </button>
-
-            {/* Symbol Tag */}
-            <span
-              className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                isLight ? "bg-[#ffffff] text-[#131722] border border-[#e0e3eb]" : "bg-[#141722] text-[#d1d4dc] border border-[#2a2e39]"
-              }`}
-            >
-              {pane.symbol}
-            </span>
+            <span className="font-mono text-[10px] text-muted-foreground">{pane.timeframe}</span>
 
             {/* Dropdown Menu to change tool in this pane */}
             {isTypeMenuOpen && (
@@ -198,9 +171,7 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
                   }}
                 />
                 <div
-                  className={`absolute top-full left-0 mt-1 w-44 rounded-lg border shadow-xl p-1 z-40 flex flex-col gap-0.5 ${
-                    isLight ? "bg-[#ffffff] border-[#e0e3eb] text-[#131722]" : "bg-[#1e222d] border-[#2a2e39] text-[#d1d4dc]"
-                  }`}
+                  className="absolute left-0 top-full z-40 mt-1 flex max-h-[min(440px,70vh)] w-52 flex-col gap-0.5 overflow-y-auto rounded border border-border bg-card p-1 shadow-xl"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="text-[9px] uppercase tracking-wider font-bold px-2 py-1 opacity-50">
@@ -213,13 +184,7 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
                         onChangePaneType?.(t.id);
                         setIsTypeMenuOpen(false);
                       }}
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded text-[11px] font-sans text-left transition-colors cursor-pointer ${
-                        paneType === t.id
-                          ? "bg-[#2962ff]/10 text-[#2962ff] font-bold"
-                          : isLight
-                          ? "hover:bg-[#f0f3fa] text-[#131722]"
-                          : "hover:bg-[#2a2e39] text-[#d1d4dc]"
-                      }`}
+                      className={`flex items-center gap-2 rounded px-2 py-1.5 text-left font-sans text-[11px] transition-colors ${paneType === t.id ? "bg-primary/10 font-semibold text-primary" : "text-foreground hover:bg-muted"}`}
                     >
                       {t.icon}
                       <span>{t.label}</span>
@@ -239,9 +204,7 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
                   e.stopPropagation();
                   onSplitHorizontal();
                 }}
-                className={`p-1 rounded transition-colors cursor-pointer ${
-                  isLight ? "hover:bg-[#e0e3eb] text-[#5d606b] hover:text-[#131722]" : "hover:bg-[#2a2e39] text-[#787b86] hover:text-white"
-                }`}
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 title="Split Pane Horizontally (2 Columns)"
               >
                 <Columns className="w-3 h-3" />
@@ -255,9 +218,7 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
                   e.stopPropagation();
                   onSplitVertical();
                 }}
-                className={`p-1 rounded transition-colors cursor-pointer ${
-                  isLight ? "hover:bg-[#e0e3eb] text-[#5d606b] hover:text-[#131722]" : "hover:bg-[#2a2e39] text-[#787b86] hover:text-white"
-                }`}
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 title="Split Pane Vertically (2 Rows)"
               >
                 <Rows className="w-3 h-3" />
@@ -271,9 +232,7 @@ export const ChartPaneWrapper: React.FC<ChartPaneWrapperProps> = ({
                   e.stopPropagation();
                   onClosePane();
                 }}
-                className={`p-1 rounded transition-colors cursor-pointer ${
-                  isLight ? "hover:bg-[#e0e3eb] text-[#5d606b] hover:text-[#f23645]" : "hover:bg-[#2a2e39] text-[#787b86] hover:text-[#f23645]"
-                }`}
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-down"
                 title="Close this Pane"
               >
                 <X className="w-3 h-3" />

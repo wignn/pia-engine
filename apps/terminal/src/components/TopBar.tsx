@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
-import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import {
-  BarChart3,
   ChevronDown,
   LayoutGrid,
+  Menu,
   Moon,
+  PanelRight,
   Search,
   Settings,
   Sun,
@@ -16,18 +16,19 @@ import { VisualLayoutPicker } from "./VisualLayoutPicker";
 
 interface TopBarProps {
   onSearchClick: () => void;
-  onOpenMainMenu?: () => void;
-  paneType?: PaneContentType;
-  layout?: ChartLayout;
-  onLayoutChange?: (layout: ChartLayout) => void;
-  theme?: "dark" | "light";
-  onToggleTheme?: () => void;
-  onOpenSettings?: () => void;
+  onOpenMainMenu: () => void;
+  paneType: PaneContentType;
+  layout: ChartLayout;
+  onLayoutChange: (layout: ChartLayout) => void;
+  theme: "dark" | "light";
+  onToggleTheme: () => void;
+  onOpenSettings: () => void;
+  onToggleMarketPanel: () => void;
 }
 
-const WORKSPACE_LABELS: Record<PaneContentType, string> = {
-  chart: "Market Overview",
-  controlpanel: "Financial War Room",
+export const WORKSPACE_LABELS: Record<PaneContentType, string> = {
+  chart: "Charts",
+  controlpanel: "Market Dashboard",
   macromaps: "Macro Map",
   hub: "Workspace Gallery",
   orderbook: "Order Book",
@@ -45,101 +46,91 @@ const WORKSPACE_LABELS: Record<PaneContentType, string> = {
   live: "Live Broadcast",
 };
 
-export const TopBar: React.FC<TopBarProps> = ({
+const iconButton =
+  "flex size-8 shrink-0 items-center justify-center rounded border border-transparent text-[#9baabd] transition-colors hover:border-[#425166] hover:bg-[#202d3c] hover:text-white";
+
+export function TopBar({
   onSearchClick,
   onOpenMainMenu,
-  paneType = "chart",
-  layout = "1x1",
+  paneType,
+  layout,
   onLayoutChange,
-  theme = "dark",
+  theme,
   onToggleTheme,
   onOpenSettings,
-}) => {
-  const isLight = theme === "light";
+  onToggleMarketPanel,
+}: TopBarProps) {
   const [isLayoutPickerOpen, setIsLayoutPickerOpen] = useState(false);
+  const layoutRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isLayoutPickerOpen) return;
+    const closeOutside = (event: MouseEvent) => {
+      if (!layoutRef.current?.contains(event.target as Node)) setIsLayoutPickerOpen(false);
+    };
+    document.addEventListener("mousedown", closeOutside);
+    return () => document.removeEventListener("mousedown", closeOutside);
+  }, [isLayoutPickerOpen]);
 
   return (
-    <header className="z-30 flex h-12 min-h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-3 text-xs sm:px-4">
+    <header className="relative z-40 flex h-[52px] min-h-[52px] items-center gap-3 border-b border-[#263546] bg-[#101923] px-3 text-[#e8eef5] sm:px-4">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex shrink-0 items-center gap-2.5">
-          <div className="flex size-7 items-center justify-center overflow-hidden rounded-md border border-border bg-background p-0.5">
-            <Image src="/logo.png" alt="PIA Terminal" width={24} height={24} priority className="size-full object-contain" />
-          </div>
-          <span className="hidden font-semibold tracking-tight text-foreground sm:inline">PIA Terminal</span>
+        <div className="flex shrink-0 items-center gap-2.5 pr-1">
+          <span className="flex h-7 items-center gap-1.5 border-l-[3px] border-[#c6a16b] pl-2.5 text-[15px] font-bold tracking-[-0.07em] text-white">PIA</span>
+          <span className="hidden border-l border-[#344357] pl-2.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-[#95a5b9] sm:block">Trading terminal</span>
         </div>
-
-        <div className="hidden h-6 w-px bg-border md:block" />
-
+        <span className="hidden h-5 w-px bg-[#344357] md:block" />
         <button
-          onClick={onOpenMainMenu}
-          className="flex h-8 shrink-0 items-center gap-2 rounded-md border border-border bg-background px-2.5 font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-muted"
-          title="Open workspace navigation"
-          aria-label="Open workspace navigation"
-        >
-          <BarChart3 className="size-3.5 text-primary" />
-          <span className="hidden sm:inline">{WORKSPACE_LABELS[paneType]}</span>
-          <ChevronDown className="size-3 text-muted-foreground" />
-        </button>
-
-        <button
-          onClick={onSearchClick}
           type="button"
-          title="Search symbols and companies (Ctrl+K)"
-          className="group flex h-8 min-w-0 w-40 items-center gap-2 rounded-md border border-border bg-background px-2.5 text-left transition-colors hover:border-primary/40 sm:w-56 lg:w-72"
+          onClick={onOpenMainMenu}
+          className="flex h-8 min-w-0 items-center gap-2 rounded px-2 text-left text-xs font-medium text-[#c7d3e0] transition-colors hover:bg-[#202d3c] hover:text-white"
+          aria-label="Choose workspace"
+          title="Choose workspace"
         >
-          <Search className="size-3.5 shrink-0 text-muted-foreground group-hover:text-primary" />
-          <span className="truncate text-muted-foreground group-hover:text-foreground">Search symbols or companies</span>
-          <kbd className="ml-auto hidden shrink-0 rounded border border-border bg-muted/60 px-1.5 font-mono text-[9px] text-muted-foreground lg:inline-block">Ctrl K</kbd>
+          <Menu className="size-4 shrink-0 sm:hidden" />
+          <span className="hidden max-w-44 truncate sm:inline">{WORKSPACE_LABELS[paneType]}</span>
+          <ChevronDown className="hidden size-3.5 shrink-0 text-[#778ba2] sm:block" />
         </button>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1.5">
-        {onLayoutChange && (
-          <div className="relative">
-            <button
-              onClick={() => setIsLayoutPickerOpen((open) => !open)}
-              className="flex size-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
-              title="Chart layout"
-              aria-label="Chart layout"
-            >
-              <LayoutGrid className="size-3.5" />
-            </button>
-            {isLayoutPickerOpen && (
-              <VisualLayoutPicker
-                currentLayout={layout}
-                onSelectLayout={(nextLayout) => {
-                  onLayoutChange(nextLayout);
-                  setIsLayoutPickerOpen(false);
-                }}
-                onClose={() => setIsLayoutPickerOpen(false)}
-                theme={theme}
-              />
-            )}
-          </div>
-        )}
+      <button
+        type="button"
+        onClick={onSearchClick}
+        className="ml-auto flex h-8 min-w-0 items-center gap-2 rounded border border-[#334255] bg-[#1a2735] px-2.5 text-left text-xs text-[#9dafc2] transition-colors hover:border-[#657a92] hover:text-white sm:w-56 lg:mx-auto lg:w-80"
+        title="Search instruments (Ctrl+K)"
+      >
+        <Search className="size-4 shrink-0" />
+        <span className="hidden flex-1 truncate sm:block">Search symbol or company</span>
+        <kbd className="hidden rounded border border-[#3d4c60] px-1.5 py-0.5 font-mono text-[10px] text-[#7f92a9] lg:block">Ctrl K</kbd>
+      </button>
 
-        {onToggleTheme && (
-          <button
-            onClick={onToggleTheme}
-            className="flex size-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
-            title={isLight ? "Switch to dark theme" : "Switch to light theme"}
-            aria-label="Toggle theme"
-          >
-            {isLight ? <Moon className="size-3.5" /> : <Sun className="size-3.5" />}
+      <div className="flex shrink-0 items-center gap-0.5 border-l border-[#344357] pl-2 sm:gap-1 sm:pl-3">
+        <div ref={layoutRef} className="relative">
+          <button type="button" onClick={() => setIsLayoutPickerOpen((open) => !open)} className={iconButton} title="Chart layout" aria-label="Chart layout">
+            <LayoutGrid className="size-4" />
           </button>
-        )}
-
-        {onOpenSettings && (
-          <button
-            onClick={onOpenSettings}
-            className="flex size-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
-            title="Terminal settings"
-            aria-label="Terminal settings"
-          >
-            <Settings className="size-3.5" />
-          </button>
-        )}
+          {isLayoutPickerOpen && (
+            <VisualLayoutPicker
+              currentLayout={layout}
+              onSelectLayout={(nextLayout) => {
+                onLayoutChange(nextLayout);
+                setIsLayoutPickerOpen(false);
+              }}
+              onClose={() => setIsLayoutPickerOpen(false)}
+              theme={theme}
+            />
+          )}
+        </div>
+        <button type="button" onClick={onToggleMarketPanel} className={iconButton} title="Toggle market panel" aria-label="Toggle market panel">
+          <PanelRight className="size-4" />
+        </button>
+        <button type="button" onClick={onToggleTheme} className={iconButton} title={theme === "dark" ? "Light theme" : "Dark theme"} aria-label="Toggle theme">
+          {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+        </button>
+        <button type="button" onClick={onOpenSettings} className={iconButton} title="Settings" aria-label="Settings">
+          <Settings className="size-4" />
+        </button>
       </div>
     </header>
   );
-};
+}

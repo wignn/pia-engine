@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Check, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, RotateCcw, X } from "lucide-react";
 import { IndicatorState } from "@/types";
 
 interface TechnicalSidebarProps {
@@ -10,6 +10,7 @@ interface TechnicalSidebarProps {
   onResetIndicators?: () => void;
   onApplyPreset?: (preset: "Default" | "Minimal" | "Klasik" | "Tren" | "Momentum") => void;
   activePreset?: string;
+  onClose?: () => void;
 }
 
 interface IndicatorMeta {
@@ -50,6 +51,7 @@ export const TechnicalSidebar: React.FC<TechnicalSidebarProps> = ({
   onResetIndicators,
   onApplyPreset,
   activePreset = "Default",
+  onClose,
 }) => {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const activeCount = Object.values(indicators).filter(Boolean).length;
@@ -59,28 +61,16 @@ export const TechnicalSidebar: React.FC<TechnicalSidebarProps> = ({
   };
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col overflow-hidden border-r border-border bg-card/40 select-none">
-      <div className="border-b border-border px-3 py-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Indicators</h2>
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
-          {PRESETS.map(({ id, label }) => {
-            const selected = activePreset === id;
-            return (
-              <button
-                key={id}
-                onClick={() => onApplyPreset?.(id)}
-                className={`rounded-md border px-2.5 py-1.5 text-left text-xs font-medium transition-colors ${
-                  selected
-                    ? "border-primary/40 bg-primary/10 text-primary"
-                    : "border-border bg-background text-muted-foreground hover:text-foreground"
-                }`}
-                aria-pressed={selected}
-              >
-                {label}
-              </button>
-            );
-          })}
+    <aside className="absolute inset-y-0 left-0 z-30 flex h-full w-[min(280px,85vw)] shrink-0 flex-col overflow-hidden border-r border-border bg-card shadow-xl md:static md:w-64 md:shadow-none">
+      <div className="border-b border-border px-4 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-foreground">Indicators</h2>
+          {onClose && <button type="button" onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden" aria-label="Close indicators"><X className="size-4" /></button>}
         </div>
+        <label className="mt-3 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground" htmlFor="indicator-preset">Preset</label>
+        <select id="indicator-preset" value={activePreset} onChange={(event) => onApplyPreset?.(event.target.value as "Default" | "Minimal" | "Klasik" | "Tren" | "Momentum")} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs text-foreground">
+          {PRESETS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+        </select>
       </div>
 
       <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
@@ -92,24 +82,7 @@ export const TechnicalSidebar: React.FC<TechnicalSidebarProps> = ({
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
-        {activeCount === 0 ? (
-          <p className="px-3 py-3 text-xs italic text-muted-foreground">No active indicators</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5 border-b border-border p-3">
-            {INDICATORS.filter((indicator) => indicators[indicator.key]).map((indicator) => (
-              <button
-                key={indicator.key}
-                onClick={() => onToggleIndicator(indicator.key)}
-                className="rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20"
-                title={`Remove ${indicator.name}`}
-              >
-                {indicator.name.split(" ")[0]} ×
-              </button>
-            ))}
-          </div>
-        )}
-
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="divide-y divide-border">
           {CATEGORIES.map(({ id, title }) => {
             const collapsed = collapsedSections[id];

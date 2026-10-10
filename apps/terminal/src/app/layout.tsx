@@ -9,8 +9,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "PIA Terminal — Professional Market Intelligence",
-  description: "Enterprise Grade Real-Time Financial Trading Terminal",
+  title: "PIA Terminal | Markets and Charts",
+  description: "A workspace for live markets, charts, news, and research.",
   icons: {
     icon: "/logo.png",
   }

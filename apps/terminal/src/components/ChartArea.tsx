@@ -422,8 +422,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       chartInstance.setStyles({
         grid: {
           show: settings?.gridVisible !== false,
-          horizontal: { color: isLight ? "#e8ebe5" : "#1f221f" },
-          vertical: { color: isLight ? "#e8ebe5" : "#1f221f" },
+          horizontal: { color: isLight ? "#e9edf2" : "#253140" },
+          vertical: { color: isLight ? "#e9edf2" : "#253140" },
         },
         candle: {
           type:
@@ -600,8 +600,8 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
     chart.setStyles({
       grid: {
         show: settings?.gridVisible !== false,
-        horizontal: { color: isLight ? "#e8ebe5" : "#1f221f" },
-        vertical: { color: isLight ? "#e8ebe5" : "#1f221f" },
+        horizontal: { color: isLight ? "#e9edf2" : "#253140" },
+        vertical: { color: isLight ? "#e9edf2" : "#253140" },
       },
       candle: {
         type:
@@ -1133,7 +1133,7 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
       } overflow-hidden select-none`}
     >
       {/* Top Tabular OHLC Bar (PIA Technical) */}
-      <div className="tabular flex h-8 shrink-0 items-center gap-x-4 overflow-x-auto border-b border-border px-3 font-mono text-[11px] whitespace-nowrap sm:px-4 bg-card/40 text-foreground select-none no-scrollbar">
+      <div className="tabular flex h-7 shrink-0 items-center gap-x-4 overflow-x-auto border-b border-border bg-muted/30 px-3 font-mono text-[10px] text-foreground whitespace-nowrap select-none no-scrollbar sm:px-4">
         <span className="text-muted-foreground">{dateStr}</span>
         <span>
           <abbr className="text-muted-foreground no-underline" title="Open">
@@ -1312,26 +1312,26 @@ export const ChartArea: React.FC<ChartAreaProps> = ({
 
       {/* Loading Overlays */}
       {loading && !loadingOlder && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#131722]/60 pointer-events-none">
-          <div className="flex items-center gap-2 text-[#787b86] text-sm">
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-background/70">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" /> Loading {symbol}{" "}
             history…
           </div>
         </div>
       )}
       {loadingOlder && (
-        <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2 flex items-center gap-2 rounded bg-[#1e222d] border border-[#2a2e39] px-3 py-1.5 text-[11px] text-[#d1d4dc] shadow-lg pointer-events-none">
+        <div className="pointer-events-none absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-[11px] text-foreground shadow-lg">
           <Loader2 className="w-3 h-3 animate-spin" /> Loading older candles…
         </div>
       )}
       {!loading && !hasData && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <div className="flex flex-col items-center gap-1 text-center">
-            <span className="text-[#d1d4dc] font-semibold">
-              No historical data for {symbol}
+            <span className="font-semibold text-foreground">
+              Chart data unavailable for {symbol}
             </span>
-            <span className="text-[11px] text-[#787b86]">
-              Market may be closed, or this symbol isn&apos;t ingested yet.
+            <span className="text-[11px] text-muted-foreground">
+              Try another instrument or refresh when the market feed returns.
             </span>
           </div>
         </div>

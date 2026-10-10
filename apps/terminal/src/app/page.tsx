@@ -14,7 +14,6 @@ import { AlertsPanel } from "@/components/AlertsPanel";
 import { CalendarPanel } from "@/components/CalendarPanel";
 import { LiveStreamPanel } from "@/components/LiveStreamPanel";
 import { OrderBookPanel } from "@/components/OrderBookPanel";
-import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { ChartTabs } from "@/components/ChartTabs";
 import { SymbolSearchModal } from "@/components/SymbolSearchModal";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -50,8 +49,8 @@ import {
   DEFAULT_INDICATOR_PARAMS,
 } from "@/types";
 
-function getGridClass(layout: ChartLayout, isLight: boolean): string {
-  const borderColor = isLight ? "bg-[#e0e3eb]" : "bg-[#1e222d]";
+function getGridClass(layout: ChartLayout): string {
+  const borderColor = "bg-border";
   switch (layout) {
     case "1x2":
       return `grid grid-cols-1 md:grid-cols-2 gap-0.5 h-full w-full ${borderColor}`;
@@ -157,8 +156,6 @@ export default function TerminalPage() {
     handleSaveSettings({ ...settings, indicatorParams: params });
   };
 
-  const isLight = settings.theme === "light";
-
   // Sync document class with active theme
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -181,10 +178,6 @@ export default function TerminalPage() {
   const [activePreset, setActivePreset] = useState<
     "Default" | "Minimal" | "Klasik" | "Tren" | "Momentum"
   >("Default");
-  const [activeRange, setActiveRange] = useState("1Y");
-  const [activeScale, setActiveScale] = useState<"Linear" | "Log" | "%">(
-    "Linear",
-  );
 
   // Multi-Chart Grid Layout State
   const [layout, setLayout] = useState<ChartLayout>("1x1");
@@ -487,10 +480,7 @@ export default function TerminalPage() {
     return panes.slice(0, 6);
   }, [layout, activePane, panes]);
 
-  const gridClass = useMemo(
-    () => getGridClass(layout, isLight),
-    [layout, isLight],
-  );
+  const gridClass = useMemo(() => getGridClass(layout), [layout]);
 
   const handleSelectTab = (tabId: string) => {
     setActiveTabId(tabId);
@@ -596,6 +586,11 @@ export default function TerminalPage() {
     setPanes((curr) =>
       curr.map((p) => (p.id === paneId ? { ...p, type: newType } : p)),
     );
+    if (paneId === activePaneId) {
+      setTabs((curr) => curr.map((tab) =>
+        tab.id === activeTabId ? { ...tab, type: newType } : tab,
+      ));
+    }
   };
 
   const handleSplitHorizontal = () => {
@@ -743,14 +738,11 @@ export default function TerminalPage() {
     }
   }, []);
 
-  // TradingView principle: Clicking active tab toggles panel open/close!
   const handleTabChangeFromDock = (tab: SidebarTab) => {
-    if (rightSidebarTab === tab && !isSidebarCollapsed) {
-      setIsSidebarCollapsed(true);
-    } else {
-      setRightSidebarTab(tab);
+    setRightSidebarTab(tab);
+    setIsSidebarCollapsed(false);
+    if (!window.matchMedia("(min-width: 1024px)").matches) {
       setIsMobileDrawerOpen(true);
-      setIsSidebarCollapsed(false);
     }
   };
 
@@ -784,6 +776,12 @@ export default function TerminalPage() {
   // Pro Keyboard Shortcuts & Type-to-Search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setInitialSearchQuery("");
+        setIsSearchOpen(true);
+        return;
+      }
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
       if (
@@ -811,6 +809,10 @@ export default function TerminalPage() {
       }
 
       // Undo / Redo Shortcuts
+      if (e.key.toLowerCase() === "v" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        setActiveTool("cursor");
+        return;
+      }
       if (
         e.key.toLowerCase() === "t" &&
         !e.ctrlKey &&
@@ -935,10 +937,6 @@ export default function TerminalPage() {
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled || !Array.isArray(data.items)) return;
-        const bySym: Record<string, any> = {};
-        for (const it of data.items)
-          bySym[String(it.symbol ?? "").toUpperCase()] = it;
-
         setWatchlist((list) => {
           // 1. Build map of clean symbols from live data (prefer clean symbol over trailing M)
           const cleanHits = new Map<string, any>();
@@ -964,11 +962,14 @@ export default function TerminalPage() {
               sym.endsWith("M") && sym.length >= 5 ? sym.slice(0, -1) : sym;
             const hit = cleanHits.get(cleanSym);
             if (!hit) {
-              // Empty / inactive pair -> remove
+              existingSyms.add(cleanSym);
+              updated.push(w);
               continue;
             }
             existingSyms.add(cleanSym);
-            const change = w.price ? hit.price - (w.price - w.change) : 0;
+            const change = typeof hit.change === "number"
+              ? hit.change
+              : w.price ? hit.price - (w.price - w.change) : 0;
             const meta = resolveInstrument(cleanSym, hit.asset_type);
             updated.push({
               ...w,
@@ -979,9 +980,13 @@ export default function TerminalPage() {
               digits: meta.digits,
               price: hit.price,
               change,
-              changePercent: w.price
-                ? Number(((change / (hit.price - change)) * 100).toFixed(2))
-                : 0,
+              changePercent: typeof hit.changePercent === "number"
+                ? hit.changePercent
+                : typeof hit.change_percent === "number"
+                  ? hit.change_percent
+                  : hit.price - change > 0
+                    ? Number(((change / (hit.price - change)) * 100).toFixed(2))
+                    : 0,
             });
           }
 
@@ -1033,27 +1038,36 @@ export default function TerminalPage() {
         onToggleTheme={handleToggleTheme}
         onOpenSettings={() => setIsSettingsOpen(true)}
         paneType={activePane.type || "chart"}
+        onToggleMarketPanel={() => {
+          if (window.matchMedia("(min-width: 1024px)").matches) {
+            setIsSidebarCollapsed((collapsed) => !collapsed);
+          } else {
+            setIsMobileDrawerOpen((open) => !open);
+          }
+        }}
       />
 
-      {/* Prominent Instrument Header & Statistics (PIA Technical) */}
-      <InstrumentHeader
-        symbol={selectedItem.symbol}
-        name={selectedItem.name}
-        price={selectedItem.price}
-        change={selectedItem.change}
-        changePercent={selectedItem.changePercent}
-        digits={selectedItem.digits || 2}
-        open={selectedItem.price - selectedItem.change}
-        high={Math.max(
-          selectedItem.price,
-          selectedItem.price - selectedItem.change,
-        )}
-        low={Math.min(
-          selectedItem.price,
-          selectedItem.price - selectedItem.change,
-        )}
-        volume={0}
-      />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background" aria-label="Chart workspace">
+          <ChartTabs
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onSelectTab={handleSelectTab}
+            onCloseTab={handleCloseTab}
+            onNewTab={handleNewTab}
+            onReorderTabs={handleReorderTabs}
+            theme={settings.theme}
+          />
+          <InstrumentHeader
+            symbol={selectedItem.symbol}
+            name={selectedItem.name}
+            price={selectedItem.price}
+            change={selectedItem.change}
+            changePercent={selectedItem.changePercent}
+            digits={selectedItem.digits || 2}
+            category={selectedItem.category}
+            provider={selectedItem.provider}
+          />
 
       {/* Timeframe & Mode Controls Bar (PIA Technical) */}
       <TechnicalToolbar
@@ -1062,9 +1076,16 @@ export default function TerminalPage() {
         chartType={activePane.chartType}
         onChartTypeChange={handleChartTypeChange}
         isSidebarOpen={isLeftSidebarOpen}
-        onToggleSidebar={() => setIsLeftSidebarOpen((prev) => !prev)}
+        onToggleSidebar={() => {
+          setIsLeftSidebarOpen((open) => !open);
+          setIsDrawingToolbarOpen(false);
+        }}
+        indicatorsCount={Object.values(activePane.indicators).filter(Boolean).length}
         isDrawingToolbarOpen={isDrawingToolbarOpen}
-        onToggleDrawingToolbar={() => setIsDrawingToolbarOpen((prev) => !prev)}
+        onToggleDrawingToolbar={() => {
+          setIsDrawingToolbarOpen((open) => !open);
+          setIsLeftSidebarOpen(false);
+        }}
         onSnapshot={() => setSnapshotTrigger((c) => c + 1)}
         onFullscreen={toggleFullscreen}
         isFullscreen={
@@ -1074,27 +1095,9 @@ export default function TerminalPage() {
         canRedo={canRedo}
         onUndo={() => setUndoTrigger((c) => c + 1)}
         onRedo={() => setRedoTrigger((c) => c + 1)}
-        activeScale={activeScale}
-        onScaleChange={setActiveScale}
-        activeRange={activeRange}
-        onRangeSelect={(range) => {
-          setActiveRange(range);
-          if (range === "1D") handleTimeframe("5m");
-          else if (range === "5D") handleTimeframe("15m");
-          else if (range === "1M" || range === "3M") handleTimeframe("1h");
-          else if (
-            range === "6M" ||
-            range === "YTD" ||
-            range === "1Y" ||
-            range === "3Y" ||
-            range === "5Y" ||
-            range === "MAX"
-          )
-            handleTimeframe("1D");
-        }}
       />
 
-      <div className="min-h-0 flex-1 flex w-full overflow-hidden relative">
+      <div className="relative flex min-h-0 w-full flex-1 overflow-hidden">
         {/* PIA Indicator & Preset Sidebar */}
         {isLeftSidebarOpen && (
           <TechnicalSidebar
@@ -1103,6 +1106,7 @@ export default function TerminalPage() {
             onResetIndicators={handleResetIndicators}
             onApplyPreset={handleApplyPreset}
             activePreset={activePreset}
+            onClose={() => setIsLeftSidebarOpen(false)}
           />
         )}
 
@@ -1116,10 +1120,6 @@ export default function TerminalPage() {
             onToggleDrawingModeLock={() => setIsDrawingModeLocked((v) => !v)}
             isDrawingsHidden={isDrawingsHidden}
             onToggleHideDrawings={() => setIsDrawingsHidden((v) => !v)}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onUndo={() => setUndoTrigger((c) => c + 1)}
-            onRedo={() => setRedoTrigger((c) => c + 1)}
             onSaveDrawings={handleSaveDrawings}
             onLoadDrawings={handleLoadDrawings}
             theme={settings.theme}
@@ -1173,27 +1173,22 @@ export default function TerminalPage() {
             })}
           </div>
         </main>
+      </div>
+        </section>
 
         {/* Desktop Splitter & Collapse Button */}
         <div
           onMouseDown={handleSplitterMouseDown}
-          className={`hidden lg:flex relative w-1 hover:w-1.5 cursor-col-resize ${
-            isLight ? "bg-[#e0e3eb]" : "bg-[#2a2e39]"
-          } hover:bg-[#2962ff] transition-all items-center justify-center select-none z-20 group shrink-0 ${
-            isDraggingSplitter ? "bg-[#2962ff] w-1.5" : ""
-          }`}
+          className={`relative z-20 hidden w-1 shrink-0 cursor-col-resize items-center justify-center bg-border transition-colors hover:bg-primary lg:flex ${isDraggingSplitter ? "bg-primary" : ""}`}
           title="Drag to resize width"
         >
           <button
+            onMouseDown={(event) => event.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               setIsSidebarCollapsed((c) => !c);
             }}
-            className={`absolute -left-2.5 top-1/2 -translate-y-1/2 w-5 h-7 rounded border flex items-center justify-center shadow-md z-30 transition-all cursor-pointer ${
-              isLight
-                ? "bg-[#ffffff] border-[#e0e3eb] text-[#5d606b] hover:text-[#131722]"
-                : "bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-white"
-            }`}
+            className="absolute -left-2.5 top-1/2 z-30 flex h-7 w-5 -translate-y-1/2 items-center justify-center rounded border border-border bg-card text-muted-foreground shadow-md transition-colors hover:text-foreground"
             title={
               isSidebarCollapsed
                 ? "Expand Panel (Alt+S)"
@@ -1218,38 +1213,44 @@ export default function TerminalPage() {
 
         {/* Right Dock Sidebar */}
         <aside
-          style={{ width: isSidebarCollapsed ? 0 : `${sidebarWidth}px` }}
+          style={{ "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}
           className={`
-            fixed inset-y-0 right-0 z-50 w-[calc(100vw-1rem)] max-w-[360px] shadow-2xl transition-transform duration-300 ease-in-out
-            lg:static lg:z-auto lg:shadow-none lg:translate-x-0 lg:transition-none
+            fixed inset-y-0 right-0 z-50 w-[min(100vw,360px)] shadow-2xl transition-transform duration-300 ease-in-out
+            lg:static lg:z-auto lg:w-[var(--sidebar-width)] lg:shadow-none lg:translate-x-0 lg:transition-none
             ${isMobileDrawerOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
             ${isSidebarCollapsed ? "lg:hidden" : "lg:flex"}
-            bg-card border-border text-foreground
-            flex flex-col h-full overflow-hidden border-l shrink-0 transition-colors
+            flex h-full shrink-0 flex-col overflow-hidden border-l border-border bg-card text-foreground
           `}
+          aria-label="Market panel"
         >
           {/* Mobile Drawer Close Header */}
           <div
-            className="flex items-center justify-between px-3 py-2.5 border-b border-border bg-muted/40 lg:hidden shrink-0"
+            className="flex shrink-0 items-center justify-between border-b border-border bg-muted/40 px-4 py-2.5 lg:hidden"
           >
-            <span className="font-bold text-xs uppercase tracking-wider">
-              {rightSidebarTab}
-            </span>
+            <span className="text-xs font-semibold text-foreground">Market panels</span>
             <button
               onClick={() => setIsMobileDrawerOpen(false)}
-              className="p-1 rounded text-[#787b86] hover:text-white hover:bg-black/10 dark:hover:bg-[#2a2e39] transition-colors cursor-pointer"
+              className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               title="Close Drawer"
+              aria-label="Close market panel"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="flex-1 overflow-hidden">
+          <RightDock
+            activeTab={rightSidebarTab}
+            setActiveTab={handleTabChangeFromDock}
+            theme={settings.theme}
+          />
+
+          <div className="min-h-0 flex-1 overflow-hidden">
             {rightSidebarTab === "watchlist" && (
               <RightWatchlist
                 items={watchlist}
                 selectedSymbol={selectedItem.symbol}
                 onSelectSymbol={handleSelectSymbol}
+                onOpenNews={() => setRightSidebarTab("news")}
                 theme={settings.theme}
               />
             )}
@@ -1303,29 +1304,10 @@ export default function TerminalPage() {
             {rightSidebarTab === "paper" && <PaperTradingPanel />}
           </div>
         </aside>
-
-        <RightDock
-          activeTab={rightSidebarTab}
-          setActiveTab={handleTabChangeFromDock}
-          theme={settings.theme}
-        />
       </div>
 
       {/* Institutional Desktop Bottom Status Bar */}
-      <BottomStatusBar />
-
-      {/* Mobile Bottom Navigation (< md) */}
-      <MobileBottomNav
-        activeTab={rightSidebarTab}
-        setActiveTab={(tab) => {
-          setRightSidebarTab(tab);
-          setIsMobileDrawerOpen(true);
-        }}
-        isDrawerOpen={isMobileDrawerOpen}
-        setIsDrawerOpen={setIsMobileDrawerOpen}
-        activeTool={activeTool}
-        setActiveTool={setActiveTool}
-      />
+      <BottomStatusBar symbol={activePane.symbol} timeframe={activePane.timeframe} />
 
       <SymbolSearchModal
         isOpen={isSearchOpen}

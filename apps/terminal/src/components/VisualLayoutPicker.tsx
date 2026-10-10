@@ -28,7 +28,7 @@ export const VisualLayoutPicker: React.FC<VisualLayoutPickerProps> = ({
   const boxClass = isLight
     ? "border-[#b2b5be] bg-[#e0e3eb]"
     : "border-[#434651] bg-[#2a2e39]";
-  const activeBoxClass = "border-[#2962ff] bg-[#2962ff]/30";
+  const activeBoxClass = "border-primary bg-primary/30";
 
   const layouts: { group: string; items: LayoutItem[] }[] = [
     {
@@ -198,16 +198,12 @@ export const VisualLayoutPicker: React.FC<VisualLayoutPickerProps> = ({
 
   return (
     <div
-      className={`w-72 rounded-xl border shadow-2xl p-3 select-none flex flex-col gap-3 transition-colors ${
-        isLight
-          ? "bg-[#ffffff] border-[#e0e3eb] text-[#131722]"
-          : "bg-[#1e222d] border-[#2a2e39] text-[#d1d4dc]"
-      }`}
+      className="absolute right-0 top-11 z-50 flex w-72 flex-col gap-3 rounded-xl border border-border bg-card p-3 text-foreground shadow-2xl"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between pb-1 border-b border-border/50">
-        <span className="font-bold text-xs">Select Chart Layout</span>
-        <span className="text-[10px] opacity-60">TradingView Style</span>
+        <span className="text-xs font-semibold">Chart layout</span>
+        <span className="text-[10px] text-muted-foreground">{layouts.length} groups</span>
       </div>
 
       {layouts.map((grp) => (
@@ -228,10 +224,8 @@ export const VisualLayoutPicker: React.FC<VisualLayoutPickerProps> = ({
                   }}
                   className={`flex flex-col items-center justify-center p-1.5 rounded-lg border transition-all cursor-pointer ${
                     isSelected
-                      ? "border-[#2962ff] bg-[#2962ff]/10 ring-1 ring-[#2962ff]"
-                      : isLight
-                      ? "border-[#e0e3eb] bg-[#f8f9fc] hover:border-[#2962ff]/60 hover:bg-[#f0f3fa]"
-                      : "border-[#2a2e39] bg-[#141722] hover:border-[#2962ff]/60 hover:bg-[#2a2e39]"
+                      ? "border-primary bg-primary/10 ring-1 ring-primary"
+                      : "border-border bg-background hover:border-primary/60 hover:bg-muted"
                   }`}
                   title={item.name}
                 >

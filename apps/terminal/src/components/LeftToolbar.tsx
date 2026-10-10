@@ -1,33 +1,11 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  Crosshair,
-  TrendingUp,
-  ArrowUpRight,
-  Minus,
-  MoveRight,
-  SquareDashed,
-  SeparatorVertical,
-  Columns,
-  Percent,
-  Square,
-  Circle,
-  Type,
-  Tag,
-  Ruler,
-  Trash2,
-  Lock,
-  Unlock,
-  Eye,
-  EyeOff,
-  Undo2,
-  Save,
-  FolderOpen,
-  Redo2,
-  ChevronRight,
-  Pencil,
-  Check,
+  ArrowUpRight, Check, Circle, Columns, Crosshair, Eye, EyeOff,
+  FolderOpen, Lock, Minus, MoveRight, Percent, Ruler, Save,
+  SeparatorVertical, Square, SquareDashed, Tag, Trash2, TrendingUp,
+  Type, Unlock,
 } from "lucide-react";
 import { DrawingTool } from "@/types";
 
@@ -35,74 +13,42 @@ interface ToolItem {
   id: DrawingTool;
   label: string;
   shortcut?: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
 }
 
 interface ToolGroup {
-  id: string;
   label: string;
-  defaultTool: DrawingTool;
   tools: ToolItem[];
 }
 
 const TOOL_GROUPS: ToolGroup[] = [
-  {
-    id: "cursor",
-    label: "Cursor Tools",
-    defaultTool: "cursor",
-    tools: [
-      { id: "cursor", label: "Crosshair", shortcut: "V / Esc", icon: <Crosshair className="w-4 h-4" /> },
-    ],
-  },
-  {
-    id: "lines",
-    label: "Lines & Trend Channels",
-    defaultTool: "trendline",
-    tools: [
-      { id: "trendline", label: "Trend Line", shortcut: "T", icon: <TrendingUp className="w-4 h-4" /> },
-      { id: "ray", label: "Ray Line", shortcut: "Alt+T", icon: <ArrowUpRight className="w-4 h-4" /> },
-      { id: "horizontal", label: "Horizontal Line (S&R)", shortcut: "H", icon: <Minus className="w-4 h-4" /> },
-      { id: "horizontal_ray", label: "Horizontal Ray", shortcut: "Alt+H", icon: <MoveRight className="w-4 h-4" /> },
-      { id: "vertical", label: "Vertical Time Line", shortcut: "Alt+V", icon: <SeparatorVertical className="w-4 h-4" /> },
-      { id: "parallel_channel", label: "Parallel Channel", shortcut: "P", icon: <Columns className="w-4 h-4" /> },
-      { id: "trend_channel", label: "Trend Channel", shortcut: "Alt+P", icon: <SquareDashed className="w-4 h-4" /> },
-    ],
-  },
-  {
-    id: "fibonacci",
-    label: "Fibonacci & Gann",
-    defaultTool: "fibonacci",
-    tools: [
-      { id: "fibonacci", label: "Fibonacci Retracement", shortcut: "F", icon: <Percent className="w-4 h-4" /> },
-      { id: "fib_extension", label: "Fibonacci Extension", shortcut: "Shift+F", icon: <TrendingUp className="w-4 h-4" /> },
-    ],
-  },
-  {
-    id: "shapes",
-    label: "Geometric Shapes & Order Blocks",
-    defaultTool: "rectangle",
-    tools: [
-      { id: "rectangle", label: "Rectangle (Order Block / Zone)", shortcut: "R", icon: <Square className="w-4 h-4" /> },
-      { id: "circle", label: "Circle Highlight", shortcut: "C", icon: <Circle className="w-4 h-4" /> },
-    ],
-  },
-  {
-    id: "annotations",
-    label: "Text & Price Markers",
-    defaultTool: "price_line",
-    tools: [
-      { id: "price_line", label: "Price Level Marker", shortcut: "L", icon: <Tag className="w-4 h-4" /> },
-      { id: "text", label: "Text Annotation", shortcut: "Alt+N", icon: <Type className="w-4 h-4" /> },
-    ],
-  },
-  {
-    id: "measure",
-    label: "Prediction & Measurement",
-    defaultTool: "measure",
-    tools: [
-      { id: "measure", label: "Measure / Pips Ruler", shortcut: "M", icon: <Ruler className="w-4 h-4" /> },
-    ],
-  },
+  { label: "Cursor", tools: [
+    { id: "cursor", label: "Crosshair", shortcut: "V", icon: <Crosshair className="size-4" /> },
+  ] },
+  { label: "Lines & channels", tools: [
+    { id: "trendline", label: "Trend line", shortcut: "T", icon: <TrendingUp className="size-4" /> },
+    { id: "ray", label: "Ray line", icon: <ArrowUpRight className="size-4" /> },
+    { id: "horizontal", label: "Horizontal line", shortcut: "H", icon: <Minus className="size-4" /> },
+    { id: "horizontal_ray", label: "Horizontal ray", icon: <MoveRight className="size-4" /> },
+    { id: "vertical", label: "Vertical line", icon: <SeparatorVertical className="size-4" /> },
+    { id: "parallel_channel", label: "Parallel channel", shortcut: "P", icon: <Columns className="size-4" /> },
+    { id: "trend_channel", label: "Trend channel", icon: <SquareDashed className="size-4" /> },
+  ] },
+  { label: "Fibonacci", tools: [
+    { id: "fibonacci", label: "Retracement", shortcut: "F", icon: <Percent className="size-4" /> },
+    { id: "fib_extension", label: "Extension", shortcut: "Shift F", icon: <TrendingUp className="size-4" /> },
+  ] },
+  { label: "Shapes", tools: [
+    { id: "rectangle", label: "Rectangle", shortcut: "R", icon: <Square className="size-4" /> },
+    { id: "circle", label: "Circle", icon: <Circle className="size-4" /> },
+  ] },
+  { label: "Annotations", tools: [
+    { id: "price_line", label: "Price marker", icon: <Tag className="size-4" /> },
+    { id: "text", label: "Text", icon: <Type className="size-4" /> },
+  ] },
+  { label: "Measure", tools: [
+    { id: "measure", label: "Measure / Pips", shortcut: "M", icon: <Ruler className="size-4" /> },
+  ] },
 ];
 
 interface LeftToolbarProps {
@@ -123,7 +69,9 @@ interface LeftToolbarProps {
   theme?: "dark" | "light";
 }
 
-export const LeftToolbar: React.FC<LeftToolbarProps> = ({
+const railButton = "flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30";
+
+export function LeftToolbar({
   activeTool = "cursor",
   setActiveTool,
   onClearDrawings,
@@ -132,153 +80,54 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
   onToggleDrawingModeLock,
   isDrawingsHidden = false,
   onToggleHideDrawings,
-  canUndo = false,
-  canRedo = false,
-  onUndo,
-  onRedo,
   onSaveDrawings,
   onLoadDrawings,
-  theme = "dark",
-}) => {
-  const isLight = theme === "light";
-  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
-  const flyoutRef = useRef<HTMLDivElement>(null);
+}: LeftToolbarProps) {
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const railRef = useRef<HTMLElement>(null);
 
-  // Close flyout when clicking outside
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (flyoutRef.current && !flyoutRef.current.contains(e.target as Node)) {
-        setOpenGroupId(null);
-      }
+    const closeOutside = (event: MouseEvent) => {
+      if (!railRef.current?.contains(event.target as Node)) setOpenGroup(null);
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", closeOutside);
+    return () => document.removeEventListener("mousedown", closeOutside);
   }, []);
 
-  // Find active tool item across all groups
-  const currentActiveToolItem = TOOL_GROUPS.flatMap((g) => g.tools).find(
-    (t) => t.id === activeTool
-  );
-
   return (
-    <aside
-      className={`hidden md:flex w-[48px] border-r flex-col items-center py-2.5 justify-between select-none z-30 shrink-0 transition-colors relative ${
-        isLight
-          ? "bg-[#ffffff] border-[#e0e3eb]"
-          : "bg-[#181b24] border-[#2a2e39]"
-      }`}
-    >
-      {/* Top Drawing Tools Groups */}
-      <div className="flex flex-col items-center gap-1.5 w-full" ref={flyoutRef}>
+    <aside ref={railRef} className="absolute inset-y-0 left-0 z-30 flex w-12 shrink-0 flex-col items-center justify-between border-r border-border bg-card py-2 shadow-lg md:static md:shadow-none" aria-label="Drawing tools">
+      <div className="flex w-full flex-col items-center gap-1">
         {TOOL_GROUPS.map((group) => {
-          const isGroupActive = group.tools.some((t) => t.id === activeTool);
-          const activeToolInGroup =
-            group.tools.find((t) => t.id === activeTool) || group.tools[0];
-          const hasMultiple = group.tools.length > 1;
-          const isFlyoutOpen = openGroupId === group.id;
-
+          const selected = group.tools.find((item) => item.id === activeTool);
+          const mainTool = selected || group.tools[0];
+          const expanded = openGroup === group.label;
           return (
-            <div key={group.id} className="relative group/btn w-full flex justify-center">
+            <div key={group.label} className="relative flex w-full justify-center">
               <button
+                type="button"
                 onClick={() => {
-                  if (hasMultiple && isGroupActive) {
-                    setOpenGroupId(isFlyoutOpen ? null : group.id);
-                  } else {
-                    setActiveTool?.(activeToolInGroup.id);
-                    setOpenGroupId(null);
-                  }
+                  if (selected && group.tools.length > 1) setOpenGroup(expanded ? null : group.label);
+                  else { setActiveTool?.(mainTool.id); setOpenGroup(null); }
                 }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  if (hasMultiple) setOpenGroupId(group.id);
-                }}
-                className={`relative w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
-                  isGroupActive
-                    ? "bg-[#2962ff]/20 text-[#2962ff] shadow-xs"
-                    : isLight
-                    ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#f0f3fa]"
-                    : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#252a36]"
-                }`}
-                title={`${activeToolInGroup.label} ${
-                  activeToolInGroup.shortcut ? `(${activeToolInGroup.shortcut})` : ""
-                }`}
+                onContextMenu={(event) => { event.preventDefault(); if (group.tools.length > 1) setOpenGroup(group.label); }}
+                className={`${railButton} relative ${selected ? "bg-primary/15 text-primary" : ""}`}
+                title={mainTool.label}
+                aria-label={mainTool.label}
+                aria-expanded={group.tools.length > 1 ? expanded : undefined}
               >
-                {activeToolInGroup.icon}
-
-                {/* Blue active indicator pip */}
-                {isGroupActive && (
-                  <span className="absolute bottom-1 right-1 w-1.5 h-1.5 bg-[#2962ff] rounded-full" />
-                )}
-
-                {/* Sub-menu tiny indicator corner triangle if group has multiple options */}
-                {hasMultiple && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenGroupId(isFlyoutOpen ? null : group.id);
-                    }}
-                    className="absolute -bottom-0.5 right-0 text-[8px] opacity-40 hover:opacity-100 hover:text-[#2962ff] p-0.5"
-                  >
-                    ▸
-                  </span>
-                )}
+                {mainTool.icon}
+                {group.tools.length > 1 && <span className="absolute bottom-1 right-1 size-1 rounded-full bg-current opacity-60" />}
               </button>
-
-              {/* Flyout Sub-menu (TradingView style popover) */}
-              {isFlyoutOpen && hasMultiple && (
-                <div
-                  className={`absolute left-[44px] top-0 z-50 w-60 rounded-xl shadow-2xl border py-1.5 px-1 animate-in fade-in slide-in-from-left-2 duration-150 backdrop-blur-md ${
-                    isLight
-                      ? "bg-[#ffffff]/98 border-[#e0e3eb] text-[#131722]"
-                      : "bg-[#1e222d]/98 border-[#2a2e39] text-[#d1d4dc]"
-                  }`}
-                >
-                  <div
-                    className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border-b mb-1 ${
-                      isLight ? "text-[#787b86] border-[#e0e3eb]" : "text-[#787b86] border-[#2a2e39]"
-                    }`}
-                  >
-                    {group.label}
-                  </div>
-                  {group.tools.map((item) => {
-                    const isSelected = activeTool === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          setActiveTool?.(item.id);
-                          setOpenGroupId(null);
-                        }}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                          isSelected
-                            ? "bg-[#2962ff] text-white"
-                            : isLight
-                            ? "hover:bg-[#f0f3fa] text-[#131722]"
-                            : "hover:bg-[#2a2e39] text-[#d1d4dc] hover:text-white"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={isSelected ? "text-white" : "text-[#2962ff]"}>
-                            {item.icon}
-                          </span>
-                          <span>{item.label}</span>
-                        </div>
-                        {item.shortcut && (
-                          <span
-                            className={`text-[10px] font-mono px-1 rounded ${
-                              isSelected
-                                ? "text-white/80"
-                                : isLight
-                                ? "text-[#787b86]"
-                                : "text-[#787b86]"
-                            }`}
-                          >
-                            {item.shortcut}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+              {expanded && group.tools.length > 1 && (
+                <div className="absolute left-11 top-0 z-50 w-56 rounded-lg border border-border bg-card p-1.5 shadow-2xl">
+                  <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{group.label}</div>
+                  {group.tools.map((item) => (
+                    <button key={item.id} type="button" onClick={() => { setActiveTool?.(item.id); setOpenGroup(null); }} className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs ${activeTool === item.id ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"}`}>
+                      {item.icon}<span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {item.shortcut && <kbd className="font-mono text-[10px] text-muted-foreground">{item.shortcut}</kbd>}
+                      {activeTool === item.id && <Check className="size-3" />}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -286,105 +135,17 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
         })}
       </div>
 
-      {/* Bottom Utility Controls (Undo, Redo, Lock Mode, Hide, Trash) */}
-      <div
-        className={`flex flex-col items-center gap-1.5 w-full pt-2.5 border-t ${
-          isLight ? "border-[#e0e3eb]" : "border-[#2a2e39]"
-        }`}
-      >
-        {/* Undo Drawing */}
-        <button
-          onClick={onUndo}
-          disabled={!canUndo}
-          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 cursor-pointer ${
-            isLight
-              ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#f0f3fa]"
-              : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#252a36]"
-          }`}
-          title="Undo Drawing (Ctrl+Z)"
-        >
-          <Undo2 className="w-4 h-4" />
+      <div className="flex w-full flex-col items-center gap-0.5 border-t border-border pt-2">
+        <button type="button" onClick={onToggleDrawingModeLock} className={`${railButton} ${isDrawingModeLocked ? "bg-primary/15 text-primary" : ""}`} title="Keep drawing tool active" aria-label="Keep drawing tool active" aria-pressed={isDrawingModeLocked}>
+          {isDrawingModeLocked ? <Lock className="size-4" /> : <Unlock className="size-4" />}
         </button>
-
-        {/* Redo Drawing */}
-        <button
-          onClick={onRedo}
-          disabled={!canRedo}
-          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 cursor-pointer ${
-            isLight
-              ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#f0f3fa]"
-              : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#252a36]"
-          }`}
-          title="Redo Drawing (Ctrl+Y)"
-        >
-          <Redo2 className="w-4 h-4" />
+        <button type="button" onClick={onSaveDrawings} disabled={drawingsCount === 0} className={railButton} title="Save drawings" aria-label="Save drawings"><Save className="size-4" /></button>
+        <button type="button" onClick={onLoadDrawings} className={railButton} title="Load drawings" aria-label="Load drawings"><FolderOpen className="size-4" /></button>
+        <button type="button" onClick={onToggleHideDrawings} className={`${railButton} ${isDrawingsHidden ? "bg-primary/15 text-primary" : ""}`} title={isDrawingsHidden ? "Show drawings" : "Hide drawings"} aria-label={isDrawingsHidden ? "Show drawings" : "Hide drawings"}>
+          {isDrawingsHidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
         </button>
-
-        {/* Stay in Drawing Mode Lock */}
-        <button
-          onClick={onToggleDrawingModeLock}
-          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-            isDrawingModeLocked
-              ? "bg-[#2962ff]/20 text-[#2962ff]"
-              : isLight
-              ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#f0f3fa]"
-              : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#252a36]"
-          }`}
-          title={isDrawingModeLocked ? "Stay in Drawing Mode: ON" : "Stay in Drawing Mode: OFF"}
-        >
-          {isDrawingModeLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-        </button>
-
-        {/* Save / Load drawing templates */}
-        <div className="flex items-center gap-0.5">
-          <button
-            onClick={onSaveDrawings}
-            disabled={drawingsCount === 0}
-            aria-label="Save drawing set"
-            className={`w-7 h-7 rounded-lg flex items-center justify-center disabled:opacity-30 ${isLight ? "text-[#5d606b] hover:bg-[#f0f3fa]" : "text-[#787b86] hover:bg-[#252a36] hover:text-[#d1d4dc]"}`}
-            title="Save drawings for this symbol and timeframe"
-          ><Save className="w-3.5 h-3.5" /></button>
-          <button
-            onClick={onLoadDrawings}
-            aria-label="Load saved drawings"
-            className={`w-7 h-7 rounded-lg flex items-center justify-center ${isLight ? "text-[#5d606b] hover:bg-[#f0f3fa]" : "text-[#787b86] hover:bg-[#252a36] hover:text-[#d1d4dc]"}`}
-            title="Load saved drawings"
-          ><FolderOpen className="w-3.5 h-3.5" /></button>
-        </div>
-        {/* Hide / Show All Drawings */}
-        <button
-          onClick={onToggleHideDrawings}
-          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-            isDrawingsHidden
-              ? "bg-[#f5b942]/20 text-[#f5b942]"
-              : isLight
-              ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#f0f3fa]"
-              : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#252a36]"
-          }`}
-          title={isDrawingsHidden ? "Show All Drawings" : "Hide All Drawings"}
-        >
-          {isDrawingsHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-        </button>
-
-        {/* Clear All Drawings */}
-        <button
-          onClick={onClearDrawings}
-          disabled={drawingsCount === 0}
-          className={`relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 cursor-pointer ${
-            isLight
-              ? "hover:bg-[#f0f3fa] text-[#5d606b] hover:text-[#f23645]"
-              : "hover:bg-[#252a36] text-[#787b86] hover:text-[#f23645]"
-          }`}
-          title={`Hapus Semua Gambar (${drawingsCount})`}
-        >
-          <Trash2 className="w-4 h-4" />
-          {drawingsCount > 0 && (
-            <span className="absolute -top-1 -right-1 px-1 py-0.2 min-w-[14px] text-[9px] font-bold bg-[#f23645] text-white rounded-full flex items-center justify-center shadow-xs">
-              {drawingsCount > 9 ? "9+" : drawingsCount}
-            </span>
-          )}
-        </button>
+        <button type="button" onClick={onClearDrawings} disabled={drawingsCount === 0} className={`${railButton} hover:text-down`} title={`Clear drawings (${drawingsCount})`} aria-label="Clear drawings"><Trash2 className="size-4" /></button>
       </div>
     </aside>
   );
-};
+}

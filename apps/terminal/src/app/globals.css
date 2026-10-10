@@ -2,21 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,500;1,600;1,700&display=swap");
-
 :root {
-  --background: #f7f6f2;
-  --foreground: #1c1e1c;
+  --background: #f5f7f9;
+  --foreground: #1a2734;
   --card: #ffffff;
-  --card-foreground: #1c1e1c;
-  --border: #e3e6e1;
-  --muted: #edf0ea;
-  --muted-foreground: #6b736b;
-  --primary: #456e3b;
+  --card-foreground: #172335;
+  --border: #d5dde6;
+  --muted: #edf1f5;
+  --muted-foreground: #617184;
+  --primary: #2e628d;
   --primary-foreground: #ffffff;
-  --up: #1f946d;
-  --down: #d93838;
-
+  --up: #008d73;
+  --down: #ca4855;
+  --background-rgb: 245 247 249;
+  --foreground-rgb: 26 39 52;
+  --card-rgb: 255 255 255;
+  --border-rgb: 213 221 230;
+  --muted-rgb: 237 241 245;
+  --muted-foreground-rgb: 97 113 132;
+  --primary-rgb: 46 98 141;
+  --primary-foreground-rgb: 255 255 255;
+  --up-rgb: 0 141 115;
+  --down-rgb: 202 72 85;
+  --bg-app: var(--background);
+  --bg-surface: var(--card);
+  --bg-surface-hover: var(--muted);
+  --bg-active: #e5eef5;
+  --border-subtle: var(--border);
+  --border-medium: var(--border);
+  --border-focus: var(--primary);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --text-muted: var(--muted-foreground);
+  --text-bright: var(--foreground);
+  --bullish: var(--up);
+  --bearish: var(--down);
+  --accent: var(--primary);
+  --accent-hover: #235070;
   --tv-bg: var(--background);
   --tv-panel: var(--card);
   --tv-border: var(--border);
@@ -30,18 +52,29 @@
 }
 
 .dark {
-  --background: #141615;
-  --foreground: #f0ede6;
-  --card: #1c1e1c;
-  --card-foreground: #f0ede6;
-  --border: rgba(255, 255, 255, 0.08);
-  --muted: #242724;
-  --muted-foreground: #8a948a;
-  --primary: #a3c98b;
-  --primary-foreground: #141615;
-  --up: #26b288;
-  --down: #ef4444;
-
+  --background: #0e141c;
+  --foreground: #e4ebf2;
+  --card: #151e28;
+  --card-foreground: #e4ebf2;
+  --border: #2c3949;
+  --muted: #1d2936;
+  --muted-foreground: #94a4b7;
+  --primary: #90b7d8;
+  --primary-foreground: #0d1728;
+  --up: #2db69a;
+  --down: #e16f78;
+  --background-rgb: 14 20 28;
+  --foreground-rgb: 228 235 242;
+  --card-rgb: 21 30 40;
+  --border-rgb: 44 57 73;
+  --muted-rgb: 29 41 54;
+  --muted-foreground-rgb: 148 164 183;
+  --primary-rgb: 144 183 216;
+  --primary-foreground-rgb: 13 23 40;
+  --up-rgb: 45 182 154;
+  --down-rgb: 225 111 120;
+  --bg-active: #253849;
+  --accent-hover: #b3d0e9;
   --tv-bg: var(--background);
   --tv-panel: var(--card);
   --tv-border: var(--border);
@@ -62,31 +95,37 @@ body {
 }
 
 body {
-  background-color: var(--tv-bg);
-  color: var(--tv-text);
   min-height: 100%;
   overflow: hidden;
-  user-select: none;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu,
-    sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* Custom Scrollbar for TradingView Look */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #131722;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a2e39;
-  border-radius: 2px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #363c4e;
+  border-radius: 999px;
+  background: var(--border);
 }

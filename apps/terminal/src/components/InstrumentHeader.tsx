@@ -1,6 +1,4 @@
-"use client";
-
-import React from "react";
+import { TrendingDown, TrendingUp } from "lucide-react";
 
 interface InstrumentHeaderProps {
   symbol: string;
@@ -9,110 +7,50 @@ interface InstrumentHeaderProps {
   change: number;
   changePercent: number;
   digits?: number;
-  open?: number;
-  high?: number;
-  low?: number;
-  volume?: number;
-  sessionStatus?: string;
-  theme?: "dark" | "light";
+  category?: string;
+  provider?: string;
 }
 
-export const InstrumentHeader: React.FC<InstrumentHeaderProps> = ({
+export function InstrumentHeader({
   symbol,
   name,
   price,
   change,
   changePercent,
   digits = 2,
-  open,
-  high,
-  low,
-  volume,
-  sessionStatus,
-}) => {
-  const isUp = change >= 0;
-  const changeSign = isUp ? "+" : "";
-
-  const formatNum = (val: number | undefined): string => {
-    if (val === undefined || isNaN(val) || val === 0) return "—";
-    return val.toLocaleString("en-US", {
+  category,
+  provider,
+}: InstrumentHeaderProps) {
+  const hasPrice = Number.isFinite(price) && price > 0;
+  const rising = change >= 0;
+  const format = (value: number) =>
+    value.toLocaleString("en-US", {
       minimumFractionDigits: digits,
       maximumFractionDigits: digits,
     });
-  };
-
-  const formatVol = (val: number | undefined): string => {
-    if (val === undefined || isNaN(val) || val <= 0) return "—";
-    if (val >= 1_000_000_000) return (val / 1_000_000_000).toFixed(2) + "B";
-    if (val >= 1_000_000) return (val / 1_000_000).toFixed(2) + "M";
-    if (val >= 1_000) return (val / 1_000).toFixed(1) + "K";
-    return val.toLocaleString("en-US");
-  };
-
-  const todayStr = React.useMemo(() => {
-    if (sessionStatus) return sessionStatus;
-    const now = new Date();
-    return `Market close · ${now.toLocaleDateString("en-US", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    })}`;
-  }, [sessionStatus]);
 
   return (
-    <div className="border-b border-border bg-card/40 transition-colors">
-      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 px-4 py-2.5 sm:px-6 [@media(max-height:500px)]:py-1">
-        <div className="min-w-0">
-          <h1 className="flex min-w-0 items-baseline gap-2">
-            <span className="font-mono text-lg font-semibold tracking-wide text-primary">
-              {symbol}
-            </span>
-            <span className="truncate text-sm text-foreground">{name}</span>
-          </h1>
-          <div className="flex items-baseline gap-3 mt-0.5">
-            <span className="tabular-nums font-mono text-2xl sm:text-3xl font-medium tracking-tight text-foreground">
-              {formatNum(price)}
-            </span>
-            <span
-              className={`tabular-nums font-mono text-sm font-medium ${
-                isUp ? "text-up" : "text-down"
-              }`}
-            >
-              {changeSign}
-              {formatNum(change)} ({changeSign}
-              {changePercent.toFixed(2)}%)
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">{todayStr}</p>
+    <div className="flex min-h-[60px] shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-4 sm:px-5">
+      <div className="min-w-0 border-l-2 border-primary pl-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="font-mono text-base font-bold tracking-tight text-foreground sm:text-lg">{symbol}</h1>
+          {category && <span className="hidden rounded-sm border border-border bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground sm:inline">{category}</span>}
         </div>
-
-        <dl className="grid grid-cols-4 gap-x-6 gap-y-1 text-xs sm:flex sm:gap-x-6 [@media(max-height:500px)]:hidden">
-          <div>
-            <dt className="text-muted-foreground">Open</dt>
-            <dd className="tabular-nums font-mono text-foreground font-medium">
-              {formatNum(open ?? price - change)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">High</dt>
-            <dd className="tabular-nums font-mono text-foreground font-medium">
-              {formatNum(high ?? Math.max(price, price - change))}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Low</dt>
-            <dd className="tabular-nums font-mono text-foreground font-medium">
-              {formatNum(low ?? Math.min(price, price - change))}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Volume</dt>
-            <dd className="tabular-nums font-mono text-foreground font-medium">
-              {formatVol(volume)}
-            </dd>
-          </div>
-        </dl>
+        <p className="truncate text-[11px] text-muted-foreground">{name}{provider ? ` · ${provider}` : ""}</p>
+      </div>
+      <div className="shrink-0 border-l border-border pl-3 text-right sm:pl-5">
+        <div className="font-mono text-lg font-semibold tabular-nums tracking-tight text-foreground sm:text-xl">
+          {hasPrice ? format(price) : "—"}
+        </div>
+        <div className={`flex items-center justify-end gap-1 font-mono text-[11px] font-medium tabular-nums ${rising ? "text-up" : "text-down"}`}>
+          {hasPrice ? (
+            <>
+              {rising ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
+              {rising ? "+" : ""}{format(change)} ({rising ? "+" : ""}{changePercent.toFixed(2)}%)
+            </>
+          ) : "Waiting for market data"}
+        </div>
       </div>
     </div>
   );
-};
+}

@@ -1,402 +1,140 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
-import {
-  Plus,
-  MoreHorizontal,
-  ChevronDown,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Search,
-  X,
-  ExternalLink,
-  Radio,
-  Newspaper,
-  TrendingUp,
-  TrendingDown,
-  Activity,
-  Globe
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import { WatchlistItem } from "@/types";
 
 interface RightWatchlistProps {
   items: WatchlistItem[];
   selectedSymbol: string;
   onSelectSymbol: (item: WatchlistItem) => void;
+  onOpenNews?: () => void;
   theme?: "dark" | "light";
 }
 
-export const RightWatchlist: React.FC<RightWatchlistProps> = ({
-  items,
-  selectedSymbol,
-  onSelectSymbol,
-  theme = "dark",
-}) => {
-  const isLight = theme === "light";
-  const [activeTab, setActiveTab] = useState<"all" | "commodities" | "indices" | "forex" | "crypto" | "stocks">("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
-  const [sortBy, setSortBy] = useState<"symbol" | "price" | "change" | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+type Category = WatchlistItem["category"] | "all";
+type SortField = "symbol" | "price" | "change";
 
-  // Selected symbol news headline
-  const [newsHeadline, setNewsHeadline] = useState<{ title: string; time: string } | null>(null);
+const CATEGORIES: { value: Category; label: string }[] = [
+  { value: "all", label: "All markets" },
+  { value: "indices", label: "Indices" },
+  { value: "stocks", label: "Stocks" },
+  { value: "forex", label: "Forex" },
+  { value: "commodities", label: "Commodities" },
+  { value: "crypto", label: "Crypto" },
+];
 
-  const selectedItem = items.find((i) => i.symbol === selectedSymbol) ?? items[0];
+export function RightWatchlist({ items, selectedSymbol, onSelectSymbol, onOpenNews }: RightWatchlistProps) {
+  const [category, setCategory] = useState<Category>("all");
+  const [query, setQuery] = useState("");
+  const [sortField, setSortField] = useState<SortField>("symbol");
+  const [sortAscending, setSortAscending] = useState(true);
+  const [headline, setHeadline] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    const fetchLatestNews = async () => {
-      try {
-        const res = await fetch(`/api/news?symbol=${encodeURIComponent(selectedItem.symbol)}&limit=1`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled || !data || !data.articles || data.articles.length === 0) return;
-        const top = data.articles[0];
-        setNewsHeadline({
-          title: top.title || top.headline,
-          time: "32 minutes ago"
-        });
-      } catch {
-        // fallback
-      }
-    };
-    fetchLatestNews();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedItem.symbol]);
+    setHeadline(null);
+    if (!selectedSymbol) return;
+    const controller = new AbortController();
+    fetch(`/api/news?symbol=${encodeURIComponent(selectedSymbol)}&limit=1`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        const article = data?.articles?.[0];
+        if (article) setHeadline(article.title || article.headline || null);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [selectedSymbol]);
 
-  const handleSort = (field: "symbol" | "price" | "change") => {
-    if (sortBy === field) {
-      if (sortDir === "desc") setSortDir("asc");
-      else {
-        setSortBy(null);
-        setSortDir("desc");
-      }
-    } else {
-      setSortBy(field);
-      setSortDir("desc");
-    }
+  const visibleItems = useMemo(() => {
+    const search = query.trim().toLowerCase();
+    const filtered = items.filter((item) =>
+      (category === "all" || item.category === category) &&
+      (!search || item.symbol.toLowerCase().includes(search) || item.name.toLowerCase().includes(search)),
+    );
+    filtered.sort((a, b) => {
+      const comparison = sortField === "symbol"
+        ? a.symbol.localeCompare(b.symbol)
+        : sortField === "price"
+          ? a.price - b.price
+          : a.changePercent - b.changePercent;
+      return sortAscending ? comparison : -comparison;
+    });
+    return filtered;
+  }, [items, category, query, sortField, sortAscending]);
+
+  const setSort = (field: SortField) => {
+    if (sortField === field) setSortAscending((current) => !current);
+    else { setSortField(field); setSortAscending(field === "symbol"); }
+  };
+  const sortIcon = (field: SortField) => sortField === field
+    ? (sortAscending ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)
+    : null;
+  const formatPrice = (item: WatchlistItem) => {
+    if (item.price <= 0) return "—";
+    const decimals = item.category === "forex" ? 5 : item.category === "stocks" ? 3 : 2;
+    return item.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: decimals });
   };
 
-  const processedItems = useMemo(() => {
-    let result = activeTab === "all" ? items : items.filter((i) => i.category === activeTab);
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (i) => i.symbol.toLowerCase().includes(q) || i.name.toLowerCase().includes(q)
-      );
-    }
-
-    if (sortBy) {
-      result = [...result].sort((a, b) => {
-        let cmp = 0;
-        if (sortBy === "symbol") cmp = a.symbol.localeCompare(b.symbol);
-        else if (sortBy === "price") cmp = a.price - b.price;
-        else if (sortBy === "change") cmp = a.changePercent - b.changePercent;
-        return sortDir === "asc" ? cmp : -cmp;
-      });
-    }
-
-    return result;
-  }, [items, activeTab, searchQuery, sortBy, sortDir]);
-
-  // Group items by category to match TradingView sections (SAHAM, FOREX, CRYPTO, etc.)
-  const groupedSections = useMemo(() => {
-    const map = new Map<string, WatchlistItem[]>();
-    processedItems.forEach((item) => {
-      const cat = item.category.toUpperCase();
-      const current = map.get(cat) || [];
-      current.push(item);
-      map.set(cat, current);
-    });
-    return Array.from(map.entries());
-  }, [processedItems]);
-
-  // Performance Matrix Data (1W, 1M, 3M, 6M, YTD, 1Y)
-  const perfData = useMemo(() => {
-    const seed = selectedItem.symbol.charCodeAt(0) + selectedItem.symbol.charCodeAt(selectedItem.symbol.length - 1);
-    const base = selectedItem.changePercent;
-    return [
-      { label: "1W", val: Number((base * 1.5 - (seed % 4) + 1.2).toFixed(2)) },
-      { label: "1M", val: Number((base * 2.1 - (seed % 5) + 0.8).toFixed(2)) },
-      { label: "3M", val: Number((base * 3.4 + (seed % 7) - 1.5).toFixed(2)) },
-      { label: "6M", val: Number((base * 5.0 - (seed % 9) - 2.0).toFixed(2)) },
-      { label: "YTD", val: Number((base * 4.2 + (seed % 11) + 0.5).toFixed(2)) },
-      { label: "1Y", val: Number((base * 7.5 + (seed % 13) + 4.2).toFixed(2)) },
-    ];
-  }, [selectedItem]);
-
   return (
-    <aside
-      className="w-full flex flex-col h-full select-none text-xs overflow-hidden transition-colors bg-card border-border text-foreground"
-    >
-      {/* Watchlist header */}
-      <div
-        className="h-[38px] border-b border-border flex items-center justify-between px-3 shrink-0 bg-card/60"
-      >
-        <div className="flex items-center gap-1.5 font-bold text-xs">
-          <span className="text-foreground">Watchlist</span>
-          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setShowSearch((v) => !v)}
-            className={`p-1 rounded transition-colors cursor-pointer ${
-              showSearch
-                ? "bg-[#2962ff]/20 text-[#2962ff]"
-                : isLight
-                ? "text-[#5d606b] hover:text-[#131722] hover:bg-[#f0f3fa]"
-                : "text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39]"
-            }`}
-            title="Search Watchlist"
-          >
-            <Search className="w-3.5 h-3.5" />
-          </button>
-          <button
-            className={`p-1 rounded transition-colors cursor-pointer ${
-              isLight ? "text-[#5d606b] hover:text-[#131722]" : "text-[#787b86] hover:text-white"
-            }`}
-            title="Add Symbol"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-          <button
-            className={`p-1 rounded transition-colors cursor-pointer ${
-              isLight ? "text-[#5d606b] hover:text-[#131722]" : "text-[#787b86] hover:text-white"
-            }`}
-            title="Options"
-          >
-            <MoreHorizontal className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Search Row */}
-      {showSearch && (
-        <div className={`p-2 border-b ${isLight ? "bg-[#f8f9fc] border-[#e0e3eb]" : "bg-[#141722] border-[#2a2e39]"}`}>
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[#787b86]" />
-            <input
-              type="text"
-              placeholder="Search watchlist..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              autoFocus
-              className={`w-full pl-7 pr-7 py-1 text-xs rounded border outline-hidden transition-all ${
-                isLight
-                  ? "bg-[#ffffff] border-[#e0e3eb] text-[#131722] focus:border-[#2962ff]"
-                  : "bg-[#1e222d] border-[#2a2e39] text-[#d1d4dc] focus:border-[#2962ff]"
-              }`}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#787b86] hover:text-white"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
+    <div className="flex h-full min-h-0 flex-col bg-card">
+      <div className="shrink-0 border-b border-border px-3 pb-2.5 pt-3">
+        <div className="mb-2.5 flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h2 className="text-[11px] font-bold uppercase tracking-[0.12em] text-foreground">Watchlist</h2>
+            <span className="truncate font-mono text-[10px] text-muted-foreground">{items.length} instruments</span>
           </div>
+          <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
         </div>
-      )}
-
-      {/* Table Column Headers: Symbol | Last | Chg | Chg% */}
-      <div
-        className="h-6 px-3 border-b border-border bg-muted/40 grid grid-cols-12 items-center text-[10px] font-mono tracking-wider shrink-0 text-muted-foreground"
-      >
-        <button
-          onClick={() => handleSort("symbol")}
-          className="col-span-5 text-left font-bold flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
-        >
-          <span>Symbol</span>
-          {sortBy === "symbol" && (sortDir === "asc" ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />)}
-        </button>
-        <button
-          onClick={() => handleSort("price")}
-          className="col-span-4 text-right font-bold flex items-center justify-end gap-1 hover:text-white transition-colors cursor-pointer"
-        >
-          <span>Last</span>
-          {sortBy === "price" && (sortDir === "asc" ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />)}
-        </button>
-        <button
-          onClick={() => handleSort("change")}
-          className="col-span-3 text-right font-bold flex items-center justify-end gap-1 hover:text-white transition-colors cursor-pointer"
-        >
-          <span>Chg%</span>
-          {sortBy === "change" && (sortDir === "asc" ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />)}
-        </button>
+        <div className="flex gap-2">
+          <label className="relative min-w-0 flex-1">
+            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <span className="sr-only">Search watchlist</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter instruments" className="h-8 w-full rounded border border-border bg-background pl-8 pr-2 text-[11px] text-foreground placeholder:text-muted-foreground" />
+          </label>
+          <select aria-label="Market category" value={category} onChange={(event) => setCategory(event.target.value as Category)} className="h-8 max-w-[104px] rounded border border-border bg-background px-1.5 text-[10px] text-foreground">
+            {CATEGORIES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </div>
       </div>
 
-      {/* Watchlist Rows (Top Half - 45% Height) */}
-      <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-[#2a2e39]/20">
-        {groupedSections.map(([sectionTitle, sectionItems]) => (
-          <div key={sectionTitle}>
-            {/* Group Header (e.g. SAHAM (STOCK), FOREX, CRYPTO) */}
-            <div
-              className="px-3 py-1 text-[9px] font-bold tracking-wider uppercase border-y border-border bg-muted/20 flex items-center justify-between text-muted-foreground"
+      <div className="grid h-7 shrink-0 grid-cols-[minmax(0,1fr)_82px_67px] items-center gap-1 border-b border-border bg-muted/50 px-3 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <button type="button" onClick={() => setSort("symbol")} className="flex items-center gap-1 text-left hover:text-foreground">Symbol {sortIcon("symbol")}</button>
+        <button type="button" onClick={() => setSort("price")} className="flex items-center justify-end gap-1 hover:text-foreground">Last {sortIcon("price")}</button>
+        <button type="button" onClick={() => setSort("change")} className="flex items-center justify-end gap-1 hover:text-foreground">Chg % {sortIcon("change")}</button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {visibleItems.length === 0 ? (
+          <div className="px-4 py-8 text-center text-xs text-muted-foreground">No symbols match this filter.</div>
+        ) : visibleItems.map((item) => {
+          const active = item.symbol === selectedSymbol;
+          return (
+            <button
+              type="button"
+              key={item.symbol}
+              onClick={() => onSelectSymbol(item)}
+              className={`grid w-full grid-cols-[minmax(0,1fr)_82px_67px] items-center gap-1 border-b border-border/50 px-3 py-2 text-left transition-colors ${active ? "border-l-2 border-l-primary bg-primary/10 pl-[10px]" : "hover:bg-muted/60"}`}
+              aria-current={active ? "true" : undefined}
             >
-              <span>{sectionTitle}</span>
-              <span className="opacity-60">{sectionItems.length}</span>
-            </div>
-
-            {sectionItems.map((item) => {
-              const isSelected = item.symbol === selectedSymbol;
-              const isPos = item.change >= 0;
-              return (
-                <div
-                  key={item.symbol}
-                  onClick={() => onSelectSymbol(item)}
-                  className={`grid grid-cols-12 items-center px-3 py-1.5 cursor-pointer transition-colors ${
-                    isSelected
-                      ? isLight
-                        ? "bg-[#e8f0fe] border-l-2 border-l-[#2962ff]"
-                        : "bg-[#2a2e39]/80 border-l-2 border-l-[#2962ff]"
-                      : isLight
-                      ? "hover:bg-[#f8f9fc]"
-                      : "hover:bg-[#242832]"
-                  }`}
-                >
-                  <div className="col-span-5 flex items-center gap-1.5 min-w-0 pr-1">
-                    <span className={`font-bold text-xs truncate ${isSelected ? "text-[#2962ff]" : isLight ? "text-[#131722]" : "text-white"}`}>
-                      {item.symbol}
-                    </span>
-                  </div>
-
-                  <div className="col-span-4 text-right font-mono text-xs font-semibold">
-                    <span className={isLight ? "text-[#131722]" : "text-[#d1d4dc]"}>
-                      {item.price.toFixed(item.digits)}
-                    </span>
-                  </div>
-
-                  <div className="col-span-3 text-right font-mono text-[11px] font-semibold">
-                    <span className={isPos ? "text-[#089981]" : "text-[#f23645]"}>
-                      {isPos ? "+" : ""}{item.changePercent.toFixed(2)}%
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
+              <span className="min-w-0">
+                <span className={`block truncate font-mono text-[11px] font-semibold ${active ? "text-primary" : "text-foreground"}`}>{item.symbol}</span>
+                <span className="block truncate text-[10px] text-muted-foreground">{item.name}</span>
+              </span>
+              <span className="text-right font-mono text-[11px] font-medium tabular-nums text-foreground">{formatPrice(item)}</span>
+              <span className={`text-right font-mono text-[10px] font-medium tabular-nums ${item.price <= 0 || item.changePercent === 0 ? "text-muted-foreground" : item.changePercent > 0 ? "text-up" : "text-down"}`}>
+                {item.price > 0 ? `${item.changePercent > 0 ? "+" : ""}${item.changePercent.toFixed(2)}%` : "—"}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Bottom Panel: TradingView Selected Instrument Detail Card & Widgets (55% height) */}
-      {selectedItem && (
-        <div
-          className={`border-t flex flex-col shrink-0 overflow-y-auto max-h-[50%] select-none ${
-            isLight ? "bg-[#ffffff] border-[#e0e3eb]" : "bg-[#141722] border-[#2a2e39]"
-          }`}
-        >
-          {/* Detail Card Header */}
-          <div className="p-3 pb-2 border-b border-[#2a2e39]/30">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-[#f5b942]/20 border border-[#f5b942]/50 flex items-center justify-center font-bold text-[10px] text-[#f5b942]">
-                    {selectedItem.symbol.slice(0, 1)}
-                  </div>
-                  <span className={`font-black text-sm tracking-wide ${isLight ? "text-[#131722]" : "text-white"}`}>
-                    {selectedItem.symbol}
-                  </span>
-                </div>
-                <div className="text-[10px] text-[#787b86] mt-0.5">
-                  {selectedItem.name} • <span className="uppercase">{selectedItem.provider}</span>
-                </div>
-              </div>
-
-              {/* Action Icons */}
-              <div className="flex items-center gap-1 text-[#787b86]">
-                <button className="p-1 hover:text-white transition-colors" title="Split Screen">
-                  <Activity className="w-3.5 h-3.5" />
-                </button>
-                <button className="p-1 hover:text-white transition-colors" title="External Link">
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Big Bold Live Price (TradingView signature) */}
-            <div className="mt-2 flex items-baseline justify-between">
-              <div className="flex items-baseline gap-1.5">
-                <span className={`font-mono text-2xl font-black ${isLight ? "text-[#131722]" : "text-white"}`}>
-                  {selectedItem.price.toFixed(selectedItem.digits)}
-                </span>
-                <span className="text-[10px] font-mono text-[#787b86] font-bold">USD</span>
-              </div>
-
-              <div
-                className={`font-mono text-xs font-bold ${
-                  selectedItem.change >= 0 ? "text-[#089981]" : "text-[#f23645]"
-                }`}
-              >
-                {selectedItem.change >= 0 ? "+" : ""}{selectedItem.change.toFixed(selectedItem.digits)} ({selectedItem.change >= 0 ? "+" : ""}{selectedItem.changePercent.toFixed(2)}%)
-              </div>
-            </div>
-
-            {/* Market Status Indicator */}
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#089981]" />
-              <span className="text-[10px] text-[#089981] font-semibold">Market open</span>
-            </div>
-          </div>
-
-          {/* Fundamental News Snippet Card (Elevated #202434) */}
-          <div className="p-3 border-b border-[#2a2e39]/30">
-            <div
-              className={`rounded-lg p-2.5 border transition-all ${
-                isLight ? "bg-[#f8f9fc] border-[#e0e3eb]" : "bg-[#202434] border-[#2a2e39]"
-              }`}
-            >
-              <div className="flex items-center justify-between text-[10px] text-[#787b86] mb-1">
-                <span className="font-semibold uppercase tracking-wider text-[#2962ff]">
-                  NEWS · {newsHeadline?.time || "Latest"}
-                </span>
-                <span className="hover:text-white cursor-pointer transition-colors">View more &gt;</span>
-              </div>
-              <p className={`text-xs font-medium leading-snug line-clamp-2 ${isLight ? "text-[#131722]" : "text-[#d1d4dc]"}`}>
-                {newsHeadline?.title || `${selectedItem.symbol} is trading as global market liquidity evolves.`}
-              </p>
-            </div>
-          </div>
-
-          {/* Multi-Timeframe Performance 6-Tile Grid */}
-          <div className="p-3">
-            <div className="text-[10px] uppercase font-bold tracking-wider text-[#787b86] mb-2 flex items-center justify-between">
-              <span>Performance</span>
-              <span className="text-[9px] font-normal lowercase">historical returns</span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-1.5">
-              {perfData.map((p) => {
-                const isPositive = p.val >= 0;
-                return (
-                  <div
-                    key={p.label}
-                    className={`rounded-md px-2 py-1.5 flex flex-col items-center justify-center border ${
-                      isPositive
-                        ? isLight
-                          ? "bg-[#089981]/10 border-[#089981]/30 text-[#089981]"
-                          : "bg-[#163332] border-[#089981]/40 text-[#089981]"
-                        : isLight
-                        ? "bg-[#f23645]/10 border-[#f23645]/30 text-[#f23645]"
-                        : "bg-[#3b1d28] border-[#f23645]/40 text-[#f23645]"
-                    }`}
-                  >
-                    <span className="text-[10px] text-[#787b86] font-mono font-medium">{p.label}</span>
-                    <span className="font-mono text-xs font-bold mt-0.5">
-                      {isPositive ? "+" : ""}{p.val.toFixed(2)}%
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+      {headline && (
+        <button type="button" onClick={onOpenNews} className="flex shrink-0 items-center gap-2 border-t border-border bg-muted/40 px-3 py-2 text-left hover:bg-muted">
+          <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-primary">News</span>
+          <span className="truncate text-[10px] text-muted-foreground">{headline}</span>
+        </button>
       )}
-    </aside>
+    </div>
   );
-};
+}
