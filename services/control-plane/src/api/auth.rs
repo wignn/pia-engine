@@ -575,6 +575,11 @@ pub async fn desktop_oauth_callback(
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
+    sqlx::query("UPDATE users SET plan = 'enterprise', updated_at = NOW() WHERE id = $1")
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let desktop_credential = create_desktop_key_in_transaction(&mut tx, user.id).await?;
     tx.commit()
         .await
@@ -592,6 +597,7 @@ pub async fn desktop_oauth_callback(
             "id": user.id,
             "email": user.email,
             "name": user.name,
+            "plan": "enterprise",
             "avatar_url": user.avatar_url
         }
     })))
