@@ -19,6 +19,7 @@ pub struct Config {
     pub encryption_key: String,
 }
 
+/// Implement methods for the Config struct
 impl Config {
     pub fn load() -> Self {
         Self {
