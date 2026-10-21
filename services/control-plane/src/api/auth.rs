@@ -588,7 +588,12 @@ pub async fn desktop_oauth_callback(
     // A generated key is returned only once; stored desktop hashes are not recoverable.
     Ok(Json(json!({
         "desktop_credential": desktop_credential,
-        "user": { "id": user.id, "email": user.email }
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "avatar_url": user.avatar_url
+        }
     })))
 }
 
