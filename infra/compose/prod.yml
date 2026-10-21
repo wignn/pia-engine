@@ -177,6 +177,8 @@ services:
         - DOCKER_BUILD_TYPE=release
     env_file:
       - ../env/.env.api-gateway
+    environment:
+      CONTROL_PLANE_INTERNAL_URL: http://control-plane:8080
     ports:
       - "${API_GATEWAY_PORT:-8000}:8000"
     depends_on:

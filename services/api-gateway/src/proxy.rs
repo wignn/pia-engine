@@ -184,7 +184,9 @@ pub async fn proxy_request(
 }
 
 fn target_base_for_path<'a>(path: &str, config: &'a crate::config::Config) -> Option<&'a str> {
-    if path == "/api/v1/macro/map"
+    if path.starts_with("/api/v1/auth/oauth/") {
+        Some(config.control_plane_url.as_str())
+    } else if path == "/api/v1/macro/map"
         || path == "/api/v1/economic/map"
         || path == "/api/v1/geosignals/map"
     {
@@ -251,7 +253,22 @@ mod tests {
             news_service_url: "http://news-service".to_string(),
             intelligence_service_url: "http://intelligence-service".to_string(),
             geo_economi_url: "http://geo-economi".to_string(),
+            control_plane_url: "http://control-plane:8080".to_string(),
         }
+    }
+
+    #[test]
+    fn oauth_paths_route_to_control_plane() {
+        let cfg = config();
+        assert_eq!(
+            target_base_for_path("/api/v1/auth/oauth/google/desktop-url", &cfg),
+            Some("http://control-plane:8080")
+        );
+        assert_eq!(
+            target_base_for_path("/api/v1/auth/oauth/google/desktop-callback", &cfg),
+            Some("http://control-plane:8080")
+        );
+        assert_eq!(target_base_for_path("/api/v1/auth/login", &cfg), None);
     }
 
     #[test]

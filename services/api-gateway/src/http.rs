@@ -18,6 +18,11 @@ pub fn build_router(state: AppState) -> Router {
         .route("/snapshot/{id}", get(crate::snapshot::get_snapshot))
         .route("/", get(root));
 
+    let oauth = Router::new().route(
+        "/api/v1/auth/oauth/{*path}",
+        any(crate::proxy::proxy_request),
+    );
+
     let protected = Router::new()
         .route(
             "/api/v1/charts/snapshot",
@@ -247,6 +252,7 @@ pub fn build_router(state: AppState) -> Router {
 
     Router::new()
         .merge(public)
+        .merge(oauth)
         .merge(protected)
         .layer(cors)
         .with_state(state)
