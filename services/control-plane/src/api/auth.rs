@@ -898,7 +898,7 @@ async fn create_desktop_key_in_transaction(
     .bind(hash_key(&raw))
     .bind(extract_prefix(&raw))
     .bind("pia-desktop")
-    .bind(&[
+    .bind([
         "market:read",
         "realtime:ws",
         "news:read",
