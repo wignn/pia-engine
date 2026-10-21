@@ -177,6 +177,14 @@ pub fn build_router(state: AppState) -> Router {
             get(super::auth::oauth_url),
         )
         .route(
+            "/api/v1/auth/oauth/google/desktop-url",
+            post(super::auth::desktop_oauth_url),
+        )
+        .route(
+            "/api/v1/auth/oauth/google/desktop-callback",
+            post(super::auth::desktop_oauth_callback),
+        )
+        .route(
             "/api/v1/auth/oauth/{provider}/callback",
             post(super::auth::oauth_callback),
         )

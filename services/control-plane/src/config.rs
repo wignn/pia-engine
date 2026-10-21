@@ -15,6 +15,7 @@ pub struct Config {
     pub github_client_id: String,
     pub github_client_secret: String,
     pub frontend_url: String,
+    pub public_api_url: String,
     pub encryption_key: String,
 }
 
@@ -43,6 +44,8 @@ impl Config {
             github_client_secret: env::var("GITHUB_CLIENT_SECRET").unwrap_or_default(),
             frontend_url: env::var("FRONTEND_URL")
                 .unwrap_or_else(|_| "http://localhost:5173".into()),
+            public_api_url: env::var("PUBLIC_API_URL")
+                .unwrap_or_else(|_| "https://api-engine.wign.dev".into()),
             encryption_key: env::var("ENCRYPTION_KEY").unwrap_or_else(|_| load_jwt_secret()),
         }
     }

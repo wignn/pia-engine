@@ -34,12 +34,41 @@ pub fn decode_jwt(token: &str, secret: &str) -> Option<jwt::JwtClaims> {
     jwt::decode_jwt(token, secret)
 }
 
-fn create_oauth_state(provider: &str, secret: &str) -> Result<String, StatusCode> {
-    jwt::create_oauth_state(provider, secret).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+fn create_oauth_state_with_nonce(
+    provider: &str,
+    nonce: &str,
+    secret: &str,
+) -> Result<String, StatusCode> {
+    jwt::create_oauth_state_with_nonce(provider, nonce, secret)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 fn validate_oauth_state(provider: &str, state_token: &str, secret: &str) -> bool {
-    jwt::validate_oauth_state(provider, state_token, secret)
+    jwt::validate_oauth_state_provider(provider, state_token, secret)
+}
+
+fn validate_oauth_state_with_nonce(
+    provider: &str,
+    nonce: &str,
+    state_token: &str,
+    secret: &str,
+) -> bool {
+    jwt::validate_oauth_state_with_nonce(provider, nonce, state_token, secret)
+}
+
+fn verified_google_identity(profile: &Value) -> Result<(&str, &str), StatusCode> {
+    if profile["verified_email"].as_bool() != Some(true) {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    let id = profile["id"]
+        .as_str()
+        .filter(|id| !id.is_empty())
+        .ok_or(StatusCode::BAD_GATEWAY)?;
+    let email = profile["email"]
+        .as_str()
+        .filter(|email| !email.is_empty())
+        .ok_or(StatusCode::BAD_GATEWAY)?;
+    Ok((id, email))
 }
 
 fn json_with_cookie(body: Value, token: &str, expiry_days: u64) -> Response {
@@ -391,9 +420,35 @@ pub async fn oauth_url(
     Path(provider): Path<String>,
 ) -> Result<Json<Value>, StatusCode> {
     let redirect_uri = format!("{}/auth/callback/{}", state.config.frontend_url, provider);
-    let state_token = create_oauth_state(&provider, &state.config.jwt_secret)?;
+    oauth_url_for_redirect(&state, &provider, &redirect_uri, "").await
+}
 
-    match provider.as_str() {
+pub async fn desktop_oauth_url(
+    State(state): State<AppState>,
+    Json(body): Json<DesktopOAuthStart>,
+) -> Result<Json<Value>, StatusCode> {
+    if body.nonce.len() < 32 || body.nonce.len() > 256 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    if !state.config.has_google_oauth() {
+        return Err(StatusCode::SERVICE_UNAVAILABLE);
+    }
+    let redirect_uri = format!(
+        "{}/api/v1/auth/oauth/google/desktop-callback",
+        state.config.public_api_url
+    );
+    oauth_url_for_redirect(&state, "google", &redirect_uri, &body.nonce).await
+}
+
+async fn oauth_url_for_redirect(
+    state: &AppState,
+    provider: &str,
+    redirect_uri: &str,
+    nonce: &str,
+) -> Result<Json<Value>, StatusCode> {
+    let state_token = create_oauth_state_with_nonce(provider, nonce, &state.config.jwt_secret)?;
+
+    match provider {
         "google" => {
             if !state.config.has_google_oauth() {
                 return Ok(Json(json!({ "error": "Google OAuth not configured" })));
@@ -401,7 +456,7 @@ pub async fn oauth_url(
             let url = format!(
                 "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&redirect_uri={}&response_type=code&scope=openid%20email%20profile&access_type=offline&state={}",
                 state.config.google_client_id,
-                urlencoding::encode(&redirect_uri),
+                urlencoding::encode(redirect_uri),
                 urlencoding::encode(&state_token),
             );
             Ok(Json(json!({ "url": url, "state": state_token })))
@@ -413,13 +468,128 @@ pub async fn oauth_url(
             let url = format!(
                 "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}&scope=user:email&state={}",
                 state.config.github_client_id,
-                urlencoding::encode(&redirect_uri),
+                urlencoding::encode(redirect_uri),
                 urlencoding::encode(&state_token),
             );
             Ok(Json(json!({ "url": url, "state": state_token })))
         }
         _ => Ok(Json(json!({ "error": "Unsupported provider" }))),
     }
+}
+
+#[derive(Deserialize)]
+pub struct DesktopOAuthStart {
+    nonce: String,
+}
+
+#[derive(Deserialize)]
+pub struct DesktopOAuthCallback {
+    code: String,
+    state: String,
+    nonce: String,
+    redirect_uri: String,
+}
+
+pub async fn desktop_oauth_callback(
+    State(state): State<AppState>,
+    Json(body): Json<DesktopOAuthCallback>,
+) -> Result<Json<Value>, StatusCode> {
+    if !validate_oauth_state_with_nonce(
+        "google",
+        &body.nonce,
+        &body.state,
+        &state.config.jwt_secret,
+    ) {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    let redirect = url::Url::parse(&body.redirect_uri).map_err(|_| StatusCode::BAD_REQUEST)?;
+    if redirect.scheme() != "http"
+        || redirect.host_str() != Some("127.0.0.1")
+        || redirect.port() != Some(43827)
+        || redirect.path() != "/oauth/callback"
+        || redirect.query().is_some()
+        || redirect.fragment().is_some()
+        || redirect.username() != ""
+        || redirect.password().is_some()
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let redirect_uri = body.redirect_uri;
+    let client = reqwest::Client::new();
+    let token_res = client
+        .post("https://oauth2.googleapis.com/token")
+        .form(&[
+            ("code", body.code.as_str()),
+            ("client_id", state.config.google_client_id.as_str()),
+            ("client_secret", state.config.google_client_secret.as_str()),
+            ("redirect_uri", redirect_uri.as_str()),
+            ("grant_type", "authorization_code"),
+        ])
+        .send()
+        .await
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+    if !token_res.status().is_success() {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    let token_data: Value = token_res
+        .json()
+        .await
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+    let google_access_token = token_data["access_token"]
+        .as_str()
+        .ok_or(StatusCode::BAD_GATEWAY)?;
+    let profile_res = client
+        .get("https://www.googleapis.com/oauth2/v2/userinfo")
+        .bearer_auth(google_access_token)
+        .send()
+        .await
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+    if !profile_res.status().is_success() {
+        return Err(StatusCode::BAD_GATEWAY);
+    }
+    let profile: Value = profile_res
+        .json()
+        .await
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+    let (google_id, email) = verified_google_identity(&profile)?;
+    let name = profile["name"].as_str().unwrap_or(email);
+    let avatar = profile["picture"].as_str();
+    let user = complete_oauth_user(&state, "google", google_id, email, name, avatar).await?;
+    let existing_keys = ApiKey::list_by_user(&state.db, user.id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let active_desktop_keys: Vec<_> = existing_keys
+        .iter()
+        .filter(|key| key.label == "pia-desktop" && key.is_active)
+        .collect();
+    let mut tx = state
+        .db
+        .begin()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    for key in active_desktop_keys {
+        sqlx::query("UPDATE api_keys SET is_active = FALSE WHERE id = $1 AND user_id = $2")
+            .bind(key.id)
+            .bind(user.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
+    let desktop_credential = create_desktop_key_in_transaction(&mut tx, user.id).await?;
+    tx.commit()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    sync::publish_config_changed_for_user(
+        &state.redis,
+        &state.config.redis_channel_prefix,
+        Some(user.id),
+    )
+    .await;
+    // A generated key is returned only once; stored desktop hashes are not recoverable.
+    Ok(Json(json!({
+        "desktop_credential": desktop_credential,
+        "user": { "id": user.id, "email": user.email }
+    })))
 }
 
 #[derive(Deserialize)]
@@ -486,23 +656,11 @@ async fn handle_google_oauth(
 
     let google_user: Value = user_res.json().await.map_err(|_| StatusCode::BAD_GATEWAY)?;
 
-    let google_id = google_user["id"].as_str().ok_or(StatusCode::BAD_GATEWAY)?;
-    let email = google_user["email"]
-        .as_str()
-        .ok_or(StatusCode::BAD_GATEWAY)?;
+    let (google_id, email) = verified_google_identity(&google_user)?;
     let name = google_user["name"].as_str().unwrap_or(email);
     let avatar = google_user["picture"].as_str();
 
-    complete_oauth_flow(
-        state,
-        "google",
-        google_id,
-        email,
-        name,
-        avatar,
-        Some(access_token),
-    )
-    .await
+    complete_oauth_flow(state, "google", google_id, email, name, avatar).await
 }
 
 async fn handle_github_oauth(
@@ -584,16 +742,65 @@ async fn handle_github_oauth(
         ).into_response());
     }
 
-    complete_oauth_flow(
-        state,
-        "github",
-        &gh_id_str,
-        &email,
-        name,
-        avatar,
-        Some(access_token),
+    complete_oauth_flow(state, "github", &gh_id_str, &email, name, avatar).await
+}
+
+async fn complete_oauth_user(
+    state: &AppState,
+    provider: &str,
+    provider_id: &str,
+    email: &str,
+    name: &str,
+    avatar_url: Option<&str>,
+) -> Result<User, StatusCode> {
+    let linked = OAuthAccount::find_by_provider(&state.db, provider, provider_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let user = if let Some(linked) = linked {
+        User::find_by_id(&state.db, linked.user_id)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .ok_or(StatusCode::UNAUTHORIZED)?
+    } else {
+        if User::find_by_email(&state.db, email)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .is_some()
+        {
+            return Err(StatusCode::CONFLICT);
+        }
+        User::find_or_create_oauth(&state.db, email, name, avatar_url)
+            .await
+            .map_err(|e| {
+                warn!(error = %e, "oauth user creation failed");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+    };
+    if !user.is_active {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    let account = OAuthAccount::create(
+        &state.db,
+        user.id,
+        provider,
+        provider_id,
+        Some(email),
+        None,
+        &state.config.encryption_key,
     )
     .await
+    .map_err(|e| {
+        warn!(error = %e, "oauth account linking failed");
+        if e.to_string().contains("unique constraint") || e.to_string().contains("duplicate key") {
+            StatusCode::CONFLICT
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    })?;
+    if account.user_id != user.id {
+        return Err(StatusCode::CONFLICT);
+    }
+    Ok(user)
 }
 
 async fn complete_oauth_flow(
@@ -603,39 +810,36 @@ async fn complete_oauth_flow(
     email: &str,
     name: &str,
     avatar_url: Option<&str>,
-    access_token: Option<&str>,
 ) -> Result<Response, StatusCode> {
-    let user = User::find_or_create_oauth(&state.db, email, name, avatar_url)
-        .await
-        .map_err(|e| {
-            warn!(error = %e, "oauth user creation failed");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    OAuthAccount::create(
-        &state.db,
-        user.id,
-        provider,
-        provider_id,
-        Some(email),
-        access_token,
-        &state.config.encryption_key,
-    )
-    .await
-    .map_err(|e| {
-        warn!(error = %e, "oauth account linking failed");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let user = complete_oauth_user(state, provider, provider_id, email, name, avatar_url).await?;
 
     let existing_keys = ApiKey::list_by_user(&state.db, user.id)
         .await
-        .unwrap_or_default();
-    let mut raw_api_key: Option<String> = None;
-    if existing_keys.is_empty() {
-        if let Ok((_key, raw)) = ApiKey::create(&state.db, user.id, "default", &[]).await {
-            raw_api_key = Some(raw);
-        }
+        .map_err(|e| {
+            warn!(error = %e, "failed to list API keys for OAuth user");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    let active_desktop_keys: Vec<_> = existing_keys
+        .iter()
+        .filter(|key| key.label == "pia-desktop" && key.is_active)
+        .collect();
+    let mut tx = state
+        .db
+        .begin()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    for key in active_desktop_keys {
+        sqlx::query("UPDATE api_keys SET is_active = FALSE WHERE id = $1 AND user_id = $2")
+            .bind(key.id)
+            .bind(user.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
+    let raw_api_key = create_desktop_key_in_transaction(&mut tx, user.id).await?;
+    tx.commit()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     sync::publish_config_changed_for_user(
         &state.redis,
@@ -670,12 +874,7 @@ async fn complete_oauth_flow(
         "token": token,
     });
 
-    if let Some(key) = raw_api_key {
-        response["api_key"] = json!(key);
-        response["message"] = json!(
-            "Welcome! Your first API key has been generated. Save it — it won't be shown again."
-        );
-    }
+    response["desktop_credential"] = json!(raw_api_key);
 
     Ok(json_with_cookie(
         response,
@@ -684,18 +883,76 @@ async fn complete_oauth_flow(
     ))
 }
 
+async fn create_desktop_key_in_transaction(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: Uuid,
+) -> Result<String, StatusCode> {
+    use atlsd_auth::api_key::{extract_prefix, generate_raw_key, hash_key};
+
+    let raw = generate_raw_key();
+    sqlx::query(
+        "INSERT INTO api_keys (user_id, key_hash, key_prefix, label, permissions) \
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(user_id)
+    .bind(hash_key(&raw))
+    .bind(extract_prefix(&raw))
+    .bind("pia-desktop")
+    .bind(&[
+        "market:read",
+        "realtime:ws",
+        "news:read",
+        "macro:read",
+        "social:read",
+    ])
+    .execute(&mut **tx)
+    .await
+    .map_err(|e| {
+        warn!(error = %e, "failed to create API key for OAuth user");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    Ok(raw)
+}
+
 #[cfg(test)]
 mod tests {
-    use atlsd_auth::jwt::{create_oauth_state, validate_oauth_state};
+    use super::verified_google_identity;
+    use atlsd_auth::jwt::{create_oauth_state_with_nonce, validate_oauth_state_provider};
+    use axum::http::StatusCode;
+    use serde_json::json;
+
+    #[test]
+    fn google_identity_requires_verified_email_and_provider_id() {
+        assert_eq!(
+            verified_google_identity(
+                &json!({"id":"123", "email":"a@example.com", "verified_email":true})
+            ),
+            Ok(("123", "a@example.com"))
+        );
+        assert_eq!(
+            verified_google_identity(
+                &json!({"id":"123", "email":"a@example.com", "verified_email":false})
+            ),
+            Err(StatusCode::FORBIDDEN)
+        );
+        assert_eq!(
+            verified_google_identity(&json!({"email":"a@example.com", "verified_email":true})),
+            Err(StatusCode::BAD_GATEWAY)
+        );
+    }
 
     #[test]
     fn oauth_state_is_signed_and_provider_bound() {
         let secret = "test-secret-with-enough-entropy";
-        let state = create_oauth_state("github", secret).unwrap();
+        let state = create_oauth_state_with_nonce("github", "nonce", secret).unwrap();
 
-        assert!(validate_oauth_state("github", &state, secret));
-        assert!(!validate_oauth_state("google", &state, secret));
-        assert!(!validate_oauth_state("github", &state, "different-secret"));
+        assert!(validate_oauth_state_provider("github", &state, secret));
+        assert!(!validate_oauth_state_provider("google", &state, secret));
+        assert!(!validate_oauth_state_provider(
+            "github",
+            &state,
+            "different-secret"
+        ));
     }
 
     #[test]

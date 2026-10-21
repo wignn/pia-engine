@@ -53,7 +53,10 @@ impl OAuthAccount {
         sqlx::query_as::<_, Self>(
             "INSERT INTO oauth_accounts (user_id, provider, provider_id, provider_email, access_token) \
              VALUES ($1, $2, $3, $4, $5) \
-             ON CONFLICT (provider, provider_id) DO UPDATE SET access_token = $5 \
+             ON CONFLICT (provider, provider_id) DO UPDATE SET \
+                provider_email = EXCLUDED.provider_email, \
+                access_token = EXCLUDED.access_token \
+             WHERE oauth_accounts.user_id = EXCLUDED.user_id \
              RETURNING *",
         )
         .bind(user_id)

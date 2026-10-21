@@ -54,6 +54,8 @@ pub fn decode_jwt(token: &str, secret: &str) -> Option<JwtClaims> {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OAuthStateClaims {
     pub provider: String,
+    #[serde(default)]
+    pub nonce: String,
     pub exp: usize,
     pub iat: usize,
 }
@@ -62,9 +64,18 @@ pub fn create_oauth_state(
     provider: &str,
     secret: &str,
 ) -> Result<String, jsonwebtoken::errors::Error> {
+    create_oauth_state_with_nonce(provider, "", secret)
+}
+
+pub fn create_oauth_state_with_nonce(
+    provider: &str,
+    nonce: &str,
+    secret: &str,
+) -> Result<String, jsonwebtoken::errors::Error> {
     let now = Utc::now();
     let claims = OAuthStateClaims {
         provider: provider.to_string(),
+        nonce: nonce.to_string(),
         exp: (now + Duration::minutes(10)).timestamp() as usize,
         iat: now.timestamp() as usize,
     };
@@ -81,6 +92,10 @@ pub fn create_oauth_state(
 }
 
 pub fn validate_oauth_state(provider: &str, state_token: &str, secret: &str) -> bool {
+    validate_oauth_state_provider(provider, state_token, secret)
+}
+
+pub fn validate_oauth_state_provider(provider: &str, state_token: &str, secret: &str) -> bool {
     decode::<OAuthStateClaims>(
         state_token,
         &DecodingKey::from_secret(secret.as_bytes()),
@@ -90,9 +105,27 @@ pub fn validate_oauth_state(provider: &str, state_token: &str, secret: &str) -> 
     .unwrap_or(false)
 }
 
+pub fn validate_oauth_state_with_nonce(
+    provider: &str,
+    nonce: &str,
+    state_token: &str,
+    secret: &str,
+) -> bool {
+    decode::<OAuthStateClaims>(
+        state_token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &Validation::default(),
+    )
+    .map(|data| data.claims.provider == provider && data.claims.nonce == nonce)
+    .unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{create_jwt, create_oauth_state, decode_jwt, validate_oauth_state};
+    use super::{
+        create_jwt, create_oauth_state, create_oauth_state_with_nonce, decode_jwt,
+        validate_oauth_state, validate_oauth_state_with_nonce,
+    };
 
     #[test]
     fn jwt_roundtrip_preserves_claims() {
@@ -126,7 +159,31 @@ mod tests {
         let state = create_oauth_state("github", secret).unwrap();
 
         assert!(validate_oauth_state("github", &state, secret));
-        assert!(!validate_oauth_state("google", &state, secret));
+        assert!(!validate_oauth_state_with_nonce(
+            "google", "", &state, secret
+        ));
         assert!(!validate_oauth_state("github", &state, "different-secret"));
+    }
+
+    #[test]
+    fn oauth_state_binds_desktop_nonce() {
+        let secret = "test-secret-with-enough-entropy";
+        let state =
+            create_oauth_state_with_nonce("google", "desktop-random-nonce", secret).unwrap();
+        assert!(validate_oauth_state_with_nonce(
+            "google",
+            "desktop-random-nonce",
+            &state,
+            secret
+        ));
+        assert!(!validate_oauth_state_with_nonce(
+            "google",
+            "different-nonce",
+            &state,
+            secret
+        ));
+        assert!(!validate_oauth_state_with_nonce(
+            "google", "", &state, secret
+        ));
     }
 }
