@@ -39,20 +39,40 @@ pub async fn create_resilient_pool(
         connect_opts = connect_opts.statement_cache_capacity(0);
     }
 
-    let pool = PgPoolOptions::new()
-        .max_connections(max_conns)
-        .min_connections(min_conns)
-        .max_lifetime(Duration::from_secs(15 * 60))
-        .idle_timeout(Duration::from_secs(5 * 60))
-        .acquire_timeout(Duration::from_secs(10))
-        .test_before_acquire(true)
-        .connect_with(connect_opts)
-        .await?;
-
-    sqlx::query("SELECT 1").execute(&pool).await.map_err(|e| {
-        error!(error = %e, "database health check failed");
-        e
-    })?;
+    // ponytail: retry loop (5x, 2s) ensures containers don't drop to zero-DB mode during restarts
+    let mut attempts = 0;
+    let pool = loop {
+        match PgPoolOptions::new()
+            .max_connections(max_conns)
+            .min_connections(min_conns)
+            .max_lifetime(Duration::from_secs(15 * 60))
+            .idle_timeout(Duration::from_secs(5 * 60))
+            .acquire_timeout(Duration::from_secs(10))
+            .test_before_acquire(true)
+            .connect_with(connect_opts.clone())
+            .await
+        {
+            Ok(p) => {
+                if let Err(e) = sqlx::query("SELECT 1").execute(&p).await {
+                    attempts += 1;
+                    if attempts >= 5 {
+                        error!(error = %e, "database health check failed after retries");
+                        return Err(e);
+                    }
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                    continue;
+                }
+                break p;
+            }
+            Err(e) => {
+                attempts += 1;
+                if attempts >= 5 {
+                    return Err(e);
+                }
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+        }
+    };
 
     info!(
         max_conns,

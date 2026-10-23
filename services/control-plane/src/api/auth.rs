@@ -567,13 +567,16 @@ pub async fn desktop_oauth_callback(
         .begin()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    for key in active_desktop_keys {
-        sqlx::query("UPDATE api_keys SET is_active = FALSE WHERE id = $1 AND user_id = $2")
-            .bind(key.id)
-            .bind(user.id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    // ponytail: keep existing keys active so saved desktop configs/env don't break on re-login
+    if active_desktop_keys.len() >= 10 {
+        for key in &active_desktop_keys[9..] {
+            sqlx::query("UPDATE api_keys SET is_active = FALSE WHERE id = $1 AND user_id = $2")
+                .bind(key.id)
+                .bind(user.id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        }
     }
     sqlx::query("UPDATE users SET plan = 'enterprise', updated_at = NOW() WHERE id = $1")
         .bind(user.id)
@@ -839,13 +842,16 @@ async fn complete_oauth_flow(
         .begin()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    for key in active_desktop_keys {
-        sqlx::query("UPDATE api_keys SET is_active = FALSE WHERE id = $1 AND user_id = $2")
-            .bind(key.id)
-            .bind(user.id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    // ponytail: keep existing keys active so saved desktop configs/env don't break on re-login
+    if active_desktop_keys.len() >= 10 {
+        for key in &active_desktop_keys[9..] {
+            sqlx::query("UPDATE api_keys SET is_active = FALSE WHERE id = $1 AND user_id = $2")
+                .bind(key.id)
+                .bind(user.id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        }
     }
     let raw_api_key = create_desktop_key_in_transaction(&mut tx, user.id).await?;
     tx.commit()
