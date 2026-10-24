@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use atlsd_eventbus::EventPublisher;
 use tokio::sync::mpsc;
