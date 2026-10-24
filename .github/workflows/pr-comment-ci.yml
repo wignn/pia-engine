@@ -1,0 +1,48 @@
+name: PR comment CI trigger
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  trigger-ci:
+    if: >-
+      github.event.issue.pull_request != null &&
+      github.event.comment.body == '/ci' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve same-repository PR branch
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          pr_json="$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")"
+          head_repo="$(jq -r '.head.repo.full_name // empty' <<< "$pr_json")"
+          head_ref="$(jq -r '.head.ref // empty' <<< "$pr_json")"
+
+          if [ "$head_repo" != "$REPOSITORY" ]; then
+            echo "::error::The /ci comment trigger supports pull requests from branches in $REPOSITORY only."
+            exit 1
+          fi
+
+          if [ -z "$head_ref" ]; then
+            echo "::error::Could not resolve the pull request head branch."
+            exit 1
+          fi
+
+          echo "ref=$head_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch the full CI workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_REF: ${{ steps.pr.outputs.ref }}
+        run: gh workflow run frontend-python-ci.yml --repo "$REPOSITORY" --ref "$HEAD_REF"
