@@ -31,9 +31,9 @@ jobs:
 
       - name: Start NATS with JetStream
         run: |
-          docker run -d --name pia-ci-nats -p 4222:4222 nats:2.11-alpine -js -m 8222
+          docker run -d --name pia-ci-nats -p 4222:4222 nats:2.11-alpine -js
           for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8222/healthz >/dev/null; then exit 0; fi
+            if bash -c 'echo > /dev/tcp/127.0.0.1/4222' 2>/dev/null; then exit 0; fi
             sleep 1
           done
           docker logs pia-ci-nats
