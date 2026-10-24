@@ -1,3 +1,4 @@
+use atlsd_contracts::{event_envelope::stable_event_id, market::RawMarketTick};
 use atlsd_eventbus::{subjects, EventPublisher};
 use std::{sync::Arc, time::Duration};
 
@@ -9,7 +10,9 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
 
 use super::{
-    publish_queue::{enqueue_or_drop, spawn_publisher, PublishEvent, PublishQueue},
+    publish_queue::{
+        enqueue_or_drop, market_data_msg_id, spawn_publisher, PublishEvent, PublishQueue,
+    },
     reconnect::ReconnectPolicy,
 };
 use crate::config::Config;
@@ -271,25 +274,32 @@ fn handle_message(
         let health = health.clone();
         let symbol = inst_id_to_symbol(&trade.inst_id);
 
-        let payload = json!({
-            "feed": FEED,
-            "source": SOURCE,
-            "symbol": &symbol,
-            "price": price,
-            "quantity": quantity,
-            "trade_time_ms": trade_time_ms,
-            "is_buyer_maker": is_buyer_maker,
-            "received_at": Utc::now().to_rfc3339(),
-        });
+        let msg_id = market_data_msg_id(&symbol, trade_time_ms, price, quantity);
+        let payload = RawMarketTick {
+            feed: FEED.to_string(),
+            source: SOURCE.to_string(),
+            symbol: symbol.clone(),
+            asset_type: Some("crypto".to_string()),
+            price,
+            volume: Some(quantity),
+            quantity: Some(quantity),
+            timestamp_ms: Some(trade_time_ms),
+            trade_time_ms: Some(trade_time_ms),
+            received_at: Some(Utc::now().to_rfc3339()),
+            is_buyer_maker: Some(is_buyer_maker),
+            ..Default::default()
+        }
+        .into_envelope(TOPIC, stable_event_id(&msg_id));
+        let payload = serde_json::to_string(&payload).expect("raw market tick serializes");
 
         let queued = enqueue_or_drop(
             WORKER,
             publish_queue,
             PublishEvent {
                 subject: TOPIC,
-                payload: payload.to_string(),
+                payload,
                 symbol,
-                msg_id: None,
+                msg_id: Some(msg_id),
             },
             queued_count,
         );

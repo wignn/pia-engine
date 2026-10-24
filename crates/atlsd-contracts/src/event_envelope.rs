@@ -57,10 +57,20 @@ impl<T> EventEnvelope<T> {
         self
     }
 
+    pub fn with_event_id(mut self, event_id: Uuid) -> Self {
+        self.event_id = event_id;
+        self
+    }
+
     pub fn mark_replayed(mut self) -> Self {
         self.metadata.replayed = true;
         self
     }
+}
+
+/// Creates a stable event identifier for idempotent producer retries.
+pub fn stable_event_id(value: &str) -> Uuid {
+    Uuid::new_v5(&Uuid::NAMESPACE_OID, value.as_bytes())
 }
 
 #[cfg(test)]

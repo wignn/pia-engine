@@ -6,7 +6,13 @@ ATLSD separates source collection, event transport, materialization, and query s
 
 `services/ingestion-gateway` manages configured FX, crypto, index, and options feed sessions. It normalizes provider messages and publishes versioned raw market events to NATS JetStream through bounded per-worker queues. Queue pressure and dropped events are observable and should be treated as an ingestion incident.
 
-`services/market-data` consumes raw market events and applies validation, deduplication, and per-symbol provider-timestamp monotonicity checks. It then:
+`services/market-data` reads raw events through one durable JetStream consumer
+(`market-data-raw-v1`, shared as a work queue by market-data replicas), with a
+24-hour stream retention window. It acknowledges an event only after the
+configured materialization and derived-event publish succeed. It applies
+validation and per-symbol provider-timestamp monotonicity checks. Redis
+Pub/Sub is not used for raw ticks because it cannot replay events after a
+consumer disconnect. It then:
 
 - materializes latest prices in PostgreSQL,
 - batches the market tick tape into ClickHouse,

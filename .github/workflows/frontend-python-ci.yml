@@ -12,6 +12,8 @@ jobs:
   rust-market-services:
     name: Rust market services
     runs-on: ubuntu-latest
+    env:
+      NATS_URL: nats://127.0.0.1:4222
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -27,8 +29,21 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Compile API and market-data services
-        run: cargo check -p api-gateway -p market-data
+      - name: Start NATS with JetStream
+        run: |
+          docker run -d --name pia-ci-nats -p 4222:4222 nats:2.11-alpine -js
+          for attempt in $(seq 1 30); do
+            if bash -c 'echo > /dev/tcp/127.0.0.1/4222' 2>/dev/null; then exit 0; fi
+            sleep 1
+          done
+          docker logs pia-ci-nats
+          exit 1
+
+      - name: Compile changed Rust applications
+        run: cargo check -p api-gateway -p ingestion-gateway -p market-data -p realtime-gateway
+
+      - name: Rust contract and NATS integration tests
+        run: cargo test -p atlsd-contracts -p atlsd-eventbus -p ingestion-gateway -p market-data -p realtime-gateway
 
   pia:
     name: pia (Next.js)
@@ -73,6 +88,47 @@ jobs:
 
       - name: Lint
         run: bun run lint
+
+      - name: Build (includes type checking)
+        run: bun run build
+
+  public-web:
+    name: public-web (SvelteKit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/public-web
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check types and Svelte components
+        run: bun run check
+
+      - name: Build
+        run: bun run build
+
+  admin:
+    name: admin (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       - name: Build (includes type checking)
         run: bun run build

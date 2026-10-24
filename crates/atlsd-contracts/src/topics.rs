@@ -1,5 +1,8 @@
 pub const MD_RAW_FINNHUB_TRADES_V1: &str = "md.raw.finnhub.trades.v1";
 pub const MD_RAW_TIINGO_QUOTES_V1: &str = "md.raw.tiingo.quotes.v1";
+pub const MD_RAW_PRIMARY_FX_QUOTES_V1: &str = "md.raw.primary_fx.quotes.v1";
+pub const MD_RAW_CRYPTO_TRADES_V1: &str = "md.raw.crypto.trades.v1";
+pub const MD_RAW_INDEX_QUOTES_V1: &str = "md.raw.index.quotes.v1";
 pub const MD_NORMALIZED_TRADES_V1: &str = "md.normalized.trades.v1";
 pub const MD_NORMALIZED_QUOTES_V1: &str = "md.normalized.quotes.v1";
 pub const MD_CANONICAL_TICKS_V1: &str = "md.canonical.ticks.v1";

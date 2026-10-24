@@ -8,11 +8,11 @@ use crate::publisher::EventPublisher;
 use crate::subjects;
 
 const NATS_MSG_ID: &str = "Nats-Msg-Id";
-const MARKET_DEDUP_WINDOW: Duration = Duration::from_secs(120);
-const MARKET_MAX_AGE: Duration = Duration::from_secs(4 * 60 * 60);
-const MARKET_MAX_BYTES: i64 = 512 * 1024 * 1024;
-const MARKET_DEDUP_MAX_AGE: Duration = Duration::from_secs(4 * 60 * 60);
-const MARKET_DEDUP_MAX_BYTES: i64 = 256 * 1024 * 1024;
+const MARKET_DEDUP_WINDOW: Duration = Duration::from_secs(24 * 60 * 60);
+const MARKET_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
+const MARKET_MAX_BYTES: i64 = 2 * 1024 * 1024 * 1024;
+const MARKET_DEDUP_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
+const MARKET_DEDUP_MAX_BYTES: i64 = 512 * 1024 * 1024;
 const NEWS_MAX_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 const INTELLIGENCE_MAX_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 const PLATFORM_MAX_AGE: Duration = Duration::from_secs(30 * 24 * 60 * 60);
@@ -49,6 +49,7 @@ pub fn market_dedup_stream_config() -> StreamConfig {
     StreamConfig {
         name: subjects::ATLSD_MARKET_DEDUP_STREAM.to_string(),
         subjects: vec!["md.dedup.>".to_string(), "md.candle.>".to_string()],
+        duplicate_window: MARKET_DEDUP_WINDOW,
         max_age: MARKET_DEDUP_MAX_AGE,
         max_bytes: MARKET_DEDUP_MAX_BYTES,
         ..Default::default()
@@ -123,13 +124,25 @@ pub async fn durable_pull_consumer(
     durable: &str,
     filter_subject: &str,
 ) -> anyhow::Result<consumer::Consumer<consumer::pull::Config>> {
+    durable_pull_consumer_with_policy(client, stream, durable, filter_subject, DeliverPolicy::New)
+        .await
+}
+
+pub async fn durable_pull_consumer_with_policy(
+    client: &async_nats::Client,
+    stream: &str,
+    durable: &str,
+    filter_subject: &str,
+    deliver_policy: DeliverPolicy,
+) -> anyhow::Result<consumer::Consumer<consumer::pull::Config>> {
     let context = async_nats::jetstream::new(client.clone());
     let stream = context.get_stream(stream.to_string()).await?;
     let config = consumer::pull::Config {
         durable_name: Some(durable.to_string()),
         filter_subject: filter_subject.to_string(),
-        deliver_policy: DeliverPolicy::New,
+        deliver_policy,
         ack_wait: Duration::from_secs(30),
+        max_deliver: -1,
         ..Default::default()
     };
 

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use atlsd_contracts::{event_envelope::stable_event_id, market::RawMarketTick};
 use atlsd_eventbus::{subjects, EventPublisher};
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
@@ -302,30 +303,29 @@ fn handle_message(
         *tick_count += 1;
         let health = health.clone();
 
-        let payload = json!({
-            "feed": FEED,
-            "source": SOURCE,
-            "symbol": symbol.public_symbol,
-            "asset_type": symbol.asset_type,
-            "price": trade.p,
-            "volume": trade.v,
-            "timestamp_ms": trade.t,
-            "received_at": Utc::now().to_rfc3339(),
-        });
+        let msg_id = market_data_msg_id(&symbol.public_symbol, trade.t, trade.p, trade.v);
+        let payload = RawMarketTick {
+            feed: FEED.to_string(),
+            source: SOURCE.to_string(),
+            symbol: symbol.public_symbol.clone(),
+            asset_type: Some(symbol.asset_type.clone()),
+            price: trade.p,
+            volume: Some(trade.v),
+            timestamp_ms: Some(trade.t),
+            received_at: Some(Utc::now().to_rfc3339()),
+            ..Default::default()
+        }
+        .into_envelope(TOPIC, stable_event_id(&msg_id));
+        let payload = serde_json::to_string(&payload).expect("raw market tick serializes");
 
         let queued = enqueue_or_drop(
             WORKER,
             publish_queue,
             PublishEvent {
                 subject: TOPIC,
-                payload: payload.to_string(),
+                payload,
                 symbol: symbol.public_symbol.clone(),
-                msg_id: Some(market_data_msg_id(
-                    &symbol.public_symbol,
-                    trade.t,
-                    trade.p,
-                    trade.v,
-                )),
+                msg_id: Some(msg_id),
             },
             queued_count,
         );

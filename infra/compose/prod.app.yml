@@ -57,7 +57,7 @@ services:
   market-data:
     image: ghcr.io/wignn/pia-market-data:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8010/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8010/ready || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -98,7 +98,7 @@ services:
   realtime-gateway:
     image: ghcr.io/wignn/pia-realtime-gateway:${ATLSD_IMAGE_TAG:-latest}
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8020/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8020/ready || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -108,9 +108,6 @@ services:
     environment:
       EVENTBUS_MODE: nats
       NATS_URL: nats://nats:4222
-      REALTIME_UDS_PATH: /tmp/atlsd-ipc/ticks.sock
-    volumes:
-      - /tmp/atlsd-ipc:/tmp/atlsd-ipc
     ports:
       - "${REALTIME_GATEWAY_PORT:-8020}:8020"
     depends_on:

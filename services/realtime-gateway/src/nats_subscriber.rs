@@ -1,93 +1,54 @@
-use atlsd_eventbus::nats::{durable_pull_consumer, init_jetstream_streams};
 use atlsd_eventbus::{subjects, EventBusMode};
 use futures_util::StreamExt;
 use serde_json::{json, Value};
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use tracing::{error, info, warn};
 
 use crate::{config::Config, hub::Hub};
 
-const NEWS_CONSUMER: &str = "realtime-news";
-const MARKET_CONSUMER: &str = "realtime-market";
-const CANDLE_CONSUMER: &str = "realtime-candles";
+const FANOUT_SUBJECTS: &[&str] = &[
+    "news.>",
+    "md.dedup.>",
+    "md.candle.>",
+    subjects::MARKET_ALERTS_V1,
+    subjects::SOCIAL_POSTS,
+];
 
-const CORE_SUBJECTS: &[&str] = &[subjects::MARKET_ALERTS_V1, subjects::SOCIAL_POSTS];
-
-pub async fn run(cfg: Config, hub: Arc<Hub>) {
+pub async fn run(cfg: Config, hub: Arc<Hub>, ready: Arc<AtomicBool>) {
     match EventBusMode::from_env_value(&cfg.eventbus_mode) {
-        EventBusMode::Nats | EventBusMode::Dual => run_loop(cfg, hub).await,
+        EventBusMode::Nats | EventBusMode::Dual => run_loop(cfg, hub, ready).await,
         EventBusMode::Redis | EventBusMode::Noop => {}
     }
 }
 
-async fn run_loop(cfg: Config, hub: Arc<Hub>) {
+async fn run_loop(cfg: Config, hub: Arc<Hub>, ready: Arc<AtomicBool>) {
     loop {
-        if let Err(err) = subscribe_loop(&cfg.nats_url, &hub).await {
+        if let Err(err) = subscribe_loop(&cfg.nats_url, &hub, &ready).await {
             error!(error = %err, "realtime NATS subscriber failed, reconnecting in 5s");
         }
+        ready.store(false, Ordering::Release);
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     }
 }
 
-async fn subscribe_loop(nats_url: &str, hub: &Arc<Hub>) -> anyhow::Result<()> {
+async fn subscribe_loop(nats_url: &str, hub: &Arc<Hub>, ready: &AtomicBool) -> anyhow::Result<()> {
     let client = async_nats::connect(nats_url).await?;
-    init_jetstream_streams(&client).await?;
-
-    let news = durable_pull_consumer(
-        &client,
-        subjects::ATLSD_NEWS_STREAM,
-        NEWS_CONSUMER,
-        "news.>",
-    )
-    .await?;
-    let mut news_messages = news.messages().await?;
-    let market = durable_pull_consumer(
-        &client,
-        subjects::ATLSD_MARKET_DEDUP_STREAM,
-        MARKET_CONSUMER,
-        "md.dedup.>",
-    )
-    .await?;
-    let mut market_messages = market.messages().await?;
-    let candles = durable_pull_consumer(
-        &client,
-        subjects::ATLSD_MARKET_DEDUP_STREAM,
-        CANDLE_CONSUMER,
-        "md.candle.>",
-    )
-    .await?;
-    let mut candle_messages = candles.messages().await?;
-
     let mut core = futures_util::stream::SelectAll::new();
-    for subject in CORE_SUBJECTS {
+    for subject in FANOUT_SUBJECTS {
         core.push(client.subscribe((*subject).to_string()).await?);
     }
+    ready.store(true, Ordering::Release);
 
     info!(
-        news_consumer = NEWS_CONSUMER,
-        market_consumer = MARKET_CONSUMER,
-        candle_consumer = CANDLE_CONSUMER,
-        core_subjects = ?CORE_SUBJECTS,
-        "realtime gateway consuming durable JetStream consumers + core subjects"
+        subjects = ?FANOUT_SUBJECTS,
+        "realtime gateway subscribed for per-instance NATS fanout"
     );
 
     loop {
         tokio::select! {
-            message = news_messages.next() => match message {
-                Some(Ok(message)) => handle_and_ack(hub, &message).await,
-                Some(Err(err)) => warn!(error = %err, "news consumer stream error"),
-                None => return Ok(()),
-            },
-            message = market_messages.next() => match message {
-                Some(Ok(message)) => handle_and_ack(hub, &message).await,
-                Some(Err(err)) => warn!(error = %err, "market consumer stream error"),
-                None => return Ok(()),
-            },
-            message = candle_messages.next() => match message {
-                Some(Ok(message)) => handle_and_ack(hub, &message).await,
-                Some(Err(err)) => warn!(error = %err, "candle consumer stream error"),
-                None => return Ok(()),
-            },
             message = core.next() => match message {
                 Some(message) => {
                     let subject = message.subject.as_str();
@@ -97,18 +58,6 @@ async fn subscribe_loop(nats_url: &str, hub: &Arc<Hub>) -> anyhow::Result<()> {
                 None => return Ok(()),
             },
         }
-    }
-}
-
-async fn handle_and_ack(hub: &Arc<Hub>, message: &async_nats::jetstream::Message) {
-    let subject = message.message.subject.as_str();
-    match std::str::from_utf8(&message.message.payload) {
-        Ok(payload) => dispatch(hub, subject, payload).await,
-        Err(err) => warn!(error = %err, subject, "JetStream payload was not UTF-8"),
-    }
-
-    if let Err(err) = message.ack().await {
-        warn!(error = %err, subject, "failed to ack JetStream message; it will be redelivered");
     }
 }
 
@@ -177,6 +126,9 @@ fn social_route(post: &Value) -> (&'static str, &'static str) {
 
 fn market_tick(payload: &str) -> anyhow::Result<Option<Value>> {
     let mut tick: Value = serde_json::from_str(payload)?;
+    if let Some(envelope_payload) = tick.get("payload").cloned() {
+        tick = envelope_payload;
+    }
     let Some(object) = tick.as_object_mut() else {
         return Ok(None);
     };
@@ -198,11 +150,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn core_subjects_exclude_stream_backed_subjects() {
-        assert!(!CORE_SUBJECTS
+    fn subscribes_to_live_fanout_subjects_not_raw_ingestion() {
+        assert!(!FANOUT_SUBJECTS
             .iter()
-            .any(|subject| subject.starts_with("md.")));
-        assert!(!CORE_SUBJECTS
+            .any(|subject| subject.starts_with("md.raw.")));
+        assert!(FANOUT_SUBJECTS
+            .iter()
+            .any(|subject| subject.starts_with("md.dedup.")));
+        assert!(FANOUT_SUBJECTS
             .iter()
             .any(|subject| subject.starts_with("news.")));
     }
@@ -217,5 +172,20 @@ mod tests {
     fn social_posts_route_other_platforms_to_social_channel() {
         let post = serde_json::json!({"platform": "truth"});
         assert_eq!(social_route(&post), ("social.post", "social"));
+    }
+
+    #[test]
+    fn market_tick_accepts_the_versioned_raw_event_contract() {
+        let payload = serde_json::json!({
+            "event_id": "00000000-0000-0000-0000-000000000001",
+            "event_type": "md.raw.crypto.trades.v1",
+            "schema_version": 1,
+            "payload": {"symbol": "BTCUSDT", "price": 67000.0}
+        })
+        .to_string();
+
+        let tick = market_tick(&payload).unwrap().unwrap();
+        assert_eq!(tick["symbol"], "BTCUSDT");
+        assert_eq!(tick["source"], "market_data");
     }
 }
