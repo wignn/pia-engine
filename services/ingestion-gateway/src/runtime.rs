@@ -9,6 +9,7 @@ use crate::health::HealthRegistry;
 use crate::market_hours;
 use crate::workers;
 
+/// Starts configured feed workers and publishes provider events through the shared event publisher.
 pub async fn run(cfg: Config) {
     info!(
         primary_fx_enabled = cfg.has_primary_fx(),
