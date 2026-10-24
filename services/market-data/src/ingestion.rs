@@ -3,7 +3,7 @@ use atlsd_contracts::{
     market::RawMarketTick,
 };
 use atlsd_eventbus::{
-    nats::{durable_pull_consumer_with_policy, dedup_headers},
+    nats::{dedup_headers, durable_pull_consumer_with_policy},
     subjects, EventBusMode,
 };
 use chrono::{DateTime, TimeZone, Utc};
@@ -106,8 +106,7 @@ impl ReadinessReset {
 
 impl Drop for ReadinessReset {
     fn drop(&mut self) {
-        self.0
-            .store(false, std::sync::atomic::Ordering::Release);
+        self.0.store(false, std::sync::atomic::Ordering::Release);
     }
 }
 
@@ -128,7 +127,10 @@ async fn handle_payload(
     let raw_symbol = tick.symbol.as_str();
     let price = tick.price;
     if price <= 0.0 {
-        warn!(symbol = raw_symbol, price, "ignoring invalid raw market price");
+        warn!(
+            symbol = raw_symbol,
+            price, "ignoring invalid raw market price"
+        );
         return Ok(());
     }
 

@@ -111,8 +111,8 @@ jobs:
       - name: Check types and Svelte components
         run: bun run check
 
-      - name: Lint
-        run: bun run lint
+      - name: Lint with ESLint
+        run: bunx eslint .
 
       - name: Build
         run: bun run build

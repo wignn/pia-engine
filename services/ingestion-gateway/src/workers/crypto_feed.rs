@@ -1,7 +1,4 @@
-use atlsd_contracts::{
-    event_envelope::stable_event_id,
-    market::RawMarketTick,
-};
+use atlsd_contracts::{event_envelope::stable_event_id, market::RawMarketTick};
 use atlsd_eventbus::{subjects, EventPublisher};
 use std::{sync::Arc, time::Duration};
 

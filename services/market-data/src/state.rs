@@ -1,5 +1,5 @@
-use std::{collections::HashMap, sync::Arc};
 use std::sync::atomic::AtomicBool;
+use std::{collections::HashMap, sync::Arc};
 
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;

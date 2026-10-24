@@ -2,10 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use atlsd_contracts::{
-    event_envelope::stable_event_id,
-    market::RawMarketTick,
-};
+use atlsd_contracts::{event_envelope::stable_event_id, market::RawMarketTick};
 use atlsd_eventbus::{subjects, EventPublisher};
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
@@ -306,12 +303,7 @@ fn handle_message(
         *tick_count += 1;
         let health = health.clone();
 
-        let msg_id = market_data_msg_id(
-            &symbol.public_symbol,
-            trade.t,
-            trade.p,
-            trade.v,
-        );
+        let msg_id = market_data_msg_id(&symbol.public_symbol, trade.t, trade.p, trade.v);
         let payload = RawMarketTick {
             feed: FEED.to_string(),
             source: SOURCE.to_string(),
