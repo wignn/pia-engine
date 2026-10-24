@@ -8,7 +8,6 @@ use atlsd_eventbus::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures_util::StreamExt;
-use serde_json::Value;
 use tracing::{debug, error, info, warn};
 
 use crate::prices::{self, CachedPrice};
@@ -307,13 +306,6 @@ async fn persist_ohlcv_candle(
     Ok(())
 }
 
-fn provider_timestamp_ms(payload: &Value) -> Option<i64> {
-    payload
-        .get("timestamp_ms")
-        .or_else(|| payload.get("trade_time_ms"))
-        .and_then(|value| value.as_i64())
-}
-
 fn should_accept_tick(
     existing_timestamp_ms: Option<i64>,
     incoming_timestamp_ms: Option<i64>,
@@ -356,16 +348,6 @@ pub async fn hydrate(state: &AppState) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn provider_timestamp_ms_reads_timestamp_ms() {
-        assert_eq!(
-            provider_timestamp_ms(&json!({ "timestamp_ms": 1710000000000_i64 })),
-            Some(1710000000000)
-        );
-    }
-
     #[test]
     fn should_accept_tick_rejects_older_provider_timestamps_but_recovers_equal_ticks() {
         assert!(should_accept_tick(Some(100), Some(101)));
