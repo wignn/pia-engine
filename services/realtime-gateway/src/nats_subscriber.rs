@@ -17,6 +17,7 @@ const FANOUT_SUBJECTS: &[&str] = &[
     subjects::SOCIAL_POSTS,
 ];
 
+/// Subscribes each gateway instance to live NATS subjects for WebSocket fanout.
 pub async fn run(cfg: Config, hub: Arc<Hub>, ready: Arc<AtomicBool>) {
     match EventBusMode::from_env_value(&cfg.eventbus_mode) {
         EventBusMode::Nats | EventBusMode::Dual => run_loop(cfg, hub, ready).await,
