@@ -20,6 +20,7 @@ const NATS_SUBJECTS: &[&str] = &[
 ];
 const RAW_MARKET_CONSUMER: &str = "market-data-raw-v1";
 
+/// Consumes durable raw ticks and acknowledges them only after processing succeeds.
 pub async fn run(state: AppState) {
     match EventBusMode::from_env_value(&state.config.eventbus_mode) {
         EventBusMode::Nats | EventBusMode::Dual => run_nats(state).await,
