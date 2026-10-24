@@ -1,4 +1,5 @@
 use std::{collections::HashMap, sync::Arc};
+use std::sync::atomic::AtomicBool;
 
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
@@ -23,6 +24,7 @@ pub struct AppState {
     pub snapshot_cache: Arc<RwLock<Option<(std::time::Instant, axum::body::Bytes)>>>,
     pub calendar: CalendarCache,
     pub history_cache: crate::cache::MarketHistoryCache,
+    pub eventbus_ready: Arc<AtomicBool>,
 }
 
 impl AppState {
@@ -45,6 +47,7 @@ impl AppState {
             snapshot_cache: Arc::new(RwLock::new(None)),
             calendar: CalendarCache::new(),
             history_cache: crate::cache::MarketHistoryCache::new(),
+            eventbus_ready: Arc::new(AtomicBool::new(false)),
         }
     }
 }

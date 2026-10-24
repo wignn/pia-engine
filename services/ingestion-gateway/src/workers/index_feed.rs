@@ -1,6 +1,9 @@
+use atlsd_contracts::{
+    event_envelope::stable_event_id,
+    market::RawMarketTick,
+};
 use atlsd_eventbus::{subjects, EventPublisher};
 use chrono::Utc;
-use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
@@ -76,15 +79,24 @@ async fn poll_symbol(
         "fetched price"
     );
 
-    let payload = json!({
-        "feed": symbol.asset_type,
-        "source": SOURCE,
-        "symbol": symbol.public_symbol,
-        "asset_type": symbol.asset_type,
-        "price": price,
-        "received_at": Utc::now().to_rfc3339(),
-    });
+    let timestamp_ms = Utc::now().timestamp_millis();
+    let msg_id = format!(
+        "{}:{}:{}:{}",
+        symbol.asset_type, symbol.public_symbol, timestamp_ms, price
+    );
+    let payload = RawMarketTick {
+        feed: symbol.asset_type.clone(),
+        source: SOURCE.to_string(),
+        symbol: symbol.public_symbol.clone(),
+        asset_type: Some(symbol.asset_type.clone()),
+        price,
+        timestamp_ms: Some(timestamp_ms),
+        received_at: Some(Utc::now().to_rfc3339()),
+        ..Default::default()
+    }
+    .into_envelope(TOPIC, stable_event_id(&msg_id));
+    let payload = serde_json::to_string(&payload).expect("raw market tick serializes");
 
-    broker.publish_str(TOPIC, &payload.to_string()).await?;
+    broker.publish_str_with_id(TOPIC, &payload, &msg_id).await?;
     Ok(())
 }

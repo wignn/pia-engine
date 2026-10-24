@@ -50,7 +50,7 @@ impl InternalAuth {
     }
 }
 
-const PUBLIC_PATHS: &[&str] = &["/health", "/metrics"];
+const PUBLIC_PATHS: &[&str] = &["/health", "/ready", "/metrics"];
 
 pub async fn require_internal_key(
     State(auth): State<InternalAuth>,

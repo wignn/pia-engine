@@ -14,7 +14,6 @@ pub struct Config {
     pub eventbus_mode: String,
     pub nats_url: String,
     pub market_data_url: String,
-    pub uds_ipc_path: Option<String>,
 }
 
 impl Config {
@@ -48,9 +47,6 @@ impl Config {
             eventbus_mode: get_env("EVENTBUS_MODE", "redis"),
             nats_url: get_env("NATS_URL", "nats://localhost:4222"),
             market_data_url: get_env("MARKET_DATA_URL", "http://market-data:8010"),
-            uds_ipc_path: std::env::var("REALTIME_UDS_PATH")
-                .ok()
-                .filter(|s| !s.trim().is_empty()),
         }
     }
 

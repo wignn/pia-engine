@@ -85,6 +85,16 @@ ATLSD's preferred durable event backbone is NATS JetStream. Subjects use the sam
 
 Redis remains transitional for cache, counters, and compatibility pub/sub while services dual-publish to NATS during migration.
 
+Raw market producers publish `EventEnvelope<RawMarketTick>` to the matching
+`md.raw.*.v1` JetStream subject. The envelope has a stable `event_id` derived
+from the provider message identity and a `feed:symbol` partition key. The
+`market-data-raw-v1` durable consumer acknowledges only after its processing
+and deduplicated-event publish complete. A 24-hour stream retention window
+allows it to resume after an outage; the derived stream uses the same 24-hour
+event-ID deduplication window. Realtime gateways subscribe independently
+to derived market subjects over Core NATS so every instance receives each
+live event; these subscriptions are fanout, not a shared work queue.
+
 Suggested JetStream streams:
 
 ```text

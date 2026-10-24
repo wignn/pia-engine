@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{atomic::AtomicBool, Arc};
 
 use crate::config::Config;
 use crate::hub::Hub;
@@ -13,4 +13,5 @@ pub struct AppState {
     pub tenant_registry: Option<Arc<TenantRegistry>>,
     pub ticket_store: Arc<TicketStore>,
     pub snapshot: Arc<Snapshot>,
+    pub realtime_ready: Arc<AtomicBool>,
 }

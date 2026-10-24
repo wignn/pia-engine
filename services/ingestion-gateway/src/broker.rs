@@ -108,7 +108,6 @@ mod tests {
             health_bind_addr: "127.0.0.1:0".to_string(),
             health_stale_after_sec: 180,
             log_level: "INFO".to_string(),
-            uds_ipc_path: None,
         }
     }
 

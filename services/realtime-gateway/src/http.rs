@@ -22,6 +22,7 @@ pub fn build_router(state: AppState) -> Router {
 
     Router::new()
         .route("/health", get(crate::health))
+        .route("/ready", get(ready))
         .route("/metrics", get(metrics_handler))
         .route("/ws", get(ws_general_handler))
         .route("/ws/v1", get(ws_v1_handler))
@@ -37,6 +38,18 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/ws/ticket", post(generate_ws_ticket))
         .layer(cors)
         .with_state(state)
+}
+
+async fn ready(State(state): State<AppState>) -> StatusCode {
+    if !state
+        .realtime_ready
+        .load(std::sync::atomic::Ordering::Acquire)
+        || !state.ticket_store.is_ready().await
+    {
+        StatusCode::SERVICE_UNAVAILABLE
+    } else {
+        StatusCode::OK
+    }
 }
 
 pub(crate) fn normalize_symbol_set(raw: &str) -> HashSet<String> {
@@ -307,7 +320,11 @@ async fn generate_ws_ticket(
     let ticket_id = state
         .ticket_store
         .issue(api_key, std::time::Duration::from_secs(30))
-        .await;
+        .await
+        .map_err(|err| {
+            tracing::warn!(error = %err, "failed to persist websocket ticket");
+            StatusCode::SERVICE_UNAVAILABLE
+        })?;
 
     Ok(Json(TicketResponse { ticket: ticket_id }))
 }

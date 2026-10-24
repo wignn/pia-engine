@@ -1,4 +1,4 @@
-use axum::{routing::get, Router};
+use axum::{http::StatusCode, routing::get, Router};
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::state::AppState;
@@ -12,6 +12,7 @@ pub fn build_router(state: AppState) -> Router {
 
     Router::new()
         .route("/health", get(crate::health))
+        .route("/ready", get(ready))
         .route(
             "/metrics",
             get(|state: axum::extract::State<AppState>| async move {
@@ -174,4 +175,18 @@ pub fn build_router(state: AppState) -> Router {
         ))
         .layer(cors)
         .with_state(state)
+}
+
+async fn ready(axum::extract::State(state): axum::extract::State<AppState>) -> StatusCode {
+    if !state
+        .eventbus_ready
+        .load(std::sync::atomic::Ordering::Acquire)
+    {
+        return StatusCode::SERVICE_UNAVAILABLE;
+    }
+
+    match state.db.acquire().await {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::SERVICE_UNAVAILABLE,
+    }
 }

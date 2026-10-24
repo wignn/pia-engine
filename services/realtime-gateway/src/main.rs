@@ -10,8 +10,6 @@ mod state;
 mod streams;
 mod tenant;
 mod ticket;
-#[cfg(unix)]
-mod uds_subscriber;
 
 use axum::Json;
 use serde_json::{json, Value};
@@ -72,6 +70,7 @@ async fn main() {
         tenant_registry,
         ticket_store,
         snapshot: Arc::new(snapshot::Snapshot::new(cfg.market_data_url.clone())),
+        realtime_ready: Arc::new(std::sync::atomic::AtomicBool::new(false)),
     };
 
     if cfg.has_redis() {
@@ -88,22 +87,10 @@ async fn main() {
 
     let nats_cfg = cfg.clone();
     let nats_hub = hub.clone();
+    let realtime_ready = state.realtime_ready.clone();
     tokio::spawn(async move {
-        nats_subscriber::run(nats_cfg, nats_hub).await;
+        nats_subscriber::run(nats_cfg, nats_hub, realtime_ready).await;
     });
-
-    #[cfg(unix)]
-    if let Some(uds_path) = cfg.uds_ipc_path.clone() {
-        let uds_hub = hub.clone();
-        tokio::spawn(async move {
-            uds_subscriber::run(uds_path, uds_hub).await;
-        });
-    }
-
-    #[cfg(not(unix))]
-    if cfg.uds_ipc_path.is_some() {
-        warn!("UDS subscriber is unsupported on this platform; subscriber disabled");
-    }
 
     let listener = match TcpListener::bind(&cfg.bind_addr).await {
         Ok(listener) => listener,
