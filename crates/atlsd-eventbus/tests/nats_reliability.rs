@@ -67,7 +67,6 @@ async fn durable_consumer_recovers_raw_events_published_while_offline() {
 
     assert_eq!(message.message.payload.as_ref(), b"offline tick");
     message.ack().await.unwrap();
-    js.delete_stream(stream_name).await.unwrap();
 }
 
 #[tokio::test]
